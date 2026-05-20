@@ -1,4 +1,7 @@
-import { useSuspenseInfiniteQuery } from "@tanstack/react-query";
+import {
+  useSuspenseInfiniteQuery,
+  useSuspenseQuery,
+} from "@tanstack/react-query";
 import {
   createFileRoute,
   getRouteApi,
@@ -7,7 +10,7 @@ import {
   useNavigate,
 } from "@tanstack/react-router";
 import { LayoutGrid, List } from "lucide-react";
-import { type SubmitEvent, useEffect, useRef, useState } from "react";
+import { type SubmitEvent, Suspense, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
@@ -36,100 +39,124 @@ export const Route = createFileRoute("/(app)/dashboard")({
     return { prefs };
   },
   loaderDeps: ({ search: { q, tag, sort, view } }) => ({ q, tag, sort, view }),
-  loader: async ({ context, deps: { q, tag, sort, view } }) => {
+  loader: ({ context, deps: { q, tag, sort, view } }) => {
     if (!context.user) {
       throw redirect({ to: "/login" });
     }
 
     const effectiveSort = sort || context.prefs.sort;
 
-    const [availableTags] = await Promise.all([
-      getAvailableTagsFn(),
-      context.queryClient.ensureInfiniteQueryData({
-        queryKey: ["records", q, tag, effectiveSort],
-        queryFn: async ({ pageParam }) => {
-          return await getRecords({
-            data: {
-              q,
-              tag,
-              sort: effectiveSort as SortParam,
-              page: pageParam as number,
-              limit: 20,
-            },
-          });
-        },
-        initialPageParam: 1,
-        getNextPageParam: (
-          lastPage: DashboardData,
-          allPages: DashboardData[],
-        ) => {
-          return lastPage.hasNextPage ? allPages.length + 1 : undefined;
-        },
-      }),
-    ]);
+    // Prefetch records without awaiting, so transition is not blocked
+    context.queryClient.prefetchInfiniteQuery({
+      queryKey: ["records", q, tag, effectiveSort],
+      queryFn: async ({ pageParam }) => {
+        return await getRecords({
+          data: {
+            q,
+            tag,
+            sort: effectiveSort as SortParam,
+            page: pageParam as number,
+            limit: 20,
+          },
+        });
+      },
+      initialPageParam: 1,
+      getNextPageParam: (
+        lastPage: DashboardData,
+        allPages: DashboardData[],
+      ) => {
+        return lastPage.hasNextPage ? allPages.length + 1 : undefined;
+      },
+    });
+
+    // Prefetch available tags
+    context.queryClient.prefetchQuery({
+      queryKey: ["availableTags"],
+      queryFn: getAvailableTagsFn,
+      staleTime: 1000 * 60 * 10, // Tags change rarely, cache for 10 minutes
+    });
 
     return {
-      availableTags,
       user: context.user,
       prefs: context.prefs,
       searchParams: { q, tag, sort, view },
     };
   },
-  pendingComponent: DashboardPending,
   component: RouteComponent,
 });
 
-function DashboardPending() {
+// タグクラウド用のスケルトン
+function TagCloudSkeleton() {
   return (
-    <div className="mx-auto max-w-5xl p-6">
-      <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-6 bg-background/95 px-6 pb-4 pt-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        {/* ヘッダーエリア */}
-        <header className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-[32px] font-semibold tracking-geist-h1 text-foreground">
-              Pooh<span className="text-orange-500">Ma</span>
-            </h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <Skeleton className="h-[36px] w-[100px] rounded-md" />
-            <Skeleton className="h-10 w-10 rounded-full" />
-          </div>
-        </header>
+    <div className="mt-4 flex overflow-x-auto py-1.5 gap-2.5 no-scrollbar scroll-smooth items-center">
+      <Skeleton className="h-[28px] w-16 rounded-full" />
+      <Skeleton className="h-[28px] w-20 rounded-full" />
+      <Skeleton className="h-[28px] w-14 rounded-full" />
+      <Skeleton className="h-[28px] w-18 rounded-full" />
+    </div>
+  );
+}
 
-        {/* 検索・フィルターエリア */}
-        <div>
-          <div className="flex items-center gap-2">
-            <Skeleton className="h-10 w-full rounded-md" />
-            <Skeleton className="h-10 w-20 rounded-md" />
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Skeleton className="h-6 w-16 rounded-full" />
-            <Skeleton className="h-6 w-20 rounded-full" />
-            <Skeleton className="h-6 w-14 rounded-full" />
+// タグクラウドコンポーネント (キャッシュを利用した非同期取得)
+function TagCloud({
+  activeTag,
+  onTagClick,
+}: {
+  activeTag: string | undefined;
+  onTagClick: (tag: string) => void;
+}) {
+  const { data: availableTags = [] } = useSuspenseQuery({
+    queryKey: ["availableTags"],
+    queryFn: getAvailableTagsFn,
+    staleTime: 1000 * 60 * 10,
+  });
+
+  if (availableTags.length === 0) return null;
+
+  return (
+    <div className="mt-4 flex overflow-x-auto py-1.5 gap-2.5 no-scrollbar scroll-smooth items-center">
+      {availableTags.map((t: string) => {
+        const isActive = activeTag === t;
+        return (
+          <button
+            key={t}
+            type="button"
+            onClick={() => onTagClick(t)}
+            className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-medium transition-all duration-200 ${
+              isActive
+                ? "bg-orange-500 text-white shadow-md scale-105"
+                : "bg-card text-muted-foreground border border-border/40 shadow-sm hover:border-orange-500/50 hover:text-orange-500 hover:bg-orange-500/5"
+            }`}
+          >
+            #{t}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// レコード一覧用のスケルトン
+function RecordListSkeleton() {
+  return (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 lg:gap-6">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div
+          // biome-ignore lint/suspicious/noArrayIndexKey: Skeleton component uses index as key
+          key={i}
+          className="flex flex-row md:flex-col overflow-hidden rounded-lg bg-card shadow-card block border border-border/50"
+        >
+          <Skeleton className="aspect-square w-28 shrink-0 md:aspect-video md:w-full rounded-none" />
+          <div className="flex flex-1 flex-col justify-center p-3 md:p-4 gap-2 md:gap-4">
+            <Skeleton className="h-5 md:h-6 w-3/4" />
+            <div className="flex gap-1">
+              <Skeleton className="h-4 md:h-5 w-12 rounded-full" />
+              <Skeleton className="h-4 md:h-5 w-16 rounded-full" />
+            </div>
+            <Skeleton className="mt-auto hidden h-[34px] w-full rounded-md md:block" />
           </div>
         </div>
-      </div>
-
-      {/* レコード一覧 (Grid Layout) */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 lg:gap-6">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div
-            // biome-ignore lint/suspicious/noArrayIndexKey: Skeleton component uses index as key
-            key={i}
-            className="flex flex-row md:flex-col overflow-hidden rounded-lg bg-card shadow-card block border border-border/50"
-          >
-            <Skeleton className="aspect-square w-28 shrink-0 md:aspect-video md:w-full rounded-none" />
-            <div className="flex flex-1 flex-col justify-center p-3 md:p-4 gap-2 md:gap-4">
-              <Skeleton className="h-5 md:h-6 w-3/4" />
-              <div className="flex gap-1">
-                <Skeleton className="h-4 md:h-5 w-12 rounded-full" />
-                <Skeleton className="h-4 md:h-5 w-16 rounded-full" />
-              </div>
-              <Skeleton className="mt-auto hidden h-[34px] w-full rounded-md md:block" />
-            </div>
-          </div>
-        ))}
-      </div>
+      ))}
     </div>
   );
 }
@@ -144,7 +171,7 @@ type SortParam =
   | "updatedAt-desc";
 
 function RouteComponent() {
-  const { availableTags, user, prefs, searchParams } = routeApi.useLoaderData();
+  const { user, prefs, searchParams } = routeApi.useLoaderData();
   const navigate = useNavigate({ from: "/dashboard" });
 
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
@@ -171,7 +198,9 @@ function RouteComponent() {
   }, []);
 
   const [searchInput, setSearchInput] = useState(searchParams.q || "");
-  const viewMode = searchParams.view || prefs.view || "card";
+  const viewMode = (searchParams.view || prefs.view || "card") as
+    | "card"
+    | "list";
 
   const handleViewModeChange = (newMode: "card" | "list") => {
     setDashboardPrefsFn({ data: { view: newMode } }).catch(console.error);
@@ -195,48 +224,6 @@ function RouteComponent() {
       }),
     });
   };
-
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useSuspenseInfiniteQuery({
-      queryKey: ["records", searchParams.q, searchParams.tag, sortParam],
-      queryFn: async ({ pageParam }) => {
-        return await getRecords({
-          data: {
-            q: searchParams.q,
-            tag: searchParams.tag,
-            sort: sortParam,
-            page: pageParam as number,
-            limit: 20,
-          },
-        });
-      },
-      initialPageParam: 1,
-      getNextPageParam: (
-        lastPage: DashboardData,
-        allPages: DashboardData[],
-      ) => {
-        return lastPage.hasNextPage ? allPages.length + 1 : undefined;
-      },
-    });
-
-  const records = data.pages.flatMap((page) => page.items);
-
-  const observerTarget = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          fetchNextPage();
-        }
-      },
-      { threshold: 1.0 },
-    );
-    if (observerTarget.current) {
-      observer.observe(observerTarget.current);
-    }
-    return () => observer.disconnect();
-  }, [fetchNextPage]);
 
   const handleSearch = (e: SubmitEvent) => {
     e.preventDefault();
@@ -299,32 +286,90 @@ function RouteComponent() {
               検索
             </button>
           </form>
-          {/* タグクラウド (フィルター) */}
-          {availableTags.length > 0 && (
-            <div className="mt-4 flex overflow-x-auto py-1.5 gap-2.5 no-scrollbar scroll-smooth items-center">
-              {availableTags.map((t: string) => {
-                const isActive = searchParams.tag === t;
-                return (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => handleTagClick(t)}
-                    className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-medium transition-all duration-200 ${
-                      isActive
-                        ? "bg-orange-500 text-white shadow-md scale-105"
-                        : "bg-card text-muted-foreground border border-border/40 shadow-sm hover:border-orange-500/50 hover:text-orange-500 hover:bg-orange-500/5"
-                    }`}
-                  >
-                    #{t}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          {/* タグクラウド (フィルター) - Suspense化 */}
+          <Suspense fallback={<TagCloudSkeleton />}>
+            <TagCloud
+              activeTag={searchParams.tag}
+              onTagClick={handleTagClick}
+            />
+          </Suspense>
         </div>
       </div>
 
-      {/* レコード一覧 */}
+      {/* レコード一覧 - Suspense化 */}
+      <Suspense fallback={<RecordListSkeleton />}>
+        <RecordListSection
+          searchParams={searchParams}
+          sortParam={sortParam}
+          viewMode={viewMode}
+          handleTagClick={handleTagClick}
+          handleSortChange={handleSortChange}
+          handleViewModeChange={handleViewModeChange}
+        />
+      </Suspense>
+    </div>
+  );
+}
+
+// レコード一覧コンポーネント
+function RecordListSection({
+  searchParams,
+  sortParam,
+  viewMode,
+  handleTagClick,
+  handleSortChange,
+  handleViewModeChange,
+}: {
+  searchParams: z.infer<typeof searchSchema>;
+  sortParam: SortParam;
+  viewMode: "card" | "list";
+  handleTagClick: (tag: string) => void;
+  handleSortChange: (newSort: SortParam) => void;
+  handleViewModeChange: (newMode: "card" | "list") => void;
+}) {
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useSuspenseInfiniteQuery({
+      queryKey: ["records", searchParams.q, searchParams.tag, sortParam],
+      queryFn: async ({ pageParam }) => {
+        return await getRecords({
+          data: {
+            q: searchParams.q,
+            tag: searchParams.tag,
+            sort: sortParam,
+            page: pageParam as number,
+            limit: 20,
+          },
+        });
+      },
+      initialPageParam: 1,
+      getNextPageParam: (
+        lastPage: DashboardData,
+        allPages: DashboardData[],
+      ) => {
+        return lastPage.hasNextPage ? allPages.length + 1 : undefined;
+      },
+    });
+
+  const records = data.pages.flatMap((page) => page.items);
+  const observerTarget = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          fetchNextPage();
+        }
+      },
+      { threshold: 1.0 },
+    );
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+    return () => observer.disconnect();
+  }, [fetchNextPage]);
+
+  return (
+    <>
       {records.length > 0 && (
         <div className="mb-4 flex items-center justify-between">
           <div className="text-[14px] text-muted-foreground font-medium tracking-geist-ui">
@@ -412,7 +457,7 @@ function RouteComponent() {
           )}
         </div>
       )}
-    </div>
+    </>
   );
 }
 

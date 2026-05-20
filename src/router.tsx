@@ -20,6 +20,7 @@ export const getRouter = () => {
       queryClient,
     },
 
+    defaultPreload: "intent",
     scrollRestoration: true,
     defaultPreloadStaleTime: 0,
     defaultPendingMs: 0,
