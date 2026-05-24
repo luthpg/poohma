@@ -59,13 +59,8 @@ function LoginPage() {
     // リダイレクト結果の確認
     const checkRedirect = async () => {
       try {
-        console.log("[Auth] getRedirectResult 実行開始...");
         // biome-ignore lint/style/noNonNullAssertion: authはuseEffectの時点でnullでないことが保証されている
-        const result = await getRedirectResult(auth!);
-        console.log(
-          "[Auth] getRedirectResult 結果:",
-          result?.user ? "User取得成功" : "null (ユーザーなし)",
-        );
+        await getRedirectResult(auth!);
       } catch (err) {
         console.error("Redirect login error:", err);
         setError("ログインに失敗しました。もう一度お試しください。");
@@ -82,19 +77,13 @@ function LoginPage() {
 
     // 認証状態の監視
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      console.log(
-        "[Auth] onAuthStateChanged 発火. User:",
-        user ? "存在" : "null",
-      );
       authFired = true;
 
       if (user) {
         try {
           setIsLoading(true);
-          console.log("[Auth] syncUser 実行開始...");
           const idToken = await user.getIdToken();
           await syncUser({ data: { idToken } });
-          console.log("[Auth] syncUser 完了");
 
           if (!isComponentMounted) return;
           await router.invalidate();

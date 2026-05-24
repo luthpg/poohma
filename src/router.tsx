@@ -22,9 +22,9 @@ export const getRouter = () => {
 
     defaultPreload: "intent",
     scrollRestoration: true,
-    defaultPreloadStaleTime: 0,
-    defaultPendingMs: 0,
-    defaultPendingMinMs: 500,
+    defaultPreloadStaleTime: 1000 * 10, // 10 seconds
+    defaultPendingMs: 150,
+    defaultPendingMinMs: 400,
   });
 
   return router;

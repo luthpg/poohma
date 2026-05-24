@@ -1,5 +1,9 @@
 import { TanStackDevtools } from "@tanstack/react-devtools";
-import { type QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  type QueryClient,
+  QueryClientProvider,
+  queryOptions,
+} from "@tanstack/react-query";
 import {
   createRootRouteWithContext,
   HeadContent,
@@ -23,6 +27,13 @@ import appCss from "@/styles.css?url";
 export interface RouterContext {
   queryClient: QueryClient;
 }
+
+export const authUserQueryOptions = queryOptions({
+  queryKey: ["authUser"],
+  queryFn: () => getAuthUser(),
+  staleTime: 1000 * 60 * 5, // 5 minutes
+  gcTime: 1000 * 60 * 30, // 10 minutes
+});
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   head: () => ({
@@ -95,8 +106,9 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     ],
   }),
 
-  beforeLoad: async () => {
-    const user = await getAuthUser();
+  beforeLoad: async ({ context }) => {
+    const user =
+      await context.queryClient.ensureQueryData(authUserQueryOptions);
     return { user };
   },
 
