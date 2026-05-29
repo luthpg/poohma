@@ -1,27 +1,17 @@
-/// <reference types="vitest/config" />
-import tailwindcss from "@tailwindcss/vite";
-import basicSsl from "@vitejs/plugin-basic-ssl";
-import viteReact from "@vitejs/plugin-react";
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig } from "vitest/config";
+import react from "@vitejs/plugin-react";
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), "");
-
-  return {
-    resolve: {
-      tsconfigPaths: true,
-    },
-    plugins: [tailwindcss(), viteReact(), basicSsl()],
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    tsconfigPaths: true,
+  },
+  test: {
+    environment: "node",
     server: {
-      proxy: {
-        "/__/auth": {
-          target: `https://${env.VITE_FIREBASE_AUTH_DOMAIN}`,
-          changeOrigin: true,
-        },
+      deps: {
+        inline: ["convex-test"],
       },
     },
-    test: {
-      fileParallelism: false,
-    },
-  };
+  },
 });

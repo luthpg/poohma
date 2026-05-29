@@ -1,27 +1,22 @@
 import {
-  useSuspenseInfiniteQuery,
-  useSuspenseQuery,
-} from "@tanstack/react-query";
-import {
   createFileRoute,
   getRouteApi,
   Link,
   redirect,
   useNavigate,
 } from "@tanstack/react-router";
+import { useQuery } from "convex/react";
 import { LayoutGrid, List } from "lucide-react";
 import { type SubmitEvent, Suspense, useEffect, useRef, useState } from "react";
 import { z } from "zod";
+import { api } from "@/../convex/_generated/api";
+import type { Doc } from "@/../convex/_generated/dataModel";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Spinner } from "@/components/ui/spinner";
 import { UserMenu } from "@/components/user-menu";
 import {
   getDashboardPrefsFn,
   setDashboardPrefsFn,
 } from "@/services/prefs.functions";
-import { getAvailableTagsFn, getRecords } from "@/services/records.functions";
-
-type DashboardData = Awaited<ReturnType<typeof getRecords>>;
 
 const searchSchema = z.object({
   q: z.string().optional(),
@@ -39,42 +34,10 @@ export const Route = createFileRoute("/(app)/dashboard")({
     return { prefs };
   },
   loaderDeps: ({ search: { q, tag, sort, view } }) => ({ q, tag, sort, view }),
-  loader: ({ context, deps: { q, tag, sort, view } }) => {
+  loader: async ({ context, deps: { q, tag, sort, view } }) => {
     if (!context.user) {
       throw redirect({ to: "/login" });
     }
-
-    const effectiveSort = sort || context.prefs.sort;
-
-    // Prefetch records without awaiting, so transition is not blocked
-    context.queryClient.prefetchInfiniteQuery({
-      queryKey: ["records", q, tag, effectiveSort],
-      queryFn: async ({ pageParam }) => {
-        return await getRecords({
-          data: {
-            q,
-            tag,
-            sort: effectiveSort as SortParam,
-            page: pageParam as number,
-            limit: 20,
-          },
-        });
-      },
-      initialPageParam: 1,
-      getNextPageParam: (
-        lastPage: DashboardData,
-        allPages: DashboardData[],
-      ) => {
-        return lastPage.hasNextPage ? allPages.length + 1 : undefined;
-      },
-    });
-
-    // Prefetch available tags
-    context.queryClient.prefetchQuery({
-      queryKey: ["availableTags"],
-      queryFn: getAvailableTagsFn,
-      staleTime: 1000 * 60 * 10, // Tags change rarely, cache for 10 minutes
-    });
 
     return {
       user: context.user,
@@ -97,7 +60,7 @@ function TagCloudSkeleton() {
   );
 }
 
-// タグクラウドコンポーネント (キャッシュを利用した非同期取得)
+// タグクラウドコンポーネント
 function TagCloud({
   activeTag,
   onTagClick,
@@ -105,12 +68,9 @@ function TagCloud({
   activeTag: string | undefined;
   onTagClick: (tag: string) => void;
 }) {
-  const { data: availableTags = [] } = useSuspenseQuery({
-    queryKey: ["availableTags"],
-    queryFn: getAvailableTagsFn,
-    staleTime: 1000 * 60 * 10,
-  });
+  const availableTags = useQuery(api.records.getAvailableTags);
 
+  if (availableTags === undefined) return <TagCloudSkeleton />;
   if (availableTags.length === 0) return null;
 
   return (
@@ -296,17 +256,15 @@ function RouteComponent() {
         </div>
       </div>
 
-      {/* レコード一覧 - Suspense化 */}
-      <Suspense fallback={<RecordListSkeleton />}>
-        <RecordListSection
-          searchParams={searchParams}
-          sortParam={sortParam}
-          viewMode={viewMode}
-          handleTagClick={handleTagClick}
-          handleSortChange={handleSortChange}
-          handleViewModeChange={handleViewModeChange}
-        />
-      </Suspense>
+      {/* レコード一覧 */}
+      <RecordListSection
+        searchParams={searchParams}
+        sortParam={sortParam}
+        viewMode={viewMode}
+        handleTagClick={handleTagClick}
+        handleSortChange={handleSortChange}
+        handleViewModeChange={handleViewModeChange}
+      />
     </div>
   );
 }
@@ -327,54 +285,23 @@ function RecordListSection({
   handleSortChange: (newSort: SortParam) => void;
   handleViewModeChange: (newMode: "card" | "list") => void;
 }) {
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useSuspenseInfiniteQuery({
-      queryKey: ["records", searchParams.q, searchParams.tag, sortParam],
-      queryFn: async ({ pageParam }) => {
-        return await getRecords({
-          data: {
-            q: searchParams.q,
-            tag: searchParams.tag,
-            sort: sortParam,
-            page: pageParam as number,
-            limit: 20,
-          },
-        });
-      },
-      initialPageParam: 1,
-      getNextPageParam: (
-        lastPage: DashboardData,
-        allPages: DashboardData[],
-      ) => {
-        return lastPage.hasNextPage ? allPages.length + 1 : undefined;
-      },
-    });
+  const { user } = routeApi.useLoaderData();
+  const records = useQuery(api.records.getRecords, {
+    q: searchParams.q,
+    tag: searchParams.tag,
+    sort: sortParam,
+  });
 
-  const records = data.pages.flatMap((page) => page.items);
-  const observerTarget = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          fetchNextPage();
-        }
-      },
-      { threshold: 1.0 },
-    );
-    if (observerTarget.current) {
-      observer.observe(observerTarget.current);
-    }
-    return () => observer.disconnect();
-  }, [fetchNextPage]);
+  if (records === undefined) {
+    return <RecordListSkeleton />;
+  }
 
   return (
     <>
       {records.length > 0 && (
         <div className="mb-4 flex items-center justify-between">
           <div className="text-[14px] text-muted-foreground font-medium tracking-geist-ui">
-            {records.length}
-            {hasNextPage ? "+" : ""} 件のレコード
+            {records.length} 件のレコード
           </div>
           <div className="flex items-center gap-3">
             <select
@@ -426,34 +353,19 @@ function RecordListSection({
           {records.map((record) =>
             viewMode === "card" ? (
               <ServiceCard
-                key={record.id}
+                key={record._id}
                 record={record}
+                currentUserId={user.id}
                 onTagClick={handleTagClick}
               />
             ) : (
               <ServiceListItem
-                key={record.id}
+                key={record._id}
                 record={record}
+                currentUserId={user.id}
                 onTagClick={handleTagClick}
               />
             ),
-          )}
-        </div>
-      )}
-
-      {/* インフィニットスクロールの監視用要素とローディングスピナー */}
-      {records.length > 0 && (
-        <div ref={observerTarget} className="mt-8 flex justify-center py-4">
-          {isFetchingNextPage && (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Spinner className="h-5 w-5" />
-              <span className="text-sm">読み込み中...</span>
-            </div>
-          )}
-          {!hasNextPage && records.length > 0 && (
-            <div className="text-sm text-muted-foreground/60">
-              すべてのレコードを表示しました
-            </div>
           )}
         </div>
       )}
@@ -461,23 +373,23 @@ function RecordListSection({
   );
 }
 
-type Record = NonNullable<
-  Awaited<ReturnType<typeof getRecords>>["items"]
->[number];
-type Tag = { id: string; tagName: string };
+type RecordType = Doc<"serviceRecords">;
 
 // リスト表示用コンポーネント
 function ServiceListItem({
   record,
+  currentUserId,
   onTagClick,
 }: {
-  record: Record & { tags: Tag[] };
+  record: RecordType;
+  currentUserId: string;
   onTagClick: (tag: string) => void;
 }) {
+  const isOwner = record.userId === currentUserId;
   return (
     <Link
       to="/records/$id"
-      params={{ id: record.id }}
+      params={{ id: record._id }}
       className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 overflow-hidden rounded-lg bg-card p-4 shadow-card transition-shadow hover:shadow-card-hover border border-border/50 block"
     >
       <div className="flex flex-col gap-1 overflow-hidden">
@@ -487,14 +399,14 @@ function ServiceListItem({
           </span>
           <span
             className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-              !record.isOwner
+              !isOwner
                 ? "bg-purple-100/50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
                 : record.visibility === "SHARED"
                   ? "bg-blue-100/50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
                   : "bg-secondary text-muted-foreground"
             }`}
           >
-            {!record.isOwner
+            {!isOwner
               ? "家族レコード"
               : record.visibility === "SHARED"
                 ? "共有中"
@@ -531,14 +443,14 @@ function ServiceListItem({
           {record.tags.map((t) => (
             <button
               type="button"
-              key={t.id}
+              key={t}
               onClick={(e) => {
                 e.preventDefault();
-                onTagClick(t.tagName);
+                onTagClick(t);
               }}
               className="rounded-full bg-background border border-border/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground shadow-sm hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-colors"
             >
-              #{t.tagName}
+              #{t}
             </button>
           ))}
         </div>
@@ -550,15 +462,18 @@ function ServiceListItem({
 // カードコンポーネント (UIパーツ)
 function ServiceCard({
   record,
+  currentUserId,
   onTagClick,
 }: {
-  record: Record & { tags: Tag[] };
+  record: RecordType;
+  currentUserId: string;
   onTagClick: (tag: string) => void;
 }) {
+  const isOwner = record.userId === currentUserId;
   return (
     <Link
       to="/records/$id"
-      params={{ id: record.id }}
+      params={{ id: record._id }}
       className="group relative flex flex-row md:flex-col overflow-hidden rounded-lg bg-card shadow-card transition-shadow hover:shadow-card-hover block"
     >
       {/* OGP画像エリア */}
@@ -585,14 +500,14 @@ function ServiceCard({
           {/* 公開設定バッジ */}
           <span
             className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] md:text-xs font-medium ${
-              !record.isOwner
+              !isOwner
                 ? "bg-purple-100/50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
                 : record.visibility === "SHARED"
                   ? "bg-blue-100/50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
                   : "bg-secondary text-muted-foreground"
             }`}
           >
-            {!record.isOwner
+            {!isOwner
               ? "家族レコード"
               : record.visibility === "SHARED"
                 ? "共有中"
@@ -624,16 +539,16 @@ function ServiceCard({
         <div className="mb-0 md:mb-4 flex flex-wrap gap-1">
           {record.tags.map((tag) => (
             <button
-              key={tag.id}
+              key={tag}
               type="button"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                onTagClick(tag.tagName);
+                onTagClick(tag);
               }}
               className="relative z-10 cursor-pointer rounded-full bg-secondary px-2 py-0.5 text-[10px] md:text-[12px] text-muted-foreground hover:bg-accent transition"
             >
-              #{tag.tagName}
+              #{tag}
             </button>
           ))}
         </div>

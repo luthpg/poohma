@@ -1,28 +1,25 @@
-import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { api } from "@/../convex/_generated/api";
 import { usePasscode } from "@/components/PasscodeProvider";
 import { Spinner } from "@/components/ui/spinner";
 import { TagInput } from "@/components/ui/tag-input";
-import {
-  createRecord,
-  getAvailableTagsFn,
-  getOgpInfoFn,
-} from "@/services/records.functions";
 
 export const Route = createFileRoute("/(app)/records/new")({
-  loader: () => getAvailableTagsFn(),
   component: NewRecordComponent,
 });
 
 function NewRecordComponent() {
-  const availableTags = Route.useLoaderData();
+  const availableTags = useQuery(api.records.getAvailableTags) || [];
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const { encryptHint, masterKey, requireUnlock } = usePasscode();
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingOgp, setIsFetchingOgp] = useState(false);
+
+  const createRecord = useMutation(api.records.createRecord);
+  const getOgpInfo = useAction(api.actions.getOgpInfo);
 
   // フォーム状態
   const [url, setUrl] = useState("");
@@ -46,7 +43,7 @@ function NewRecordComponent() {
     if (!url) return;
     setIsFetchingOgp(true);
     try {
-      const ogp = await getOgpInfoFn({ data: { url } });
+      const ogp = await getOgpInfo({ url });
       if (ogp.title && !title) setTitle(ogp.title);
       if (ogp.image) setOgpImage(ogp.image);
       if (ogp.description) setOgpDescription(ogp.description);
@@ -89,35 +86,33 @@ function NewRecordComponent() {
           if (cred.passwordHint) {
             const { encrypted, iv } = await encryptHint(cred.passwordHint);
             return {
-              label: cred.label,
-              loginId: cred.loginId,
+              id: crypto.randomUUID(),
+              label: cred.label || undefined,
+              loginId: cred.loginId || undefined,
               passwordHint: encrypted,
               passwordHintIv: iv,
             };
           }
           return {
-            label: cred.label,
-            loginId: cred.loginId,
-            passwordHint: cred.passwordHint,
+            id: crypto.randomUUID(),
+            label: cred.label || undefined,
+            loginId: cred.loginId || undefined,
+            passwordHint: cred.passwordHint || undefined,
             passwordHintIv: undefined,
           };
         }),
       );
 
       await createRecord({
-        data: {
-          title,
-          url,
-          ogpImage,
-          ogpDescription,
-          memo,
-          visibility,
-          credentials: encryptedCredentials,
-          tags,
-        },
+        title,
+        url: url || undefined,
+        ogpImage: ogpImage || undefined,
+        ogpDescription: ogpDescription || undefined,
+        memo: memo || undefined,
+        visibility,
+        credentials: encryptedCredentials,
+        tags,
       });
-      // キャッシュを無効化してダッシュボードに即時反映
-      await queryClient.invalidateQueries({ queryKey: ["records"] });
 
       // 作成成功後、ダッシュボードへ遷移
       await navigate({ to: "/dashboard" });

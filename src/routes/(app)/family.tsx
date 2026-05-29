@@ -1,8 +1,11 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { useConvex, useMutation, useQuery } from "convex/react";
 import { Eye, EyeOff } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { api } from "@/../convex/_generated/api";
+import type { Id } from "@/../convex/_generated/dataModel";
 import { usePasscode } from "@/components/PasscodeProvider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
@@ -15,14 +18,6 @@ import {
   unwrapMasterKey,
   wrapMasterKey,
 } from "@/lib/crypto";
-import {
-  changeFamilyFn,
-  createFamilyFn,
-  getFamilyInfoByInviteCodeFn,
-  getFamilyMembersFn,
-  getRecordsForReEncryptionFn,
-  joinFamilyFn,
-} from "@/services/family.functions";
 import { auth } from "@/utils/firebase";
 
 export const Route = createFileRoute("/(app)/family")({
@@ -31,10 +26,6 @@ export const Route = createFileRoute("/(app)/family")({
   ): { inviteCode?: string } => ({
     inviteCode: search.inviteCode as string | undefined,
   }),
-  loader: async () => {
-    const family = await getFamilyMembersFn();
-    return { family };
-  },
   pendingComponent: FamilyPending,
   component: FamilyComponent,
 });
@@ -83,9 +74,14 @@ function FamilyPending() {
 }
 
 function FamilyComponent() {
-  const { family } = Route.useLoaderData();
+  const family = useQuery(api.families.getFamilyMembers);
   const search = Route.useSearch();
   const router = useRouter();
+  const convex = useConvex();
+
+  const createFamilyMut = useMutation(api.families.createFamily);
+  const joinFamilyMut = useMutation(api.families.joinFamily);
+  const changeFamilyMut = useMutation(api.families.changeFamily);
 
   const [createName, setCreateName] = useState("");
   const [createPasscode, setCreatePasscode] = useState("");
@@ -100,9 +96,38 @@ function FamilyComponent() {
 
   const { masterKey, requireUnlock, decryptHint } = usePasscode();
   const [isChangingFamily, setIsChangingFamily] = useState(
-    !!search.inviteCode && !!family,
+    !!search.inviteCode && family !== undefined && family !== null,
   );
   const autoJoinTriggered = useRef(false);
+
+  const executeJoin = useCallback(
+    async (code: string) => {
+      setIsLoading(true);
+      try {
+        await joinFamilyMut({ inviteCode: code as Id<"families"> });
+        toast.success("家族グループに参加しました");
+        await router.invalidate();
+      } catch {
+        toast.error("参加に失敗しました");
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [router, joinFamilyMut],
+  );
+
+  // 招待コードがURLにあり、家族未所属の場合は自動で参加を発火
+  useEffect(() => {
+    if (search.inviteCode && !family && !autoJoinTriggered.current) {
+      autoJoinTriggered.current = true;
+      executeJoin(search.inviteCode);
+    }
+  }, [search.inviteCode, family, executeJoin]);
+
+  // family がまだロード中の場合はペンディングコンポーネントを表示
+  if (family === undefined) {
+    return <FamilyPending />;
+  }
 
   const handleChangeFamily = async (
     action: "create" | "join",
@@ -152,9 +177,10 @@ function FamilyComponent() {
         newMasterKeyIv = wrapped.iv;
         newMasterKeySalt = salt;
       } else {
-        const existingFamily = await getFamilyInfoByInviteCodeFn({
-          data: { inviteCode: joinCode },
-        });
+        const existingFamily = await convex.query(
+          api.families.getFamilyInfoByInviteCode,
+          { inviteCode: joinCode as Id<"families"> },
+        );
         if (
           !existingFamily.masterKeyEncrypted ||
           !existingFamily.masterKeyIv ||
@@ -174,7 +200,10 @@ function FamilyComponent() {
       }
 
       // 3. 所有するレコードの再暗号化
-      const recordsToReEncrypt = await getRecordsForReEncryptionFn();
+      const recordsToReEncrypt = await convex.query(
+        api.families.getRecordsForReEncryption,
+        {},
+      );
       const reEncryptedCredentials: {
         id: string;
         passwordHint: string;
@@ -201,16 +230,14 @@ function FamilyComponent() {
       }
 
       // 4. サーバーへ送信
-      const result = await changeFamilyFn({
-        data: {
-          action,
-          name: action === "create" ? createName : undefined,
-          masterKeyEncrypted: newMasterKeyEncrypted,
-          masterKeyIv: newMasterKeyIv,
-          masterKeySalt: newMasterKeySalt,
-          inviteCode: action === "join" ? joinCode : undefined,
-          credentials: reEncryptedCredentials,
-        },
+      const result = await changeFamilyMut({
+        action,
+        name: action === "create" ? createName : undefined,
+        masterKeyEncrypted: newMasterKeyEncrypted,
+        masterKeyIv: newMasterKeyIv,
+        masterKeySalt: newMasterKeySalt,
+        inviteCode: action === "join" ? joinCode : undefined,
+        credentials: reEncryptedCredentials,
       });
 
       // 5. 新しいマスターキーを sessionStorage に保存
@@ -258,13 +285,11 @@ function FamilyComponent() {
       const masterKey = await generateMasterKey();
       const wrapped = await wrapMasterKey(masterKey, passcodeKey);
 
-      await createFamilyFn({
-        data: {
-          name: createName,
-          masterKeyEncrypted: wrapped.encrypted,
-          masterKeyIv: wrapped.iv,
-          masterKeySalt: salt,
-        },
+      await createFamilyMut({
+        name: createName,
+        masterKeyEncrypted: wrapped.encrypted,
+        masterKeyIv: wrapped.iv,
+        masterKeySalt: salt,
       });
       toast.success("家族グループを作成しました。");
       await router.invalidate();
@@ -275,34 +300,10 @@ function FamilyComponent() {
     }
   };
 
-  const executeJoin = useCallback(
-    async (code: string) => {
-      setIsLoading(true);
-      try {
-        await joinFamilyFn({ data: { inviteCode: code } });
-        toast.success("家族グループに参加しました");
-        await router.invalidate();
-      } catch {
-        toast.error("参加に失敗しました");
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [router],
-  );
-
   const handleJoin = async (e: React.SubmitEvent) => {
     e.preventDefault();
     await executeJoin(joinCode);
   };
-
-  // 招待コードがURLにあり、家族未所属の場合は自動で参加を発火
-  useEffect(() => {
-    if (search.inviteCode && !family && !autoJoinTriggered.current) {
-      autoJoinTriggered.current = true;
-      executeJoin(search.inviteCode);
-    }
-  }, [search.inviteCode, family, executeJoin]);
 
   return (
     <div className="mx-auto max-w-3xl p-6">

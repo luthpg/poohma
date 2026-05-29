@@ -4,10 +4,12 @@ import {
   redirect,
   useRouter,
 } from "@tanstack/react-router";
+import { useMutation } from "convex/react";
 import { signOut } from "firebase/auth";
 import { AlertTriangle, Download } from "lucide-react";
 import { type SubmitEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { api } from "@/../convex/_generated/api";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,7 +23,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { useExportCsv } from "@/hooks/use-export-csv";
-import { deleteAccountFn, updateProfileFn } from "@/services/auth.functions";
 import { auth } from "@/utils/firebase";
 
 export const Route = createFileRoute("/(app)/settings")({
@@ -50,6 +51,9 @@ function SettingsComponent() {
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const { handleExport, isExporting } = useExportCsv();
 
+  const updateProfile = useMutation(api.users.updateProfile);
+  const deleteAccount = useMutation(api.users.deleteAccount);
+
   const handleSubmit = async (e: SubmitEvent) => {
     e.preventDefault();
     if (!displayName.trim()) {
@@ -59,7 +63,7 @@ function SettingsComponent() {
 
     setIsSaving(true);
     try {
-      await updateProfileFn({ data: { displayName: displayName.trim() } });
+      await updateProfile({ displayName: displayName.trim() });
       toast.success("プロフィールを更新しました");
       await router.invalidate();
     } catch (error) {
@@ -73,10 +77,27 @@ function SettingsComponent() {
   const handleDeleteAccount = async () => {
     setIsDeleting(true);
     try {
-      await deleteAccountFn();
-      if (auth) {
+      // 1. Convex 側のデータ削除
+      await deleteAccount();
+
+      // 2. Firebase Auth ユーザーの削除
+      const currentUser = auth?.currentUser;
+      if (currentUser) {
+        try {
+          await currentUser.delete();
+        } catch (fbError) {
+          console.warn(
+            "Firebase user delete requires recent login. Logging out instead.",
+            fbError,
+          );
+          if (auth) {
+            await signOut(auth);
+          }
+        }
+      } else if (auth) {
         await signOut(auth);
       }
+
       toast.success("退会処理が完了しました");
       await router.invalidate();
       await router.navigate({ to: "/" });

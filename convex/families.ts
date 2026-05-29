@@ -1,0 +1,227 @@
+import { v } from "convex/values";
+import { query, mutation } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
+
+export const getFamilyMembers = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+    const userId = identity.subject;
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .unique();
+
+    if (!user || !user.familyId) return null;
+
+    const family = await ctx.db.get(user.familyId);
+    if (!family) return null;
+
+    const usersInFamily = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("familyId"), family._id))
+      .collect();
+
+    return {
+      ...family,
+      users: usersInFamily.map((u) => ({
+        id: u.userId,
+        email: u.email,
+        displayName: u.displayName,
+      })),
+      id: family._id,
+    };
+  },
+});
+
+export const createFamily = mutation({
+  args: {
+    name: v.string(),
+    masterKeyEncrypted: v.optional(v.string()),
+    masterKeyIv: v.optional(v.string()),
+    masterKeySalt: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    const userId = identity.subject;
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .unique();
+
+    if (!user) throw new Error("User not found");
+    if (user.familyId) throw new Error("Already in a family");
+
+    const familyId = await ctx.db.insert("families", {
+      name: args.name,
+      masterKeyEncrypted: args.masterKeyEncrypted,
+      masterKeyIv: args.masterKeyIv,
+      masterKeySalt: args.masterKeySalt,
+      updatedAt: Date.now(),
+    });
+
+    await ctx.db.patch(user._id, { familyId });
+    return familyId;
+  },
+});
+
+export const joinFamily = mutation({
+  args: {
+    inviteCode: v.id("families"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    const userId = identity.subject;
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .unique();
+
+    if (!user) throw new Error("User not found");
+    if (user.familyId) throw new Error("Already in a family");
+
+    const family = await ctx.db.get(args.inviteCode);
+    if (!family) throw new Error("Invalid invite code");
+
+    await ctx.db.patch(user._id, { familyId: family._id });
+    return family._id;
+  },
+});
+
+export const getFamilyInfoByInviteCode = query({
+  args: { inviteCode: v.id("families") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+
+    const family = await ctx.db.get(args.inviteCode);
+    if (!family) throw new Error("Invalid invite code");
+
+    return {
+      id: family._id,
+      name: family.name,
+      masterKeyEncrypted: family.masterKeyEncrypted,
+      masterKeyIv: family.masterKeyIv,
+      masterKeySalt: family.masterKeySalt,
+    };
+  },
+});
+
+export const getRecordsForReEncryption = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    const userId = identity.subject;
+
+    const records = await ctx.db
+      .query("serviceRecords")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .collect();
+
+    return records.map((record) => ({
+      _id: record._id,
+      id: record._id,
+      credentials: record.credentials
+        .filter((c) => c.passwordHint && c.passwordHintIv)
+        .map((c) => ({
+          id: c.id,
+          passwordHint: c.passwordHint!,
+          passwordHintIv: c.passwordHintIv!,
+        })),
+    })).filter(record => record.credentials.length > 0);
+  },
+});
+
+export const changeFamily = mutation({
+  args: {
+    action: v.union(v.literal("create"), v.literal("join")),
+    name: v.optional(v.string()),
+    masterKeyEncrypted: v.optional(v.string()),
+    masterKeyIv: v.optional(v.string()),
+    masterKeySalt: v.optional(v.string()),
+    inviteCode: v.optional(v.string()), // string as it comes from form, we'll validate
+    credentials: v.array(
+      v.object({
+        id: v.string(),
+        passwordHint: v.string(),
+        passwordHintIv: v.string(),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    const userId = identity.subject;
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .unique();
+
+    if (!user) throw new Error("User not found");
+
+    let parsedTargetFamilyId: Id<"families">;
+
+    if (args.action === "create") {
+      if (!args.name || !args.masterKeyEncrypted || !args.masterKeyIv || !args.masterKeySalt) {
+        throw new Error("Missing fields for create");
+      }
+      parsedTargetFamilyId = await ctx.db.insert("families", {
+        name: args.name,
+        masterKeyEncrypted: args.masterKeyEncrypted,
+        masterKeyIv: args.masterKeyIv,
+        masterKeySalt: args.masterKeySalt,
+        updatedAt: Date.now(),
+      });
+    } else {
+      if (!args.inviteCode) throw new Error("Missing invite code");
+      const family = await ctx.db.get(args.inviteCode as Id<"families">);
+      if (!family) throw new Error("Invalid invite code");
+      parsedTargetFamilyId = family._id;
+    }
+
+    // Update user familyId
+    await ctx.db.patch(user._id, { familyId: parsedTargetFamilyId });
+
+    // Update familyId for all records owned by user
+    const records = await ctx.db
+      .query("serviceRecords")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .collect();
+
+    const credUpdates = new Map(args.credentials.map(c => [c.id, c]));
+
+    for (const record of records) {
+      let needsUpdate = false;
+      const newCredentials = record.credentials.map(cred => {
+        const update = credUpdates.get(cred.id);
+        if (update) {
+          needsUpdate = true;
+          return {
+            ...cred,
+            passwordHint: update.passwordHint,
+            passwordHintIv: update.passwordHintIv,
+          };
+        }
+        return cred;
+      });
+
+      if (record.familyId !== parsedTargetFamilyId || needsUpdate) {
+        await ctx.db.patch(record._id, {
+          familyId: parsedTargetFamilyId,
+          credentials: newCredentials,
+          updatedAt: Date.now(),
+        });
+      }
+    }
+
+    return { success: true, familyId: parsedTargetFamilyId };
+  },
+});

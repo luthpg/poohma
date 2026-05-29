@@ -1,4 +1,3 @@
-import { type InfiniteData, useQueryClient } from "@tanstack/react-query";
 import {
   createFileRoute,
   getRouteApi,
@@ -6,8 +5,11 @@ import {
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { type SubmitEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { api } from "@/../convex/_generated/api";
+import type { Doc, Id } from "@/../convex/_generated/dataModel";
 import { usePasscode } from "@/components/PasscodeProvider";
 import {
   AlertDialog,
@@ -23,26 +25,13 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { TagInput } from "@/components/ui/tag-input";
-import {
-  deleteRecord,
-  getAvailableTagsFn,
-  getOgpInfoFn,
-  getRecordDetail,
-  type getRecords,
-  updateRecord,
-} from "@/services/records.functions";
-
-type DashboardData = Awaited<ReturnType<typeof getRecords>>;
 
 export const Route = createFileRoute("/(app)/records/$id")({
-  loader: async ({ params }) => {
-    // サーバー関数を呼び出してレコード詳細を取得
-    const record = await getRecordDetail({ data: { id: params.id } });
-    const availableTags = await getAvailableTagsFn();
-    return { record, availableTags };
+  loader: ({ params }) => {
+    return { id: params.id as Id<"serviceRecords"> };
   },
   pendingComponent: RecordDetailPending,
-  component: RecordDetailComponent,
+  component: RecordDetailWrapper,
 });
 
 function RecordDetailPending() {
@@ -87,11 +76,38 @@ function RecordDetailPending() {
 
 const routeApi = getRouteApi("/(app)/records/$id");
 
-function RecordDetailComponent() {
-  const { record, availableTags } = routeApi.useLoaderData();
+function RecordDetailWrapper() {
+  const { id } = routeApi.useLoaderData();
+  const record = useQuery(api.records.getRecordDetail, { id });
+  const availableTags = useQuery(api.records.getAvailableTags);
+
+  if (record === undefined || availableTags === undefined) {
+    return <RecordDetailPending />;
+  }
+
+  return (
+    <RecordDetailComponent record={record} availableTags={availableTags} />
+  );
+}
+
+function RecordDetailComponent({
+  record,
+  availableTags,
+}: {
+  record: Doc<"serviceRecords"> & {
+    user: {
+      displayName?: string;
+      email: string;
+    } | null;
+  };
+  availableTags: string[];
+}) {
+  const { user } = routeApi.useRouteContext();
+  const currentUserId = user?.id;
+  const isOwner = record.userId === currentUserId;
+  const isEditable = isOwner || record.visibility === "SHARED";
   const navigate = useNavigate();
   const router = useRouter();
-  const queryClient = useQueryClient();
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -112,7 +128,7 @@ function RecordDetailComponent() {
       passwordHint: c.passwordHint || "",
     })),
   );
-  const [tags, setTags] = useState<string[]>(record.tags.map((t) => t.tagName));
+  const [tags, setTags] = useState<string[]>(record.tags);
   const [memo, setMemo] = useState(record.memo || "");
   const [visibility, setVisibility] = useState<"PRIVATE" | "SHARED">(
     record.visibility,
@@ -120,11 +136,15 @@ function RecordDetailComponent() {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingOgp, setIsFetchingOgp] = useState(false);
 
+  const getOgpInfo = useAction(api.actions.getOgpInfo);
+  const updateRecord = useMutation(api.records.updateRecord);
+  const deleteRecord = useMutation(api.records.deleteRecord);
+
   const handleUrlBlur = async () => {
     if (!url) return;
     setIsFetchingOgp(true);
     try {
-      const ogp = await getOgpInfoFn({ data: { url } });
+      const ogp = await getOgpInfo({ url });
       if (ogp.title && !title) setTitle(ogp.title);
       if (ogp.image) setOgpImage(ogp.image);
       if (ogp.description) setOgpDescription(ogp.description);
@@ -217,11 +237,12 @@ function RecordDetailComponent() {
         }
       }
 
-      const encryptedCredentials = await Promise.all(
+      const encryptedCreds = await Promise.all(
         filteredCreds.map(async (cred) => {
           if (cred.passwordHint) {
             const { encrypted, iv } = await encryptHint(cred.passwordHint);
             return {
+              id: crypto.randomUUID(),
               label: cred.label,
               loginId: cred.loginId,
               passwordHint: encrypted,
@@ -229,6 +250,7 @@ function RecordDetailComponent() {
             };
           }
           return {
+            id: crypto.randomUUID(),
             label: cred.label,
             loginId: cred.loginId,
             passwordHint: cred.passwordHint,
@@ -238,51 +260,18 @@ function RecordDetailComponent() {
       );
 
       await updateRecord({
+        id: record._id,
         data: {
-          id: record.id,
-          data: {
-            title,
-            url: url || undefined,
-            ogpImage: ogpImage || undefined,
-            ogpDescription: ogpDescription || undefined,
-            memo: memo || undefined,
-            visibility,
-            credentials: encryptedCredentials,
-            tags: tags,
-          },
+          title,
+          url: url || undefined,
+          ogpImage: ogpImage || undefined,
+          ogpDescription: ogpDescription || undefined,
+          memo: memo || undefined,
+          visibility,
+          credentials: encryptedCreds,
+          tags,
         },
       });
-
-      // ダッシュボードのキャッシュを即座に更新して戻った時の表示を最新にする
-      queryClient.setQueriesData(
-        { queryKey: ["records"] },
-        (oldData: InfiniteData<DashboardData> | undefined) => {
-          if (!oldData) return oldData;
-          return {
-            ...oldData,
-            pages: oldData.pages.map((page) => ({
-              ...page,
-              items: page.items.map((r) => {
-                if (r.id === record.id) {
-                  return {
-                    ...r,
-                    title,
-                    url: url || null,
-                    ogpImage: ogpImage || null,
-                    ogpDescription: ogpDescription || null,
-                    memo: memo || null,
-                    visibility,
-                    tags: tags.map((t) => ({ id: t, tagName: t })),
-                  };
-                }
-                return r;
-              }),
-            })),
-          };
-        },
-      );
-      // バックグラウンドで最新状態に同期させる
-      queryClient.invalidateQueries({ queryKey: ["records"] });
 
       await router.invalidate();
       setIsEditing(false);
@@ -298,24 +287,7 @@ function RecordDetailComponent() {
     setIsLoading(true);
 
     try {
-      await deleteRecord({ data: { id: record.id } });
-
-      // ダッシュボードのキャッシュから削除
-      queryClient.setQueriesData(
-        { queryKey: ["records"] },
-        (oldData: InfiniteData<DashboardData> | undefined) => {
-          if (!oldData) return oldData;
-          return {
-            ...oldData,
-            pages: oldData.pages.map((page) => ({
-              ...page,
-              items: page.items.filter((r) => r.id !== record.id),
-            })),
-          };
-        },
-      );
-      queryClient.invalidateQueries({ queryKey: ["records"] });
-
+      await deleteRecord({ id: record._id });
       toast.success("レコードを削除しました");
       await navigate({ to: "/dashboard" });
     } catch (error) {
@@ -597,27 +569,24 @@ function RecordDetailComponent() {
                   if (!record.url) return;
                   setIsLoading(true);
                   try {
-                    const ogp = await getOgpInfoFn({
-                      data: { url: record.url },
-                    });
+                    const ogp = await getOgpInfo({ url: record.url });
                     await updateRecord({
+                      id: record._id,
                       data: {
-                        id: record.id,
-                        data: {
-                          title: record.title,
-                          url: record.url,
-                          ogpImage: ogp.image || undefined,
-                          ogpDescription: ogp.description || undefined,
-                          memo: record.memo || undefined,
-                          visibility: record.visibility,
-                          credentials: record.credentials.map((c) => ({
-                            label: c.label || "",
-                            loginId: c.loginId || "",
-                            passwordHint: c.passwordHint || "",
-                            passwordHintIv: c.passwordHintIv || undefined,
-                          })),
-                          tags: record.tags.map((t) => t.tagName),
-                        },
+                        title: record.title,
+                        url: record.url,
+                        ogpImage: ogp.image || undefined,
+                        ogpDescription: ogp.description || undefined,
+                        memo: record.memo || undefined,
+                        visibility: record.visibility,
+                        credentials: record.credentials.map((c) => ({
+                          id: c.id,
+                          label: c.label || "",
+                          loginId: c.loginId || "",
+                          passwordHint: c.passwordHint || "",
+                          passwordHintIv: c.passwordHintIv || undefined,
+                        })),
+                        tags: record.tags,
                       },
                     });
                     toast.success("OGP情報を更新しました");
@@ -655,14 +624,14 @@ function RecordDetailComponent() {
             </h1>
             <span
               className={`shrink-0 rounded-full px-3 py-1 text-[12px] font-medium tracking-wide uppercase ${
-                !record.isOwner
+                !isOwner
                   ? "bg-purple-100/50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
                   : record.visibility === "SHARED"
                     ? "bg-blue-100/50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
                     : "bg-secondary text-muted-foreground"
               }`}
             >
-              {!record.isOwner
+              {!isOwner
                 ? "家族レコード"
                 : record.visibility === "SHARED"
                   ? "共有中"
@@ -685,12 +654,12 @@ function RecordDetailComponent() {
             <div className="mb-8 flex flex-wrap gap-2">
               {record.tags.map((tag) => (
                 <Link
-                  key={tag.id}
+                  key={tag}
                   to="/dashboard"
-                  search={{ tag: tag.tagName }}
-                  className="rounded bg-secondary px-2 py-1 text-[12px] font-medium text-muted-foreground hover:bg-accent transition"
+                  search={{ tag }}
+                  className="rounded-full bg-secondary px-2.5 py-1 text-[12px] font-medium text-muted-foreground shadow-sm hover:bg-orange-500 hover:text-white transition"
                 >
-                  #{tag.tagName}
+                  #{tag}
                 </Link>
               ))}
             </div>
@@ -727,7 +696,7 @@ function RecordDetailComponent() {
           )}
 
           {/* アクションボタン (編集権限がある場合のみ) */}
-          {record.isEditable && (
+          {isEditable && (
             <div className="mt-10 flex justify-end gap-4 border-t border-border pt-6">
               <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -779,10 +748,10 @@ function CredentialCard({
 }: {
   cred: {
     id: string;
-    label: string | null;
-    loginId: string | null;
-    passwordHint: string | null;
-    passwordHintIv: string | null;
+    label?: string;
+    loginId?: string;
+    passwordHint?: string;
+    passwordHintIv?: string;
   };
 }) {
   const { decryptHint, requireUnlock } = usePasscode();
