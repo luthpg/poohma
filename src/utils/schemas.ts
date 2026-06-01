@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { Visibility } from "@/../generated/prisma/client";
+
+const Visibility = ["PRIVATE", "SHARED"] as const;
 
 /** Base64形式の正規表現（標準Base64、空文字は不可） */
 const BASE64_REGEX = /^[A-Za-z0-9+/]+={0,2}$/;

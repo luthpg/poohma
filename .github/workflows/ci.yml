@@ -13,25 +13,6 @@ jobs:
   check-and-test:
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: password
-          POSTGRES_DB: poohma_db
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    env:
-      DATABASE_URL: postgresql://postgres:password@localhost:5432/poohma_db?schema=public
-      DIRECT_URL: postgresql://postgres:password@localhost:5432/poohma_db?schema=public
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -52,12 +33,6 @@ jobs:
 
       - name: Lint & Format Check (Biome)
         run: pnpm run check
-
-      - name: Generate Prisma Client
-        run: pnpm run db:generate
-
-      - name: Migrate Database for Testing
-        run: pnpm run db:migrate
 
       - name: Type Check (tsgo)
         run: pnpm run tsc

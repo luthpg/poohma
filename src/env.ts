@@ -18,6 +18,7 @@ export const env = createEnv({
     VITE_FIREBASE_AUTH_DOMAIN: z.string().min(1),
     VITE_FIREBASE_PROJECT_ID: z.string().min(1),
     VITE_FIREBASE_STORAGE_BUCKET: z.string().min(1),
+    VITE_CONVEX_URL: z.string().url(),
   },
 
   /**

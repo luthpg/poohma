@@ -1,17 +1,38 @@
+import { useConvex } from "convex/react";
 import Papa from "papaparse";
 import { useState } from "react";
 import { toast } from "sonner";
+import { api } from "@/../convex/_generated/api";
 import { usePasscode } from "@/components/PasscodeProvider";
-import { exportOwnedRecordsCsv } from "@/services/records.functions";
 
 export function useExportCsv() {
   const [isExporting, setIsExporting] = useState(false);
   const { masterKey, requireUnlock, decryptHint } = usePasscode();
+  const convex = useConvex();
 
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      const data = await exportOwnedRecordsCsv();
+      const records = await convex.query(api.records.getOwnedRecords, {});
+
+      // Convex レコードを CSV 行フォーマットに変換
+      const data: Record<string, string>[] = records.map((record) => {
+        const row: Record<string, string> = {
+          Title: record.title,
+          URL: record.url || "",
+          Memo: record.memo || "",
+          Visibility: record.visibility,
+          Tags: record.tags.join(","),
+        };
+        record.credentials.forEach((cred, i) => {
+          const idx = i + 1;
+          row[`Label${idx}`] = cred.label || "";
+          row[`LoginID${idx}`] = cred.loginId || "";
+          row[`PasswordHint${idx}`] = cred.passwordHint || "";
+          row[`PasswordHintIv${idx}`] = cred.passwordHintIv || "";
+        });
+        return row;
+      });
 
       // Check if there are any encrypted hints
       let hasEncryptedHints = false;

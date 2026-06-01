@@ -4,10 +4,11 @@ import {
   redirect,
   useRouter,
 } from "@tanstack/react-router";
-import { signOut } from "firebase/auth";
+import { useMutation } from "convex/react";
 import { AlertTriangle, Download } from "lucide-react";
 import { type SubmitEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { api } from "@/../convex/_generated/api";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,7 +22,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { useExportCsv } from "@/hooks/use-export-csv";
-import { deleteAccountFn, updateProfileFn } from "@/services/auth.functions";
+import { clearQueryCache } from "@/hooks/usePersistentQuery";
 import { auth } from "@/utils/firebase";
 
 export const Route = createFileRoute("/(app)/settings")({
@@ -39,16 +40,25 @@ const routeApi = getRouteApi("/(app)/settings");
 function SettingsComponent() {
   const { user } = routeApi.useLoaderData();
   const router = useRouter();
+  const { queryClient } = Route.useRouteContext();
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
   const [displayName, setDisplayName] = useState(user.displayName || "");
+
+  // ローダーデータの user.displayName が変わった場合にフォームの値を同期
+  useEffect(() => {
+    setDisplayName(user.displayName || "");
+  }, [user.displayName]);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const { handleExport, isExporting } = useExportCsv();
+
+  const updateProfile = useMutation(api.users.updateProfile);
+  const deleteAccount = useMutation(api.users.deleteAccount);
 
   const handleSubmit = async (e: SubmitEvent) => {
     e.preventDefault();
@@ -59,7 +69,8 @@ function SettingsComponent() {
 
     setIsSaving(true);
     try {
-      await updateProfileFn({ data: { displayName: displayName.trim() } });
+      await updateProfile({ displayName: displayName.trim() });
+      await queryClient.invalidateQueries({ queryKey: ["authUser"] });
       toast.success("プロフィールを更新しました");
       await router.invalidate();
     } catch (error) {
@@ -73,16 +84,33 @@ function SettingsComponent() {
   const handleDeleteAccount = async () => {
     setIsDeleting(true);
     try {
-      await deleteAccountFn();
-      if (auth) {
-        await signOut(auth);
+      const currentUser = auth?.currentUser;
+      if (!currentUser) {
+        throw new Error("認証情報が見つかりません。再ログインしてください。");
       }
+
+      // 1. Firebase Auth ユーザーの削除を先に実行
+      await currentUser.delete();
+
+      // 2. Auth削除成功後にConvexのデータ削除
+      await deleteAccount();
+
+      // 3. キャッシュのクリア
+      clearQueryCache();
+
       toast.success("退会処理が完了しました");
       await router.invalidate();
       await router.navigate({ to: "/" });
     } catch (error) {
       console.error(error);
-      toast.error("退会処理に失敗しました");
+      const err = error as { code?: string; message?: string };
+      if (err?.code === "auth/requires-recent-login") {
+        toast.error(
+          "セキュリティ保護のため、最近ログインしていない場合はこの操作を実行できません。一度ログアウトし、再ログインしてからやり直してください。",
+        );
+      } else {
+        toast.error(err?.message || "退会処理に失敗しました");
+      }
       setIsDeleting(false);
     }
   };

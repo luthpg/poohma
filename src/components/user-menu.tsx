@@ -1,5 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useRouter } from "@tanstack/react-router";
+import { useConvex, useMutation } from "convex/react";
 import { signOut } from "firebase/auth";
 import {
   Database,
@@ -15,6 +16,7 @@ import {
 import Papa from "papaparse";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { api } from "@/../convex/_generated/api";
 import { usePasscode } from "@/components/PasscodeProvider";
 import { useTheme } from "@/components/theme-provider";
 import {
@@ -44,8 +46,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
 import { useExportCsv } from "@/hooks/use-export-csv";
+import { clearQueryCache } from "@/hooks/usePersistentQuery";
 import { logout } from "@/services/auth.functions";
-import { getOgpInfoFn, importRecordsCsv } from "@/services/records.functions";
 import { auth } from "@/utils/firebase";
 
 export function UserMenu({
@@ -59,6 +61,8 @@ export function UserMenu({
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const convex = useConvex();
+  const importRecordsMut = useMutation(api.records.importRecords);
   const { theme, setTheme } = useTheme();
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -69,6 +73,9 @@ export function UserMenu({
     try {
       if (auth) await signOut(auth);
       await logout();
+      clearQueryCache();
+      await queryClient.invalidateQueries({ queryKey: ["authUser"] });
+      queryClient.setQueryData(["authUser"], null);
       await router.invalidate();
       await router.navigate({ to: "/" });
     } catch (_error) {
@@ -127,7 +134,9 @@ export function UserMenu({
               // OGP情報を取得（既に画像や説明がある場合はスキップ）
               if (newRow.URL && !newRow.ogpImage && !newRow.ogpDescription) {
                 try {
-                  const ogp = await getOgpInfoFn({ data: { url: newRow.URL } });
+                  const ogp = await convex.action(api.actions.getOgpInfo, {
+                    url: newRow.URL,
+                  });
                   if (ogp.image) newRow.ogpImage = ogp.image;
                   if (ogp.description) newRow.ogpDescription = ogp.description;
                   if (ogp.title && !newRow.Title) newRow.Title = ogp.title;
@@ -148,8 +157,49 @@ export function UserMenu({
             }),
           );
 
-          const response = await importRecordsCsv({
-            data: encryptedData as Record<string, unknown>[],
+          const recordsToImport = encryptedData.map((row) => {
+            const credentials = [];
+            for (let i = 1; i <= 10; i++) {
+              const label = row[`Label${i}`];
+              const loginId = row[`LoginID${i}`];
+              const passwordHint = row[`PasswordHint${i}`];
+              const passwordHintIv = row[`PasswordHintIv${i}`];
+              if (label || loginId || passwordHint) {
+                credentials.push({
+                  id: crypto.randomUUID(),
+                  label: String(label || "") || undefined,
+                  loginId: String(loginId || "") || undefined,
+                  passwordHint: String(passwordHint || "") || undefined,
+                  passwordHintIv: passwordHintIv
+                    ? String(passwordHintIv)
+                    : undefined,
+                });
+              }
+            }
+            const tags =
+              typeof row.Tags === "string"
+                ? row.Tags.split(",")
+                    .map((t: string) => t.trim())
+                    .filter(Boolean)
+                : [];
+            return {
+              title: String(row.Title || ""),
+              url: row.URL ? String(row.URL) : undefined,
+              ogpImage: row.ogpImage ? String(row.ogpImage) : undefined,
+              ogpDescription: row.ogpDescription
+                ? String(row.ogpDescription)
+                : undefined,
+              memo: row.Memo ? String(row.Memo) : undefined,
+              visibility: (row.Visibility === "SHARED"
+                ? "SHARED"
+                : "PRIVATE") as "PRIVATE" | "SHARED",
+              credentials,
+              tags,
+            };
+          });
+
+          const response = await importRecordsMut({
+            records: recordsToImport,
           });
 
           if (response.failures && response.failures.length > 0) {
@@ -174,7 +224,6 @@ export function UserMenu({
               { id: toastId },
             );
           }
-          await queryClient.invalidateQueries({ queryKey: ["records"] });
           await router.invalidate();
         } catch (error) {
           console.error(error);

@@ -30,6 +30,7 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const router = useRouter();
+  const { queryClient } = Route.useRouteContext();
   const search = Route.useSearch();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -84,6 +85,7 @@ function LoginPage() {
           setIsLoading(true);
           const idToken = await user.getIdToken();
           await syncUser({ data: { idToken } });
+          await queryClient.invalidateQueries({ queryKey: ["authUser"] });
 
           if (!isComponentMounted) return;
           await router.invalidate();
@@ -117,7 +119,7 @@ function LoginPage() {
       isComponentMounted = false;
       unsubscribe();
     };
-  }, [router]);
+  }, [router, queryClient]);
 
   const handleGoogleLogin = async () => {
     if (!auth || !googleProvider) {
