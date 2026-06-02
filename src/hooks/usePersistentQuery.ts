@@ -34,7 +34,10 @@ export function usePersistentQuery<T>(
     }
   }, [isAuthenticated]);
 
-  const result = useQuery(query, args);
+  const result = useQuery(
+    query,
+    isAuthenticated ? (args === undefined ? {} : args) : "skip",
+  );
   // Create a unique key based on the query function and its arguments
   let queryKey = "";
   if (query && typeof query === "object") {

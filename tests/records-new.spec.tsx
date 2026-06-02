@@ -45,6 +45,10 @@ vi.mock("convex/react", () => ({
   useQuery: vi.fn(),
   useMutation: vi.fn(),
   useAction: vi.fn(),
+  useConvexAuth: () => ({
+    isLoading: false,
+    isAuthenticated: true,
+  }),
 }));
 
 // Mock PasscodeProvider hook

@@ -5,7 +5,7 @@ import {
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
 import { type SubmitEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
@@ -78,8 +78,15 @@ const routeApi = getRouteApi("/(app)/records/$id");
 
 function RecordDetailWrapper() {
   const { id } = routeApi.useLoaderData();
-  const record = useQuery(api.records.getRecordDetail, { id });
-  const availableTags = useQuery(api.records.getAvailableTags);
+  const { isAuthenticated } = useConvexAuth();
+  const availableTags = useQuery(
+    api.records.getAvailableTags,
+    isAuthenticated ? {} : "skip",
+  );
+  const record = useQuery(
+    api.records.getRecordDetail,
+    isAuthenticated ? { id } : "skip",
+  );
 
   if (record === undefined || availableTags === undefined) {
     return <RecordDetailPending />;

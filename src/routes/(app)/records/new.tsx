@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
@@ -12,7 +12,9 @@ export const Route = createFileRoute("/(app)/records/new")({
 });
 
 function NewRecordComponent() {
-  const availableTags = useQuery(api.records.getAvailableTags) || [];
+  const { isAuthenticated } = useConvexAuth();
+  const availableTags =
+    useQuery(api.records.getAvailableTags, isAuthenticated ? {} : "skip") || [];
   const navigate = useNavigate();
   const { encryptHint, masterKey, requireUnlock } = usePasscode();
   const [isLoading, setIsLoading] = useState(false);

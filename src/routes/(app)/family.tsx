@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useConvex, useMutation, useQuery } from "convex/react";
+import { useConvex, useConvexAuth, useMutation, useQuery } from "convex/react";
 import { Eye, EyeOff } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -74,7 +74,11 @@ function FamilyPending() {
 }
 
 function FamilyComponent() {
-  const family = useQuery(api.families.getFamilyMembers);
+  const { isAuthenticated } = useConvexAuth();
+  const family = useQuery(
+    api.families.getFamilyMembers,
+    isAuthenticated ? {} : "skip",
+  );
   const search = Route.useSearch();
   const router = useRouter();
   const { queryClient } = Route.useRouteContext();

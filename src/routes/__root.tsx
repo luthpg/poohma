@@ -164,15 +164,13 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 });
 
 function RootDocument({ children }: { children: React.ReactNode }) {
-  const convexAuth = useConvexFirebaseAuth();
-
   return (
     <html lang="ja" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
       <body>
-        <ConvexProviderWithAuth client={convex} useAuth={() => convexAuth}>
+        <ConvexProviderWithAuth client={convex} useAuth={useConvexFirebaseAuth}>
           <QueryClientProvider client={Route.useRouteContext().queryClient}>
             <ThemeProvider defaultTheme="system" storageKey="theme">
               <PasscodeProvider>
