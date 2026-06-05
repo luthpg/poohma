@@ -116,6 +116,7 @@ function NewRecordComponent() {
         tags,
       });
 
+      toast.success("サービスを登録しました");
       // 作成成功後、ダッシュボードへ遷移
       await navigate({ to: "/dashboard" });
     } catch (error) {

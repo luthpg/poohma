@@ -5,7 +5,7 @@ import {
   redirect,
   useNavigate,
 } from "@tanstack/react-router";
-import { LayoutGrid, List } from "lucide-react";
+import { LayoutGrid, List, X } from "lucide-react";
 import { type SubmitEvent, Suspense, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { api } from "@/../convex/_generated/api";
@@ -160,6 +160,9 @@ function RouteComponent() {
   }, []);
 
   const [searchInput, setSearchInput] = useState(searchParams.q || "");
+  useEffect(() => {
+    setSearchInput(searchParams.q || "");
+  }, [searchParams.q]);
   const viewMode = (searchParams.view || prefs.view || "card") as
     | "card"
     | "list";
@@ -234,16 +237,35 @@ function RouteComponent() {
         {/* 検索・フィルターエリア */}
         <div>
           <form onSubmit={handleSearch} className="flex items-center gap-2">
-            <input
-              type="text"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="タグやサービス名で検索..."
-              className="w-full rounded-md bg-card px-4 py-2.5 h-10 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-shadow"
-            />
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="タグやサービス名で検索..."
+                className="w-full rounded-md bg-card pl-4 pr-10 py-2.5 h-10 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-shadow"
+              />
+              {searchInput && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchInput("");
+                    navigate({
+                      search: (prev) => ({
+                        ...prev,
+                        q: undefined,
+                      }),
+                    });
+                  }}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
             <button
               type="submit"
-              className="rounded-md bg-foreground px-4 py-2.5 h-10 w-20 text-[14px] font-medium text-background shadow-border hover:bg-foreground/90 transition"
+              className="rounded-md bg-foreground px-4 py-2.5 h-10 w-20 text-[14px] font-medium text-background shadow-border hover:bg-foreground/90 transition cursor-pointer"
             >
               検索
             </button>

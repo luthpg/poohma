@@ -280,6 +280,7 @@ function RecordDetailComponent({
         },
       });
 
+      toast.success("レコードを更新しました");
       await router.invalidate();
       setIsEditing(false);
     } catch (error) {

@@ -1,7 +1,8 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useConvex, useConvexAuth, useMutation, useQuery } from "convex/react";
+import { signOut } from "firebase/auth";
 import { Eye, EyeOff } from "lucide-react";
-import { QRCodeSVG } from "qrcode.react";
+import { QRCodeCanvas } from "qrcode.react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
@@ -9,6 +10,7 @@ import type { Id } from "@/../convex/_generated/dataModel";
 import { usePasscode } from "@/components/PasscodeProvider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { clearQueryCache } from "@/hooks/usePersistentQuery";
 import {
   deriveKeyFromPasscode,
   encrypt,
@@ -18,6 +20,7 @@ import {
   unwrapMasterKey,
   wrapMasterKey,
 } from "@/lib/crypto";
+import { logout } from "@/services/auth.functions";
 import { auth } from "@/utils/firebase";
 
 export const Route = createFileRoute("/(app)/family")({
@@ -83,6 +86,71 @@ function FamilyComponent() {
   const router = useRouter();
   const { queryClient } = Route.useRouteContext();
   const convex = useConvex();
+  const handleLogout = async () => {
+    try {
+      if (auth) await signOut(auth);
+      await logout();
+      clearQueryCache();
+      await queryClient.invalidateQueries({ queryKey: ["authUser"] });
+      queryClient.setQueryData(["authUser"], null);
+      await router.invalidate();
+      await router.navigate({ to: "/" });
+    } catch (_error) {
+      toast.error("ログアウトに失敗しました");
+    }
+  };
+  const copyQrCode = async () => {
+    const canvas = document.getElementById(
+      "qr-canvas",
+    ) as HTMLCanvasElement | null;
+    if (!canvas) {
+      toast.error("QRコードが見つかりません");
+      return;
+    }
+    try {
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          toast.error("画像の生成に失敗しました");
+          return;
+        }
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            [blob.type]: blob,
+          }),
+        ]);
+        toast.success("QRコード画像をクリップボードにコピーしました");
+      }, "image/png");
+    } catch (err) {
+      console.error(err);
+      toast.error("画像のコピーに対応していないブラウザです");
+    }
+  };
+
+  const shareInviteUrl = async () => {
+    const inviteUrl = `${window.location.origin}/family?inviteCode=${family?.id}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "PoohMa 家族招待",
+          text: `${family?.name}への招待コードです。以下のリンクから参加してください。`,
+          url: inviteUrl,
+        });
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") {
+          console.error(err);
+          toast.error("共有に失敗しました");
+        }
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(inviteUrl);
+        toast.success("招待URLをクリップボードにコピーしました");
+      } catch (err) {
+        console.error(err);
+        toast.error("コピーに失敗しました");
+      }
+    }
+  };
 
   const createFamilyMut = useMutation(api.families.createFamily);
   const joinFamilyMut = useMutation(api.families.joinFamily);
@@ -319,12 +387,22 @@ function FamilyComponent() {
         <h1 className="text-[32px] font-semibold tracking-geist-h1 text-foreground">
           家族管理
         </h1>
-        <Link
-          to="/dashboard"
-          className="rounded-md bg-card px-4 py-2 text-[14px] font-medium text-foreground shadow-border hover:bg-accent transition"
-        >
-          ダッシュボードへ
-        </Link>
+        {family ? (
+          <Link
+            to="/dashboard"
+            className="rounded-md bg-card px-4 py-2 text-[14px] font-medium text-foreground shadow-border hover:bg-accent transition"
+          >
+            ダッシュボードへ
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="rounded-md bg-card px-4 py-2 text-[14px] font-medium text-red-500 shadow-border hover:bg-accent transition cursor-pointer"
+          >
+            ログアウト
+          </button>
+        )}
       </div>
 
       {family && !isChangingFamily ? (
@@ -339,15 +417,16 @@ function FamilyComponent() {
               招待コード
             </h3>
             <div className="flex flex-col md:flex-row items-center gap-6 rounded-md bg-muted/50 p-6 shadow-border-light">
-              <div className="bg-white p-2 rounded-md shadow-sm">
-                <QRCodeSVG
+              <div className="bg-white p-2 rounded-md shadow-sm shrink-0">
+                <QRCodeCanvas
+                  id="qr-canvas"
                   value={`${typeof window !== "undefined" ? window.location.origin : ""}/family?inviteCode=${family.id}`}
                   size={120}
                 />
               </div>
-              <div className="flex-1 w-full space-y-3">
-                <div className="flex items-center gap-3">
-                  <code className="flex-1 font-mono text-[14px] md:text-[16px] font-semibold text-foreground bg-card p-2.5 rounded-md shadow-sm border border-border">
+              <div className="flex-1 w-full space-y-3 min-w-0">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                  <code className="flex-1 font-mono text-[14px] md:text-[16px] font-semibold text-foreground bg-card p-2.5 rounded-md shadow-sm border border-border break-all">
                     {family.id}
                   </code>
                   <button
@@ -356,9 +435,25 @@ function FamilyComponent() {
                       navigator.clipboard.writeText(family.id);
                       toast.success("コピーしました");
                     }}
-                    className="rounded-md bg-card px-4 py-2.5 text-[14px] font-medium text-foreground shadow-border hover:bg-accent transition whitespace-nowrap"
+                    className="rounded-md bg-card px-4 py-2.5 text-[14px] font-medium text-foreground shadow-border hover:bg-accent transition whitespace-nowrap cursor-pointer"
                   >
                     コピー
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={copyQrCode}
+                    className="rounded-md bg-card px-3 py-1.5 text-[13px] font-medium text-foreground shadow-border hover:bg-accent transition flex flex-auto items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    QRコード画像をコピー
+                  </button>
+                  <button
+                    type="button"
+                    onClick={shareInviteUrl}
+                    className="rounded-md bg-card px-3 py-1.5 text-[13px] font-medium text-foreground shadow-border hover:bg-accent transition flex flex-auto items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    招待URLを共有・コピー
                   </button>
                 </div>
                 <p className="text-[13px] text-muted-foreground">

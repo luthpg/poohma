@@ -25,12 +25,21 @@ export const syncUser = mutation({
 
     if (existingByUid) {
       // UIDが一致 → プロフィール情報を更新
-      await ctx.db.patch(existingByUid._id, {
+      // すでに displayName が存在する場合は上書きしない
+      const patchData: {
+        email: string;
+        photoURL?: string;
+        updatedAt: number;
+        displayName?: string;
+      } = {
         email,
-        displayName,
         photoURL,
         updatedAt: Date.now(),
-      });
+      };
+      if (!existingByUid.displayName && displayName) {
+        patchData.displayName = displayName;
+      }
+      await ctx.db.patch(existingByUid._id, patchData);
       return existingByUid.userId;
     }
 
@@ -54,13 +63,23 @@ export const syncUser = mutation({
       }
 
       // 旧ユーザーを更新（UIDとプロフィールを新しいものに差し替え）
-      await ctx.db.patch(existingByEmail._id, {
+      // すでに displayName が存在する場合は上書きしない
+      const patchData: {
+        userId: string;
+        email: string;
+        photoURL?: string;
+        updatedAt: number;
+        displayName?: string;
+      } = {
         userId: uid,
         email,
-        displayName,
         photoURL,
         updatedAt: Date.now(),
-      });
+      };
+      if (!existingByEmail.displayName && displayName) {
+        patchData.displayName = displayName;
+      }
+      await ctx.db.patch(existingByEmail._id, patchData);
 
       return uid;
     }
