@@ -61,7 +61,7 @@ export function isPrivateIp(ip: string): boolean {
  *
  * @throws URLが安全でない場合にエラーをスロー
  */
-export async function validateUrlSafety(urlString: string): Promise<void> {
+export async function validateUrlSafety(urlString: string): Promise<string> {
   let parsed: URL;
   try {
     parsed = new URL(urlString);
@@ -81,7 +81,7 @@ export async function validateUrlSafety(urlString: string): Promise<void> {
     if (isPrivateIp(hostnameWithoutBrackets)) {
       throw new Error("Access to private IP addresses is not allowed");
     }
-    return;
+    return hostnameWithoutBrackets;
   }
 
   // DNS解決してIPをチェック
@@ -91,11 +91,28 @@ export async function validateUrlSafety(urlString: string): Promise<void> {
   const addresses6 = await dns
     .resolve6(hostnameWithoutBrackets)
     .catch(() => []);
-  const allAddresses = [...addresses4, ...addresses6];
 
-  for (const addr of allAddresses) {
+  if (addresses4.length === 0 && addresses6.length === 0) {
+    throw new Error("Could not resolve host");
+  }
+
+  for (const addr of addresses4) {
     if (isPrivateIp(addr)) {
       throw new Error("Access to private IP addresses is not allowed");
     }
   }
+  if (addresses4.length > 0) {
+    return addresses4[0];
+  }
+
+  for (const addr of addresses6) {
+    if (isPrivateIp(addr)) {
+      throw new Error("Access to private IP addresses is not allowed");
+    }
+  }
+  if (addresses6.length > 0) {
+    return addresses6[0];
+  }
+
+  throw new Error("No safe IP addresses found");
 }

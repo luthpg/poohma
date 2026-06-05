@@ -22,8 +22,6 @@ import {
   decrypt,
   deriveKeyFromPasscode,
   encrypt,
-  exportKeyToBase64,
-  importKeyFromBase64,
   unwrapMasterKey,
 } from "@/lib/crypto";
 
@@ -63,10 +61,6 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
   const [showPasscode, setShowPasscode] = useState(false);
   const resolvePromiseRef = useRef<((value: boolean) => void) | null>(null);
 
-  const storageKey = user?.familyId
-    ? `poohma_master_key_${user.familyId}`
-    : null;
-
   const unlock = useCallback(
     async (code: string) => {
       if (
@@ -91,15 +85,6 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
         masterKeyRef.current = key;
         setMasterKey(key);
 
-        if (storageKey) {
-          try {
-            const exported = await exportKeyToBase64(key);
-            sessionStorage.setItem(storageKey, exported);
-          } catch (e) {
-            console.error("Failed to export master key to sessionStorage", e);
-          }
-        }
-
         return true;
       } catch (error) {
         console.error("Unlock failed:", error);
@@ -109,7 +94,7 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
         setIsUnlocking(false);
       }
     },
-    [user, storageKey],
+    [user],
   );
 
   const decryptHint = useCallback(async (encrypted: string, iv: string) => {
@@ -164,53 +149,11 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isPromptOpen]);
 
-  // 起動時・リロード時・家族変更時に sessionStorage から鍵を復元する
-  useEffect(() => {
-    const restoreKey = async () => {
-      if (storageKey) {
-        const storedKey = sessionStorage.getItem(storageKey);
-        if (storedKey) {
-          try {
-            const key = await importKeyFromBase64(storedKey);
-            masterKeyRef.current = key;
-            setMasterKey(key);
-          } catch (e) {
-            console.error(
-              "Failed to restore master key from sessionStorage",
-              e,
-            );
-            sessionStorage.removeItem(storageKey);
-            masterKeyRef.current = null;
-            setMasterKey(null);
-          }
-        } else {
-          // storageKey が変わったが新しいキーがない場合は旧キーをクリア
-          masterKeyRef.current = null;
-          setMasterKey(null);
-        }
-      }
-    };
-    restoreKey();
-  }, [storageKey]);
-
   // ユーザーや家族IDが変わったら（ログアウトなど）鍵をクリアする
+  // biome-ignore lint/correctness/useExhaustiveDependencies: clear key when familyId changes
   useEffect(() => {
-    if (!user?.familyId) {
-      setMasterKey(null);
-      masterKeyRef.current = null;
-
-      // セッションストレージ内の関連キーをクリア
-      const keysToRemove: string[] = [];
-      for (let i = 0; i < sessionStorage.length; i++) {
-        const key = sessionStorage.key(i);
-        if (key?.startsWith("poohma_master_key_")) {
-          keysToRemove.push(key);
-        }
-      }
-      keysToRemove.forEach((k) => {
-        sessionStorage.removeItem(k);
-      });
-    }
+    setMasterKey(null);
+    masterKeyRef.current = null;
   }, [user?.familyId]);
 
   return (

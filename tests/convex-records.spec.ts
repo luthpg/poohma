@@ -1,3 +1,6 @@
+import { EventEmitter } from "node:events";
+import type http from "node:http";
+import https from "node:https";
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../convex/_generated/api";
@@ -5,6 +8,30 @@ import type { Id } from "../convex/_generated/dataModel";
 import schema from "../convex/schema";
 
 const modules = import.meta.glob("../convex/**/*.ts");
+
+// E2EE url-safety のモック
+vi.mock("../src/utils/url-safety", () => {
+  return {
+    validateUrlSafety: vi.fn().mockResolvedValue("93.184.216.34"),
+    isPrivateIp: vi.fn().mockReturnValue(false),
+  };
+});
+
+// node:http / node:https のモック
+vi.mock("node:http", () => {
+  return {
+    default: {
+      request: vi.fn(),
+    },
+  };
+});
+vi.mock("node:https", () => {
+  return {
+    default: {
+      request: vi.fn(),
+    },
+  };
+});
 
 describe("2.2.1 閲覧権限（Visibility）の境界値テスト (Convex版)", () => {
   it("「自分のみ (PRIVATE)」「家族と共有 (SHARED)」の設定が、DBクエリレベルで正しくフィルタリングされること", async () => {
@@ -108,16 +135,27 @@ describe("2.2.2. OGP取得処理のフェイルセーフとタイムアウト (C
         </html>
       `;
 
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockResolvedValue({
-          ok: true,
-          status: 200,
-          arrayBuffer: async () => new TextEncoder().encode(mockHtml).buffer,
-          headers: {
-            get: () => "text/html; charset=utf-8",
-          },
-        }),
+      vi.mocked(https.request).mockImplementation(
+        (_options: unknown, callback: unknown) => {
+          const mockReq = Object.assign(new EventEmitter(), {
+            end: () => {
+              process.nextTick(() => {
+                const mockRes = Object.assign(new EventEmitter(), {
+                  statusCode: 200,
+                  headers: {},
+                }) as unknown as http.IncomingMessage;
+
+                if (typeof callback === "function") {
+                  callback(mockRes);
+                }
+                mockRes.emit("data", Buffer.from(mockHtml));
+                mockRes.emit("end");
+              });
+            },
+            destroy: () => {},
+          }) as unknown as http.ClientRequest;
+          return mockReq;
+        },
       );
 
       const t = convexTest(schema, modules);
@@ -143,16 +181,27 @@ describe("2.2.2. OGP取得処理のフェイルセーフとタイムアウト (C
         </html>
       `;
 
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockResolvedValue({
-          ok: true,
-          status: 200,
-          arrayBuffer: async () => new TextEncoder().encode(mockHtml).buffer,
-          headers: {
-            get: () => "text/html; charset=utf-8",
-          },
-        }),
+      vi.mocked(https.request).mockImplementation(
+        (_options: unknown, callback: unknown) => {
+          const mockReq = Object.assign(new EventEmitter(), {
+            end: () => {
+              process.nextTick(() => {
+                const mockRes = Object.assign(new EventEmitter(), {
+                  statusCode: 200,
+                  headers: {},
+                }) as unknown as http.IncomingMessage;
+
+                if (typeof callback === "function") {
+                  callback(mockRes);
+                }
+                mockRes.emit("data", Buffer.from(mockHtml));
+                mockRes.emit("end");
+              });
+            },
+            destroy: () => {},
+          }) as unknown as http.ClientRequest;
+          return mockReq;
+        },
       );
 
       const t = convexTest(schema, modules);
@@ -171,12 +220,26 @@ describe("2.2.2. OGP取得処理のフェイルセーフとタイムアウト (C
 
   describe("異常系 (フェイルセーフ)", () => {
     it("HTTP ステータスコードが 500 などのエラーを返却した場合、クラッシュせず空のOGP情報を返却すること", async () => {
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockResolvedValue({
-          ok: false,
-          status: 500,
-        }),
+      vi.mocked(https.request).mockImplementation(
+        (_options: unknown, callback: unknown) => {
+          const mockReq = Object.assign(new EventEmitter(), {
+            end: () => {
+              process.nextTick(() => {
+                const mockRes = Object.assign(new EventEmitter(), {
+                  statusCode: 500,
+                  headers: {},
+                }) as unknown as http.IncomingMessage;
+
+                if (typeof callback === "function") {
+                  callback(mockRes);
+                }
+                mockRes.emit("end");
+              });
+            },
+            destroy: () => {},
+          }) as unknown as http.ClientRequest;
+          return mockReq;
+        },
       );
 
       const t = convexTest(schema, modules);
@@ -193,9 +256,18 @@ describe("2.2.2. OGP取得処理のフェイルセーフとタイムアウト (C
     });
 
     it("ネットワーク接続エラー等の理由で fetch が例外をスローした場合、クラッシュせず空のOGP情報を返却すること", async () => {
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockRejectedValue(new Error("Network Error")),
+      vi.mocked(https.request).mockImplementation(
+        (_options: unknown, _callback: unknown) => {
+          const mockReq = Object.assign(new EventEmitter(), {
+            end: () => {
+              process.nextTick(() => {
+                mockReq.emit("error", new Error("Network Error"));
+              });
+            },
+            destroy: () => {},
+          }) as unknown as http.ClientRequest;
+          return mockReq;
+        },
       );
 
       const t = convexTest(schema, modules);

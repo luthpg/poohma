@@ -155,7 +155,7 @@ export async function unwrapMasterKey(
     unwrappingKey,
     { name: ALGORITHM, iv },
     { name: ALGORITHM, length: KEY_LENGTH },
-    true,
+    false,
     ["encrypt", "decrypt"],
   );
 }

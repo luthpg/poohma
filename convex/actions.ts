@@ -1,21 +1,83 @@
 "use node";
 
+import http from "node:http";
+import https from "node:https";
+import { URL } from "node:url";
+import * as cheerio from "cheerio";
 import { v } from "convex/values";
 import { action } from "./_generated/server";
 import { validateUrlSafety } from "../src/utils/url-safety";
 
-function decodeHtmlEntities(str: string): string {
-  if (!str) return "";
-  return str
-    .replace(/&quot;/g, '"')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&#39;/g, "'")
-    .replace(/&apos;/g, "'")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
-    .replace(/&amp;/g, '&');
+async function fetchSafeBuffer(urlString: string, maxRedirects = 5): Promise<Buffer> {
+  let currentUrl = urlString;
+  for (let i = 0; i < maxRedirects; i++) {
+    const parsed = new URL(currentUrl);
+    // 1. 安全性の検証とIPアドレス解決
+    const ip = await validateUrlSafety(currentUrl);
+
+    // 2. リクエストの構築
+    const isHttps = parsed.protocol === "https:";
+    const lib = isHttps ? https : http;
+
+    const result = await new Promise<{ type: "data"; data: Buffer } | { type: "redirect"; url: string }>((resolve, reject) => {
+      const options: https.RequestOptions = {
+        hostname: ip, // 直接IPへ接続
+        port: parsed.port ? parseInt(parsed.port, 10) : (isHttps ? 443 : 80),
+        path: parsed.pathname + parsed.search,
+        method: "GET",
+        headers: {
+          "User-Agent": "PoohMa-OGP-Bot/1.0",
+          Accept: "text/html,application/xhtml+xml",
+          Host: parsed.hostname, // Hostヘッダーには元のドメインを指定
+        },
+        timeout: 5000,
+      };
+
+      if (isHttps) {
+        options.servername = parsed.hostname; // SNI 送信用
+      }
+
+      const req = lib.request(options, (res) => {
+        // リダイレクト判定
+        if (
+          res.statusCode &&
+          res.statusCode >= 300 &&
+          res.statusCode < 400 &&
+          res.headers.location
+        ) {
+          const nextUrl = new URL(res.headers.location, currentUrl).toString();
+          resolve({ type: "redirect", url: nextUrl });
+          return;
+        }
+
+        if (res.statusCode !== 200) {
+          reject(new Error(`HTTP error status ${res.statusCode}`));
+          return;
+        }
+
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk) => chunks.push(chunk));
+        res.on("end", () => {
+          resolve({ type: "data", data: Buffer.concat(chunks) });
+        });
+      });
+
+      req.on("error", reject);
+      req.on("timeout", () => {
+        req.destroy();
+        reject(new Error("Request timeout"));
+      });
+      req.end();
+    });
+
+    if (result.type === "redirect") {
+      currentUrl = result.url;
+      continue;
+    }
+
+    return result.data;
+  }
+  throw new Error("Too many redirects");
 }
 
 export const getOgpInfo = action({
@@ -27,35 +89,11 @@ export const getOgpInfo = action({
     }
 
     try {
-      // SSRF validation including DNS resolution
-      await validateUrlSafety(args.url);
+      // 1. 安全に HTML データを Buffer としてフェッチ（DNS Rebinding 対策）
+      const buffer = await fetchSafeBuffer(args.url);
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-      let response: Response;
-      try {
-        response = await fetch(args.url, {
-          headers: {
-            "User-Agent": "PoohMa-OGP-Bot/1.0",
-            Accept: "text/html,application/xhtml+xml",
-          },
-          signal: controller.signal,
-        });
-      } finally {
-        clearTimeout(timeoutId);
-      }
-
-      if (!response.ok) {
-        return { title: "", image: "", description: "" };
-      }
-
-      // arrayBuffer を取得し、charset に基づいてデコード
-      const arrayBuffer = await response.arrayBuffer();
-      let html = new TextDecoder("utf-8").decode(arrayBuffer);
-
-      // meta タグから charset を検出
-
+      // 2. 文字エンコーディングの検出とデコード（一時的に utf-8 でパースして charset メタタグを探す）
+      let html = buffer.toString("utf-8");
       const metaCharsetMatch =
         html.match(/<meta[^>]*charset=["']?([\w-]+)/i) ||
         html.match(/<meta[^>]*http-equiv=["']?content-type["']?[^>]*content=["']?[^"']*charset=([\w-]+)/i);
@@ -64,55 +102,37 @@ export const getOgpInfo = action({
         const detectedCharset = metaCharsetMatch[1].toLowerCase();
         if (detectedCharset !== "utf-8" && detectedCharset !== "utf8") {
           try {
-            html = new TextDecoder(detectedCharset).decode(arrayBuffer);
+            html = new TextDecoder(detectedCharset).decode(new Uint8Array(buffer));
           } catch (e) {
             console.warn(`Failed to decode with charset: ${detectedCharset}`, e);
           }
         }
       }
 
-      // 正規表現で OGP / meta 情報抽出 (属性順序の違いも考慮)
-      const titleMatch =
-        html.match(
-          /<meta\s+(?:property|name)=["']og:title["']\s+content=["']([^"']+)["']/i
-        ) ||
-        html.match(
-          /<meta\s+content=["']([^"']+)["']\s+(?:property|name)=["']og:title["']/i
-        ) ||
-        html.match(/<title>([^<]+)<\/title>/i);
+      // 3. cheerio による OGP 情報抽出（ReDoS 対策）
+      const $ = cheerio.load(html);
 
-      const imageMatch =
-        html.match(
-          /<meta\s+(?:property|name)=["']og:image["']\s+content=["']([^"']+)["']/i
-        ) ||
-        html.match(
-          /<meta\s+content=["']([^"']+)["']\s+(?:property|name)=["']og:image["']/i
-        );
+      const title = (
+        $('meta[property="og:title"]').attr("content") ||
+        $('meta[name="og:title"]').attr("content") ||
+        $("title").text() ||
+        ""
+      ).trim();
 
-      const descriptionMatch =
-        html.match(
-          /<meta\s+(?:property|name)=["']og:description["']\s+content=["']([^"']+)["']/i
-        ) ||
-        html.match(
-          /<meta\s+content=["']([^"']+)["']\s+(?:property|name)=["']og:description["']/i
-        ) ||
-        html.match(
-          /<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i
-        ) ||
-        html.match(
-          /<meta\s+content=["']([^"']+)["']\s+name=["']description["']/i
-        );
+      let image = (
+        $('meta[property="og:image"]').attr("content") ||
+        $('meta[name="og:image"]').attr("content") ||
+        ""
+      ).trim();
 
-      let title = titleMatch ? titleMatch[1].trim() : "";
-      let image = imageMatch ? imageMatch[1].trim() : "";
-      let description = descriptionMatch ? descriptionMatch[1].trim() : "";
+      const description = (
+        $('meta[property="og:description"]').attr("content") ||
+        $('meta[name="og:description"]').attr("content") ||
+        $('meta[name="description"]').attr("content") ||
+        ""
+      ).trim();
 
-      // HTMLエンティティのデコード
-      title = decodeHtmlEntities(title);
-      image = decodeHtmlEntities(image);
-      description = decodeHtmlEntities(description);
-
-      // OGP画像の相対パスを解決
+      // 4. OGP 画像の相対パスを解決
       if (image && !image.startsWith("http://") && !image.startsWith("https://")) {
         try {
           image = new URL(image, args.url).toString();

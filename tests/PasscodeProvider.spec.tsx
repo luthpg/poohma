@@ -117,9 +117,6 @@ describe("PasscodeProvider E2EE State Management", () => {
         "iv",
         mockDerivedKey,
       );
-      expect(cryptoLib.exportKeyToBase64).toHaveBeenCalledWith(
-        mockUnwrappedKey,
-      );
     });
 
     // The modal should close and state should be unlocked
@@ -128,13 +125,11 @@ describe("PasscodeProvider E2EE State Management", () => {
       expect(screen.getByText("Unlocked")).toBeTruthy();
     });
 
-    // Verify it was saved to sessionStorage
-    expect(sessionStorage.getItem("poohma_master_key_family-1")).toBe(
-      "base64-exported-key",
-    );
+    // Verify it was NOT saved to sessionStorage
+    expect(sessionStorage.getItem("poohma_master_key_family-1")).toBeNull();
   });
 
-  it("should clear master key and sessionStorage when familyId changes or user logs out", async () => {
+  it("should remain Locked on mount even if sessionStorage has data, and clear master key when user logs out", async () => {
     let currentUser = {
       familyId: "family-1",
       family: {
@@ -149,14 +144,22 @@ describe("PasscodeProvider E2EE State Management", () => {
       user: currentUser,
     }));
 
-    // Setup initial sessionStorage state
+    // Setup initial sessionStorage state (which should be ignored now)
     sessionStorage.setItem("poohma_master_key_family-1", "existing-base64-key");
-    const mockImportedKey = { type: "secret" } as unknown as CryptoKey;
-    (cryptoLib.importKeyFromBase64 as Mock).mockResolvedValue(mockImportedKey);
+
+    let requireUnlockRef: (() => Promise<boolean>) | null = null;
 
     const TestComponent = () => {
-      const { isLocked } = usePasscode();
-      return <div>{isLocked ? "Locked" : "Unlocked"}</div>;
+      const { isLocked, masterKey, requireUnlock } = usePasscode();
+      requireUnlockRef = requireUnlock;
+      return (
+        <div>
+          <div data-testid="lock-status">
+            {isLocked ? "Locked" : "Unlocked"}
+          </div>
+          <div data-testid="key-status">{masterKey ? "HasKey" : "NoKey"}</div>
+        </div>
+      );
     };
 
     const { rerender } = render(
@@ -165,12 +168,31 @@ describe("PasscodeProvider E2EE State Management", () => {
       </PasscodeProvider>,
     );
 
-    // After mount, it should try to import key from sessionStorage
+    // Should be locked initially on mount (sessionStorage is ignored)
+    expect(screen.getByTestId("lock-status").textContent).toBe("Locked");
+    expect(screen.getByTestId("key-status").textContent).toBe("NoKey");
+    expect(cryptoLib.importKeyFromBase64).not.toHaveBeenCalled();
+
+    // Now unlock it manually
+    const mockDerivedKey = {} as CryptoKey;
+    const mockUnwrappedKey = { type: "secret" } as unknown as CryptoKey;
+    (cryptoLib.deriveKeyFromPasscode as Mock).mockResolvedValue(mockDerivedKey);
+    (cryptoLib.unwrapMasterKey as Mock).mockResolvedValue(mockUnwrappedKey);
+
+    // biome-ignore lint/style/noNonNullAssertion: testing ref is non-null
+    requireUnlockRef!();
     await waitFor(() => {
-      expect(cryptoLib.importKeyFromBase64).toHaveBeenCalledWith(
-        "existing-base64-key",
-      );
-      expect(screen.getByText("Unlocked")).toBeTruthy();
+      expect(screen.getByText("家族パスコードの入力")).toBeTruthy();
+    });
+
+    const input = screen.getByPlaceholderText("パスコード");
+    fireEvent.change(input, { target: { value: "my-passcode" } });
+    const submitButton = screen.getByRole("button", { name: "ロック解除" });
+    fireEvent.click(submitButton);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("lock-status").textContent).toBe("Unlocked");
+      expect(screen.getByTestId("key-status").textContent).toBe("HasKey");
     });
 
     // Simulate logout by changing the mock context value before rerender
@@ -186,7 +208,9 @@ describe("PasscodeProvider E2EE State Management", () => {
     );
 
     await waitFor(() => {
-      expect(sessionStorage.getItem("poohma_master_key_family-1")).toBeNull();
+      // familyId is null, so isLocked should be false (Unlocked), but masterKey should be cleared (NoKey)
+      expect(screen.getByTestId("lock-status").textContent).toBe("Unlocked");
+      expect(screen.getByTestId("key-status").textContent).toBe("NoKey");
     });
   });
 });

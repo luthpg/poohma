@@ -46,15 +46,15 @@ describe("isPrivateIp", () => {
 
 describe("validateUrlSafety", () => {
   it("should allow valid https URLs", async () => {
-    await expect(
-      validateUrlSafety("https://example.com"),
-    ).resolves.toBeUndefined();
+    const ip = await validateUrlSafety("https://example.com");
+    expect(ip).toBeTypeOf("string");
+    expect(isPrivateIp(ip)).toBe(false);
   });
 
   it("should allow valid http URLs", async () => {
-    await expect(
-      validateUrlSafety("http://example.com"),
-    ).resolves.toBeUndefined();
+    const ip = await validateUrlSafety("http://example.com");
+    expect(ip).toBeTypeOf("string");
+    expect(isPrivateIp(ip)).toBe(false);
   });
 
   it("should reject ftp URLs", async () => {

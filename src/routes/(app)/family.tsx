@@ -14,7 +14,6 @@ import { clearQueryCache } from "@/hooks/usePersistentQuery";
 import {
   deriveKeyFromPasscode,
   encrypt,
-  exportKeyToBase64,
   generateMasterKey,
   generateSalt,
   unwrapMasterKey,
@@ -304,7 +303,7 @@ function FamilyComponent() {
       }
 
       // 4. サーバーへ送信
-      const result = await changeFamilyMut({
+      await changeFamilyMut({
         action,
         name: action === "create" ? createName : undefined,
         masterKeyEncrypted: newMasterKeyEncrypted,
@@ -313,20 +312,6 @@ function FamilyComponent() {
         inviteCode: action === "join" ? joinCode : undefined,
         credentials: reEncryptedCredentials,
       });
-
-      // 5. 新しいマスターキーを sessionStorage に保存
-      // router.invalidate() で familyId が変わる前に保存しておく
-      if (result.familyId) {
-        try {
-          const exported = await exportKeyToBase64(newMasterKey);
-          sessionStorage.setItem(
-            `poohma_master_key_${result.familyId}`,
-            exported,
-          );
-        } catch (e) {
-          console.error("Failed to save new master key to sessionStorage", e);
-        }
-      }
 
       await queryClient.invalidateQueries({ queryKey: ["authUser"] });
       toast.success("家族グループを変更し、データを移行しました");
