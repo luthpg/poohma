@@ -1,7 +1,49 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { mutation, query } from "./_generated/server";
+import type { QueryCtx } from "./_generated/server";
+import { internalQuery, mutation, query } from "./_generated/server";
+
+export const getFamilyMembersByFamilyId = async (
+  ctx: QueryCtx,
+  familyId: Id<"families">,
+) => {
+  const family = await ctx.db.get(familyId);
+  if (!family) return null;
+
+  const usersInFamily = await ctx.db
+    .query("users")
+    .filter((q) => q.eq(q.field("familyId"), family._id))
+    .collect();
+
+  return {
+    ...family,
+    users: usersInFamily.map((u) => ({
+      id: u.userId,
+      email: u.email,
+      displayName: u.displayName,
+    })),
+    id: family._id,
+  };
+};
+
+export const getFamilyMembersById = async (ctx: QueryCtx, userId: string) => {
+  const user = await ctx.db
+    .query("users")
+    .withIndex("by_userId", (q) => q.eq("userId", userId))
+    .unique();
+
+  if (!user?.familyId) return null;
+
+  return await getFamilyMembersByFamilyId(ctx, user.familyId);
+};
+
+export const getFamilyMembersInternal = internalQuery({
+  args: { familyId: v.id("families") },
+  handler: async (ctx, { familyId }) => {
+    return await getFamilyMembersByFamilyId(ctx, familyId);
+  },
+});
 
 export const getFamilyMembers = query({
   args: {},
@@ -17,23 +59,7 @@ export const getFamilyMembers = query({
 
     if (!user?.familyId) return null;
 
-    const family = await ctx.db.get(user.familyId);
-    if (!family) return null;
-
-    const usersInFamily = await ctx.db
-      .query("users")
-      .filter((q) => q.eq(q.field("familyId"), family._id))
-      .collect();
-
-    return {
-      ...family,
-      users: usersInFamily.map((u) => ({
-        id: u.userId,
-        email: u.email,
-        displayName: u.displayName,
-      })),
-      id: family._id,
-    };
+    return await getFamilyMembersById(ctx, userId);
   },
 });
 
@@ -66,6 +92,13 @@ export const createFamily = mutation({
     });
 
     await ctx.db.patch(user._id, { familyId });
+
+    await ctx.scheduler.runAfter(0, internal.actions.sendEmailInternal, {
+      email: user.email,
+      subject: "PoohMaへようこそ",
+      body: `-=-=-=-=-=-=-=-=-=-\n※本メールは送信専用アドレスから送信しています。\n-=-=-=-=-=-=-=-=-=-\n\n${user.displayName} さん\n\nこんにちは！家族間アカウント管理アプリ「PoohMa」からお知らせです。\n\n家族名「${args.name}」へ参加が完了しました。\n\n※なんらかの誤りであると考えられる場合はお手数ですが運営にご連絡ください。\n\n[PoohMa]\nhttps://poohma.vercel.app/`,
+    });
+
     return familyId;
   },
 });
@@ -97,6 +130,24 @@ export const joinFamily = mutation({
       subject: "PoohMaへようこそ",
       body: `-=-=-=-=-=-=-=-=-=-\n※本メールは送信専用アドレスから送信しています。\n-=-=-=-=-=-=-=-=-=-\n\n${user.displayName} さん\n\nこんにちは！家族間アカウント管理アプリ「PoohMa」からお知らせです。\n\n家族名「${family.name}」へ参加が完了しました。\n\n※なんらかの誤りであると考えられる場合はお手数ですが運営にご連絡ください。\n\n[PoohMa]\nhttps://poohma.vercel.app/`,
     });
+
+    const familyMembers = await ctx.runQuery(
+      internal.families.getFamilyMembersInternal,
+      {
+        familyId: family._id,
+      },
+    );
+    if (!familyMembers) throw new Error("Family members not found");
+    await Promise.all(
+      familyMembers.users.map((member) => {
+        if (member.email === user.email) return null;
+        return ctx.scheduler.runAfter(0, internal.actions.sendEmailInternal, {
+          email: member.email,
+          subject: `[PoohMa] ${family.name} に新しいメンバーが参加しました！`,
+          body: `-=-=-=-=-=-=-=-=-=-\n※本メールは送信専用アドレスから送信しています。\n-=-=-=-=-=-=-=-=-=-\n\n${member.displayName} さん\n\nこんにちは！家族間アカウント管理アプリ「PoohMa」からお知らせです。\n\n家族名「${family.name}」へ新しいメンバーが参加しました。\n\n※なんらかの誤りであると考えられる場合はお手数ですが運営にご連絡ください。\n\n[PoohMa]\nhttps://poohma.vercel.app/`,
+        });
+      }),
+    );
 
     return family._id;
   },
