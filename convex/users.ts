@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import { internalQuery, mutation, query } from "./_generated/server";
 
 /**
  * ユーザー同期（ログイン時に呼ばれる）
@@ -158,12 +159,10 @@ export const deleteAccount = mutation({
     if (user.familyId) {
       const familyId = user.familyId;
       // 同じ家族のメンバーをカウント
-      const familyMembers = await ctx.db
-        .query("users")
-        .collect();
-      
+      const familyMembers = await ctx.db.query("users").collect();
+
       const otherMembers = familyMembers.filter(
-        (u) => u.familyId === familyId && u.userId !== userId
+        (u) => u.familyId === familyId && u.userId !== userId,
       );
 
       // 他のメンバーがいない場合は家族も削除
@@ -190,6 +189,45 @@ export const getUserByFirebaseUid = query({
     if (!user) return null;
 
     let family = null;
+    if (user.familyId) {
+      const familyDoc = await ctx.db.get(user.familyId);
+      if (familyDoc) {
+        family = {
+          id: familyDoc._id,
+          name: familyDoc.name,
+          masterKeyEncrypted: familyDoc.masterKeyEncrypted,
+          masterKeyIv: familyDoc.masterKeyIv,
+          masterKeySalt: familyDoc.masterKeySalt,
+        };
+      }
+    }
+
+    return {
+      id: user.userId,
+      userId: user.userId,
+      email: user.email,
+      displayName: user.displayName,
+      photoURL: user.photoURL,
+      familyId: user.familyId,
+      family,
+    };
+  },
+});
+
+export const getUserById = internalQuery({
+  args: { id: v.id("users") },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.id);
+
+    if (!user) return null;
+
+    let family: {
+      id: Id<"families">;
+      name: string;
+      masterKeyEncrypted: string | undefined;
+      masterKeyIv: string | undefined;
+      masterKeySalt: string | undefined;
+    } | null = null;
     if (user.familyId) {
       const familyDoc = await ctx.db.get(user.familyId);
       if (familyDoc) {

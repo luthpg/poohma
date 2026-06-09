@@ -1,6 +1,7 @@
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
-import { Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
+import { mutation, query } from "./_generated/server";
 
 export const getFamilyMembers = query({
   args: {},
@@ -14,7 +15,7 @@ export const getFamilyMembers = query({
       .withIndex("by_userId", (q) => q.eq("userId", userId))
       .unique();
 
-    if (!user || !user.familyId) return null;
+    if (!user?.familyId) return null;
 
     const family = await ctx.db.get(user.familyId);
     if (!family) return null;
@@ -90,6 +91,13 @@ export const joinFamily = mutation({
     if (!family) throw new Error("Invalid invite code");
 
     await ctx.db.patch(user._id, { familyId: family._id });
+
+    await ctx.scheduler.runAfter(0, internal.actions.sendEmailInternal, {
+      email: user.email,
+      subject: "PoohMaへようこそ",
+      body: `-=-=-=-=-=-=-=-=-=-\n※本メールは送信専用アドレスから送信しています。\n-=-=-=-=-=-=-=-=-=-\n\n${user.displayName} さん\n\nこんにちは！家族間アカウント管理アプリ「PoohMa」からお知らせです。\n\n家族名「${family.name}」へ参加が完了しました。\n\n※なんらかの誤りであると考えられる場合はお手数ですが運営にご連絡ください。\n\n[PoohMa]\nhttps://poohma.vercel.app/`,
+    });
+
     return family._id;
   },
 });
@@ -125,17 +133,19 @@ export const getRecordsForReEncryption = query({
       .withIndex("by_userId", (q) => q.eq("userId", userId))
       .collect();
 
-    return records.map((record) => ({
-      _id: record._id,
-      id: record._id,
-      credentials: record.credentials
-        .filter((c) => c.passwordHint && c.passwordHintIv)
-        .map((c) => ({
-          id: c.id,
-          passwordHint: c.passwordHint!,
-          passwordHintIv: c.passwordHintIv!,
-        })),
-    })).filter(record => record.credentials.length > 0);
+    return records
+      .map((record) => ({
+        _id: record._id,
+        id: record._id,
+        credentials: record.credentials
+          .filter((c) => c.passwordHint && c.passwordHintIv)
+          .map((c) => ({
+            id: c.id,
+            passwordHint: c.passwordHint,
+            passwordHintIv: c.passwordHintIv,
+          })),
+      }))
+      .filter((record) => record.credentials.length > 0);
   },
 });
 
@@ -152,7 +162,7 @@ export const changeFamily = mutation({
         id: v.string(),
         passwordHint: v.string(),
         passwordHintIv: v.string(),
-      })
+      }),
     ),
   },
   handler: async (ctx, args) => {
@@ -170,7 +180,12 @@ export const changeFamily = mutation({
     let parsedTargetFamilyId: Id<"families">;
 
     if (args.action === "create") {
-      if (!args.name || !args.masterKeyEncrypted || !args.masterKeyIv || !args.masterKeySalt) {
+      if (
+        !args.name ||
+        !args.masterKeyEncrypted ||
+        !args.masterKeyIv ||
+        !args.masterKeySalt
+      ) {
         throw new Error("Missing fields for create");
       }
       parsedTargetFamilyId = await ctx.db.insert("families", {
@@ -196,11 +211,11 @@ export const changeFamily = mutation({
       .withIndex("by_userId", (q) => q.eq("userId", userId))
       .collect();
 
-    const credUpdates = new Map(args.credentials.map(c => [c.id, c]));
+    const credUpdates = new Map(args.credentials.map((c) => [c.id, c]));
 
     for (const record of records) {
       let needsUpdate = false;
-      const newCredentials = record.credentials.map(cred => {
+      const newCredentials = record.credentials.map((cred) => {
         const update = credUpdates.get(cred.id);
         if (update) {
           needsUpdate = true;
@@ -221,6 +236,12 @@ export const changeFamily = mutation({
         });
       }
     }
+
+    await ctx.scheduler.runAfter(0, internal.actions.sendEmailInternal, {
+      email: user.email,
+      subject: "PoohMaからのお知らせ（家族変更完了）",
+      body: `-=-=-=-=-=-=-=-=-=-\n※本メールは送信専用アドレスから送信しています。\n-=-=-=-=-=-=-=-=-=-\n\n${user.displayName} さん\n\nこんにちは！家族間アカウント管理アプリ「PoohMa」からお知らせです。\n\n家族名「${args.name}」へ変更が完了しました。\n\n※なんらかの誤りであると考えられる場合はお手数ですが運営にご連絡ください。\n\n[PoohMa]\nhttps://poohma.vercel.app/`,
+    });
 
     return { success: true, familyId: parsedTargetFamilyId };
   },

@@ -5,10 +5,14 @@ import https from "node:https";
 import { URL } from "node:url";
 import * as cheerio from "cheerio";
 import { v } from "convex/values";
-import { action } from "./_generated/server";
 import { validateUrlSafety } from "../src/utils/url-safety";
+import { internal } from "./_generated/api";
+import { action, internalAction } from "./_generated/server";
 
-async function fetchSafeBuffer(urlString: string, maxRedirects = 5): Promise<Buffer> {
+async function fetchSafeBuffer(
+  urlString: string,
+  maxRedirects = 5,
+): Promise<Buffer> {
   let currentUrl = urlString;
   for (let i = 0; i < maxRedirects; i++) {
     const parsed = new URL(currentUrl);
@@ -19,10 +23,12 @@ async function fetchSafeBuffer(urlString: string, maxRedirects = 5): Promise<Buf
     const isHttps = parsed.protocol === "https:";
     const lib = isHttps ? https : http;
 
-    const result = await new Promise<{ type: "data"; data: Buffer } | { type: "redirect"; url: string }>((resolve, reject) => {
+    const result = await new Promise<
+      { type: "data"; data: Buffer } | { type: "redirect"; url: string }
+    >((resolve, reject) => {
       const options: https.RequestOptions = {
         hostname: ip, // 直接IPへ接続
-        port: parsed.port ? parseInt(parsed.port, 10) : (isHttps ? 443 : 80),
+        port: parsed.port ? parseInt(parsed.port, 10) : isHttps ? 443 : 80,
         path: parsed.pathname + parsed.search,
         method: "GET",
         headers: {
@@ -96,15 +102,22 @@ export const getOgpInfo = action({
       let html = buffer.toString("utf-8");
       const metaCharsetMatch =
         html.match(/<meta[^>]*charset=["']?([\w-]+)/i) ||
-        html.match(/<meta[^>]*http-equiv=["']?content-type["']?[^>]*content=["']?[^"']*charset=([\w-]+)/i);
+        html.match(
+          /<meta[^>]*http-equiv=["']?content-type["']?[^>]*content=["']?[^"']*charset=([\w-]+)/i,
+        );
 
       if (metaCharsetMatch) {
         const detectedCharset = metaCharsetMatch[1].toLowerCase();
         if (detectedCharset !== "utf-8" && detectedCharset !== "utf8") {
           try {
-            html = new TextDecoder(detectedCharset).decode(new Uint8Array(buffer));
+            html = new TextDecoder(detectedCharset).decode(
+              new Uint8Array(buffer),
+            );
           } catch (e) {
-            console.warn(`Failed to decode with charset: ${detectedCharset}`, e);
+            console.warn(
+              `Failed to decode with charset: ${detectedCharset}`,
+              e,
+            );
           }
         }
       }
@@ -133,7 +146,11 @@ export const getOgpInfo = action({
       ).trim();
 
       // 4. OGP 画像の相対パスを解決
-      if (image && !image.startsWith("http://") && !image.startsWith("https://")) {
+      if (
+        image &&
+        !image.startsWith("http://") &&
+        !image.startsWith("https://")
+      ) {
         try {
           image = new URL(image, args.url).toString();
         } catch (e) {
@@ -150,5 +167,71 @@ export const getOgpInfo = action({
       console.error("OGP fetch failed:", error);
       return { title: "", image: "", description: "" };
     }
+  },
+});
+
+export const sendEmailReq = async ({
+  email,
+  subject,
+  body,
+}: {
+  email: string;
+  subject: string;
+  body: string;
+}): Promise<boolean> => {
+  try {
+    const mailAccessToken = process.env.KUROCO_MAIL_ACCESS_TOKEN;
+    const mailApiBaseUrl = process.env.KUROCO_MAIL_API_BASE_URL;
+    if (!mailAccessToken || !mailApiBaseUrl) {
+      throw new Error("Mail access token or API base URL is not defined");
+    }
+    const response = await fetch(`${mailApiBaseUrl}/email/send`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-rcms-api-access-token": mailAccessToken,
+      },
+      body: JSON.stringify({
+        email,
+        subject,
+        body,
+      }),
+    });
+    const resultObject = (await response.json()) as { result: boolean };
+    return resultObject.result;
+  } catch (error) {
+    console.error("Email send failed:", error);
+    return false;
+  }
+};
+
+export const sendEmail = action({
+  args: { userId: v.id("users"), subject: v.string(), body: v.string() },
+  handler: async (ctx, args): Promise<boolean> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthenticated call to sendEmail");
+    }
+
+    const user = await ctx.runQuery(internal.users.getUserById, {
+      id: args.userId,
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    return sendEmailReq({
+      email: user.email,
+      subject: args.subject,
+      body: args.body,
+    });
+  },
+});
+
+export const sendEmailInternal = internalAction({
+  args: { email: v.string(), subject: v.string(), body: v.string() },
+  handler: async (_ctx, args): Promise<boolean> => {
+    return sendEmailReq(args);
   },
 });

@@ -1,7 +1,7 @@
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
 import { z } from "zod";
-import { RecordInputSchema, CredentialInputSchema } from "../src/utils/schemas";
+import { CredentialInputSchema, RecordInputSchema } from "../src/utils/schemas";
+import { mutation, query } from "./_generated/server";
 
 const ConvexCredentialInputSchema = CredentialInputSchema.extend({
   id: z.string(),
@@ -46,7 +46,7 @@ export const getRecords = query({
       ? await ctx.db
           .query("serviceRecords")
           .withIndex("by_familyId_visibility", (q) =>
-            q.eq("familyId", user.familyId).eq("visibility", "SHARED")
+            q.eq("familyId", user.familyId).eq("visibility", "SHARED"),
           )
           .collect()
       : [];
@@ -58,7 +58,7 @@ export const getRecords = query({
     ];
 
     if (args.tag) {
-      records = records.filter((r) => r.tags.includes(args.tag!));
+      records = records.filter((r) => r.tags.includes(args.tag as string));
     }
 
     if (args.q) {
@@ -70,8 +70,8 @@ export const getRecords = query({
           r.credentials.some(
             (c) =>
               c.label?.toLowerCase().includes(q) ||
-              c.loginId?.toLowerCase().includes(q)
-          )
+              c.loginId?.toLowerCase().includes(q),
+          ),
       );
     }
 
@@ -79,8 +79,10 @@ export const getRecords = query({
     records.sort((a, b) => {
       if (args.sort === "name-asc") return a.title.localeCompare(b.title);
       if (args.sort === "name-desc") return b.title.localeCompare(a.title);
-      if (args.sort === "url-asc") return (a.url || "").localeCompare(b.url || "");
-      if (args.sort === "url-desc") return (b.url || "").localeCompare(a.url || "");
+      if (args.sort === "url-asc")
+        return (a.url || "").localeCompare(b.url || "");
+      if (args.sort === "url-desc")
+        return (b.url || "").localeCompare(a.url || "");
       // default: updatedAt-desc
       return b.updatedAt - a.updatedAt;
     });
@@ -110,7 +112,9 @@ export const getRecordDetail = query({
 
     const hasAccess =
       record.userId === userId ||
-      (user && record.familyId === user.familyId && record.visibility === "SHARED");
+      (user &&
+        record.familyId === user.familyId &&
+        record.visibility === "SHARED");
 
     if (!hasAccess) {
       throw new Error("Access denied");
@@ -156,7 +160,7 @@ export const getAvailableTags = query({
       ? await ctx.db
           .query("serviceRecords")
           .withIndex("by_familyId_visibility", (q) =>
-            q.eq("familyId", user.familyId).eq("visibility", "SHARED")
+            q.eq("familyId", user.familyId).eq("visibility", "SHARED"),
           )
           .collect()
       : [];
@@ -195,7 +199,7 @@ export const createRecord = mutation({
         loginId: v.optional(v.string()),
         passwordHint: v.optional(v.string()),
         passwordHintIv: v.optional(v.string()),
-      })
+      }),
     ),
     tags: v.array(v.string()),
   },
@@ -203,7 +207,7 @@ export const createRecord = mutation({
     const parsed = ConvexRecordInputSchema.safeParse(args);
     if (!parsed.success) {
       throw new Error(
-        `Validation failed: ${parsed.error.issues.map((i) => i.message).join(", ")}`
+        `Validation failed: ${parsed.error.issues.map((i) => i.message).join(", ")}`,
       );
     }
 
@@ -254,7 +258,7 @@ export const updateRecord = mutation({
           loginId: v.optional(v.string()),
           passwordHint: v.optional(v.string()),
           passwordHintIv: v.optional(v.string()),
-        })
+        }),
       ),
       tags: v.array(v.string()),
     }),
@@ -263,7 +267,7 @@ export const updateRecord = mutation({
     const parsed = ConvexRecordInputSchema.safeParse(args.data);
     if (!parsed.success) {
       throw new Error(
-        `Validation failed: ${parsed.error.issues.map((i) => i.message).join(", ")}`
+        `Validation failed: ${parsed.error.issues.map((i) => i.message).join(", ")}`,
       );
     }
 
@@ -344,10 +348,10 @@ export const importRecords = mutation({
             loginId: v.optional(v.string()),
             passwordHint: v.optional(v.string()),
             passwordHintIv: v.optional(v.string()),
-          })
+          }),
         ),
         tags: v.array(v.string()),
-      })
+      }),
     ),
   },
   handler: async (ctx, args) => {
@@ -379,7 +383,9 @@ export const importRecords = mutation({
         if (!parsed.success) {
           failures.push({
             row: i + 1,
-            reason: parsed.error.issues.map((issue) => issue.message).join(", "),
+            reason: parsed.error.issues
+              .map((issue) => issue.message)
+              .join(", "),
           });
           continue;
         }
