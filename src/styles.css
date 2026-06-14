@@ -12,6 +12,8 @@ body {
   font-variant-ligatures: common-ligatures;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-wrap: anywhere;
+  word-break: auto-phrase;
 }
 
 code {

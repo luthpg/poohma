@@ -76,7 +76,12 @@ export function useExportCsv() {
         }),
       );
 
-      const csv = Papa.unparse(decryptedData);
+      const columns = ["Title", "URL", "Memo", "Visibility", "Tags"];
+      for (let i = 1; i <= 10; i++) {
+        columns.push(`Label${i}`, `LoginID${i}`, `PasswordHint${i}`);
+      }
+
+      const csv = Papa.unparse(decryptedData, { columns });
       // Excelの文字化け対策としてBOM (UTF-8) を付与
       const bom = new Uint8Array([0xef, 0xbb, 0xbf]);
       const blob = new Blob([bom, csv], { type: "text/csv;charset=utf-8;" });
