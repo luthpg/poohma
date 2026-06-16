@@ -48,6 +48,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useExportCsv } from "@/hooks/use-export-csv";
 import { clearQueryCache } from "@/hooks/usePersistentQuery";
 import { logout } from "@/services/auth.functions";
+import { processInChunks } from "@/utils/chunk-processor";
 import { auth } from "@/utils/firebase";
 
 export function UserMenu({
@@ -107,6 +108,20 @@ export function UserMenu({
             return;
           }
 
+          // --- 早期バリデーション (Fail Fast) ---
+          const isOversized = data.some((row) =>
+            Object.values(row).some((val) => val && val.length > 10000),
+          );
+          if (isOversized) {
+            toast.error(
+              "文字数が上限（10,000文字）を超えているフィールドが含まれています。",
+              { id: toastId, duration: 8000 },
+            );
+            setIsImporting(false);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+            return;
+          }
+
           let hasHintsToEncrypt = false;
           for (const row of data) {
             for (let i = 1; i <= 10; i++) {
@@ -127,8 +142,9 @@ export function UserMenu({
             }
           }
 
-          const encryptedData = await Promise.all(
-            data.map(async (row) => {
+          const encryptedData = await processInChunks(
+            data,
+            async (row) => {
               const newRow = { ...row };
 
               // OGP情報を取得（既に画像や説明がある場合はスキップ）
@@ -154,7 +170,14 @@ export function UserMenu({
                 }
               }
               return newRow;
-            }),
+            },
+            10, // 10件ごとにスレッドを解放
+            (current, total) => {
+              // オプション: トーストのメッセージを更新して進捗を伝える
+              toast.loading(`データを処理中... (${current}/${total})`, {
+                id: toastId,
+              });
+            },
           );
 
           const recordsToImport = encryptedData.map((row) => {

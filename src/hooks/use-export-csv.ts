@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import { usePasscode } from "@/components/PasscodeProvider";
+import { sanitizeCsvValue } from "@/utils/csv-sanitize";
 
 export function useExportCsv() {
   const [isExporting, setIsExporting] = useState(false);
@@ -58,12 +59,20 @@ export function useExportCsv() {
       const decryptedData = await Promise.all(
         data.map(async (row) => {
           const newRow = { ...row };
+
+          // サニタイズを適用
+          for (const key of Object.keys(row)) {
+            newRow[key] = sanitizeCsvValue(row[key]);
+          }
+
           for (let i = 1; i <= 10; i++) {
             const hint = newRow[`PasswordHint${i}`];
             const iv = newRow[`PasswordHintIv${i}`];
             if (hint && iv) {
               try {
-                newRow[`PasswordHint${i}`] = await decryptHint(hint, iv);
+                const plainHint = await decryptHint(hint, iv);
+                // サニタイズを適用
+                newRow[`PasswordHint${i}`] = sanitizeCsvValue(plainHint);
               } catch (e) {
                 console.error("Failed to decrypt hint for export", e);
                 newRow[`PasswordHint${i}`] = "";
