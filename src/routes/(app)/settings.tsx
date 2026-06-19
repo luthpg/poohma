@@ -9,6 +9,7 @@ import { AlertTriangle, Download } from "lucide-react";
 import { type SubmitEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
+import { usePasscode } from "@/components/PasscodeProvider";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +24,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { useExportCsv } from "@/hooks/use-export-csv";
 import { clearQueryCache } from "@/hooks/usePersistentQuery";
+import { isBiometricEnabledForUser } from "@/lib/biometric";
 import { auth } from "@/utils/firebase";
 
 export const Route = createFileRoute("/(app)/settings")({
@@ -41,12 +43,29 @@ function SettingsComponent() {
   const { user } = routeApi.useLoaderData();
   const router = useRouter();
   const { queryClient } = Route.useRouteContext();
+  const { disableBiometric } = usePasscode();
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
   const [displayName, setDisplayName] = useState(user.displayName || "");
+  const [hasBiometric, setHasBiometric] = useState(false);
+
+  useEffect(() => {
+    isBiometricEnabledForUser(user.id).then(setHasBiometric);
+  }, [user.id]);
+
+  const handleClearBiometric = async () => {
+    try {
+      await disableBiometric();
+      setHasBiometric(false);
+      toast.success("この端末の生体認証データを削除しました");
+    } catch (error) {
+      console.error(error);
+      toast.error("生体認証データの削除に失敗しました");
+    }
+  };
 
   // ローダーデータの user.displayName が変わった場合にフォームの値を同期
   useEffect(() => {
@@ -204,6 +223,31 @@ function SettingsComponent() {
           </div>
         </form>
       </div>
+
+      {hasBiometric && (
+        <div className="rounded-lg bg-card p-6 shadow-card border border-border/50 mt-8">
+          <h2 className="text-[18px] font-semibold text-foreground tracking-geist-ui mb-2">
+            セキュリティ設定
+          </h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-6">
+            <div>
+              <p className="text-[14px] font-medium text-foreground">
+                生体認証の解除
+              </p>
+              <p className="text-[12px] text-muted-foreground mt-1">
+                この端末に保存されている生体認証（FaceID/指紋）のロック解除設定を削除します。
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleClearBiometric}
+              className="rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+            >
+              設定を削除
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Danger Zone */}
       <div className="mt-8 rounded-lg border border-red-500/20 bg-red-500/5 p-6 shadow-sm">

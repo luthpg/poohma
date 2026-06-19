@@ -1,5 +1,5 @@
 import { useRouteContext } from "@tanstack/react-router";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Fingerprint } from "lucide-react";
 import type React from "react";
 import {
   createContext,
@@ -19,6 +19,13 @@ import {
 } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import {
+  decryptPasscodeWithBiometrics,
+  disableBiometricUnlock,
+  isBiometricEnabledForUser,
+  isBiometricSupported,
+  registerBiometricUnlock,
+} from "@/lib/biometric";
+import {
   decrypt,
   deriveKeyFromPasscode,
   encrypt,
@@ -33,6 +40,7 @@ interface FamilyE2EE {
 }
 
 interface AuthUser {
+  id: string;
   familyId: string | null;
   family: FamilyE2EE | null;
 }
@@ -44,6 +52,7 @@ interface PasscodeContextType {
   decryptHint: (encrypted: string, iv: string) => Promise<string>;
   encryptHint: (text: string) => Promise<{ encrypted: string; iv: string }>;
   isLocked: boolean;
+  disableBiometric: () => Promise<void>;
 }
 
 const PasscodeContext = createContext<PasscodeContextType | null>(null);
@@ -60,6 +69,37 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
   const [isPromptOpen, setIsPromptOpen] = useState(false);
   const [showPasscode, setShowPasscode] = useState(false);
   const resolvePromiseRef = useRef<((value: boolean) => void) | null>(null);
+
+  // 生体認証ステート
+  const [biometricSupported, setBiometricSupported] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [shouldRegisterBiometric, setShouldRegisterBiometric] = useState(false);
+  const [isBiometricAuthenticating, setIsBiometricAuthenticating] =
+    useState(false);
+
+  // 生体認証のサポート状況と有効状態をチェック
+  useEffect(() => {
+    let isMounted = true;
+    const checkBiometrics = async () => {
+      const supported = await isBiometricSupported();
+      if (!isMounted) return;
+      setBiometricSupported(supported);
+
+      if (supported && user?.id) {
+        const enabled = await isBiometricEnabledForUser(user.id);
+        if (!isMounted) return;
+        setBiometricEnabled(enabled);
+      } else {
+        if (!isMounted) return;
+        setBiometricEnabled(false);
+      }
+    };
+
+    checkBiometrics();
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id]);
 
   const unlock = useCallback(
     async (code: string) => {
@@ -121,12 +161,34 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
     });
   }, [isLocked, user]);
 
+  const disableBiometric = useCallback(async () => {
+    if (!user?.id) return;
+    await disableBiometricUnlock(user.id);
+    setBiometricEnabled(false); // グローバルなステートもオフにする
+  }, [user?.id]);
+
   const handleUnlockSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
     const success = await unlock(passcode);
     if (success) {
       setIsPromptOpen(false);
+
+      // パスコード認証成功後に生体認証登録を行う
+      if (shouldRegisterBiometric && user?.id) {
+        try {
+          await registerBiometricUnlock(user.id, passcode);
+          setBiometricEnabled(true);
+          toast.success("指紋/FaceIDでのロック解除を有効にしました。");
+        } catch (error) {
+          console.error("Biometric registration failed:", error);
+          if (error instanceof Error && error.name !== "NotAllowedError") {
+            toast.error("生体認証の登録に失敗しました。");
+          }
+        }
+      }
+
       setPasscode("");
+      setShouldRegisterBiometric(false);
       if (resolvePromiseRef.current) {
         resolvePromiseRef.current(true);
         resolvePromiseRef.current = null;
@@ -134,9 +196,34 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const handleBiometricUnlock = async () => {
+    if (!user?.id) return;
+    try {
+      setIsBiometricAuthenticating(true);
+      const decryptedPasscode = await decryptPasscodeWithBiometrics(user.id);
+      const success = await unlock(decryptedPasscode);
+      if (success) {
+        setIsPromptOpen(false);
+        setPasscode("");
+        if (resolvePromiseRef.current) {
+          resolvePromiseRef.current(true);
+          resolvePromiseRef.current = null;
+        }
+      }
+    } catch (error) {
+      console.error("Biometric unlock failed:", error);
+      if (error instanceof Error && error.name !== "NotAllowedError") {
+        toast.error("生体認証によるロック解除に失敗しました。");
+      }
+    } finally {
+      setIsBiometricAuthenticating(false);
+    }
+  };
+
   const handleCancelUnlock = () => {
     setIsPromptOpen(false);
     setPasscode("");
+    setShouldRegisterBiometric(false);
     if (resolvePromiseRef.current) {
       resolvePromiseRef.current(false);
       resolvePromiseRef.current = null;
@@ -165,6 +252,7 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
         decryptHint,
         encryptHint,
         isLocked,
+        disableBiometric,
       }}
     >
       {children}
@@ -195,12 +283,13 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
                 placeholder="パスコード"
                 value={passcode}
                 onChange={(e) => setPasscode(e.target.value)}
-                disabled={isUnlocking}
+                disabled={isUnlocking || isBiometricAuthenticating}
               />
               <button
                 type="button"
                 onClick={() => setShowPasscode(!showPasscode)}
                 className="absolute inset-y-0 right-0 flex items-center pr-4 text-muted-foreground hover:text-foreground"
+                disabled={isUnlocking || isBiometricAuthenticating}
               >
                 {showPasscode ? (
                   <EyeOff className="h-5 w-5" />
@@ -209,19 +298,56 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
                 )}
               </button>
             </div>
+
+            {/* 生体認証サポートあり＆未有効化の場合の登録チェックボックス */}
+            {biometricSupported && !biometricEnabled && (
+              <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={shouldRegisterBiometric}
+                  onChange={(e) => setShouldRegisterBiometric(e.target.checked)}
+                  disabled={isUnlocking || isBiometricAuthenticating}
+                  className="rounded border-border bg-background checked:bg-primary text-primary focus:ring-primary/20 h-4 w-4"
+                />
+                <span>次回から指紋/FaceIDでロック解除する</span>
+              </label>
+            )}
+
+            {/* 生体認証が有効な場合のクイック解除ボタン */}
+            {biometricEnabled && (
+              <button
+                type="button"
+                onClick={handleBiometricUnlock}
+                disabled={isUnlocking || isBiometricAuthenticating}
+                className="w-full flex items-center justify-center gap-2 rounded-lg border border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary py-3 font-semibold transition-all duration-200 shadow-sm disabled:opacity-50"
+              >
+                {isBiometricAuthenticating ? (
+                  <>
+                    <Spinner className="h-5 w-5 text-primary" />
+                    生体認証を検証中...
+                  </>
+                ) : (
+                  <>
+                    <Fingerprint className="h-5 w-5" />
+                    指紋 / FaceID でロック解除
+                  </>
+                )}
+              </button>
+            )}
+
             <div className="flex gap-3">
               <button
                 type="button"
                 onClick={handleCancelUnlock}
                 className="flex-1 rounded-lg border bg-background py-3 font-semibold text-foreground shadow-sm transition-all hover:bg-muted disabled:opacity-50"
-                disabled={isUnlocking}
+                disabled={isUnlocking || isBiometricAuthenticating}
               >
                 キャンセル
               </button>
               <button
                 type="submit"
                 className="flex-1 flex items-center justify-center rounded-lg bg-primary py-3 font-semibold text-primary-foreground shadow-lg transition-all hover:opacity-90 disabled:opacity-50"
-                disabled={isUnlocking || !passcode}
+                disabled={isUnlocking || !passcode || isBiometricAuthenticating}
               >
                 {isUnlocking ? (
                   <>
