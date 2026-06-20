@@ -230,11 +230,7 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  useEffect(() => {
-    if (isPromptOpen) {
-      passcodeInputRef.current?.focus();
-    }
-  }, [isPromptOpen]);
+  // 変更点1: 自動でフォーカスを当てていた useEffect を削除しました。
 
   // ユーザーや家族IDが変わったら（ログアウトなど）鍵をクリアする
   // biome-ignore lint/correctness/useExhaustiveDependencies: clear key when familyId changes
@@ -263,6 +259,8 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
           showCloseButton={false}
           onInteractOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
+          // 変更点2: ダイアログが開いた際のRadix UI独自の自動フォーカス挙動を抑制
+          onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold tracking-tight">
@@ -301,7 +299,15 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
 
             {/* 生体認証サポートあり＆未有効化の場合の登録チェックボックス */}
             {biometricSupported && !biometricEnabled && (
-              <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+              <label 
+                className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none"
+                // 変更点3: inputにフォーカスがある場合のみ、クリック時のフォーカス移動をキャンセルさせる
+                onMouseDown={(e) => {
+                  if (document.activeElement === passcodeInputRef.current) {
+                    e.preventDefault();
+                  }
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={shouldRegisterBiometric}
