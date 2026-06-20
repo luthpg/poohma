@@ -50,7 +50,7 @@ export const getFamilyMembersInternal = internalQuery({
   },
 });
 
-export const getFamilyMembers = familyBoundQuery({
+export const getFamilyMembers = authenticatedQuery({
   args: {},
   handler: async (ctx) => {
     const { user } = ctx;
