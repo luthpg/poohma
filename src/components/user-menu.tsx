@@ -402,7 +402,7 @@ export function UserMenu({
                 <AlertDialogCancel>キャンセル</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={handleLogout}
-                  className="bg-red-500 hover:bg-red-600 focus:ring-red-500"
+                  className="text-white bg-red-500 hover:bg-red-600 focus:ring-red-500"
                 >
                   ログアウト
                 </AlertDialogAction>

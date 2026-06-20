@@ -32,19 +32,6 @@ import {
   unwrapMasterKey,
 } from "@/lib/crypto";
 
-interface FamilyE2EE {
-  name: string;
-  masterKeyEncrypted: string | null;
-  masterKeyIv: string | null;
-  masterKeySalt: string | null;
-}
-
-interface AuthUser {
-  id: string;
-  familyId: string | null;
-  family: FamilyE2EE | null;
-}
-
 interface PasscodeContextType {
   masterKey: CryptoKey | null;
   unlock: (passcode: string) => Promise<boolean>;
@@ -58,9 +45,7 @@ interface PasscodeContextType {
 const PasscodeContext = createContext<PasscodeContextType | null>(null);
 
 export function PasscodeProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useRouteContext({ from: "__root__" }) as {
-    user: AuthUser | null;
-  };
+  const { user } = useRouteContext({ from: "__root__" });
   const passcodeInputRef = useRef<HTMLInputElement>(null);
   const [masterKey, setMasterKey] = useState<CryptoKey | null>(null);
   const masterKeyRef = useRef<CryptoKey | null>(null);
@@ -165,6 +150,9 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
     if (!user?.id) return;
     await disableBiometricUnlock(user.id);
     setBiometricEnabled(false); // グローバルなステートもオフにする
+    // ロック解除した状態をリセット
+    setMasterKey(null);
+    masterKeyRef.current = null;
   }, [user?.id]);
 
   const handleUnlockSubmit = async (e: React.SubmitEvent) => {
@@ -176,7 +164,11 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
       // パスコード認証成功後に生体認証登録を行う
       if (shouldRegisterBiometric && user?.id) {
         try {
-          await registerBiometricUnlock(user.id, passcode);
+          await registerBiometricUnlock(
+            user.id,
+            passcode,
+            `${user.email}${user?.family != null ? ` [${user.family.name}]` : ""}`,
+          );
           setBiometricEnabled(true);
           toast.success("指紋/FaceIDでのロック解除を有効にしました。");
         } catch (error) {
@@ -230,7 +222,12 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // 変更点1: 自動でフォーカスを当てていた useEffect を削除しました。
+  useEffect(() => {
+    // パスコード入力ダイアログが表示されていて、かつ生体認証が利用できない場合は、パスコード入力欄にフォーカスする
+    if (isPromptOpen && (!biometricSupported || !biometricEnabled)) {
+      passcodeInputRef.current?.focus();
+    }
+  }, [isPromptOpen, biometricEnabled, biometricSupported]);
 
   // ユーザーや家族IDが変わったら（ログアウトなど）鍵をクリアする
   // biome-ignore lint/correctness/useExhaustiveDependencies: clear key when familyId changes
@@ -259,7 +256,6 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
           showCloseButton={false}
           onInteractOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
-          // 変更点2: ダイアログが開いた際のRadix UI独自の自動フォーカス挙動を抑制
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <DialogHeader>
@@ -288,6 +284,12 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
                 onClick={() => setShowPasscode(!showPasscode)}
                 className="absolute inset-y-0 right-0 flex items-center pr-4 text-muted-foreground hover:text-foreground"
                 disabled={isUnlocking || isBiometricAuthenticating}
+                // inputにフォーカスがある場合のみ、クリック時のフォーカス移動をキャンセルさせる
+                onMouseDown={(e) => {
+                  if (document.activeElement === passcodeInputRef.current) {
+                    e.preventDefault();
+                  }
+                }}
               >
                 {showPasscode ? (
                   <EyeOff className="h-5 w-5" />
@@ -299,24 +301,48 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
 
             {/* 生体認証サポートあり＆未有効化の場合の登録チェックボックス */}
             {biometricSupported && !biometricEnabled && (
-              <label 
-                className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none"
-                // 変更点3: inputにフォーカスがある場合のみ、クリック時のフォーカス移動をキャンセルさせる
-                onMouseDown={(e) => {
-                  if (document.activeElement === passcodeInputRef.current) {
-                    e.preventDefault();
-                  }
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={shouldRegisterBiometric}
-                  onChange={(e) => setShouldRegisterBiometric(e.target.checked)}
-                  disabled={isUnlocking || isBiometricAuthenticating}
-                  className="rounded border-border bg-background checked:bg-primary text-primary focus:ring-primary/20 h-4 w-4"
-                />
-                <span>次回から指紋/FaceIDでロック解除する</span>
-              </label>
+              <div className="flex flex-col gap-2">
+                <label
+                  className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none"
+                  // inputにフォーカスがある場合のみ、クリック時のフォーカス移動をキャンセルさせる
+                  onMouseDown={(e) => {
+                    if (document.activeElement === passcodeInputRef.current) {
+                      e.preventDefault();
+                    }
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={shouldRegisterBiometric}
+                    onChange={(e) =>
+                      setShouldRegisterBiometric(e.target.checked)
+                    }
+                    disabled={isUnlocking || isBiometricAuthenticating}
+                    className="rounded border-border bg-background checked:bg-primary text-primary focus:ring-primary/20 h-4 w-4"
+                  />
+                  <span>次回から指紋/FaceIDでロック解除する</span>
+                </label>
+                <details className="text-xs text-muted-foreground/80 cursor-pointer select-none">
+                  <summary className="hover:text-foreground transition-colors">
+                    iPhoneでお使いになれない場合
+                  </summary>
+                  <div className="mt-2 p-3 rounded-lg bg-muted/50 space-y-2 leading-relaxed">
+                    <p>
+                      <strong>① 自動入力の設定チェック</strong>
+                      <br />
+                      iPhoneの「設定」アプリ
+                      ＞「パスワード」＞「パスワードのオプション」で、
+                      <strong>「パスキーとパスワードを自動入力」をオン</strong>
+                      にしてください。
+                    </p>
+                    <p>
+                      <strong>② タブの種類をチェック</strong>
+                      <br />
+                      Safariの「プライベートブラウズ」では動かない場合があります。通常のタブでお試しください。
+                    </p>
+                  </div>
+                </details>
+              </div>
             )}
 
             {/* 生体認証が有効な場合のクイック解除ボタン */}

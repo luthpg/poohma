@@ -46,6 +46,7 @@ export async function isBiometricEnabledForUser(
 export async function registerBiometricUnlock(
   userId: string,
   passcode: string,
+  displayName?: string,
 ): Promise<void> {
   if (!userId) {
     throw new Error(
@@ -75,8 +76,8 @@ export async function registerBiometricUnlock(
     },
     user: {
       id: userIdBytes,
-      name: userId, // ユーザーの一意な識別子
-      displayName: `PoohMa User (${userId.slice(0, 8)}...)`,
+      name: displayName ?? userId, // ユーザーの一意な識別子
+      displayName: displayName ?? `PoohMa User (${userId.slice(0, 8)}...)`,
     },
     pubKeyCredParams: [
       { type: "public-key", alg: -7 }, // ES256

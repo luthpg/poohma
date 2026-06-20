@@ -1,9 +1,9 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useConvex, useConvexAuth, useMutation, useQuery } from "convex/react";
 import { signOut } from "firebase/auth";
-import { Eye, EyeOff } from "lucide-react";
+import { Check, Eye, EyeOff, X } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
@@ -80,6 +80,14 @@ function FamilyComponent() {
   const family = useQuery(
     api.families.getFamilyMembers,
     isAuthenticated ? {} : "skip",
+  );
+  const myJoinRequest = useQuery(
+    api.families.getMyJoinRequest,
+    isAuthenticated ? {} : "skip",
+  );
+  const pendingRequests = useQuery(
+    api.families.getPendingRequests,
+    isAuthenticated && family ? {} : "skip",
   );
   const search = Route.useSearch();
   const router = useRouter();
@@ -175,8 +183,14 @@ function FamilyComponent() {
   };
 
   const createFamilyMut = useMutation(api.families.createFamily);
-  const joinFamilyMut = useMutation(api.families.joinFamily);
   const changeFamilyMut = useMutation(api.families.changeFamily);
+  const createJoinRequestMut = useMutation(api.families.createJoinRequest);
+  const cancelJoinRequestMut = useMutation(api.families.cancelJoinRequest);
+  const dismissRejectedRequestMut = useMutation(
+    api.families.dismissRejectedRequest,
+  );
+  const approveJoinRequestMut = useMutation(api.families.approveJoinRequest);
+  const rejectJoinRequestMut = useMutation(api.families.rejectJoinRequest);
 
   const [createName, setCreateName] = useState("");
   const [createPasscode, setCreatePasscode] = useState("");
@@ -193,57 +207,36 @@ function FamilyComponent() {
   const [isChangingFamily, setIsChangingFamily] = useState(
     !!search.inviteCode && family !== undefined && family !== null,
   );
-  const autoJoinTriggered = useRef(false);
 
-  const executeJoin = useCallback(
+  // 参加申請を送信する
+  const handleSendJoinRequest = useCallback(
     async (code: string) => {
       setIsLoading(true);
       try {
-        await joinFamilyMut({ inviteCode: code as Id<"families"> });
-        await queryClient.invalidateQueries({ queryKey: ["authUser"] });
-        toast.success("家族グループに参加しました");
-        await router.invalidate();
-      } catch {
-        toast.error("参加に失敗しました");
+        await createJoinRequestMut({
+          inviteCode: code as Id<"families">,
+        });
+        toast.success(
+          "参加申請を送信しました。家族メンバーの承認をお待ちください。",
+        );
+      } catch (error) {
+        const msg =
+          error instanceof Error ? error.message : "参加申請に失敗しました";
+        toast.error(msg);
       } finally {
         setIsLoading(false);
       }
     },
-    [router, joinFamilyMut, queryClient],
+    [createJoinRequestMut],
   );
 
-  // 招待コードがURLにあり、家族未所属の場合は自動で参加を発火
-  useEffect(() => {
-    if (search.inviteCode && !family && !autoJoinTriggered.current) {
-      autoJoinTriggered.current = true;
-      executeJoin(search.inviteCode);
-    }
-  }, [search.inviteCode, family, executeJoin]);
+  // 家族移行（既存メンバーが承認後に移行を完了する）
+  const handleCompleteTransfer = useCallback(async () => {
+    if (myJoinRequest?.status !== "approved") return;
 
-  // family がまだロード中の場合はペンディングコンポーネントを表示
-  if (family === undefined) {
-    return <FamilyPending />;
-  }
-
-  const handleChangeFamily = async (
-    action: "create" | "join",
-    e: React.SubmitEvent,
-  ) => {
-    e.preventDefault();
-    if (action === "create") {
-      if (createPasscode.length < 8) {
-        toast.error("パスコードは8文字以上にしてください");
-        return;
-      }
-      if (createPasscode !== createPasscodeConfirm) {
-        toast.error("パスコードが一致しません");
-        return;
-      }
-    } else {
-      if (!joinCode || joinPasscode.length < 8) {
-        toast.error("招待コードとパスコードを入力してください（8文字以上）");
-        return;
-      }
+    if (!joinPasscode || joinPasscode.length < 8) {
+      toast.error("新しい家族のパスコードを入力してください（8文字以上）");
+      return;
     }
 
     setIsLoading(true);
@@ -257,43 +250,27 @@ function FamilyComponent() {
         }
       }
 
-      // 2. 新しいマスターキーの準備
-      let newMasterKeyEncrypted: string | undefined;
-      let newMasterKeyIv: string | undefined;
-      let newMasterKeySalt: string | undefined;
-      let newMasterKey: CryptoKey;
-
-      if (action === "create") {
-        const salt = generateSalt();
-        const passcodeKey = await deriveKeyFromPasscode(createPasscode, salt);
-        newMasterKey = await generateMasterKey();
-        const wrapped = await wrapMasterKey(newMasterKey, passcodeKey);
-
-        newMasterKeyEncrypted = wrapped.encrypted;
-        newMasterKeyIv = wrapped.iv;
-        newMasterKeySalt = salt;
-      } else {
-        const existingFamily = await convex.query(
-          api.families.getFamilyInfoByInviteCode,
-          { inviteCode: joinCode as Id<"families"> },
-        );
-        if (
-          !existingFamily.masterKeyEncrypted ||
-          !existingFamily.masterKeyIv ||
-          !existingFamily.masterKeySalt
-        ) {
-          throw new Error("既存家族の暗号化情報が不正です");
-        }
-        const wrappingKey = await deriveKeyFromPasscode(
-          joinPasscode,
-          existingFamily.masterKeySalt,
-        );
-        newMasterKey = await unwrapMasterKey(
-          existingFamily.masterKeyEncrypted,
-          existingFamily.masterKeyIv,
-          wrappingKey,
-        );
+      // 2. 移行先の家族情報を取得
+      const existingFamily = await convex.query(
+        api.families.getFamilyInfoByInviteCode,
+        { inviteCode: myJoinRequest.familyId as Id<"families"> },
+      );
+      if (
+        !existingFamily.masterKeyEncrypted ||
+        !existingFamily.masterKeyIv ||
+        !existingFamily.masterKeySalt
+      ) {
+        throw new Error("既存家族の暗号化情報が不正です");
       }
+      const wrappingKey = await deriveKeyFromPasscode(
+        joinPasscode,
+        existingFamily.masterKeySalt,
+      );
+      const newMasterKey = await unwrapMasterKey(
+        existingFamily.masterKeyEncrypted,
+        existingFamily.masterKeyIv,
+        wrappingKey,
+      );
 
       // 3. 所有するレコードの再暗号化
       const recordsToReEncrypt = await convex.query(
@@ -309,12 +286,10 @@ function FamilyComponent() {
       for (const record of recordsToReEncrypt) {
         for (const cred of record.credentials) {
           if (cred.passwordHint && cred.passwordHintIv) {
-            // 復号
             const plainHint = await decryptHint(
               cred.passwordHint,
               cred.passwordHintIv,
             );
-            // 新しいマスターキーで暗号化
             const { encrypted, iv } = await encrypt(plainHint, newMasterKey);
             reEncryptedCredentials.push({
               id: cred.id,
@@ -327,12 +302,8 @@ function FamilyComponent() {
 
       // 4. サーバーへ送信
       await changeFamilyMut({
-        action,
-        name: action === "create" ? createName : undefined,
-        masterKeyEncrypted: newMasterKeyEncrypted,
-        masterKeyIv: newMasterKeyIv,
-        masterKeySalt: newMasterKeySalt,
-        inviteCode: action === "join" ? joinCode : undefined,
+        action: "join",
+        inviteCode: myJoinRequest.familyId,
         credentials: reEncryptedCredentials,
       });
 
@@ -347,6 +318,102 @@ function FamilyComponent() {
       );
     } finally {
       setIsLoading(false);
+    }
+  }, [
+    myJoinRequest,
+    joinPasscode,
+    masterKey,
+    requireUnlock,
+    convex,
+    decryptHint,
+    changeFamilyMut,
+    queryClient,
+    router,
+  ]);
+
+  const handleChangeFamily = async (
+    action: "create" | "join",
+    e: React.SubmitEvent,
+  ) => {
+    e.preventDefault();
+    if (action === "create") {
+      if (createPasscode.length < 8) {
+        toast.error("パスコードは8文字以上にしてください");
+        return;
+      }
+      if (createPasscode !== createPasscodeConfirm) {
+        toast.error("パスコードが一致しません");
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        // 1. セッションに旧マスターキーがあるか確認、なければロック解除を要求
+        if (!masterKey) {
+          const unlocked = await requireUnlock();
+          if (!unlocked) {
+            setIsLoading(false);
+            return;
+          }
+        }
+
+        // 2. 新しいマスターキーの準備
+        const salt = generateSalt();
+        const passcodeKey = await deriveKeyFromPasscode(createPasscode, salt);
+        const newMasterKey = await generateMasterKey();
+        const wrapped = await wrapMasterKey(newMasterKey, passcodeKey);
+
+        // 3. 所有するレコードの再暗号化
+        const recordsToReEncrypt = await convex.query(
+          api.families.getRecordsForReEncryption,
+          {},
+        );
+        const reEncryptedCredentials: {
+          id: string;
+          passwordHint: string;
+          passwordHintIv: string;
+        }[] = [];
+
+        for (const record of recordsToReEncrypt) {
+          for (const cred of record.credentials) {
+            if (cred.passwordHint && cred.passwordHintIv) {
+              const plainHint = await decryptHint(
+                cred.passwordHint,
+                cred.passwordHintIv,
+              );
+              const { encrypted, iv } = await encrypt(plainHint, newMasterKey);
+              reEncryptedCredentials.push({
+                id: cred.id,
+                passwordHint: encrypted,
+                passwordHintIv: iv,
+              });
+            }
+          }
+        }
+
+        // 4. サーバーへ送信
+        await changeFamilyMut({
+          action: "create",
+          name: createName,
+          masterKeyEncrypted: wrapped.encrypted,
+          masterKeyIv: wrapped.iv,
+          masterKeySalt: salt,
+          credentials: reEncryptedCredentials,
+        });
+
+        await queryClient.invalidateQueries({ queryKey: ["authUser"] });
+        toast.success("家族グループを変更し、データを移行しました");
+        setIsChangingFamily(false);
+        await router.invalidate();
+      } catch (error) {
+        console.error(error);
+        toast.error("家族の変更に失敗しました");
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      // 「参加」の場合は、承認制のためリクエスト送信に切り替え
+      await handleSendJoinRequest(joinCode);
     }
   };
 
@@ -386,8 +453,248 @@ function FamilyComponent() {
 
   const handleJoin = async (e: React.SubmitEvent) => {
     e.preventDefault();
-    await executeJoin(joinCode);
+    await handleSendJoinRequest(joinCode);
   };
+
+  // family がまだロード中の場合はペンディングコンポーネントを表示
+  if (family === undefined) {
+    return <FamilyPending />;
+  }
+
+  // 保留中・却下済み申請がある場合のUI（家族未所属ユーザー向け）
+  if (!family && myJoinRequest) {
+    return (
+      <div className="mx-auto max-w-3xl p-6">
+        <div className="mb-8 flex items-center justify-between">
+          <h1 className="text-[32px] font-semibold tracking-geist-h1 text-foreground">
+            家族管理
+          </h1>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="rounded-md bg-card px-4 py-2 text-[14px] font-medium text-red-500 shadow-border hover:bg-accent transition cursor-pointer"
+          >
+            ログアウト
+          </button>
+        </div>
+
+        {myJoinRequest.status === "pending" && (
+          <div className="rounded-lg bg-card p-6 shadow-card transition-shadow">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-500/10">
+                <Spinner className="h-5 w-5 text-orange-500" />
+              </div>
+              <div>
+                <h2 className="text-[18px] font-semibold tracking-geist-ui text-foreground">
+                  承認待ち
+                </h2>
+                <p className="text-[13px] text-muted-foreground">
+                  家族「{myJoinRequest.familyName}」への参加申請を送信しました
+                </p>
+              </div>
+            </div>
+            <p className="text-[14px] text-muted-foreground leading-relaxed mb-6">
+              家族メンバーがあなたの参加申請を承認するまでお待ちください。
+              承認されると自動的に家族グループに参加できます。
+            </p>
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={async () => {
+                setIsLoading(true);
+                try {
+                  await cancelJoinRequestMut({
+                    requestId: myJoinRequest.id as Id<"joinRequests">,
+                  });
+                  toast.success("参加申請をキャンセルしました");
+                } catch {
+                  toast.error("キャンセルに失敗しました");
+                } finally {
+                  setIsLoading(false);
+                }
+              }}
+              className="flex items-center justify-center w-full rounded-md bg-card px-4 py-2.5 text-[14px] font-medium text-red-500 shadow-border transition hover:bg-accent disabled:opacity-50 cursor-pointer"
+            >
+              {isLoading ? (
+                <>
+                  <Spinner className="mr-2 h-4 w-4" />
+                  キャンセル中...
+                </>
+              ) : (
+                "参加申請をキャンセル"
+              )}
+            </button>
+          </div>
+        )}
+
+        {myJoinRequest.status === "rejected" && (
+          <div className="rounded-lg bg-card p-6 shadow-card transition-shadow">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500/10">
+                <X className="h-5 w-5 text-red-500" />
+              </div>
+              <div>
+                <h2 className="text-[18px] font-semibold tracking-geist-ui text-foreground">
+                  参加申請が見送られました
+                </h2>
+                <p className="text-[13px] text-muted-foreground">
+                  家族「{myJoinRequest.familyName}
+                  」への参加申請は承認されませんでした
+                </p>
+              </div>
+            </div>
+            <p className="text-[14px] text-muted-foreground leading-relaxed mb-6">
+              詳細については家族メンバーへ直接ご確認ください。
+              別の家族グループに申請する場合は、下のボタンを押してください。
+            </p>
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={async () => {
+                setIsLoading(true);
+                try {
+                  await dismissRejectedRequestMut({
+                    requestId: myJoinRequest.id as Id<"joinRequests">,
+                  });
+                } catch {
+                  toast.error("操作に失敗しました");
+                } finally {
+                  setIsLoading(false);
+                }
+              }}
+              className="flex items-center justify-center w-full rounded-md bg-foreground px-4 py-2.5 text-[14px] font-medium text-background shadow-border transition hover:bg-foreground/90 disabled:opacity-50 cursor-pointer"
+            >
+              別の家族グループに申請する
+            </button>
+          </div>
+        )}
+
+        {myJoinRequest.status === "approved" && (
+          <div className="rounded-lg bg-card p-6 shadow-card transition-shadow">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500/10">
+                <Check className="h-5 w-5 text-green-500" />
+              </div>
+              <div>
+                <h2 className="text-[18px] font-semibold tracking-geist-ui text-foreground">
+                  参加申請が承認されました！
+                </h2>
+                <p className="text-[13px] text-muted-foreground">
+                  家族「{myJoinRequest.familyName}」への参加が承認されました
+                </p>
+              </div>
+            </div>
+            <p className="text-[14px] text-muted-foreground leading-relaxed mb-2">
+              ページを再読み込みすると、家族グループに参加できます。
+            </p>
+            <button
+              type="button"
+              onClick={async () => {
+                await queryClient.invalidateQueries({
+                  queryKey: ["authUser"],
+                });
+                await router.invalidate();
+              }}
+              className="flex items-center justify-center w-full rounded-md bg-orange-500 px-4 py-2.5 text-[14px] font-medium text-white shadow-border transition hover:bg-orange-600 cursor-pointer"
+            >
+              ページを更新する
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // 家族移行中に承認を受けた場合のUI
+  if (family && isChangingFamily && myJoinRequest?.status === "approved") {
+    return (
+      <div className="mx-auto max-w-3xl p-6">
+        <div className="mb-8 flex items-center justify-between">
+          <h1 className="text-[32px] font-semibold tracking-geist-h1 text-foreground">
+            家族管理
+          </h1>
+          <button
+            type="button"
+            onClick={() => setIsChangingFamily(false)}
+            className="text-[14px] px-3 py-1 bg-background rounded-md border shadow-sm text-foreground hover:bg-accent transition"
+          >
+            キャンセル
+          </button>
+        </div>
+
+        <div className="rounded-lg bg-card p-6 shadow-card transition-shadow">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500/10">
+              <Check className="h-5 w-5 text-green-500" />
+            </div>
+            <div>
+              <h2 className="text-[18px] font-semibold tracking-geist-ui text-foreground">
+                移行先の家族から承認されました
+              </h2>
+              <p className="text-[13px] text-muted-foreground">
+                家族「{myJoinRequest.familyName}
+                」への移行を完了してください
+              </p>
+            </div>
+          </div>
+          <p className="text-[14px] text-muted-foreground leading-relaxed mb-6">
+            移行を完了するには、新しい家族のパスコードを入力してください。あなたが所有するパスワードヒントは自動的に再暗号化されます。
+          </p>
+          <div className="space-y-4">
+            <div>
+              <label
+                htmlFor="transfer-passcode-input"
+                className="mb-1.5 block text-[14px] font-medium text-foreground"
+              >
+                新しい家族のパスコード <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type={showJoinPasscode ? "text" : "password"}
+                  id="transfer-passcode-input"
+                  required
+                  minLength={8}
+                  value={joinPasscode}
+                  onChange={(e) => setJoinPasscode(e.target.value)}
+                  placeholder="8文字以上"
+                  className="w-full rounded-md bg-card p-2.5 text-base md:text-[14px] pr-10 shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowJoinPasscode(!showJoinPasscode)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+                >
+                  {showJoinPasscode ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+              <p className="mt-1.5 text-[12px] text-muted-foreground">
+                移行先の家族のパスコードを入力してください。
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={handleCompleteTransfer}
+              className="flex items-center justify-center w-full rounded-md bg-orange-500 px-4 py-2.5 text-[14px] font-medium text-white shadow-border transition hover:bg-orange-600 disabled:opacity-50 cursor-pointer"
+            >
+              {isLoading ? (
+                <>
+                  <Spinner className="mr-2 h-4 w-4" />
+                  移行中...
+                </>
+              ) : (
+                "移行を完了する"
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-3xl p-6">
@@ -468,6 +775,8 @@ function FamilyComponent() {
                 </div>
                 <p className="text-[13px] text-muted-foreground">
                   このコードまたはQRコードを家族に共有して参加してもらいます。
+                  <br />
+                  参加には家族メンバーの承認が必要です。
                 </p>
               </div>
             </div>
@@ -503,6 +812,87 @@ function FamilyComponent() {
               })}
             </ul>
           </div>
+
+          {/* 参加リクエスト一覧 */}
+          {pendingRequests && pendingRequests.length > 0 && (
+            <div className="mt-8 border-t border-border pt-6">
+              <h3 className="mb-4 text-[14px] font-medium text-foreground flex items-center gap-2">
+                参加リクエスト
+                <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-orange-500 text-[11px] font-semibold text-white">
+                  {pendingRequests.length}
+                </span>
+              </h3>
+              <ul className="space-y-3">
+                {pendingRequests.map((req) => (
+                  <li
+                    key={req.id}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-md bg-orange-500/5 p-4 shadow-border-light border border-orange-500/20"
+                  >
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-[14px] font-medium text-foreground">
+                        {req.displayName}
+                      </span>
+                      <span className="text-[12px] text-muted-foreground truncate">
+                        {req.email}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground mt-0.5">
+                        {new Date(req.createdAt).toLocaleString("ja-JP")}
+                      </span>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <button
+                        type="button"
+                        disabled={isLoading}
+                        onClick={async () => {
+                          setIsLoading(true);
+                          try {
+                            await approveJoinRequestMut({
+                              requestId: req.id as Id<"joinRequests">,
+                            });
+                            toast.success(
+                              `${req.displayName} さんの参加を承認しました`,
+                            );
+                          } catch {
+                            toast.error("承認に失敗しました");
+                          } finally {
+                            setIsLoading(false);
+                          }
+                        }}
+                        className="flex items-center gap-1.5 rounded-md bg-green-600 px-4 py-2 text-[13px] font-medium text-white shadow-border transition hover:bg-green-700 disabled:opacity-50 cursor-pointer"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                        承認
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isLoading}
+                        onClick={async () => {
+                          setIsLoading(true);
+                          try {
+                            await rejectJoinRequestMut({
+                              requestId: req.id as Id<"joinRequests">,
+                            });
+                            toast.success(
+                              `${req.displayName} さんの参加を却下しました`,
+                            );
+                          } catch {
+                            toast.error("却下に失敗しました");
+                          } finally {
+                            setIsLoading(false);
+                          }
+                        }}
+                        className="flex items-center gap-1.5 rounded-md bg-card px-4 py-2 text-[13px] font-medium text-red-500 shadow-border transition hover:bg-accent disabled:opacity-50 cursor-pointer"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                        却下
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="mt-8 border-t border-border pt-6 text-center">
             <button
               type="button"
@@ -544,7 +934,7 @@ function FamilyComponent() {
                 </button>
               </div>
               <p className="text-[14px] text-red-700/80 dark:text-red-400/80 leading-relaxed">
-                新しい家族を作成するか、別の家族の招待コードを入力して参加してください。
+                新しい家族を作成するか、別の家族の招待コードを入力して参加申請を送信してください。
                 <br />
                 <strong>注意:</strong>{" "}
                 あなたが所有するパスワードヒントは、自動的に新しいグループ用に再暗号化されます。現在のパスコードの入力が求められる場合があります。
@@ -667,7 +1057,7 @@ function FamilyComponent() {
               </form>
             </div>
 
-            {/* 家族に参加 */}
+            {/* 家族に参加（申請送信） */}
             <div className="rounded-lg bg-card p-6 shadow-card transition-shadow">
               <h2 className="mb-6 text-[18px] font-semibold tracking-geist-ui text-foreground">
                 既存の家族に参加
@@ -697,43 +1087,9 @@ function FamilyComponent() {
                     className="w-full font-mono rounded-md bg-card p-2.5 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
                   />
                 </div>
-                {isChangingFamily && (
-                  <div>
-                    <label
-                      htmlFor="family-join-passcode-input"
-                      className="mb-1.5 block text-[14px] font-medium text-foreground"
-                    >
-                      新しい家族のパスコード{" "}
-                      <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showJoinPasscode ? "text" : "password"}
-                        id="family-join-passcode-input"
-                        required
-                        minLength={8}
-                        value={joinPasscode}
-                        onChange={(e) => setJoinPasscode(e.target.value)}
-                        placeholder="8文字以上"
-                        className="w-full rounded-md bg-card p-2.5 text-base md:text-[14px] pr-10 shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowJoinPasscode(!showJoinPasscode)}
-                        className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
-                      >
-                        {showJoinPasscode ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                    <p className="mt-1.5 text-[12px] text-muted-foreground">
-                      移行先の家族のパスコードを入力してください。
-                    </p>
-                  </div>
-                )}
+                <p className="text-[12px] text-muted-foreground leading-relaxed">
+                  招待コードを入力して参加申請を送信します。家族メンバーの承認後に参加が完了します。
+                </p>
                 <button
                   type="submit"
                   disabled={isLoading}
@@ -742,10 +1098,10 @@ function FamilyComponent() {
                   {isLoading ? (
                     <>
                       <Spinner className="mr-2 h-4 w-4" />
-                      参加中...
+                      送信中...
                     </>
                   ) : (
-                    "参加する"
+                    "参加申請を送信"
                   )}
                 </button>
               </form>

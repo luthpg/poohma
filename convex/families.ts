@@ -98,7 +98,25 @@ export const joinFamily = authenticatedMutation({
     const family = await ctx.db.get(args.inviteCode);
     if (!family) throw new Error("Invalid invite code");
 
+    // Verify approved request
+    const approvedRequest = await ctx.db
+      .query("joinRequests")
+      .withIndex("by_familyId_userId", (q) =>
+        q.eq("familyId", family._id).eq("userId", user.userId),
+      )
+      .filter((q) => q.eq(q.field("status"), "approved"))
+      .unique();
+
+    if (!approvedRequest) {
+      throw new Error(
+        "Access denied: You must be approved to join this family",
+      );
+    }
+
     await ctx.db.patch(user._id, { familyId: family._id });
+
+    // Delete approved request
+    await ctx.db.delete(approvedRequest._id);
 
     await ctx.scheduler.runAfter(0, internal.actions.sendEmailInternal, {
       email: user.email,
@@ -132,8 +150,24 @@ export const joinFamily = authenticatedMutation({
 export const getFamilyInfoByInviteCode = authenticatedQuery({
   args: { inviteCode: v.id("families") },
   handler: async (ctx, args) => {
+    const { user } = ctx;
     const family = await ctx.db.get(args.inviteCode);
     if (!family) throw new Error("Invalid invite code");
+
+    const isMember = user.familyId === family._id;
+    const approvedRequest = await ctx.db
+      .query("joinRequests")
+      .withIndex("by_familyId_userId", (q) =>
+        q.eq("familyId", family._id).eq("userId", user.userId),
+      )
+      .filter((q) => q.eq(q.field("status"), "approved"))
+      .unique();
+
+    if (!isMember && !approvedRequest) {
+      throw new Error(
+        "Access denied: You must be approved to access family keys",
+      );
+    }
 
     return {
       id: family._id,
@@ -211,7 +245,26 @@ export const changeFamily = familyBoundMutation({
       if (!args.inviteCode) throw new Error("Missing invite code");
       const family = await ctx.db.get(args.inviteCode as Id<"families">);
       if (!family) throw new Error("Invalid invite code");
+
+      // Verify approved join request
+      const approvedRequest = await ctx.db
+        .query("joinRequests")
+        .withIndex("by_familyId_userId", (q) =>
+          q.eq("familyId", family._id).eq("userId", user.userId),
+        )
+        .filter((q) => q.eq(q.field("status"), "approved"))
+        .unique();
+
+      if (!approvedRequest) {
+        throw new Error(
+          "Access denied: You must be approved to join this family",
+        );
+      }
+
       parsedTargetFamilyId = family._id;
+
+      // Delete approved request
+      await ctx.db.delete(approvedRequest._id);
     }
 
     // Update user familyId
@@ -256,5 +309,293 @@ export const changeFamily = familyBoundMutation({
     });
 
     return { success: true, familyId: parsedTargetFamilyId };
+  },
+});
+
+export const getFamilyPublicInfo = authenticatedQuery({
+  args: { inviteCode: v.id("families") },
+  handler: async (ctx, args) => {
+    const family = await ctx.db.get(args.inviteCode);
+    if (!family) throw new Error("Invalid invite code");
+
+    return {
+      id: family._id,
+      name: family.name,
+    };
+  },
+});
+
+export const createJoinRequest = authenticatedMutation({
+  args: { inviteCode: v.id("families") },
+  handler: async (ctx, args) => {
+    const { user } = ctx;
+    const family = await ctx.db.get(args.inviteCode);
+    if (!family) throw new Error("Invalid invite code");
+
+    if (user.familyId === family._id) {
+      throw new Error("You are already a member of this family");
+    }
+
+    // Check if there is any pending request by this user for ANY family
+    const anyPendingRequest = await ctx.db
+      .query("joinRequests")
+      .withIndex("by_userId_status", (q) =>
+        q.eq("userId", user.userId).eq("status", "pending"),
+      )
+      .first();
+
+    if (anyPendingRequest) {
+      throw new Error(
+        "You already have a pending join request for another family. Please cancel it first.",
+      );
+    }
+
+    // Check if there is already an active (approved) request for this family
+    const existingApproved = await ctx.db
+      .query("joinRequests")
+      .withIndex("by_familyId_userId", (q) =>
+        q.eq("familyId", family._id).eq("userId", user.userId),
+      )
+      .filter((q) => q.eq(q.field("status"), "approved"))
+      .unique();
+
+    if (existingApproved) {
+      return existingApproved._id;
+    }
+
+    // Delete any rejected requests for this family first
+    const rejectedRequest = await ctx.db
+      .query("joinRequests")
+      .withIndex("by_familyId_userId", (q) =>
+        q.eq("familyId", family._id).eq("userId", user.userId),
+      )
+      .filter((q) => q.eq(q.field("status"), "rejected"))
+      .unique();
+
+    if (rejectedRequest) {
+      await ctx.db.delete(rejectedRequest._id);
+    }
+
+    const requestId = await ctx.db.insert("joinRequests", {
+      familyId: family._id,
+      userId: user.userId,
+      status: "pending",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    // Send email to all existing family members
+    const familyMembers = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("familyId"), family._id))
+      .collect();
+
+    for (const member of familyMembers) {
+      await ctx.scheduler.runAfter(0, internal.actions.sendEmailInternal, {
+        email: member.email,
+        subject: `[PoohMa] 家族「${family.name}」への参加申請が届きました`,
+        body: `-=-=-=-=-=-=-=-=-=-\n※本メールは送信専用アドレスから送信しています。\n-=-=-=-=-=-=-=-=-=-\n\n${member.displayName || "メンバー"} さん\n\nこんにちは！家族間アカウント管理アプリ「PoohMa」からお知らせです。\n\n家族「${family.name}」に新しい参加申請が届きました。\n\n【申請者】\n表示名: ${user.displayName || "名無し"}\nメールアドレス: ${user.email}\n\n以下のリンクから承認または却下を行ってください。\n\n[PoohMa 家族管理]\nhttps://poohma.vercel.app/family`,
+      });
+    }
+
+    return requestId;
+  },
+});
+
+export const cancelJoinRequest = authenticatedMutation({
+  args: { requestId: v.id("joinRequests") },
+  handler: async (ctx, args) => {
+    const { user } = ctx;
+    const request = await ctx.db.get(args.requestId);
+    if (!request) throw new Error("Request not found");
+
+    if (request.userId !== user.userId) {
+      throw new Error("Unauthorized: This is not your request");
+    }
+
+    if (request.status !== "pending") {
+      throw new Error("Only pending requests can be cancelled");
+    }
+
+    await ctx.db.delete(request._id);
+    return { success: true };
+  },
+});
+
+export const getMyJoinRequest = authenticatedQuery({
+  args: {},
+  handler: async (ctx) => {
+    const { user } = ctx;
+    const request = await ctx.db
+      .query("joinRequests")
+      .withIndex("by_userId_status", (q) => q.eq("userId", user.userId))
+      .filter((q) =>
+        q.or(
+          q.eq(q.field("status"), "pending"),
+          q.eq(q.field("status"), "approved"),
+        ),
+      )
+      .first();
+
+    if (!request) {
+      const rejected = await ctx.db
+        .query("joinRequests")
+        .withIndex("by_userId_status", (q) =>
+          q.eq("userId", user.userId).eq("status", "rejected"),
+        )
+        .first();
+      if (rejected) {
+        const family = await ctx.db.get(rejected.familyId);
+        return {
+          id: rejected._id,
+          familyId: rejected.familyId,
+          familyName: family?.name || "未知の家族",
+          status: "rejected" as const,
+        };
+      }
+      return null;
+    }
+
+    const family = await ctx.db.get(request.familyId);
+    return {
+      id: request._id,
+      familyId: request.familyId,
+      familyName: family?.name || "未知の家族",
+      status: request.status,
+    };
+  },
+});
+
+export const dismissRejectedRequest = authenticatedMutation({
+  args: { requestId: v.id("joinRequests") },
+  handler: async (ctx, args) => {
+    const { user } = ctx;
+    const request = await ctx.db.get(args.requestId);
+    if (!request) throw new Error("Request not found");
+    if (request.userId !== user.userId) throw new Error("Unauthorized");
+    if (request.status !== "rejected") {
+      throw new Error("Only rejected requests can be dismissed");
+    }
+
+    await ctx.db.delete(request._id);
+    return { success: true };
+  },
+});
+
+export const getPendingRequests = familyBoundQuery({
+  args: {},
+  handler: async (ctx) => {
+    const { familyId } = ctx;
+
+    const pendingRequests = await ctx.db
+      .query("joinRequests")
+      .withIndex("by_familyId_status", (q) =>
+        q.eq("familyId", familyId).eq("status", "pending"),
+      )
+      .collect();
+
+    const results = [];
+    for (const req of pendingRequests) {
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_userId", (q) => q.eq("userId", req.userId))
+        .unique();
+      results.push({
+        id: req._id,
+        userId: req.userId,
+        status: req.status,
+        createdAt: req.createdAt,
+        displayName: user?.displayName || "名無し",
+        email: user?.email || "",
+      });
+    }
+
+    return results;
+  },
+});
+
+export const approveJoinRequest = familyBoundMutation({
+  args: { requestId: v.id("joinRequests") },
+  handler: async (ctx, args) => {
+    const { familyId } = ctx;
+
+    const request = await ctx.db.get(args.requestId);
+    if (!request) throw new Error("Request not found");
+    if (request.familyId !== familyId) {
+      throw new Error("Unauthorized: Request does not belong to your family");
+    }
+    if (request.status !== "pending") {
+      throw new Error("Only pending requests can be approved");
+    }
+
+    const applicant = await ctx.db
+      .query("users")
+      .withIndex("by_userId", (q) => q.eq("userId", request.userId))
+      .unique();
+    if (!applicant) throw new Error("Applicant not found");
+
+    if (!applicant.familyId) {
+      await ctx.db.patch(applicant._id, { familyId });
+      await ctx.db.patch(request._id, {
+        status: "approved",
+        updatedAt: Date.now(),
+      });
+
+      const family = await ctx.db.get(familyId);
+      await ctx.scheduler.runAfter(0, internal.actions.sendEmailInternal, {
+        email: applicant.email,
+        subject: `[PoohMa] 家族「${family?.name}」への参加申請が承認されました！`,
+        body: `-=-=-=-=-=-=-=-=-=-\n※本メールは送信専用アドレスから送信しています。\n-=-=-=-=-=-=-=-=-=-\n\n${applicant.displayName || "メンバー"} さん\n\nこんにちは！家族間アカウント管理アプリ「PoohMa」からお知らせです。\n\n家族「${family?.name}」への参加申請が承認されました。\n\nログインして家族の暗号キーをセットアップしてください。\n\n[PoohMa]\nhttps://poohma.vercel.app/family`,
+      });
+    } else {
+      await ctx.db.patch(request._id, {
+        status: "approved",
+        updatedAt: Date.now(),
+      });
+
+      const family = await ctx.db.get(familyId);
+      await ctx.scheduler.runAfter(0, internal.actions.sendEmailInternal, {
+        email: applicant.email,
+        subject: `[PoohMa] 家族「${family?.name}」への移行申請が承認されました！`,
+        body: `-=-=-=-=-=-=-=-=-=-\n※本メールは送信専用アドレスから送信しています。\n-=-=-=-=-=-=-=-=-=-\n\n${applicant.displayName || "メンバー"} さん\n\nこんにちは！家族間アカウント管理アプリ「PoohMa」からお知らせです。\n\n家族「${family?.name}」への移行申請が承認されました。\n\n移行処理を完了するために、アプリにアクセスして新しい家族のパスコードを入力してください。\n\n[PoohMa]\nhttps://poohma.vercel.app/family`,
+      });
+    }
+
+    return { success: true };
+  },
+});
+
+export const rejectJoinRequest = familyBoundMutation({
+  args: { requestId: v.id("joinRequests") },
+  handler: async (ctx, args) => {
+    const { familyId } = ctx;
+
+    const request = await ctx.db.get(args.requestId);
+    if (!request) throw new Error("Request not found");
+    if (request.familyId !== familyId) throw new Error("Unauthorized");
+    if (request.status !== "pending") {
+      throw new Error("Only pending requests can be rejected");
+    }
+
+    await ctx.db.patch(request._id, {
+      status: "rejected",
+      updatedAt: Date.now(),
+    });
+
+    const applicant = await ctx.db
+      .query("users")
+      .withIndex("by_userId", (q) => q.eq("userId", request.userId))
+      .unique();
+
+    if (applicant) {
+      const family = await ctx.db.get(familyId);
+      await ctx.scheduler.runAfter(0, internal.actions.sendEmailInternal, {
+        email: applicant.email,
+        subject: `[PoohMa] 家族「${family?.name}」への参加申請が見送られました`,
+        body: `-=-=-=-=-=-=-=-=-=-\n※本メールは送信専用アドレスから送信しています。\n-=-=-=-=-=-=-=-=-=-\n\n${applicant.displayName || "メンバー"} さん\n\nこんにちは！家族間アカウント管理アプリ「PoohMa」からお知らせです。\n\n家族「${family?.name}」への参加申請は、承認されませんでした。\n詳細については家族メンバーへ直接ご確認ください。\n\n[PoohMa]\nhttps://poohma.vercel.app/`,
+      });
+    }
+
+    return { success: true };
   },
 });

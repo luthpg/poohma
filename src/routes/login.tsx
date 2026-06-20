@@ -147,7 +147,9 @@ function LoginPage() {
       <div className="w-full max-w-md space-y-8 rounded-xl bg-card p-8 shadow-lg">
         {/* ロゴエリア */}
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-orange-500">PoohMa</h1>
+          <h1 className="text-3xl font-bold text-foreground">
+            Pooh<span className="text-orange-500">Ma</span>
+          </h1>
           <p className="mt-2 text-muted-foreground">
             家族のパスワード、
             <br />

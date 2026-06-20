@@ -179,4 +179,197 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
       });
     });
   });
+
+  describe("2.1.3 家族の承認制参加フローの検証", () => {
+    it("家族への参加申請、一覧取得、承認、および参加完了ができること", async () => {
+      const t = convexTest(schema, modules);
+
+      let familyId!: Id<"families">;
+
+      // シードデータ投入
+      await t.run(async (ctx) => {
+        // 既存家族と既存メンバー
+        familyId = await ctx.db.insert("families", {
+          name: "田中家",
+          masterKeyEncrypted: "SGVsbG9Xb3JsZA==",
+          masterKeyIv: "SGVsbG9Xb3JsZA==",
+          masterKeySalt: "SGVsbG9Xb3JsZA==",
+          updatedAt: Date.now(),
+        });
+
+        await ctx.db.insert("users", {
+          userId: "member_a",
+          email: "member_a@example.com",
+          displayName: "メンバーA",
+          familyId,
+          updatedAt: Date.now(),
+        });
+
+        // 参加申請を行う新規ユーザー
+        await ctx.db.insert("users", {
+          userId: "applicant_b",
+          email: "applicant_b@example.com",
+          displayName: "申請者B",
+          updatedAt: Date.now(),
+        });
+
+        // 家族未所属の一般ユーザー
+        await ctx.db.insert("users", {
+          userId: "stranger",
+          email: "stranger@example.com",
+          displayName: "よそ者",
+          updatedAt: Date.now(),
+        });
+      });
+
+      const memberA = t.withIdentity({
+        subject: "member_a",
+        email: "member_a@example.com",
+      });
+
+      const applicantB = t.withIdentity({
+        subject: "applicant_b",
+        email: "applicant_b@example.com",
+      });
+
+      // 1. 申請前は getFamilyInfoByInviteCode で鍵を取得できないこと
+      await expect(
+        applicantB.query(api.families.getFamilyInfoByInviteCode, {
+          inviteCode: familyId,
+        }),
+      ).rejects.toThrow("Access denied");
+
+      // 2. 家族公開情報は取得できること
+      const publicInfo = await applicantB.query(
+        api.families.getFamilyPublicInfo,
+        { inviteCode: familyId },
+      );
+      expect(publicInfo.name).toBe("田中家");
+
+      // 3. 参加申請を作成する
+      const requestId = await applicantB.mutation(
+        api.families.createJoinRequest,
+        { inviteCode: familyId },
+      );
+      expect(requestId).toBeDefined();
+
+      // 4. 重複申請がエラーになること
+      await expect(
+        applicantB.mutation(api.families.createJoinRequest, {
+          inviteCode: familyId,
+        }),
+      ).rejects.toThrow("pending join request");
+
+      // 5. 申請状態を確認できること
+      const myRequest = await applicantB.query(api.families.getMyJoinRequest);
+      expect(myRequest?.status).toBe("pending");
+      expect(myRequest?.familyName).toBe("田中家");
+
+      // 6. 既存メンバーが保留中の申請一覧を取得できること
+      const pendingRequests = await memberA.query(
+        api.families.getPendingRequests,
+      );
+      expect(pendingRequests.length).toBe(1);
+      expect(pendingRequests[0].userId).toBe("applicant_b");
+      expect(pendingRequests[0].displayName).toBe("申請者B");
+
+      // 7. 申請者以外の無関係なユーザーは保留中一覧を取得できないこと
+      const stranger = t.withIdentity({
+        subject: "stranger",
+        email: "stranger@example.com",
+      });
+      await expect(
+        stranger.query(api.families.getPendingRequests),
+      ).rejects.toThrow("User does not belong to a family");
+
+      // 8. 既存メンバーが申請を承認すること
+      await memberA.mutation(api.families.approveJoinRequest, {
+        requestId,
+      });
+
+      // 9. 承認後は getFamilyInfoByInviteCode が通ること
+      const infoAfterApproval = await applicantB.query(
+        api.families.getFamilyInfoByInviteCode,
+        { inviteCode: familyId },
+      );
+      expect(infoAfterApproval.masterKeyEncrypted).toBe("SGVsbG9Xb3JsZA==");
+
+      // 10. 承認状態の申請があるため joinFamily で正式に参加できること
+      const joinedFamilyId = await applicantB.mutation(
+        api.families.joinFamily,
+        { inviteCode: familyId },
+      );
+      expect(joinedFamilyId).toBe(familyId);
+
+      // 11. 参加後はユーザーの familyId が更新されていること
+      const updatedApplicant = await t.run(async (ctx) => {
+        return await ctx.db
+          .query("users")
+          .withIndex("by_userId", (q) => q.eq("userId", "applicant_b"))
+          .unique();
+      });
+      expect(updatedApplicant?.familyId).toBe(familyId);
+
+      // 12. 正式参加後は申請データが削除されていること
+      const myRequestAfterJoin = await applicantB.query(
+        api.families.getMyJoinRequest,
+      );
+      expect(myRequestAfterJoin).toBeNull();
+    });
+
+    it("参加申請を却下し、その後再申請ができること", async () => {
+      const t = convexTest(schema, modules);
+      let familyId!: Id<"families">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          name: "山田家",
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("users", {
+          userId: "member_y",
+          email: "y@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("users", {
+          userId: "applicant_z",
+          email: "z@example.com",
+          updatedAt: Date.now(),
+        });
+      });
+
+      const memberY = t.withIdentity({
+        subject: "member_y",
+        email: "y@example.com",
+      });
+      const applicantZ = t.withIdentity({
+        subject: "applicant_z",
+        email: "z@example.com",
+      });
+
+      // 申請
+      const requestId = await applicantZ.mutation(
+        api.families.createJoinRequest,
+        { inviteCode: familyId },
+      );
+
+      // 却下
+      await memberY.mutation(api.families.rejectJoinRequest, { requestId });
+
+      // 却下された状態を確認
+      const status = await applicantZ.query(api.families.getMyJoinRequest);
+      expect(status?.status).toBe("rejected");
+
+      // 却下状態を消去して再申請できるようにする
+      await applicantZ.mutation(api.families.dismissRejectedRequest, {
+        requestId,
+      });
+
+      const statusAfterDismiss = await applicantZ.query(
+        api.families.getMyJoinRequest,
+      );
+      expect(statusAfterDismiss).toBeNull();
+    });
+  });
 });

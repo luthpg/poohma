@@ -21,6 +21,21 @@ export default defineSchema({
     .index("by_userId", ["userId"])
     .index("by_email", ["email"]),
 
+  joinRequests: defineTable({
+    familyId: v.id("families"),
+    userId: v.string(), // 申請者の Firebase UID
+    status: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("rejected"),
+    ),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_familyId_status", ["familyId", "status"])
+    .index("by_userId_status", ["userId", "status"])
+    .index("by_familyId_userId", ["familyId", "userId"]),
+
   serviceRecords: defineTable({
     title: v.string(),
     url: v.optional(v.string()),
