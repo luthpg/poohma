@@ -54,6 +54,12 @@ export const Route = createRootRouteWithContext<RouterContext>()({
         content:
           "PoohMaは家族でアカウント情報を安全に共有・管理できるWebアプリです。暗号化で大切なパスワードヒントを守ります。",
       },
+      // Google Search Console認証用
+      {
+        name: "google-site-verification",
+        content:
+          "Xwlu3JEEZcvhMmYC-BoHyCRizCC90oefBJCbX5852lM",
+      },
       // OGP
       { property: "og:type", content: "website" },
       {
