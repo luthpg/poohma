@@ -11,6 +11,7 @@
 import type * as actions from "../actions.js";
 import type * as customBuilders from "../customBuilders.js";
 import type * as families from "../families.js";
+import type * as migration_action from "../migration_action.js";
 import type * as migrations from "../migrations.js";
 import type * as records from "../records.js";
 import type * as rls from "../rls.js";
@@ -26,6 +27,7 @@ declare const fullApi: ApiFromModules<{
   actions: typeof actions;
   customBuilders: typeof customBuilders;
   families: typeof families;
+  migration_action: typeof migration_action;
   migrations: typeof migrations;
   records: typeof records;
   rls: typeof rls;
