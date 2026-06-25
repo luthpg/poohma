@@ -33,6 +33,9 @@ vi.mock("@/lib/crypto", () => {
     importKeyFromBase64: vi.fn(),
     decrypt: vi.fn(),
     encrypt: vi.fn(),
+    unwrapDEK: vi.fn(),
+    wrapDEK: vi.fn(),
+    generateDEK: vi.fn(),
   };
 });
 
@@ -212,5 +215,125 @@ describe("PasscodeProvider E2EE State Management", () => {
       expect(screen.getByTestId("lock-status").textContent).toBe("Unlocked");
       expect(screen.getByTestId("key-status").textContent).toBe("NoKey");
     });
+  });
+});
+
+import { act } from "@testing-library/react";
+import * as cryptoUtils from "@/lib/crypto";
+
+describe("PasscodeProvider - decryptHint (Envelope Encryption Branching)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useRouteContext).mockReturnValue({
+      user: {
+        familyId: "family-1",
+        family: {
+          name: "Test Family",
+          masterKeyEncrypted: "encrypted-key",
+          masterKeyIv: "iv",
+          masterKeySalt: "salt",
+        },
+      },
+    });
+  });
+
+  it("【新方式】dekEncrypted と dekIv がある場合、unwrapDEK を経由して復号されること", async () => {
+    // 0. 事前にアンロックに必要な鍵導出関数をスパイ・モック化
+    const mockMasterKey = { tag: "mock-master-key" } as unknown as CryptoKey;
+    vi.spyOn(cryptoUtils, "deriveKeyFromPasscode").mockResolvedValue(
+      {} as CryptoKey,
+    );
+    vi.spyOn(cryptoUtils, "unwrapMasterKey").mockResolvedValue(mockMasterKey);
+
+    // 1. 各暗号化関数の挙動をスパイ・モック化
+    const unwrapDEKSpy = vi
+      .spyOn(cryptoUtils, "unwrapDEK")
+      .mockResolvedValue({} as CryptoKey);
+    const decryptSpy = vi
+      .spyOn(cryptoUtils, "decrypt")
+      .mockResolvedValue("decrypted_hint_text");
+
+    // 2. コンポーネントのレンダリング
+    let resultContext: any;
+    function TestComponent() {
+      resultContext = usePasscode();
+      return null;
+    }
+
+    render(
+      <PasscodeProvider>
+        <TestComponent />
+      </PasscodeProvider>,
+    );
+
+    // 🔥 2.5. テスト実行前に unlock を呼び出して masterKey をセットする
+    await act(async () => {
+      await resultContext.unlock("dummy-passcode");
+    });
+
+    // 3. テスト対象メソッドの実行
+    const decrypted = await resultContext.decryptHint(
+      "encrypted_data",
+      "iv_data",
+      "dek_encrypted_data",
+      "dek_iv_data",
+    );
+
+    // 4. アサーション
+    expect(unwrapDEKSpy).toHaveBeenCalledWith(
+      "dek_encrypted_data",
+      "dek_iv_data",
+      mockMasterKey, // 導出されたマスターキーが正しく渡されているか検証
+    );
+    expect(decryptSpy).toHaveBeenCalledWith(
+      "encrypted_data",
+      "iv_data",
+      expect.anything(), // 復号された DEK が渡される
+    );
+    expect(decrypted).toBe("decrypted_hint_text");
+  });
+
+  it("【旧方式フォールバック】dekEncrypted がない場合、unwrapDEK を呼ばずに直接 masterKey で復号されること", async () => {
+    // 0. 事前にアンロックに必要な鍵導出関数をスパイ・モック化
+    const mockMasterKey = { tag: "mock-master-key" } as unknown as CryptoKey;
+    vi.spyOn(cryptoUtils, "deriveKeyFromPasscode").mockResolvedValue(
+      {} as CryptoKey,
+    );
+    vi.spyOn(cryptoUtils, "unwrapMasterKey").mockResolvedValue(mockMasterKey);
+
+    const unwrapDEKSpy = vi.spyOn(cryptoUtils, "unwrapDEK");
+    const decryptSpy = vi
+      .spyOn(cryptoUtils, "decrypt")
+      .mockResolvedValue("legacy_decrypted_hint_text");
+
+    let resultContext: any;
+    function TestComponent() {
+      resultContext = usePasscode();
+      return null;
+    }
+
+    render(
+      <PasscodeProvider>
+        <TestComponent />
+      </PasscodeProvider>,
+    );
+
+    // 🔥 2.5. テスト実行前に unlock を呼び出して masterKey をセットする
+    await act(async () => {
+      await resultContext?.unlock("dummy-passcode");
+    });
+
+    const decrypted = await resultContext?.decryptHint(
+      "legacy_encrypted_data",
+      "legacy_iv_data",
+    );
+
+    expect(unwrapDEKSpy).not.toHaveBeenCalled();
+    expect(decryptSpy).toHaveBeenCalledWith(
+      "legacy_encrypted_data",
+      "legacy_iv_data",
+      mockMasterKey, // 旧方式なのでマスターキーが直接復号に使われるか検証
+    );
+    expect(decrypted).toBe("legacy_decrypted_hint_text");
   });
 });

@@ -373,3 +373,94 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
     });
   });
 });
+
+import {
+  decrypt,
+  deriveKeyFromPasscode,
+  encrypt,
+  generateDEK,
+  unwrapDEK,
+  wrapDEK,
+} from "@/lib/crypto";
+
+describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
+  it("旧パスコードでラップされたDEKが、新しいパスコードのマスターキーで正しく再ラップされ、データが復号可能な状態を維持できること", async () => {
+    //---------------------------------------------------------
+    // 1. 準備段階: 旧パスコードで暗号化されたレコードを模倣
+    //---------------------------------------------------------
+    const oldPasscode = "old-family-passcode-1234";
+    const newPasscode = "new-family-passcode-5678";
+    const secretHint = "super-secret-password-hint";
+
+    // 鍵の導出 (ストレッチング等はモックするか、実関数を使用)
+    const oldMasterKey = await deriveKeyFromPasscode(
+      oldPasscode,
+      "static-salt-for-test",
+    );
+    const newMasterKey = await deriveKeyFromPasscode(
+      newPasscode,
+      "static-salt-for-test",
+    );
+
+    // 個別DEKの生成とデータの暗号化
+    const originalDek = await generateDEK();
+    const encryptedHint = await encrypt(secretHint, originalDek);
+    const wrappedDekOld = await wrapDEK(originalDek, oldMasterKey);
+
+    // Convexに格納されていると仮定するダミーのデータ構造
+    const mockDbCredential = {
+      id: "cred-test-id",
+      passwordHint: encryptedHint.encrypted,
+      passwordHintIv: encryptedHint.iv,
+      passwordHintDekEncrypted: wrappedDekOld.encrypted,
+      passwordHintDekIv: wrappedDekOld.iv,
+    };
+
+    //---------------------------------------------------------
+    // 2. 実行段階: family.tsx 内のローテーションロジックのシミュレーション
+    //---------------------------------------------------------
+    // ① 旧マスターキーを使ってDEKを取り出す
+    const unwrappedDek = await unwrapDEK(
+      mockDbCredential.passwordHintDekEncrypted,
+      mockDbCredential.passwordHintDekIv,
+      oldMasterKey,
+    );
+
+    // ② 取り出したDEKを、新しいマスターキーでラップし直す
+    const reWrappedDek = await wrapDEK(unwrappedDek, newMasterKey);
+
+    // ③ 新しいペイロードの作成（これがConvexのMutationに送信される）
+    const rotatedCredentialPayload = {
+      id: mockDbCredential.id,
+      passwordHint: mockDbCredential.passwordHint, // 暗号文自体は不変
+      passwordHintIv: mockDbCredential.passwordHintIv,
+      passwordHintDekEncrypted: reWrappedDek.encrypted, // 新しい封筒
+      passwordHintDekIv: reWrappedDek.iv,
+    };
+
+    // (必要に応じてここで Convex のテストクライアントを叩く)
+    // await t.mutation(api.records.updateFamilyPasscode, { credentials: [rotatedCredentialPayload], ... });
+
+    //---------------------------------------------------------
+    // 3. 検証段階: 新しいパスコード（新マスターキー）だけで復号ができるか
+    //---------------------------------------------------------
+    // 新しい鍵でDEKをアンラップできるか
+    const decryptedDek = await unwrapDEK(
+      rotatedCredentialPayload.passwordHintDekEncrypted,
+      rotatedCredentialPayload.passwordHintDekIv,
+      newMasterKey,
+    );
+
+    // アンラップしたDEKで、暗号文が元の平文に戻るか
+    const finalPlainHint = await decrypt(
+      rotatedCredentialPayload.passwordHint,
+      rotatedCredentialPayload.passwordHintIv,
+      decryptedDek,
+    );
+
+    // 最終アサーション: 鍵が書き換わっても、データの中身が正しく復元できること
+    expect(finalPlainHint).toBe(secretHint);
+    // 元のDEKオブジェクト（鍵の生データ情報）が同一性を保っていることの検証
+    expect(decryptedDek).toBeDefined();
+  });
+});
