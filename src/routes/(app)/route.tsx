@@ -1,4 +1,5 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { AppHeader } from "@/components/AppHeader";
 
 export const Route = createFileRoute("/(app)")({
   beforeLoad: async ({ context, location }) => {
@@ -17,5 +18,13 @@ export const Route = createFileRoute("/(app)")({
 });
 
 function RouteComponent() {
-  return <Outlet />;
+  const { user } = Route.useRouteContext();
+
+  // family ページは独自ヘッダーを持つため、共通ヘッダーを非表示にする
+  return (
+    <>
+      {user?.familyId && <AppHeader user={user} />}
+      <Outlet />
+    </>
+  );
 }

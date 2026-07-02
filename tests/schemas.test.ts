@@ -343,7 +343,9 @@ describe("1.3 スキーマ・バリデーション (CredentialInputSchema)", () 
           issue.path.includes("passwordHintIv"),
         );
         expect(ivIssue).toBeDefined();
-        expect(ivIssue?.message).toBe("IVは16文字のBase64形式である必要があります");
+        expect(ivIssue?.message).toBe(
+          "IVは16文字のBase64形式である必要があります",
+        );
       }
     });
   });
