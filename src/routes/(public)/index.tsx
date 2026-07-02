@@ -19,7 +19,7 @@ import {
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/(public)/")({
   component: RouteComponent,
 });
 
@@ -33,26 +33,6 @@ function RouteComponent() {
 
   return (
     <div className="min-h-screen bg-background font-sans text-foreground selection:bg-neutral-100 selection:text-foreground">
-      {/* ナビゲーション */}
-      <nav className="sticky top-0 z-50 w-full flex items-center justify-between px-6 py-4 md:px-12 backdrop-blur-md bg-white/80 dark:bg-[#0c0a09]/80 shadow-border">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-500 text-white font-bold text-lg shadow-sm">
-            P
-          </div>
-          <span className="text-xl font-bold tracking-geist-h2 text-foreground">
-            PoohMa
-          </span>
-        </div>
-        <div className="flex items-center gap-4">
-          <Link
-            to="/login"
-            className="rounded-md bg-white dark:bg-[#171717] px-4 py-1.5 text-sm font-medium transition hover:bg-neutral-50 dark:hover:bg-neutral-800 shadow-border text-foreground tracking-geist-ui"
-          >
-            ログイン
-          </Link>
-        </div>
-      </nav>
-
       {/* ① ヒーローセクション (Hero) */}
       <header className="relative overflow-hidden px-6 pt-24 pb-20 md:pt-36 md:pb-32 max-w-7xl mx-auto">
         <div className="grid gap-16 lg:grid-cols-12 lg:items-center">

@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getCookie, setCookie } from "@tanstack/react-start/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/../convex/_generated/api";
-import { env } from "@/env";
+import { env } from "@/env/client";
 
 const convexClient = new ConvexHttpClient(env.VITE_CONVEX_URL as string);
 

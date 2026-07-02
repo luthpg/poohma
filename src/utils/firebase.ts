@@ -1,6 +1,6 @@
 import { type FirebaseApp, getApps, initializeApp } from "firebase/app";
 import { type Auth, GoogleAuthProvider, getAuth } from "firebase/auth";
-import { env } from "@/env";
+import { env } from "@/env/client";
 
 const isBrowser = typeof window !== "undefined";
 

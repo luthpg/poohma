@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
 import { usePasscode } from "@/components/PasscodeProvider";
+import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { clearQueryCache } from "@/hooks/usePersistentQuery";
@@ -801,13 +802,14 @@ function FamilyComponent() {
                     type="button"
                     onClick={() => {
                       navigator.clipboard.writeText(family.id);
-                      toast.success("コピーしました");
+                      toast.success("招待コードをコピーしました");
                     }}
                     className="rounded-md bg-card px-4 py-2.5 text-[14px] font-medium text-foreground shadow-border hover:bg-accent transition whitespace-nowrap cursor-pointer"
                   >
                     コピー
                   </button>
                 </div>
+                <Separator className="my-2" />
                 <div className="flex flex-col sm:flex-row gap-2 pt-1">
                   <button
                     type="button"
@@ -826,6 +828,7 @@ function FamilyComponent() {
                       : "招待URLをコピー"}
                   </button>
                 </div>
+                <Separator className="my-2" />
                 <p className="text-[13px] text-muted-foreground">
                   このコードまたはQRコードを家族に共有して参加してもらいます。
                   <br />

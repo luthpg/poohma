@@ -3,11 +3,15 @@ import { Link, useRouter } from "@tanstack/react-router";
 import { useConvex, useMutation } from "convex/react";
 import { signOut } from "firebase/auth";
 import {
+  BookOpen,
   Database,
   Download,
+  Gavel,
+  HelpCircle,
   Laptop,
   LogOut,
   Moon,
+  ScrollText,
   Sun,
   Upload,
   UserCog,
@@ -391,6 +395,33 @@ export function UserMenu({
                 </DropdownMenuSubContent>
               </DropdownMenuPortal>
             </DropdownMenuSub>
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup>
+            <DropdownMenuItem asChild>
+              <Link to="/usage" className="cursor-pointer">
+                <BookOpen className="mr-2 h-4 w-4" />
+                <span>使い方</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/faq" className="cursor-pointer">
+                <HelpCircle className="mr-2 h-4 w-4" />
+                <span>FAQ</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/terms-of-service" className="cursor-pointer">
+                <Gavel className="mr-2 h-4 w-4" />
+                <span>利用規約</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/privacy-policy" className="cursor-pointer">
+                <ScrollText className="mr-2 h-4 w-4" />
+                <span>プライバシーポリシー</span>
+              </Link>
+            </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
           <AlertDialog>
