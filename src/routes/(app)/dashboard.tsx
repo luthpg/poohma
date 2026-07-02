@@ -7,14 +7,14 @@ import {
 } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { Globe, LayoutGrid, List, Lock, Tag, Trash2, X } from "lucide-react";
-import { type SubmitEvent, Suspense, useEffect, useRef, useState } from "react";
+import { type SubmitEvent, Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { api } from "@/../convex/_generated/api";
 import type { Doc, Id } from "@/../convex/_generated/dataModel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TagInput } from "@/components/ui/tag-input";
-import { UserMenu } from "@/components/user-menu";
+
 import { usePersistentQuery } from "@/hooks/usePersistentQuery";
 import {
   getDashboardPrefsFn,
@@ -136,31 +136,8 @@ type SortParam =
   | "updatedAt-desc";
 
 function RouteComponent() {
-  const { user, prefs, searchParams } = routeApi.useLoaderData();
+  const { prefs, searchParams } = routeApi.useLoaderData();
   const navigate = useNavigate({ from: "/dashboard" });
-
-  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
-  const lastScrollY = useRef(0);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-
-      // ヘッダーの高さ分(約70px)は常に表示、それ以降でスクロール方向を判定
-      if (currentScrollY < 70) {
-        setIsHeaderVisible(true);
-      } else if (currentScrollY > lastScrollY.current) {
-        setIsHeaderVisible(false);
-      } else {
-        setIsHeaderVisible(true);
-      }
-
-      lastScrollY.current = currentScrollY;
-    };
-
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
 
   const [searchInput, setSearchInput] = useState(searchParams.q || "");
   useEffect(() => {
@@ -286,73 +263,46 @@ function RouteComponent() {
 
   return (
     <div className="mx-auto max-w-5xl p-6 relative">
-      <div
-        className={`sticky top-0 z-20 -mx-6 -mt-6 mb-6 bg-background/95 px-6 pb-4 pt-6 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-transform duration-300 ease-in-out ${
-          isHeaderVisible ? "translate-y-0" : "-translate-y-[72px]"
-        }`}
-      >
-        {/* ヘッダーエリア */}
-        <header className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-[32px] font-semibold tracking-geist-h1 text-foreground">
-              Pooh<span className="text-orange-500">Ma</span>
-            </h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link
-              to="/records/new"
-              className="rounded-md bg-orange-500 px-4 py-2 text-[14px] font-medium text-white shadow-border hover:bg-orange-600 transition"
-            >
-              + 新規登録
-            </Link>
-            <UserMenu user={user} />
-          </div>
-        </header>
-
-        {/* 検索・フィルターエリア */}
-        <div>
-          <form onSubmit={handleSearch} className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <input
-                type="text"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="タグやサービス名で検索..."
-                className="w-full rounded-md bg-card pl-4 pr-10 py-2.5 h-10 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-shadow"
-              />
-              {searchInput && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchInput("");
-                    navigate({
-                      search: (prev) => ({
-                        ...prev,
-                        q: undefined,
-                      }),
-                    });
-                  }}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground cursor-pointer"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-            <button
-              type="submit"
-              className="rounded-md bg-foreground px-4 py-2.5 h-10 w-20 text-[14px] font-medium text-background shadow-border hover:bg-foreground/90 transition cursor-pointer"
-            >
-              検索
-            </button>
-          </form>
-          {/* タグクラウド (フィルター) - Suspense化 */}
-          <Suspense fallback={<TagCloudSkeleton />}>
-            <TagCloud
-              activeTag={searchParams.tag}
-              onTagClick={handleTagClick}
+      {/* 検索・フィルターエリア */}
+      <div className="mb-6">
+        <form onSubmit={handleSearch} className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="タグやサービス名で検索..."
+              className="w-full rounded-md bg-card pl-4 pr-10 py-2.5 h-10 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-shadow"
             />
-          </Suspense>
-        </div>
+            {searchInput && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchInput("");
+                  navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      q: undefined,
+                    }),
+                  });
+                }}
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <button
+            type="submit"
+            className="rounded-md bg-foreground px-4 py-2.5 h-10 w-20 text-[14px] font-medium text-background shadow-border hover:bg-foreground/90 transition cursor-pointer"
+          >
+            検索
+          </button>
+        </form>
+        {/* タグクラウド (フィルター) - Suspense化 */}
+        <Suspense fallback={<TagCloudSkeleton />}>
+          <TagCloud activeTag={searchParams.tag} onTagClick={handleTagClick} />
+        </Suspense>
       </div>
 
       {/* レコード一覧 */}
