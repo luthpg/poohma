@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import admin from "firebase-admin";
-import { env } from "@/env";
+import { env } from "@/env/client";
 
 /**
  * Firebase Admin SDK の初期化

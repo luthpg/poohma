@@ -11,7 +11,7 @@ import {
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react";
-import { env } from "@/env";
+import { env } from "@/env/client";
 import { useConvexFirebaseAuth } from "@/hooks/useConvexFirebaseAuth";
 import { getAuthUser } from "@/services/auth.functions";
 import "@fontsource/geist-sans/400.css";

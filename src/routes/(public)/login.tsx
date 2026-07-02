@@ -14,7 +14,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { syncUser } from "@/services/auth.functions";
 import { auth, googleProvider } from "@/utils/firebase";
 
-export const Route = createFileRoute("/login")({
+export const Route = createFileRoute("/(public)/login")({
   validateSearch: (search: Record<string, unknown>): { redirect?: string } => {
     return {
       redirect: search.redirect as string | undefined,
