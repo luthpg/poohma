@@ -14,7 +14,10 @@ async function fetchSafeBuffer(
   maxRedirects = 5,
 ): Promise<Buffer> {
   let currentUrl = urlString;
-  for (let i = 0; i < maxRedirects; i++) {
+  const visited = new Set<string>([currentUrl]);
+  const safeMaxRedirects = Math.min(Math.max(maxRedirects, 1), 10);
+
+  for (let i = 0; i < safeMaxRedirects; i++) {
     const parsed = new URL(currentUrl);
     // 1. 安全性の検証とIPアドレス解決
     const ip = await validateUrlSafety(currentUrl);
@@ -62,7 +65,19 @@ async function fetchSafeBuffer(
         }
 
         const chunks: Buffer[] = [];
-        res.on("data", (chunk) => chunks.push(chunk));
+        let totalSize = 0;
+        const maxResponseSize = 5 * 1024 * 1024; // 5MB
+
+        res.on("data", (chunk) => {
+          totalSize += chunk.length;
+          if (totalSize > maxResponseSize) {
+            req.destroy();
+            reject(new Error("Response size limit exceeded"));
+            return;
+          }
+          chunks.push(chunk);
+        });
+
         res.on("end", () => {
           resolve({ type: "data", data: Buffer.concat(chunks) });
         });
@@ -77,6 +92,10 @@ async function fetchSafeBuffer(
     });
 
     if (result.type === "redirect") {
+      if (visited.has(result.url)) {
+        throw new Error("Redirect cycle detected");
+      }
+      visited.add(result.url);
       currentUrl = result.url;
       continue;
     }

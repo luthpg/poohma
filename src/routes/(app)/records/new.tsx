@@ -72,6 +72,21 @@ function NewRecordComponent() {
     e.preventDefault();
     setIsLoading(true);
 
+    if (memo && memo.length > 10000) {
+      toast.error("メモは10,000文字以内で入力してください");
+      setIsLoading(false);
+      return;
+    }
+
+    const invalidHint = credentials.find(
+      (c) => c.passwordHint && c.passwordHint.length > 2000,
+    );
+    if (invalidHint) {
+      toast.error("パスワードヒントは2,000文字以内で入力してください");
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const hasHintsToEncrypt = credentials.some((c) => c.passwordHint);
       if (hasHintsToEncrypt && !masterKey) {
