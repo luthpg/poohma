@@ -5,6 +5,7 @@ import https from "node:https";
 import { URL } from "node:url";
 import * as cheerio from "cheerio";
 import { v } from "convex/values";
+import { Resend } from "resend";
 import { validateUrlSafety } from "../src/utils/url-safety";
 import { internal } from "./_generated/api";
 import { action, internalAction } from "./_generated/server";
@@ -199,25 +200,23 @@ export const sendEmailReq = async ({
   body: string;
 }): Promise<boolean> => {
   try {
-    const mailAccessToken = process.env.KUROCO_MAIL_ACCESS_TOKEN;
-    const mailApiBaseUrl = process.env.KUROCO_MAIL_API_BASE_URL;
-    if (!mailAccessToken || !mailApiBaseUrl) {
+    const mailApiKey = process.env.RESEND_API_KEY;
+    const mailFrom = process.env.RESEND_MAIL_FROM;
+    if (!mailApiKey || !mailFrom) {
       throw new Error("Mail access token or API base URL is not defined");
     }
-    const response = await fetch(`${mailApiBaseUrl}/email/send`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-rcms-api-access-token": mailAccessToken,
-      },
-      body: JSON.stringify({
-        email,
-        subject,
-        body,
-      }),
+    const resend = new Resend(mailApiKey);
+
+    const response = await resend.emails.send({
+      from: `PoohMa <${mailFrom}>`,
+      to: [...email.split(/,\s*/g)].map((e) => e.trim()).filter(Boolean),
+      subject: subject,
+      text: body,
     });
-    const resultObject = (await response.json()) as { result: boolean };
-    return resultObject.result;
+    if (response.error != null) {
+      throw Error(response.error.message);
+    }
+    return true;
   } catch (error) {
     console.error("Email send failed:", error);
     return false;
