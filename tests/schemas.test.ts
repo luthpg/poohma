@@ -14,7 +14,7 @@ describe("RecordInputSchema", () => {
         {
           label: "Admin",
           loginId: "admin@example.com",
-          passwordHint: "SGVsbG8gV29ybGQ=", // Base64 encrypted hint
+          passwordHint: "SGVsbG8gV29ybGQgYXV0aGVudGljYXRlZCBhZWFk", // Base64 encrypted hint
           passwordHintIv: "dGVzdGl2MTIzNDU2", // Base64 IV
         },
       ],
@@ -241,7 +241,7 @@ describe("1.3 スキーマ・バリデーション (CredentialInputSchema)", () 
     loginId: "user@example.com",
   };
 
-  const validBase64Hint = "SGVsbG8gV29ybGQ="; // "Hello World"
+  const validBase64Hint = "SGVsbG8gV29ybGQgYXV0aGVudGljYXRlZCBhZWFk"; // "Hello World" (extended for AEAD min length)
   const validBase64Iv = "dGVzdGl2MTIzNDU2"; // "testiv123456"
 
   describe("正常系（バリデーション成功）", () => {
@@ -323,7 +323,7 @@ describe("1.3 スキーマ・バリデーション (CredentialInputSchema)", () 
         );
         expect(hintIssue).toBeDefined();
         expect(hintIssue?.message).toBe(
-          "パスワードヒントはBase64形式（暗号化済み）である必要があります",
+          "暗号データはBase64形式である必要があります",
         );
       }
     });
@@ -343,7 +343,7 @@ describe("1.3 スキーマ・バリデーション (CredentialInputSchema)", () 
           issue.path.includes("passwordHintIv"),
         );
         expect(ivIssue).toBeDefined();
-        expect(ivIssue?.message).toBe("IVはBase64形式である必要があります");
+        expect(ivIssue?.message).toBe("IVは16文字のBase64形式である必要があります");
       }
     });
   });

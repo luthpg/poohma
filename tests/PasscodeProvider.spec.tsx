@@ -254,7 +254,7 @@ describe("PasscodeProvider - decryptHint (Envelope Encryption Branching)", () =>
       .mockResolvedValue("decrypted_hint_text");
 
     // 2. コンポーネントのレンダリング
-    let resultContext: any;
+    let resultContext!: ReturnType<typeof usePasscode>;
     function TestComponent() {
       resultContext = usePasscode();
       return null;
@@ -306,7 +306,7 @@ describe("PasscodeProvider - decryptHint (Envelope Encryption Branching)", () =>
       .spyOn(cryptoUtils, "decrypt")
       .mockResolvedValue("legacy_decrypted_hint_text");
 
-    let resultContext: any;
+    let resultContext!: ReturnType<typeof usePasscode>;
     function TestComponent() {
       resultContext = usePasscode();
       return null;
