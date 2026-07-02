@@ -1,1178 +1,985 @@
-import { SiGithub } from "@icons-pack/react-simple-icons";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
-  AlertCircle,
-  ArrowRight,
   Check,
   ChevronDown,
-  ChevronUp,
-  Cpu,
-  Database,
-  EyeOff,
-  Folder,
+  Copy,
+  Download,
   Globe,
-  Laptop,
   Lock,
-  Share2,
+  Search,
   Shield,
+  Users,
 } from "lucide-react";
-import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
+import { useEffect, useState } from "react";
+import { JpText } from "@/components/JpText";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/(public)/")({
   component: RouteComponent,
 });
 
 function RouteComponent() {
-  // FAQのアコーディオン状態管理
+  const [activeTab, setActiveTab] = useState("security");
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
-  const toggleFaq = (index: number) => {
-    setOpenFaq(openFaq === index ? null : index);
-  };
+  // デモスマホ画面用のアニメーションステート
+  const [demoStep, setDemoStep] = useState(0);
+  const [_copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setDemoStep((prev) => {
+        const next = (prev + 1) % 5;
+        if (next === 0) {
+          setCopied(false);
+        }
+        if (next === 4) {
+          setCopied(true);
+        }
+        return next;
+      });
+    }, 2800);
+
+    return () => clearInterval(timer);
+  }, []);
 
   return (
-    <div className="min-h-screen bg-background font-sans text-foreground selection:bg-neutral-100 selection:text-foreground">
-      {/* ① ヒーローセクション (Hero) */}
-      <header className="relative overflow-hidden px-6 pt-24 pb-20 md:pt-36 md:pb-32 max-w-7xl mx-auto">
-        <div className="grid gap-16 lg:grid-cols-12 lg:items-center">
-          {/* 左側：キャッチコピーとCTA */}
-          <div className="lg:col-span-7 flex flex-col items-start text-left z-10">
-            <Badge className="mb-6 bg-orange-50 text-orange-600 hover:bg-orange-100 dark:bg-orange-950/30 dark:text-orange-400 border-none px-3 py-1 font-medium tracking-geist-ui rounded-full">
-              セキュリティを、もっと温かく、シンプルに
-            </Badge>
-            <h1 className="text-[40px] font-semibold leading-[1.1] tracking-geist-hero md:text-[64px] text-foreground text-left max-w-2xl">
-              家族のパスワード、
-              <br />
-              <span className="text-orange-500">LINEで送るのをやめよう。</span>
-            </h1>
-            <p className="mt-8 text-[18px] md:text-[20px] leading-[1.6] text-muted-foreground max-w-xl">
-              パスワードそのものではなく、我が家だけの「ヒント」を最高峰の暗号化でスマートに共有。1Passwordは難しすぎるパートナーや家族に最適です。
-            </p>
-            <div className="mt-10 flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-              <Link
-                to="/login"
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-[#171717] dark:bg-white text-white dark:text-[#171717] px-8 py-4 text-[16px] font-medium transition hover:opacity-90 shadow-md w-full sm:w-auto text-center"
-              >
-                <span className="text-orange-500 font-bold">
-                  Googleアカウント
-                </span>
-                <span>で1秒登録</span>
-              </Link>
-            </div>
-            <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground tracking-geist-ui">
-              <Check className="h-4 w-4 text-orange-500" />
-              <span>初期設定不要</span>
-              <span className="text-neutral-300 dark:text-neutral-700">|</span>
-              <Check className="h-4 w-4 text-orange-500" />
-              <span>完全無料</span>
-            </div>
-          </div>
+    <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 antialiased font-sans transition-colors duration-300 break-words overflow-x-hidden">
+      {/* インラインスタイルでカスタムアニメーションを注入 */}
+      <style>{`
+        @keyframes border-flow {
+          0% { stroke-dashoffset: 40; }
+          100% { stroke-dashoffset: 0; }
+        }
+        .animate-border-flow {
+          animation: border-flow 3s linear infinite;
+        }
+      `}</style>
 
-          {/* 右側：デバイスモックアップ (HTML/CSS) */}
-          <div className="lg:col-span-5 relative flex justify-center lg:justify-end">
-            {/* 装飾用のバックグラウンドグラデーションウォッシュ */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] bg-gradient-to-tr from-orange-400/20 to-amber-300/10 rounded-full blur-3xl -z-10" />
-
-            {/* PC Mockup (MacBook Pro 風) */}
-            <div className="w-full max-w-[500px] aspect-[16/10] bg-[#171717] dark:bg-[#262626] rounded-xl p-2.5 shadow-2xl relative border border-neutral-700/50">
-              {/* インカメラ */}
-              <div className="absolute top-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-neutral-900 rounded-full" />
-              {/* 画面 */}
-              <div className="w-full h-full bg-[#fafafa] dark:bg-[#121212] rounded-md overflow-hidden flex flex-row select-none">
-                {/* サイドバー */}
-                <div className="w-1/4 bg-[#f4f4f5] dark:bg-[#1a1919] p-2 flex flex-col gap-3 border-r border-neutral-200 dark:border-neutral-800">
-                  <div className="flex items-center gap-1.5 px-1">
-                    <div className="h-4 w-4 rounded bg-orange-500 flex items-center justify-center text-[10px] text-white font-bold">
-                      P
-                    </div>
-                    <span className="text-[10px] font-bold text-foreground">
-                      PoohMa
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <div className="text-[8px] px-1.5 py-1 rounded bg-orange-500/10 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 font-medium">
-                      ホーム
-                    </div>
-                    <div className="text-[8px] px-1.5 py-1 text-muted-foreground hover:bg-neutral-200 dark:hover:bg-neutral-800 rounded">
-                      サービス一覧
-                    </div>
-                    <div className="text-[8px] px-1.5 py-1 text-muted-foreground hover:bg-neutral-200 dark:hover:bg-neutral-800 rounded">
-                      家族設定
-                    </div>
-                  </div>
-                </div>
-                {/* メインダッシュボード */}
-                <div className="w-3/4 p-3 flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <div className="text-[10px] font-bold">ダッシュボード</div>
-                    <div className="h-4 w-12 rounded bg-orange-500 text-white text-[8px] flex items-center justify-center font-medium">
-                      + 新規登録
-                    </div>
-                  </div>
-
-                  {/* カードグリッド */}
-                  <div className="grid grid-cols-2 gap-2 overflow-y-auto max-h-[160px] no-scrollbar">
-                    {/* Netflix カード */}
-                    <div className="rounded-lg bg-white dark:bg-[#1e1e1e] p-2 shadow-card border-none flex flex-col gap-1.5">
-                      <div className="flex items-center gap-1">
-                        <div className="h-4 w-4 rounded bg-[#e50914] text-white font-bold text-[8px] flex items-center justify-center">
-                          N
-                        </div>
-                        <div className="text-[8px] font-bold truncate">
-                          Netflix
-                        </div>
-                      </div>
-                      <div className="h-8 rounded bg-[#e50914] flex items-center justify-center text-[10px] text-white font-bold select-none shadow-sm">
-                        NETFLIX
-                      </div>
-                      <div className="text-[7px] text-muted-foreground truncate">
-                        動画配信サービス
-                      </div>
-                    </div>
-
-                    {/* Amazon Prime カード */}
-                    <div className="rounded-lg bg-white dark:bg-[#1e1e1e] p-2 shadow-card border-none flex flex-col gap-1.5">
-                      <div className="flex items-center gap-1">
-                        <div className="h-4 w-4 rounded bg-[#00a8e1] text-white font-bold text-[8px] flex items-center justify-center">
-                          a
-                        </div>
-                        <div className="text-[8px] font-bold truncate">
-                          Amazon Prime
-                        </div>
-                      </div>
-                      <div className="h-8 rounded bg-[#1A232F] flex items-center justify-center text-[7px] text-white font-semibold select-none shadow-sm">
-                        prime video
-                      </div>
-                      <div className="text-[7px] text-muted-foreground truncate">
-                        配送・映画
-                      </div>
-                    </div>
-
-                    {/* Spotify カード */}
-                    <div className="rounded-lg bg-white dark:bg-[#1e1e1e] p-2 shadow-card border-none flex flex-col gap-1.5">
-                      <div className="flex items-center gap-1">
-                        <div className="h-4 w-4 rounded bg-[#1DB954] text-white font-bold text-[8px] flex items-center justify-center">
-                          S
-                        </div>
-                        <div className="text-[8px] font-bold truncate">
-                          Spotify
-                        </div>
-                      </div>
-                      <div className="h-8 rounded bg-[#1DB954] flex items-center justify-center text-[8px] text-black font-bold select-none shadow-sm">
-                        Spotify
-                      </div>
-                      <div className="text-[7px] text-muted-foreground truncate">
-                        音楽ストリーミング
-                      </div>
-                    </div>
-
-                    {/* Supermarket カード */}
-                    <div className="rounded-lg bg-white dark:bg-[#1e1e1e] p-2 shadow-card border-none flex flex-col gap-1.5">
-                      <div className="flex items-center gap-1">
-                        <div className="h-4 w-4 rounded bg-orange-600 text-white font-bold text-[8px] flex items-center justify-center">
-                          🛒
-                        </div>
-                        <div className="text-[8px] font-bold truncate">
-                          コープスーパー
-                        </div>
-                      </div>
-                      {/* 画像プレースホルダーとしてのスケルトン風コープ店舗イラスト */}
-                      <div className="h-8 rounded bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center shadow-sm relative overflow-hidden">
-                        <div className="absolute top-1 left-2 h-2 w-10 bg-orange-500/20 rounded" />
-                        <div className="absolute bottom-1 right-2 h-4 w-6 bg-emerald-500/30 rounded" />
-                        <span className="text-[7px] text-muted-foreground">
-                          Local Super
-                        </span>
-                      </div>
-                      <div className="text-[7px] text-muted-foreground truncate">
-                        ネットスーパー
-                      </div>
-                    </div>
-                  </div>
-                </div>
+      <main>
+        {/* ─── ① HERO SECTION ─── */}
+        <section className="relative overflow-hidden py-16 md:py-28 bg-white dark:bg-zinc-950">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-12 gap-12 items-center">
+            {/* 左側コピー・アクション */}
+            <div className="md:col-span-6 text-center md:text-left flex flex-col items-center md:items-start z-10">
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 dark:bg-orange-500/10 px-3.5 py-1 text-xs font-semibold text-orange-600 dark:text-orange-400 mb-6 border border-orange-100 dark:border-orange-500/20 tracking-geist-ui">
+                <Shield className="h-3.5 w-3.5" />{" "}
+                金融機関レベルのデータ暗号鍵保護を採用
               </div>
-
-              {/* 重ね合わせるスマホ Mockup (iPhone風) */}
-              <div className="absolute -bottom-6 left-2 sm:-left-6 md:-left-12 w-[130px] aspect-[9/19] bg-[#171717] dark:bg-[#262626] rounded-2xl p-1.5 shadow-2xl border border-neutral-700/50 flex flex-col z-20">
-                {/* Dynamic Island */}
-                <div className="w-8 h-2.5 bg-black rounded-full mx-auto mb-1 flex items-center justify-center" />
-                {/* スマホ画面 */}
-                <div className="flex-1 bg-white dark:bg-[#121212] rounded-xl overflow-hidden p-1.5 flex flex-col gap-2 select-none">
-                  {/* アプリヘッダー */}
-                  <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 pb-1">
-                    <span className="text-[7px] font-bold text-orange-500">
-                      PoohMa
-                    </span>
-                    <span className="text-[6px] text-muted-foreground">
-                      ファミリー
-                    </span>
-                  </div>
-                  {/* カードリストのモバイル版 */}
-                  <div className="flex flex-col gap-1.5 overflow-y-auto max-h-[180px] no-scrollbar">
-                    <div className="rounded border border-neutral-100 dark:border-neutral-800 p-1 flex items-center justify-between">
-                      <div className="flex items-center gap-1">
-                        <div className="h-3 w-3 rounded-full bg-[#e50914] text-white flex items-center justify-center text-[5px] font-bold">
-                          N
-                        </div>
-                        <span className="text-[6px] font-medium">Netflix</span>
-                      </div>
-                      <span className="text-[5px] bg-orange-500/10 text-orange-600 px-1 py-0.2 rounded font-semibold">
-                        SHARED
-                      </span>
-                    </div>
-
-                    <div className="rounded border border-neutral-100 dark:border-neutral-800 p-1 flex items-center justify-between">
-                      <div className="flex items-center gap-1">
-                        <div className="h-3 w-3 rounded-full bg-[#00a8e1] text-white flex items-center justify-center text-[5px] font-bold">
-                          a
-                        </div>
-                        <span className="text-[6px] font-medium">Amazon</span>
-                      </div>
-                      <span className="text-[5px] bg-orange-500/10 text-orange-600 px-1 py-0.2 rounded font-semibold">
-                        SHARED
-                      </span>
-                    </div>
-
-                    <div className="rounded border border-neutral-100 dark:border-neutral-800 p-1 flex items-center justify-between">
-                      <div className="flex items-center gap-1">
-                        <div className="h-3 w-3 rounded-full bg-neutral-900 text-white flex items-center justify-center text-[5px] font-bold">
-                          P
-                        </div>
-                        <span className="text-[6px] font-medium">
-                          パパの銀行
-                        </span>
-                      </div>
-                      <span className="text-[5px] bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400 px-1 py-0.2 rounded font-semibold">
-                        PRIVATE
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* ② 課題提起セクション (Problem) */}
-      <section className="bg-neutral-50 dark:bg-[#0c0a09] border-y border-border py-24 md:py-32">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center max-w-3xl mx-auto mb-16 md:mb-24">
-            <Badge className="bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 border-none px-3 py-1 font-medium tracking-geist-ui rounded-full">
-              PROBLEM
-            </Badge>
-            <h2 className="mt-4 text-[32px] md:text-[40px] font-semibold tracking-geist-h1">
-              家族間アカウント共有の4大ストレス
-            </h2>
-            <p className="mt-4 text-[16px] md:text-[18px] text-muted-foreground">
-              私たちは日常的にアカウントを共有していますが、その方法は危険で非効率です。
-            </p>
-          </div>
-
-          <div className="grid gap-12 lg:grid-cols-12 lg:items-center">
-            {/* LINE風チャット画面モック */}
-            <div className="lg:col-span-6 flex justify-center">
-              <div className="w-full max-w-[340px] aspect-[9/18] bg-neutral-950 rounded-[36px] p-3 shadow-2xl relative border border-neutral-800">
-                {/* Dynamic Island */}
-                <div className="w-24 h-4 bg-black rounded-full mx-auto mb-3 flex items-center justify-center" />
-                {/* LINEチャット画面 */}
-                <div className="w-full h-[calc(100%-20px)] bg-[#7494c0] dark:bg-[#202731] rounded-[28px] overflow-hidden flex flex-col p-3 text-[12px]">
-                  {/* ヘッダー */}
-                  <div className="flex items-center justify-between text-white border-b border-white/10 pb-2 mb-2">
-                    <span className="font-bold">家族のトーク</span>
-                    <span className="text-[10px] opacity-75">メンバー 3</span>
-                  </div>
-
-                  {/* チャット履歴 */}
-                  <div className="flex-1 flex flex-col gap-3 overflow-y-auto no-scrollbar justify-end">
-                    {/* 左：パパ */}
-                    <div className="flex items-start gap-2">
-                      <div className="w-6 h-6 rounded-full bg-orange-300 flex items-center justify-center font-bold text-[10px] text-orange-950">
-                        パ
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-[8px] text-white/70 mb-0.5">
-                          パパ
-                        </span>
-                        <div className="bg-white text-neutral-900 rounded-lg p-2 max-w-[180px] shadow-sm relative after:content-[''] after:absolute after:top-2 after:-left-1.5 after:border-t-4 after:border-t-transparent after:border-r-6 after:border-r-white after:border-b-4 after:border-b-transparent">
-                          ネトフリのパスワードなんだっけ？🤔
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* 右：ママ */}
-                    <div className="flex items-end gap-1 justify-end">
-                      <span className="text-[8px] text-white/50 mb-1">
-                        既読 11:42
-                      </span>
-                      <div className="bg-[#85e347] dark:bg-emerald-600 dark:text-white text-neutral-950 rounded-lg p-2 max-w-[180px] shadow-sm relative after:content-[''] after:absolute after:top-2 after:-right-1.5 after:border-t-4 after:border-t-transparent after:border-l-6 after:border-l-[#85e347] dark:after:border-l-emerald-600 after:border-b-4 after:border-b-transparent">
-                        poohma_love_family1
-                      </div>
-                    </div>
-
-                    {/* 左：パパ */}
-                    <div className="flex items-start gap-2">
-                      <div className="w-6 h-6 rounded-full bg-orange-300 flex items-center justify-center font-bold text-[10px] text-orange-950">
-                        パ
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-[8px] text-white/70 mb-0.5">
-                          パパ
-                        </span>
-                        <div className="bg-white text-neutral-900 rounded-lg p-2 max-w-[180px] shadow-sm relative after:content-[''] after:absolute after:top-2 after:-left-1.5 after:border-t-4 after:border-t-transparent after:border-r-6 after:border-r-white after:border-b-4 after:border-b-transparent">
-                          ログインできない！😭
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* 右：ママ */}
-                    <div className="flex items-end gap-1 justify-end">
-                      <span className="text-[8px] text-white/50 mb-1">
-                        既読 11:43
-                      </span>
-                      <div className="bg-[#85e347] dark:bg-emerald-600 dark:text-white text-neutral-950 rounded-lg p-2 max-w-[180px] shadow-sm relative after:content-[''] after:absolute after:top-2 after:-right-1.5 after:border-t-4 after:border-t-transparent after:border-l-6 after:border-l-[#85e347] dark:after:border-l-emerald-600 after:border-b-4 after:border-b-transparent">
-                        あ、最初のpは大文字のPね！
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 入力エリア */}
-                  <div className="mt-2 bg-white/10 rounded-full h-7 flex items-center px-3 justify-between text-white/50 text-[10px]">
-                    <span>メッセージを入力...</span>
-                    <span>😊</span>
-                  </div>
-                </div>
-
-                {/* アラートバルーン */}
-                <div className="absolute -top-3 -right-2 sm:-right-6 bg-red-500 text-white rounded-lg p-2 text-[10px] font-semibold flex items-center gap-1 shadow-lg border border-red-400">
-                  <AlertCircle className="h-3.5 w-3.5" />
-                  <span>パスワード丸見えで危険！</span>
-                </div>
-              </div>
-            </div>
-
-            {/* 右側：4大ストレスのカード */}
-            <div className="lg:col-span-6 flex flex-col gap-4">
-              <div className="p-6 rounded-lg bg-white dark:bg-[#171717] shadow-card flex gap-4">
-                <div className="h-10 w-10 shrink-0 rounded-full bg-red-100 dark:bg-red-950/30 text-red-500 flex items-center justify-center font-bold text-lg">
-                  1
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg tracking-geist-h2">
-                    「ねぇパスワードなんだっけ？」が毎回起きる
-                  </h3>
-                  <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-                    動画配信サービスやネットスーパーにログインするたび、毎回LINEや声で聞いていませんか？
-                    そのたびに作業が中断されます。
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-6 rounded-lg bg-white dark:bg-[#171717] shadow-card flex gap-4">
-                <div className="h-10 w-10 shrink-0 rounded-full bg-red-100 dark:bg-red-950/30 text-red-500 flex items-center justify-center font-bold text-lg">
-                  2
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg tracking-geist-h2">
-                    LINEやメモに残すセキュリティの不安
-                  </h3>
-                  <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-                    トーク履歴や冷蔵庫の紙メモにパスワードをそのまま書くのは、アカウント乗っ取りや外部への漏えいのリスクが常に付きまといます。
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-6 rounded-lg bg-white dark:bg-[#171717] shadow-card flex gap-4">
-                <div className="h-10 w-10 shrink-0 rounded-full bg-red-100 dark:bg-red-950/30 text-red-500 flex items-center justify-center font-bold text-lg">
-                  3
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg tracking-geist-h2">
-                    1Password等は家族には難しすぎる
-                  </h3>
-                  <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-                    「本格的なパスワード管理ツールは、パートナーや親がめんどくさがって使ってくれない。」結局、元のLINEでの共有に戻ってしまいます。
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-6 rounded-lg bg-white dark:bg-[#171717] shadow-card flex gap-4">
-                <div className="h-10 w-10 shrink-0 rounded-full bg-red-100 dark:bg-red-950/30 text-red-500 flex items-center justify-center font-bold text-lg">
-                  4
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg tracking-geist-h2">
-                    共通アカウントと個人アカウントの混在
-                  </h3>
-                  <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-                    「どれが家族全員で使うやつで、どれが自分だけのものか分からなくなる。」プライベートを守りながら共有する境界線が曖昧になります。
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ③ 解決策の提示セクション (Solution) */}
-      <section className="bg-white dark:bg-[#0c0a09] py-24 md:py-32 overflow-hidden">
-        <div className="max-w-6xl mx-auto px-6 text-center">
-          <Badge className="bg-orange-50 text-orange-600 hover:bg-orange-100 dark:bg-orange-950/30 dark:text-orange-400 border-none px-3 py-1 font-medium tracking-geist-ui rounded-full">
-            SOLUTION
-          </Badge>
-          <h2 className="mt-4 text-[32px] md:text-[40px] font-semibold tracking-geist-h1 max-w-3xl mx-auto leading-tight">
-            家族全員が迷わない、最も安全で、
-            <br />
-            最もシンプルなアカウントの居場所
-          </h2>
-          <p className="mt-6 text-[18px] text-muted-foreground max-w-xl mx-auto">
-            PoohMa（プーマ）は、家族のパスワード管理のストレスを解消し、安全でクリーンなスペースを提供します。
-          </p>
-
-          {/* 盾・鍵・フォルダのビジュアル構成図 (HTML/CSS & Skeleton) */}
-          <div className="mt-16 max-w-3xl mx-auto p-8 rounded-2xl bg-neutral-50 dark:bg-[#121212] shadow-card flex flex-col md:flex-row items-center justify-around gap-8 relative">
-            {/* 左側：バラバラなデータ (吸い込まれる) */}
-            <div className="flex flex-col gap-2 bg-white dark:bg-[#1a1a1a] p-4 rounded-xl shadow-sm border border-neutral-100 dark:border-neutral-800 z-10 w-44">
-              <span className="text-[10px] font-semibold text-muted-foreground mb-1 block">
-                散らばった情報
-              </span>
-              <div className="h-5 rounded bg-neutral-100 dark:bg-neutral-800 flex items-center px-2 text-[9px] gap-1">
-                <span className="text-red-500">LINE:</span> 〇〇パスワード
-              </div>
-              <div className="h-5 rounded bg-neutral-100 dark:bg-neutral-800 flex items-center px-2 text-[9px] gap-1">
-                <span className="text-yellow-600">メモ紙:</span> 冷蔵庫の付箋
-              </div>
-              <div className="h-5 rounded bg-neutral-100 dark:bg-neutral-800 flex items-center px-2 text-[9px] gap-1">
-                <span className="text-blue-500">個人の脳内:</span> 合言葉
-              </div>
-            </div>
-
-            {/* モバイル用移行矢印 (縦並び時) */}
-            <div className="flex md:hidden flex-col items-center gap-1">
-              <ArrowRight className="h-6 w-6 text-orange-500 animate-pulse rotate-90" />
-              <span className="text-[9px] font-mono text-muted-foreground uppercase">
-                Organize
-              </span>
-            </div>
-
-            {/* 中央の移行矢印 */}
-            <div className="hidden md:flex flex-col items-center gap-1">
-              <ArrowRight className="h-6 w-6 text-orange-500 animate-pulse" />
-              <span className="text-[9px] font-mono text-muted-foreground uppercase">
-                Organize
-              </span>
-            </div>
-
-            {/* 中央：オレンジフォルダ & 盾の抽象図 */}
-            <div className="relative flex items-center justify-center w-36 h-36">
-              {/* 光彩エフェクト */}
-              <div className="absolute inset-0 bg-orange-400/20 rounded-full blur-2xl animate-pulse" />
-              {/* フォルダ */}
-              <Folder className="h-28 w-28 text-orange-500 fill-orange-500/10 drop-shadow-lg" />
-              {/* 盾 */}
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/3 bg-white dark:bg-neutral-900 rounded-full p-2.5 shadow-lg border border-orange-500/20">
-                <Shield className="h-8 w-8 text-orange-500 fill-orange-500/10" />
-              </div>
-            </div>
-
-            {/* モバイル用移行矢印 (縦並び時) */}
-            <div className="flex md:hidden flex-col items-center gap-1">
-              <ArrowRight className="h-6 w-6 text-orange-500 animate-pulse rotate-90" />
-              <span className="text-[9px] font-mono text-muted-foreground uppercase">
-                Encrypt
-              </span>
-            </div>
-
-            {/* 中央の移行矢印 */}
-            <div className="hidden md:flex flex-col items-center gap-1">
-              <ArrowRight className="h-6 w-6 text-orange-500 animate-pulse" />
-              <span className="text-[9px] font-mono text-muted-foreground uppercase">
-                Encrypt
-              </span>
-            </div>
-
-            {/* 右側：整頓されたカードと暗号データ */}
-            <div className="flex flex-col gap-2 bg-white dark:bg-[#1a1a1a] p-4 rounded-xl shadow-sm border border-neutral-100 dark:border-neutral-800 z-10 w-44">
-              <span className="text-[10px] font-semibold text-muted-foreground mb-1 block">
-                暗号化されたヒント
-              </span>
-              <div className="h-5 rounded bg-orange-50/80 dark:bg-orange-950/20 flex items-center justify-between px-2 text-[9px] text-orange-700 dark:text-orange-300 font-medium">
-                <span>Netflixヒント</span>
-                <Lock className="h-2.5 w-2.5" />
-              </div>
-              <div className="h-5 rounded bg-orange-50/80 dark:bg-orange-950/20 flex items-center justify-between px-2 text-[9px] text-orange-700 dark:text-orange-300 font-medium">
-                <span>Amazonヒント</span>
-                <Lock className="h-2.5 w-2.5" />
-              </div>
-              <div className="h-5 rounded bg-orange-50/80 dark:bg-orange-950/20 flex items-center justify-between px-2 text-[9px] text-orange-700 dark:text-orange-300 font-medium">
-                <span>電気ガスヒント</span>
-                <Lock className="h-2.5 w-2.5" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ④ 機能・推しポイント詳細セクション (Features) */}
-      <section className="bg-neutral-50 dark:bg-[#0c0a09] border-y border-border py-24 md:py-32">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center max-w-3xl mx-auto mb-16 md:mb-24">
-            <Badge className="bg-orange-50 text-orange-600 hover:bg-orange-100 dark:bg-orange-950/30 dark:text-orange-400 border-none px-3 py-1 font-medium tracking-geist-ui rounded-full">
-              FEATURES
-            </Badge>
-            <h2 className="mt-4 text-[32px] md:text-[40px] font-semibold tracking-geist-h1">
-              本気で使いやすさを追求した機能群
-            </h2>
-            <p className="mt-4 text-[16px] md:text-[18px] text-muted-foreground">
-              直感的なUIと強力なセキュリティ。家族全員が快適に使える工夫を凝らしました。
-            </p>
-          </div>
-
-          <div className="grid gap-8 md:grid-cols-2">
-            {/* Feature 1 */}
-            <div className="p-8 bg-white dark:bg-[#171717] rounded-xl shadow-card hover:shadow-card-hover transition-all flex flex-col justify-between">
-              <div>
-                <Badge className="bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 border-none rounded">
-                  機能 1
-                </Badge>
-                <h3 className="mt-4 text-[24px] font-semibold tracking-geist-h2">
-                  URLを入れるだけ。一目でわかるダッシュボード
-                </h3>
-                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
-                  URLを入力した瞬間に、Webサービスのロゴや背景画像を自動で取得（OGPフェッチ）。文字だらけの無機質なリストではなく、直感的にどのサービスか見分けられます。タグによる絞り込みも爆速です。
-                </p>
-              </div>
-
-              {/* ビジュアルモック */}
-              <div className="mt-8 bg-neutral-50 dark:bg-[#1e1e1e] rounded-lg p-4 border border-neutral-100 dark:border-neutral-800">
-                <div className="flex flex-col gap-3">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[9px] text-muted-foreground font-mono">
-                      INPUT URL
-                    </span>
-                    <div className="h-8 rounded bg-white dark:bg-[#121212] border border-neutral-200 dark:border-neutral-800 flex items-center justify-between px-3 text-[10px]">
-                      <span>https://netflix.com</span>
-                      <Globe className="h-3.5 w-3.5 text-orange-500" />
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-center">
-                    <ArrowRight className="h-4 w-4 text-orange-500 rotate-90 md:rotate-0" />
-                  </div>
-                  <div className="rounded-lg bg-white dark:bg-[#121212] p-3 shadow-sm flex items-center justify-between border border-orange-500/20">
-                    <div className="flex items-center gap-2">
-                      <div className="h-8 w-8 rounded bg-[#e50914] text-white flex items-center justify-center font-bold text-sm">
-                        N
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-[10px] font-bold">Netflix</span>
-                        <span className="text-[8px] text-muted-foreground">
-                          自動フェッチ完了
-                        </span>
-                      </div>
-                    </div>
-                    <Badge className="bg-orange-500/10 text-orange-600 text-[8px] border-none">
-                      #動画
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Feature 2 */}
-            <div className="p-8 bg-white dark:bg-[#171717] rounded-xl shadow-card hover:shadow-card-hover transition-all flex flex-col justify-between">
-              <div>
-                <Badge className="bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 border-none rounded">
-                  機能 2
-                </Badge>
-                <h3 className="mt-4 text-[24px] font-semibold tracking-geist-h2">
-                  「家族専用」パスコードとE2EE（最高峰の安全）
-                </h3>
-                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
-                  パスワードヒントは、家族間で決めたパスコードを使って、あなたの端末（ブラウザ）上で暗号化されてからクラウドへ送られます。サーバー側には暗号化された文字しか残らず、運営者すら覗くことはできません。
-                </p>
-              </div>
-
-              {/* ビジュアルモック */}
-              <div className="mt-8 bg-neutral-50 dark:bg-[#1e1e1e] rounded-lg p-4 border border-neutral-100 dark:border-neutral-800">
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-around gap-2 text-[10px]">
-                    <div className="flex flex-col items-center gap-1">
-                      <span className="text-[8px] text-muted-foreground">
-                        プレーンテキスト
-                      </span>
-                      <div className="px-2 py-1 bg-white dark:bg-[#121212] rounded border font-mono">
-                        私の秘密ヒント
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-center">
-                      <Lock className="h-5 w-5 text-orange-500 animate-bounce" />
-                      <span className="text-[7px] text-orange-600 font-semibold font-mono">
-                        AES-GCM
-                      </span>
-                    </div>
-                    <div className="flex flex-col items-center gap-1">
-                      <span className="text-[8px] text-muted-foreground">
-                        サーバー保存データ
-                      </span>
-                      <div className="px-2 py-1 bg-neutral-800 text-neutral-400 rounded font-mono text-[8px] max-w-[120px] truncate">
-                        U2FsdGVkX19jG...
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-[9px] text-center text-muted-foreground bg-orange-50 dark:bg-orange-950/20 p-1.5 rounded text-orange-800 dark:text-orange-400 font-mono">
-                    ※ サーバー管理者も暗号化前の文字は解読不可能です。
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Feature 3 */}
-            <div className="p-8 bg-white dark:bg-[#171717] rounded-xl shadow-card hover:shadow-card-hover transition-all flex flex-col justify-between">
-              <div>
-                <Badge className="bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 border-none rounded">
-                  機能 3
-                </Badge>
-                <h3 className="mt-4 text-[24px] font-semibold tracking-geist-h2">
-                  1つのサービスに、複数のアカウントを内包
-                </h3>
-                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
-                  「Amazon（パパ用）」「Amazon（ママ用）」のように、サービスごとに異なるログインIDや異なるヒントを、「ラベル」付きでまとめて登録できます。「あれ、誰のアカウントだっけ？」問題を一瞬で解決。
-                </p>
-              </div>
-
-              {/* ビジュアルモック */}
-              <div className="mt-8 bg-neutral-50 dark:bg-[#1e1e1e] rounded-lg p-4 border border-neutral-100 dark:border-neutral-800">
-                <div className="bg-white dark:bg-[#121212] rounded-lg p-3 shadow-sm border border-neutral-200 dark:border-neutral-800">
-                  <div className="flex items-center gap-2 border-b dark:border-neutral-800 pb-2 mb-2">
-                    <div className="h-6 w-6 rounded bg-neutral-900 text-white flex items-center justify-center font-bold text-xs">
-                      a
-                    </div>
-                    <span className="text-[12px] font-bold">Amazon.co.jp</span>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between bg-neutral-50 dark:bg-[#1a1a1a] p-2 rounded">
-                      <div className="flex flex-col text-[10px]">
-                        <span className="font-semibold text-[9px] text-muted-foreground">
-                          ID: papamail@...
-                        </span>
-                        <span className="font-mono text-orange-600 text-[8px]">
-                          ヒント: 実家の犬の名前
-                        </span>
-                      </div>
-                      <Badge className="bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[8px] border-none font-semibold">
-                        パパ用
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between bg-neutral-50 dark:bg-[#1a1a1a] p-2 rounded">
-                      <div className="flex flex-col text-[10px]">
-                        <span className="font-semibold text-[9px] text-muted-foreground">
-                          ID: mamamail@...
-                        </span>
-                        <span className="font-mono text-orange-600 text-[8px]">
-                          ヒント: 初めて買った車の名前
-                        </span>
-                      </div>
-                      <Badge className="bg-pink-500/10 text-pink-600 dark:text-pink-400 text-[8px] border-none font-semibold">
-                        ママ用
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Feature 4 */}
-            <div className="p-8 bg-white dark:bg-[#171717] rounded-xl shadow-card hover:shadow-card-hover transition-all flex flex-col justify-between">
-              <div>
-                <Badge className="bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 border-none rounded">
-                  機能 4
-                </Badge>
-                <h3 className="mt-4 text-[24px] font-semibold tracking-geist-h2">
-                  プライベートとシェアのシームレスな切り替え
-                </h3>
-                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
-                  「これは自分専用の仕事用銀行」「これは家族と共有するNetflix」を、スイッチひとつで切り替え可能。家族全員の共有スペースに表示するか、自分の端末のみに秘めておくかを自由に制御できます。
-                </p>
-              </div>
-
-              {/* ビジュアルモック */}
-              <div className="mt-8 bg-neutral-50 dark:bg-[#1e1e1e] rounded-lg p-4 border border-neutral-100 dark:border-neutral-800">
-                <div className="flex items-center justify-around gap-4">
-                  {/* スイッチ */}
-                  <div className="flex flex-col items-center gap-2 bg-white dark:bg-[#121212] p-3 rounded-lg border dark:border-neutral-800 shadow-sm">
-                    <span className="text-[8px] text-muted-foreground font-semibold">
-                      公開ステータス
-                    </span>
-                    <div className="flex items-center gap-1.5 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-full cursor-pointer select-none">
-                      <span className="text-[8px] px-2 py-0.5 rounded-full bg-orange-500 text-white font-bold">
-                        SHARED
-                      </span>
-                      <span className="text-[8px] px-2 py-0.5 text-muted-foreground font-semibold">
-                        PRIVATE
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <ArrowRight className="h-4 w-4 text-orange-500" />
-                  </div>
-                  {/* フォルダ */}
-                  <div className="flex flex-col items-center gap-1 bg-white dark:bg-[#121212] p-3 rounded-lg border dark:border-neutral-800 shadow-sm w-28">
-                    <Folder className="h-10 w-10 text-orange-500 fill-orange-500/10" />
-                    <span className="text-[8px] font-semibold text-center text-foreground">
-                      ファミリー共有フォルダへ格納
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ⑤ テクニカル・セキュリティセクション (For Tech/Developers) */}
-      <section className="bg-white dark:bg-[#0c0a09] py-24 md:py-32">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="grid gap-16 lg:grid-cols-12 lg:items-start">
-            {/* 左側：説明 */}
-            <div className="lg:col-span-5 flex flex-col items-start text-left">
-              <Badge className="bg-orange-50 text-orange-600 hover:bg-orange-100 dark:bg-orange-950/30 dark:text-orange-400 border-none px-3 py-1 font-medium tracking-geist-ui rounded-full">
-                FOR DEVELOPERS
-              </Badge>
-              <h2 className="mt-4 text-[32px] md:text-[40px] font-semibold tracking-geist-h1 leading-tight text-foreground">
-                最高峰の安全性を、
+              <h1 className="text-[26px] sm:text-5xl lg:text-6xl font-extrabold tracking-geist-hero leading-[1.12] text-[#171717] dark:text-zinc-100">
+                <JpText>家族の「パスワード忘れた」を</JpText>
                 <br />
-                技術で裏付ける
-              </h2>
-              <p className="mt-6 text-[16px] text-muted-foreground leading-relaxed">
-                PoohMaは、ITエンジニアやセキュリティ意識の高い主導入者の方々に納得していただけるよう、堅牢なセキュリティアーキテクチャを開示しています。
-              </p>
+                <span className="text-[#f97316] dark:text-orange-400">
+                  <JpText>たった1分</JpText>
+                </span>
+                <JpText>で解決する。</JpText>
+              </h1>
 
-              <div className="mt-8 flex flex-wrap gap-2">
-                <Badge className="bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 border-none px-2 py-1 rounded font-mono text-[10px]">
-                  WebCrypto API (PBKDF2/AES-GCM) ●
-                </Badge>
-                <Badge className="bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 border-none px-2 py-1 rounded font-mono text-[10px]">
-                  Client-side Encryption ●
-                </Badge>
-                <Badge className="bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 border-none px-2 py-1 rounded font-mono text-[10px]">
-                  Server-side SSRF Prevention ●
-                </Badge>
-                <Badge className="bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 border-none px-2 py-1 rounded font-mono text-[10px]">
-                  DNS Resolution & Dynamic IP Verification ●
-                </Badge>
-                <Badge className="bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 border-none px-2 py-1 rounded font-mono text-[10px]">
-                  TanStack Start & Supabase & Firebase Auth ●
-                </Badge>
-              </div>
-            </div>
-
-            {/* 右側：フロー図 (HTML/CSS & Skeletons) */}
-            <div className="lg:col-span-7 flex flex-col gap-8 w-full">
-              {/* E2EE Flow */}
-              <div className="p-6 rounded-xl bg-neutral-50 dark:bg-[#121212] shadow-card border border-neutral-100 dark:border-neutral-800 flex flex-col gap-4">
-                <div className="flex items-center justify-between border-b dark:border-neutral-800 pb-2">
-                  <h3 className="text-sm font-semibold tracking-geist-h2 font-mono flex items-center gap-1.5">
-                    <Shield className="h-4 w-4 text-orange-500" />
-                    <span>End-to-End Encryption (E2EE) Flow</span>
-                  </h3>
-                  <span className="text-[9px] bg-orange-500/10 text-orange-600 px-1.5 py-0.5 rounded font-mono font-semibold">
-                    CLIENT SIDE
-                  </span>
-                </div>
-
-                <div className="flex flex-col md:flex-row gap-4 items-stretch text-[10px] font-mono">
-                  {/* Browser */}
-                  <div className="flex-1 p-3 bg-white dark:bg-[#1a1a1a] rounded border border-orange-500/15 flex flex-col gap-2 relative">
-                    <div className="absolute top-1 right-2 text-[8px] text-orange-500 font-semibold">
-                      あなたの端末上 (Browser)
-                    </div>
-                    <div className="mt-2 flex items-center gap-1 bg-neutral-100 dark:bg-neutral-800 p-1.5 rounded">
-                      <Laptop className="h-3.5 w-3.5" />
-                      <span>パスコード入力</span>
-                    </div>
-                    <div className="h-0.5 bg-neutral-200 dark:bg-neutral-800 my-1" />
-                    <div className="bg-orange-500/10 text-orange-700 dark:text-orange-400 p-1.5 rounded text-[8px] flex flex-col gap-1">
-                      <span className="font-bold">WBKDF2</span>
-                      <span>WebCrypto API / 鍵導出</span>
-                    </div>
-                    <div className="bg-orange-500/10 text-orange-700 dark:text-orange-400 p-1.5 rounded text-[8px] flex flex-col gap-1">
-                      <span className="font-bold">AES-GCM (暗号化)</span>
-                      <span>データヒント暗号化</span>
-                    </div>
-                  </div>
-
-                  {/* Arrow */}
-                  <div className="flex items-center justify-center font-bold text-neutral-300">
-                    <ArrowRight className="h-6 w-6 text-neutral-400 rotate-90 md:rotate-0" />
-                  </div>
-
-                  {/* Server & DB */}
-                  <div className="flex-1 flex flex-col gap-3">
-                    <div className="p-3 bg-white dark:bg-[#1a1a1a] rounded border dark:border-neutral-800 flex items-center gap-2">
-                      <Cpu className="h-5 w-5 text-neutral-400" />
-                      <div className="flex flex-col">
-                        <span className="font-bold text-[9px]">
-                          PoohMaサーバー (Nitro)
-                        </span>
-                        <span className="text-[8px] text-muted-foreground">
-                          暗号化済みの文字列を中継のみ
-                        </span>
-                      </div>
-                    </div>
-                    <div className="p-3 bg-white dark:bg-[#1a1a1a] rounded border border-emerald-500/15 flex items-center gap-2">
-                      <Database className="h-5 w-5 text-emerald-500" />
-                      <div className="flex flex-col">
-                        <span className="font-bold text-[9px] text-emerald-600 dark:text-emerald-400">
-                          Supabase (DB)
-                        </span>
-                        <span className="text-[8px] text-muted-foreground">
-                          暗号化データのみ格納
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              {/* モバイル専用: コンパクトなイラスト表示で情緒的つながりを創出 */}
+              <div className="block md:hidden my-6 w-full max-w-[90%] rounded-2xl overflow-hidden bg-[#fafafa] dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800 p-3 shadow-sm transition-transform duration-300">
+                <img
+                  src="/hero-image.png"
+                  alt="ファミリーイラスト"
+                  className="w-full h-full object-contain rounded-xl"
+                />
               </div>
 
-              {/* SSRF Prevention Flow */}
-              <div className="p-6 rounded-xl bg-neutral-50 dark:bg-[#121212] shadow-card border border-neutral-100 dark:border-neutral-800 flex flex-col gap-4">
-                <div className="flex items-center justify-between border-b dark:border-neutral-800 pb-2">
-                  <h3 className="text-sm font-semibold tracking-geist-h2 font-mono flex items-center gap-1.5">
-                    <AlertCircle className="h-4 w-4 text-orange-500" />
-                    <span>SSRF Prevention Flow (Server-Side)</span>
-                  </h3>
-                  <span className="text-[9px] bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 px-1.5 py-0.5 rounded font-mono font-semibold">
-                    SERVER SIDE
-                  </span>
-                </div>
+              <JpText
+                as="p"
+                className="mt-6 max-w-xl text-base text-[#4d4d4d] dark:text-zinc-400 sm:text-lg leading-relaxed"
+              >
+                PoohMa（プーマ）は、実際のパスワードを1文字もサーバーに預けません。ご家族にしか分からない「ヒント」を安全に共有する、全く新しいアカウント管理帳です。
+              </JpText>
 
-                <div className="flex flex-col gap-4 text-[10px] font-mono">
-                  {/* SSRF シーケンス */}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-2 items-center text-center">
-                    <div className="p-2 bg-white dark:bg-[#1a1a1a] rounded border dark:border-neutral-800">
-                      <span className="block font-bold">1. 外部URL入力</span>
-                      <span className="text-[8px] text-muted-foreground">
-                        fetch要求
-                      </span>
-                    </div>
-                    <div className="hidden md:block text-neutral-400">→</div>
-                    <div className="p-2 bg-white dark:bg-[#1a1a1a] rounded border dark:border-neutral-800">
-                      <span className="block font-bold">2. DNS動的解決</span>
-                      <span className="text-[8px] text-muted-foreground">
-                        IPの検証
-                      </span>
-                    </div>
-                    <div className="hidden md:block text-neutral-400">→</div>
-                    <div className="p-2 bg-white dark:bg-[#1a1a1a] rounded border border-orange-500/15">
-                      <span className="block font-bold text-orange-600 dark:text-orange-400">
-                        3. プライベートIP検証
-                      </span>
-                      <span className="text-[8px] text-muted-foreground">
-                        ローカル検証
-                      </span>
-                    </div>
-                    <div className="hidden md:block text-neutral-400">→</div>
-                    <div className="p-2 bg-white dark:bg-[#1a1a1a] rounded border border-emerald-500/15">
-                      <span className="block font-bold text-emerald-600 dark:text-emerald-400">
-                        4. 完全ブロック
-                      </span>
-                      <span className="text-[8px] text-muted-foreground">
-                        不正アクセス防止
-                      </span>
-                    </div>
-                  </div>
-                  <div className="bg-neutral-100 dark:bg-neutral-800 p-2 rounded text-[8px] text-muted-foreground leading-normal font-sans">
-                    サーバー側でSSRF（Server-Side Request
-                    Forgery）対策を徹底。DNS解決による動的IP検証を実施し、プライベートIPへの不正アクセスを完全ブロックします。
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ⑥ かんたん3ステップ (How It Works) */}
-      <section className="bg-neutral-50 dark:bg-[#0c0a09] border-y border-border py-24 md:py-32">
-        <div className="max-w-6xl mx-auto px-6 text-center">
-          <Badge className="bg-orange-50 text-orange-600 hover:bg-orange-100 dark:bg-orange-950/30 dark:text-orange-400 border-none px-3 py-1 font-medium tracking-geist-ui rounded-full">
-            HOW IT WORKS
-          </Badge>
-          <h2 className="mt-4 text-[32px] md:text-[40px] font-semibold tracking-geist-h1">
-            かんたん3ステップ
-          </h2>
-          <p className="mt-4 text-[16px] md:text-[18px] text-muted-foreground max-w-xl mx-auto">
-            PoohMaを始めるのはとても簡単です。特別なアプリのインストールは不要で、ブラウザからすぐに利用可能です。
-          </p>
-
-          {/* 3連スマホUIモック */}
-          <div className="mt-16 grid gap-8 md:grid-cols-3 max-w-5xl mx-auto">
-            {/* Step 1 */}
-            <div className="flex flex-col items-center">
-              <div className="mb-4 flex h-8 w-8 items-center justify-center rounded-full bg-orange-500/10 text-[14px] font-bold text-orange-600 shadow-border">
-                1
-              </div>
-              <h3 className="font-semibold text-lg tracking-geist-h2 mb-4">
-                アカウント作成
-              </h3>
-
-              {/* スマホ画面モック */}
-              <div className="w-full max-w-[240px] aspect-[9/18] bg-neutral-900 rounded-[28px] p-2 shadow-lg border dark:border-neutral-800 flex flex-col">
-                <div className="w-16 h-2 bg-black rounded-full mx-auto mb-2" />
-                <div className="flex-1 bg-white dark:bg-[#121212] rounded-xl p-3 flex flex-col justify-center gap-4 text-center">
-                  <Folder className="h-10 w-10 text-orange-500 mx-auto fill-orange-500/10" />
-                  <div className="text-[12px] font-bold">
-                    PoohMa アカウント作成
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <div className="h-7 rounded border dark:border-neutral-800 flex items-center justify-center gap-1.5 text-[8px] font-semibold bg-neutral-50 dark:bg-neutral-800/50 cursor-pointer hover:bg-neutral-100">
-                      <span className="text-orange-500 font-bold">G</span>{" "}
-                      Googleでサインイン
-                    </div>
-                    <div className="h-7 rounded border dark:border-neutral-800 flex items-center justify-center gap-1.5 text-[8px] font-semibold bg-neutral-50 dark:bg-neutral-800/50 cursor-pointer hover:bg-neutral-100">
-                      Firebase Auth ログイン
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <p className="mt-4 text-xs text-muted-foreground leading-normal max-w-[200px]">
-                Googleアカウント等を利用して、1秒でアカウントを作成します。
-              </p>
-            </div>
-
-            {/* Step 2 */}
-            <div className="flex flex-col items-center">
-              <div className="mb-4 flex h-8 w-8 items-center justify-center rounded-full bg-orange-500/10 text-[14px] font-bold text-orange-600 shadow-border">
-                2
-              </div>
-              <h3 className="font-semibold text-lg tracking-geist-h2 mb-4">
-                家族グループ・パスコード設定
-              </h3>
-
-              {/* スマホ画面モック */}
-              <div className="w-full max-w-[240px] aspect-[9/18] bg-neutral-900 rounded-[28px] p-2 shadow-lg border dark:border-neutral-800 flex flex-col">
-                <div className="w-16 h-2 bg-black rounded-full mx-auto mb-2" />
-                <div className="flex-1 bg-white dark:bg-[#121212] rounded-xl p-3 flex flex-col justify-between text-left">
-                  <div className="flex flex-col gap-2">
-                    <div className="text-[9px] font-bold">
-                      家族グループの作成
-                    </div>
-                    <div className="p-2 bg-neutral-50 dark:bg-neutral-800/50 rounded flex justify-between items-center">
-                      <span className="font-mono text-[8px] font-bold text-neutral-600 dark:text-neutral-400">
-                        F4MILY-A1B2-C3D4
-                      </span>
-                      <Share2 className="h-3 w-3 text-orange-500 cursor-pointer" />
-                    </div>
-                    <p className="text-[7px] text-muted-foreground">
-                      招待コードをパートナーに共有してください。
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <div className="text-[9px] font-bold">
-                      家族パスコードを設定
-                    </div>
-                    <div className="h-7 rounded border dark:border-neutral-800 flex items-center px-2 text-[8px] bg-neutral-50 dark:bg-neutral-800/50 justify-between">
-                      <span>••••••••••••</span>
-                      <Lock className="h-3 w-3 text-neutral-400" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <p className="mt-4 text-xs text-muted-foreground leading-normal max-w-[200px]">
-                家族コードを発行してパートナーを招待し、暗号化用の「家族共通パスコード」を設定します。
-              </p>
-            </div>
-
-            {/* Step 3 */}
-            <div className="flex flex-col items-center">
-              <div className="mb-4 flex h-8 w-8 items-center justify-center rounded-full bg-orange-500/10 text-[14px] font-bold text-orange-600 shadow-border">
-                3
-              </div>
-              <h3 className="font-semibold text-lg tracking-geist-h2 mb-4">
-                アカウント情報を登録
-              </h3>
-
-              {/* スマホ画面モック */}
-              <div className="w-full max-w-[240px] aspect-[9/18] bg-neutral-900 rounded-[28px] p-2 shadow-lg border dark:border-neutral-800 flex flex-col">
-                <div className="w-16 h-2 bg-black rounded-full mx-auto mb-2" />
-                <div className="flex-1 bg-white dark:bg-[#121212] rounded-xl p-3 flex flex-col justify-between text-left">
-                  <div className="flex flex-col gap-2 overflow-y-auto no-scrollbar">
-                    <div className="text-[9px] font-bold">アカウントの登録</div>
-
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-[7px] text-muted-foreground font-semibold">
-                        URL
-                      </span>
-                      <div className="h-6 rounded border dark:border-neutral-800 flex items-center px-2 text-[7px] bg-neutral-50">
-                        https://netflix.com
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-[7px] text-muted-foreground font-semibold">
-                        タイトル
-                      </span>
-                      <div className="h-6 rounded border dark:border-neutral-800 flex items-center px-2 text-[7px] bg-neutral-50">
-                        Netflix
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-[7px] text-muted-foreground font-semibold">
-                        ログインID
-                      </span>
-                      <div className="h-6 rounded border dark:border-neutral-800 flex items-center px-2 text-[7px] bg-neutral-50">
-                        netflix@family.com
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-[7px] text-muted-foreground font-semibold">
-                        パスワードのヒント
-                      </span>
-                      <div className="h-6 rounded border dark:border-neutral-800 flex items-center px-2 text-[7px] bg-neutral-50 justify-between">
-                        <span>実家で飼っていた猫の名前</span>
-                        <EyeOff className="h-2.5 w-2.5 text-neutral-400" />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="h-6 w-full rounded bg-orange-500 text-white text-[8px] flex items-center justify-center font-bold cursor-pointer hover:bg-orange-600 mt-2">
-                    登録する
-                  </div>
-                </div>
-              </div>
-              <p className="mt-4 text-xs text-muted-foreground leading-normal max-w-[200px]">
-                URLとログインID、パスワードの「ヒント」を入力して登録すれば、共有スペースにカードが現れます。
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ⑦ よくある質問 (FAQ) */}
-      <section className="bg-white dark:bg-[#0c0a09] py-24 md:py-32">
-        <div className="max-w-4xl mx-auto px-6">
-          <div className="text-center mb-16 md:mb-24">
-            <Badge className="bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 border-none px-3 py-1 font-medium tracking-geist-ui rounded-full">
-              FAQ
-            </Badge>
-            <h2 className="mt-4 text-[32px] md:text-[40px] font-semibold tracking-geist-h1">
-              よくある質問
-            </h2>
-          </div>
-
-          <div className="flex flex-col gap-4">
-            {[
-              {
-                q: "パスワードそのものを保存するのは怖いのですが？",
-                a: "PoohMaではパスワードそのものではなく「自分たちにしか分からないヒント（例：実家の犬の名前、初めて買った車の名前）」を登録することを推奨しています。さらに、そのヒント自体も、家族独自のパスコードを使用してあなたの端末（ブラウザ）上で強力に暗号化（E2EE）されてから送信されるため、極めて安全です。",
-              },
-              {
-                q: "家族のパスコードを忘れたらどうなりますか？",
-                a: "エンドツーエンド暗号化（E2EE）の特性上、暗号を復号するためのキーはサーバー側には保存されていません。そのため、運営者であっても復号することは不可能です。家族共通のパスコードは、家族間で大切に管理してください（技術的にはMasterKeyとソルトを使用した堅牢な仕組みをとっています）。",
-              },
-              {
-                q: "本当に無料で使えますか？将来的に有料化しますか？",
-                a: "はい、すべての機能を完全無料でご利用いただけます。家族間の基本的なパスワード共有を助けるインフラとして提供されており、広告やプレミアムオプションなどの強制はありません。安心してご使用ください。",
-              },
-              {
-                q: "プライベートとシェアの切り替えは後からでも変更可能ですか？",
-                a: "はい、変更可能です。各サービスレコードの詳細画面から、トグルの切り替え（PRIVATE ⇄ SHARED）を行うだけで、いつでもリアルタイムに共有設定を変更することができます。",
-              },
-            ].map((faq, index) => {
-              const isOpen = openFaq === index;
-              return (
-                <div
-                  key={faq.q}
-                  className="rounded-lg bg-neutral-50 dark:bg-[#121212] shadow-card transition-all"
+              <div className="mt-8 flex w-full flex-col sm:flex-row gap-4 justify-center md:justify-start">
+                <Button
+                  variant="default"
+                  className="h-13 px-8 text-base w-full sm:w-auto font-semibold bg-[#171717] hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 transition-all shadow-md rounded-lg"
                 >
-                  <button
-                    type="button"
-                    onClick={() => toggleFaq(index)}
-                    className="w-full flex items-center justify-between p-5 text-left font-medium text-[16px] tracking-geist-h2 text-foreground"
-                  >
-                    <span>Q: {faq.q}</span>
-                    {isOpen ? (
-                      <ChevronUp className="h-5 w-5 text-orange-500 shrink-0" />
-                    ) : (
-                      <ChevronDown className="h-5 w-5 text-neutral-400 shrink-0" />
-                    )}
-                  </button>
-                  <div
-                    className={`overflow-hidden transition-all duration-300 ${
-                      isOpen
-                        ? "max-h-96 border-t dark:border-neutral-800"
-                        : "max-h-0"
+                  <Link to="/login">アプリを使ってみる</Link>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-13 px-8 text-base w-full sm:w-auto font-semibold shadow-border hover:bg-zinc-50 dark:hover:bg-zinc-900 border-none rounded-lg"
+                  onClick={() => {
+                    const el = document.getElementById("demo-section");
+                    if (el != null) el.scrollIntoView({ behavior: "smooth" });
+                  }}
+                >
+                  デモを見る
+                </Button>
+              </div>
+
+              {/* デカ文字・社会的証明実績 */}
+              <div className="mt-12 border-t border-zinc-100 dark:border-zinc-800 pt-8 grid grid-cols-2 gap-6 w-full max-w-md text-left">
+                <div className="bg-[#fafafa] dark:bg-zinc-900/50 p-4 rounded-xl shadow-card">
+                  <p className="text-3xl font-extrabold text-[#f97316] dark:text-orange-400 tracking-geist-h2 font-sans">
+                    100%
+                  </p>
+                  <p className="text-xs text-[#666666] dark:text-zinc-400 mt-1 font-medium">
+                    実パスワード不保持
+                  </p>
+                </div>
+                <div className="bg-[#fafafa] dark:bg-zinc-900/50 p-4 rounded-xl shadow-card">
+                  <p className="text-3xl font-extrabold text-[#f97316] dark:text-orange-400 tracking-geist-h2 font-sans">
+                    E2E
+                  </p>
+                  <p className="text-xs text-[#666666] dark:text-zinc-400 mt-1 font-medium">
+                    端末間暗号化セキュリティ
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 右側ビジュアル (画像A + フローティングカード) */}
+            <div className="hidden md:flex md:col-span-6 relative w-full justify-center items-center">
+              <div className="absolute w-[85%] h-[85%] rounded-full bg-orange-100/30 dark:bg-orange-500/5 blur-3xl z-0"></div>
+
+              <div className="relative z-10 w-full max-w-md md:max-w-lg aspect-auto rounded-2xl overflow-hidden shadow-card border border-zinc-200/50 dark:border-zinc-800 bg-white/90 dark:bg-zinc-950/80 p-5 transition-transform duration-500 hover:scale-[1.01]">
+                <img
+                  src="/hero-image.png"
+                  alt="ファミリーイラスト"
+                  className="w-full h-full object-contain rounded-xl"
+                />
+              </div>
+
+              {/* フローティングミニカード (奥行き感の創出) */}
+              <div className="absolute bottom-[-15px] right-[10px] md:bottom-[-20px] md:right-[-10px] z-20 bg-white dark:bg-zinc-900 border border-orange-200/60 dark:border-orange-500/30 rounded-2xl p-4 shadow-xl max-w-[190px] hidden sm:block animate-bounce [animation-duration:5s]">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                  <span className="text-[9px] font-bold font-mono text-zinc-500 dark:text-zinc-400 tracking-wider uppercase">
+                    Netflix
+                  </span>
+                </div>
+                <p className="text-[12px] font-bold text-zinc-800 dark:text-zinc-100">
+                  共有アカウント
+                </p>
+                <div className="bg-orange-50 dark:bg-orange-950/40 text-[#f97316] dark:text-orange-400 text-[10px] font-semibold px-2 py-1 rounded-md mt-1.5 border border-orange-100/50 dark:border-orange-950/50">
+                  ヒント: ポチの誕生日
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ─── ② PROBLEM SECTION ─── */}
+        <section className="bg-zinc-50/50 dark:bg-zinc-900/10 py-16 md:py-32 border-y border-zinc-100 dark:border-zinc-800/80">
+          <div className="mx-auto max-w-3xl px-4 sm:px-6">
+            <div className="text-center max-w-xl mx-auto mb-12">
+              <span className="text-xs font-bold text-orange-500 dark:text-orange-400 uppercase tracking-widest">
+                我が家のあるある
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-geist-h1 mt-2 text-[#171717] dark:text-zinc-100">
+                <JpText>こんな「パスワードどこだっけ？」ありませんか？</JpText>
+              </h2>
+            </div>
+
+            {/* チャットUI */}
+            <div className="w-full max-w-md mx-auto bg-[#7591b6] dark:bg-zinc-900/90 rounded-3xl overflow-hidden shadow-2xl border border-zinc-200/20">
+              {/* トークルームヘッダー */}
+              <div className="bg-[#7591b6]/95 dark:bg-zinc-900/95 backdrop-blur-md border-b border-[#637d9e] dark:border-zinc-800 px-5 py-3.5 flex items-center justify-between text-white">
+                <div className="flex items-center gap-2.5">
+                  <span className="font-bold text-sm tracking-geist-ui">
+                    家族トーク
+                  </span>
+                  <span className="text-[10px] bg-white/20 dark:bg-zinc-800 px-2 py-0.5 rounded-full font-bold">
+                    3
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-emerald-400 font-semibold">
+                    オンライン
+                  </span>
+                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+                </div>
+              </div>
+
+              {/* トーク内容 */}
+              <div className="p-4 md:p-6 space-y-6 text-left h-[330px] overflow-y-auto no-scrollbar flex flex-col justify-end">
+                {/* ママからの発信 */}
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-pink-100 dark:bg-pink-900/30 flex items-center justify-center text-xs font-bold text-pink-600 dark:text-pink-400 shrink-0 shadow-sm border border-pink-200/30">
+                    ママ
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[10px] text-white/80 dark:text-zinc-400 ml-1">
+                      ママ
+                    </span>
+                    <div className="bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100 text-[13px] md:text-[14px] px-3.5 py-2.5 rounded-2xl rounded-tl-none shadow-sm max-w-[240px] leading-relaxed relative">
+                      お父さん、アマプラのパスワード変えた？
+                      ログインできないんだけど。
+                    </div>
+                  </div>
+                </div>
+
+                {/* パパの返信 */}
+                <div className="flex items-start gap-3 justify-end">
+                  <div className="flex flex-col gap-0.5 items-end">
+                    <span className="text-[10px] text-white/80 dark:text-zinc-400 mr-1">
+                      パパ
+                    </span>
+                    <div className="bg-[#06c755] text-white text-[13px] md:text-[14px] px-3.5 py-2.5 rounded-2xl rounded-tr-none shadow-sm max-w-[240px] leading-relaxed relative">
+                      あれ？変えてないよ。メモした紙どこにやったっけな…
+                    </div>
+                  </div>
+                  <div className="w-8 h-8 rounded-full bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center text-xs font-bold text-teal-600 dark:text-teal-400 shrink-0 shadow-sm border border-teal-200/30">
+                    パパ
+                  </div>
+                </div>
+
+                {/* おじいちゃんの割り込み */}
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-xs font-bold text-amber-600 dark:text-amber-400 shrink-0 shadow-sm border border-amber-200/30">
+                    祖父
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[10px] text-white/80 dark:text-zinc-400 ml-1">
+                      おじいちゃん
+                    </span>
+                    <div className="bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100 text-[13px] md:text-[14px] px-3.5 py-2.5 rounded-2xl rounded-tl-none shadow-sm max-w-[240px] leading-relaxed relative">
+                      ルーターの裏のやつじゃダメなのか？
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <JpText
+              as="p"
+              className="text-center text-[#666666] dark:text-zinc-400 text-sm mt-8 max-w-lg mx-auto leading-relaxed"
+            >
+              デリケートなパスワードをLINEやメモ用紙でやり取りするのは、紛失や誤送信のリスクが高く危険です。PoohMaがあれば、紙も危険なテキスト送信も不要になります。
+            </JpText>
+          </div>
+        </section>
+
+        {/* ─── ③ CORE VALUE SECTION ─── */}
+        <section
+          id="features"
+          className="py-16 md:py-32 bg-white dark:bg-zinc-950"
+        >
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="text-center max-w-xl mx-auto mb-16 px-1">
+              <span className="text-xs font-bold text-orange-500 dark:text-orange-400 uppercase tracking-widest">
+                主な特徴
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-geist-h1 mt-2 text-[#171717] dark:text-zinc-100">
+                <JpText>家族みんなが安心して使える3つの理由</JpText>
+              </h2>
+            </div>
+
+            <div className="w-full max-w-4xl mx-auto">
+              {/* タブナビゲーション (モダンピルタブ) */}
+              <div className="flex border border-zinc-200/50 dark:border-zinc-800 mb-10 p-1.5 bg-zinc-50 dark:bg-zinc-900/50 rounded-xl max-w-md mx-auto shadow-inner">
+                {["security", "easy", "free"].map((tab, idx) => (
+                  <Button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`flex-1 py-2.5 text-center text-sm font-semibold rounded-lg transition-all border-none shadow-none cursor-pointer ${
+                      activeTab === tab
+                        ? "bg-white dark:bg-zinc-800 text-[#171717] dark:text-zinc-50 shadow-sm border border-zinc-200/30"
+                        : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 bg-transparent hover:bg-zinc-100/50 dark:hover:bg-zinc-800/30"
                     }`}
                   >
-                    <p className="p-5 text-sm leading-relaxed text-muted-foreground">
-                      A: {faq.a}
-                    </p>
+                    {idx === 0
+                      ? "安全に守る"
+                      : idx === 1
+                        ? "みんなで使う"
+                        : "データエクスポート"}
+                  </Button>
+                ))}
+              </div>
+
+              {/* タブコンテンツ */}
+              <div className="border border-zinc-200/60 dark:border-zinc-800 rounded-3xl p-5 sm:p-8 md:p-10 bg-white dark:bg-zinc-900/20 shadow-card min-h-[300px] flex flex-col md:flex-row gap-10 items-center justify-between transition-all duration-300 overflow-hidden">
+                {activeTab === "security" && (
+                  <>
+                    <div className="space-y-5 max-w-md">
+                      <div className="h-12 w-12 rounded-xl bg-orange-50 dark:bg-orange-500/10 text-[#f97316] dark:text-orange-400 flex items-center justify-center shadow-border">
+                        <Lock className="h-6 w-6" />
+                      </div>
+                      <h3 className="text-xl sm:text-2xl font-bold tracking-geist-h2 text-[#171717] dark:text-zinc-100">
+                        実パスワードを預からない「ヒント共有」
+                      </h3>
+                      <p className="text-[#4d4d4d] dark:text-zinc-400 text-sm md:text-base leading-relaxed">
+                        サーバーに保存されるのは、家族にしか解けない「パスワードのヒント」だけ。もしデータベースが完全にハッキングされたとしても、実際のパスワードが流出することは物理的に不可能です。
+                      </p>
+                    </div>
+
+                    {/* SVG機能アイコン: 安全/保護 */}
+                    <div className="w-full max-w-[200px] md:w-64 aspect-square bg-[#fafafa] dark:bg-zinc-900/60 rounded-2xl border border-zinc-100 dark:border-zinc-800/80 flex flex-col items-center justify-center p-6 text-center shrink-0 shadow-sm mx-auto mt-6 md:mt-0">
+                      <div className="w-32 h-32 text-[#f97316] dark:text-orange-400 flex items-center justify-center">
+                        <svg
+                          className="w-full h-full"
+                          viewBox="0 0 100 100"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <title>安全にまもるアイコン</title>
+                          <path
+                            d="M50 12L80 24V50C80 70.8 67 86.4 50 90C33 86.4 20 70.8 20 50V24L50 12Z"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            fill="currentColor"
+                            fillOpacity="0.05"
+                          />
+                          <rect
+                            x="38"
+                            y="46"
+                            width="24"
+                            height="18"
+                            rx="3"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                            fill="currentColor"
+                            fillOpacity="0.1"
+                          />
+                          <path
+                            d="M44 46V38C44 34.7 46.7 32 50 32C53.3 32 56 34.7 56 38V46"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                          />
+                          <circle cx="50" cy="55" r="3" fill="currentColor" />
+                        </svg>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {activeTab === "easy" && (
+                  <>
+                    <div className="space-y-5 max-w-md">
+                      <div className="h-12 w-12 rounded-xl bg-orange-50 dark:bg-orange-500/10 text-[#f97316] dark:text-orange-400 flex items-center justify-center shadow-border">
+                        <Users className="h-6 w-6" />
+                      </div>
+                      <h3 className="text-xl sm:text-2xl font-bold tracking-geist-h2 text-[#171717] dark:text-zinc-100">
+                        Wikiのように家族全員でかんたん編集
+                      </h3>
+                      <p className="text-[#4d4d4d] dark:text-zinc-400 text-sm md:text-base leading-relaxed">
+                        フォルダ作成や共有範囲の指定がボタン一つ。スマホ操作が苦手なおじいちゃんやおばあちゃんでも、アプリを開くだけで迷わず直感的に利用可能です。
+                      </p>
+                    </div>
+
+                    {/* SVG機能アイコン: 簡単/家族 */}
+                    <div className="w-full max-w-[200px] md:w-64 aspect-square bg-[#fafafa] dark:bg-zinc-900/60 rounded-2xl border border-zinc-100 dark:border-zinc-800/80 flex flex-col items-center justify-center p-6 text-center shrink-0 shadow-sm mx-auto mt-6 md:mt-0">
+                      <div className="w-32 h-32 text-[#f97316] dark:text-orange-400 flex items-center justify-center">
+                        <svg
+                          className="w-full h-full"
+                          viewBox="0 0 120 120"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <title>みんなでつかうアイコン</title>
+                          <circle
+                            cx="60"
+                            cy="35"
+                            r="14"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                            fill="currentColor"
+                            fillOpacity="0.05"
+                          />
+                          <circle
+                            cx="35"
+                            cy="78"
+                            r="14"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                            fill="currentColor"
+                            fillOpacity="0.05"
+                          />
+                          <circle
+                            cx="85"
+                            cy="78"
+                            r="14"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                            fill="currentColor"
+                            fillOpacity="0.05"
+                          />
+                          <path
+                            d="M50 45L40 68M70 45L80 68M49 78H71"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                            strokeDasharray="3 3"
+                          />
+                          <circle
+                            cx="60"
+                            cy="65"
+                            r="8"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                            fill="currentColor"
+                            fillOpacity="0.1"
+                          />
+                          <path
+                            d="M60 73V83H65M60 79H63"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {activeTab === "free" && (
+                  <>
+                    <div className="space-y-5 max-w-md">
+                      <div className="h-12 w-12 rounded-xl bg-orange-50 dark:bg-orange-500/10 text-[#f97316] dark:text-orange-400 flex items-center justify-center shadow-border">
+                        <Download className="h-6 w-6" />
+                      </div>
+                      <h3 className="text-xl sm:text-2xl font-bold tracking-geist-h2 text-[#171717] dark:text-zinc-100">
+                        いつでもCSVエクスポート可能
+                      </h3>
+                      <p className="text-[#4d4d4d] dark:text-zinc-400 text-sm md:text-base leading-relaxed">
+                        「サービスを解約したいけれどデータが残るのが不安」という心配は不要です。登録したすべてのデータはいつでも安全なCSV/プレーンテキストとして手元にエクスポートして退会できます。
+                      </p>
+                    </div>
+
+                    {/* SVG機能アイコン: 自由/エクスポート */}
+                    <div className="w-full max-w-[200px] md:w-64 aspect-square bg-[#fafafa] dark:bg-zinc-900/60 rounded-2xl border border-zinc-100 dark:border-zinc-800/80 flex flex-col items-center justify-center p-6 text-center shrink-0 shadow-sm mx-auto mt-6 md:mt-0">
+                      <div className="w-32 h-32 text-[#f97316] dark:text-orange-400 flex items-center justify-center">
+                        <svg
+                          className="w-full h-full"
+                          viewBox="0 0 120 120"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <title>いつでもやめられるアイコン</title>
+                          <rect
+                            x="25"
+                            y="35"
+                            width="70"
+                            height="55"
+                            rx="6"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                            fill="currentColor"
+                            fillOpacity="0.05"
+                          />
+                          <path
+                            d="M75 55L90 40M90 40H78M90 40V52"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <rect
+                            x="42"
+                            y="55"
+                            width="22"
+                            height="16"
+                            rx="2"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                            fill="currentColor"
+                            fillOpacity="0.1"
+                          />
+                          <path
+                            d="M47 55V48C47 43.5 50.5 41 53.5 42C56.5 43 57 46.5 57 48"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ─── ④ ACTUAL SCREEN SECTION ─── */}
+        <section
+          id="demo-section"
+          className="bg-[#fffbeb] dark:bg-[#1a160d] py-16 md:py-32 border-y border-amber-100 dark:border-amber-900/20"
+        >
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col items-center">
+            <div className="text-center max-w-xl mx-auto mb-16">
+              <span className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest">
+                操作デモ
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-geist-h1 mt-2 text-zinc-900 dark:text-zinc-100">
+                <JpText>覚えるのはパスワードではなく「ヒント」だけ</JpText>
+              </h2>
+              <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
+                実際のアプリが動作するステップをリアルタイムに体験してください。
+              </p>
+            </div>
+
+            {/* スマートフォンモックアップ */}
+            <div className="w-full max-w-[300px] aspect-[9/19.5] bg-zinc-950 dark:bg-zinc-900 rounded-[46px] p-3 border-[8px] border-zinc-800 dark:border-zinc-700 shadow-2xl relative overflow-hidden transition-all duration-300">
+              {/* iPhoneスピーカー・ダイナミックアイランド */}
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 w-28 h-5 bg-zinc-850 rounded-full z-30 flex items-center justify-center">
+                <div className="w-1.5 h-1.5 rounded-full bg-zinc-900 mr-2"></div>
+                <div className="w-10 h-1 bg-zinc-900 rounded-full"></div>
+              </div>
+
+              {/* スクリーン内部 */}
+              <div className="w-full h-full bg-white dark:bg-zinc-950 rounded-[36px] overflow-hidden relative flex flex-col pt-8 text-left text-zinc-800 dark:text-zinc-100 select-none">
+                {/* アプリケーションヘッダー */}
+                <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-900 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-xs flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <img
+                      src="/poohma_icon.png"
+                      alt="PoohMa"
+                      className="h-5 w-5 object-contain"
+                    />
+                    <span className="font-bold text-xs tracking-geist-ui font-sans">
+                      PoohMa
+                    </span>
                   </div>
+                  <span className="text-[9px] bg-orange-50 dark:bg-orange-950/40 text-[#f97316] dark:text-orange-400 px-1.5 py-0.5 rounded font-semibold border border-orange-100/30">
+                    ファミリー
+                  </span>
                 </div>
-              );
-            })}
+
+                {/* スクリーン内部コンテンツ */}
+                <div className="flex-1 p-3 overflow-hidden relative">
+                  {/* ステップ0 & 1: アカウント一覧画面 */}
+                  {(demoStep === 0 || demoStep === 1) && (
+                    <div className="space-y-3 transition-opacity duration-300">
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-3 w-3 text-zinc-400" />
+                        <div className="w-full bg-zinc-50 dark:bg-zinc-900 text-[10px] pl-7 pr-3 py-2 rounded-lg border border-zinc-200/50 dark:border-zinc-800 text-zinc-400 font-medium">
+                          サービスを検索...
+                        </div>
+                      </div>
+
+                      <div className="text-[10px] font-bold text-zinc-400 tracking-wider uppercase mt-3 pl-1">
+                        アカウント一覧
+                      </div>
+
+                      <div className="space-y-1.5">
+                        {/* Netflixアイテム */}
+                        <div
+                          className={`p-2.5 rounded-xl border flex items-center justify-between transition-all duration-300 ${
+                            demoStep === 1
+                              ? "bg-orange-50/60 dark:bg-orange-950/30 border-orange-200 dark:border-orange-500/40 scale-[0.98]"
+                              : "bg-white dark:bg-zinc-900 border-zinc-100 dark:border-zinc-800/80 shadow-xs"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-lg bg-red-100 dark:bg-red-950 flex items-center justify-center text-[10px] font-extrabold text-red-600">
+                              N
+                            </div>
+                            <div>
+                              <div className="text-[11px] font-bold">
+                                Netflix
+                              </div>
+                              <div className="text-[8px] text-zinc-400">
+                                family@example.com
+                              </div>
+                            </div>
+                          </div>
+                          <span className="text-[8px] text-[#f97316] font-semibold bg-orange-50 dark:bg-orange-950/30 px-1.5 py-0.5 rounded">
+                            ヒントあり
+                          </span>
+                        </div>
+
+                        {/* 他のアカウント */}
+                        <div className="p-2.5 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between opacity-60">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-lg bg-blue-100 dark:bg-blue-950 flex items-center justify-center text-[10px] font-extrabold text-blue-600">
+                              A
+                            </div>
+                            <div>
+                              <div className="text-[11px] font-bold">
+                                Amazon Prime
+                              </div>
+                              <div className="text-[8px] text-zinc-400">
+                                family@example.com
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="p-2.5 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between opacity-60">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-lg bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-[10px] font-extrabold text-emerald-600">
+                              W
+                            </div>
+                            <div>
+                              <div className="text-[11px] font-bold">
+                                Family Wi-Fi
+                              </div>
+                              <div className="text-[8px] text-zinc-400">
+                                Router-5G-1024
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* モッククリックカーソル */}
+                      {demoStep === 1 && (
+                        <div className="absolute right-12 bottom-16 w-6 h-6 rounded-full bg-orange-500/30 border border-orange-500/80 flex items-center justify-center z-40 animate-ping">
+                          <div className="w-2.5 h-2.5 rounded-full bg-orange-500"></div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ステップ2: フェード遷移中 */}
+                  {demoStep === 2 && (
+                    <div className="w-full h-full flex flex-col items-center justify-center transition-all duration-300">
+                      <div className="w-7 h-7 rounded-full border-2 border-orange-500 border-t-transparent animate-spin"></div>
+                    </div>
+                  )}
+
+                  {/* ステップ3 & 4: アカウント詳細/ヒント公開画面 */}
+                  {(demoStep === 3 || demoStep === 4) && (
+                    <div className="space-y-4 h-full flex flex-col justify-between pb-1 transition-opacity duration-300">
+                      <div className="space-y-3.5">
+                        {/* 戻るボタン風 */}
+                        <div className="text-[9px] text-zinc-400 font-bold flex items-center gap-1 cursor-pointer">
+                          <span>←</span> 戻る
+                        </div>
+
+                        {/* Netflixメイン情報 */}
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-950 flex items-center justify-center text-sm font-black text-red-600 shadow-sm border border-red-200/20">
+                            N
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-extrabold">Netflix</h4>
+                            <p className="text-[9px] text-[#666666] dark:text-zinc-400">
+                              共有アカウント情報
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* ログイン情報 */}
+                        <div className="space-y-2 border border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-900/20 p-2.5 rounded-xl">
+                          <div>
+                            <span className="block text-[8px] font-bold text-zinc-400 tracking-wider">
+                              メールアドレス
+                            </span>
+                            <div className="text-[10.5px] font-semibold mt-0.5">
+                              family@example.com
+                            </div>
+                          </div>
+                          <div className="border-t border-zinc-100 dark:border-zinc-900 pt-1.5">
+                            <span className="block text-[8px] font-bold text-zinc-400 tracking-wider">
+                              パスワード
+                            </span>
+                            <div className="text-[10.5px] font-mono tracking-widest text-zinc-400 mt-0.5">
+                              ••••••••••••
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* スライドアップするヒントカード */}
+                      <div className="bg-[#fafafa] dark:bg-zinc-900 border border-orange-200 dark:border-orange-500/40 rounded-xl p-3 shadow-card transform translate-y-0 transition-transform duration-500 ease-out z-20">
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <span className="text-[8px] font-bold bg-[#f97316] text-white px-1.5 py-0.5 rounded-sm uppercase tracking-wider">
+                            ヒント
+                          </span>
+                          <span className="text-[9px] text-zinc-400 font-medium">
+                            ※ パスワードは預かっていません
+                          </span>
+                        </div>
+
+                        <p className="text-[12px] font-extrabold text-[#171717] dark:text-zinc-100 py-1 bg-white dark:bg-zinc-950 px-2 rounded-md border border-zinc-100 dark:border-zinc-800 shadow-inner">
+                          ポチの誕生日 ＋ いつもの4桁
+                        </p>
+
+                        <button
+                          type="button"
+                          className={`mt-2.5 w-full py-1.5 text-[9px] font-extrabold rounded-md border-none flex items-center justify-center gap-1 transition-all ${
+                            demoStep === 4
+                              ? "bg-emerald-500 text-white shadow-sm"
+                              : "bg-[#171717] hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                          }`}
+                        >
+                          {demoStep === 4 ? (
+                            <>
+                              <Check className="w-2.5 h-2.5" /> コピー完了！
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-2.5 h-2.5" /> ヒントをコピー
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ⑧ フッターボトムCTA & フッター */}
-      <section className="relative overflow-hidden py-24 md:py-32 border-t border-border">
-        {/* 背景グラデーションウォッシュ */}
-        <div className="absolute inset-0 bg-gradient-to-tr from-orange-100/40 via-amber-50/20 to-rose-100/30 dark:from-orange-950/10 dark:via-neutral-950 dark:to-stone-950 -z-10" />
+        {/* ─── ⑤ SECURITY SECTION ─── */}
+        <section
+          id="security"
+          className="py-16 md:py-32 bg-white dark:bg-zinc-950"
+        >
+          <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+            <div className="text-center max-w-2xl mx-auto mb-16">
+              <span className="text-xs font-bold text-orange-500 dark:text-orange-400 uppercase tracking-widest">
+                高い安全性
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-geist-h1 mt-2 text-[#171717] dark:text-zinc-100">
+                <JpText>
+                  開発チームであっても、あなたのパスワードを絶対に見られません
+                </JpText>
+              </h2>
+            </div>
 
-        <div className="max-w-4xl mx-auto px-6 text-center">
-          <h2 className="text-[32px] md:text-[48px] font-semibold tracking-geist-hero leading-tight">
-            さあ、家族のアカウントを
-            <br />
-            スマートに一元管理しよう。
-          </h2>
-          <p className="mt-6 text-[16px] md:text-[18px] text-muted-foreground max-w-lg mx-auto">
-            LINEでのパスワード送信を今すぐやめて、最高峰のプライバシーに守られた「ヒント共有」を始めましょう。
-          </p>
+            {/* パスワード不保持の強力な宣言 */}
+            <div className="mb-14 bg-orange-50/50 dark:bg-orange-500/5 border border-orange-200/50 dark:border-orange-500/20 rounded-2xl p-5 sm:p-6 md:p-8 text-center max-w-3xl mx-auto overflow-hidden">
+              <h3 className="text-lg sm:text-xl font-extrabold text-[#f97316] dark:text-orange-400 tracking-geist-h2 mb-2">
+                <JpText>「私たちは実パスワードを1文字も預かりません」</JpText>
+              </h3>
+              <JpText
+                as="p"
+                className="text-sm text-[#4d4d4d] dark:text-zinc-400 leading-relaxed max-w-xl mx-auto"
+              >
+                暗号化技術により、すべてのパスワードヒントはあなたのスマホ内でロックされ、サーバーには完全に判読不能な状態で保管されます。鍵を持っているのは家族だけです。
+              </JpText>
+            </div>
 
-          <div className="mt-10 flex justify-center">
-            <Link
-              to="/login"
-              className="rounded-full bg-orange-500 hover:bg-orange-600 text-white font-semibold px-8 py-4 text-[16px] transition shadow-lg inline-flex items-center gap-2"
-            >
-              今すぐ無料で始める
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+            {/* Vercelワークフロー流の3ステップ図解 */}
+            <div className="border border-zinc-200/60 dark:border-zinc-800 bg-[#fafafa]/50 dark:bg-zinc-900/10 rounded-3xl p-8 md:p-12 shadow-inner relative overflow-hidden">
+              {/* ステップ接続用のアニメーションSVGグラデーションライン */}
+              <div className="absolute top-[88px] left-[15%] w-[70%] h-1 hidden md:block z-0 overflow-hidden">
+                <svg
+                  className="w-full h-full"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <title>データフローライン</title>
+                  <path
+                    d="M 0,2 H 800"
+                    stroke="url(#flow-gradient)"
+                    strokeWidth="3"
+                    strokeDasharray="10 8"
+                    className="animate-border-flow"
+                  />
+                  <defs>
+                    <linearGradient
+                      id="flow-gradient"
+                      x1="0"
+                      y1="0"
+                      x2="1"
+                      y2="0"
+                    >
+                      <stop offset="0%" stopColor="#f97316" />
+                      <stop offset="50%" stopColor="#de1d8d" />
+                      <stop offset="100%" stopColor="#0a72ef" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10 relative z-10">
+                {/* ステップ1 */}
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800 rounded-2xl p-6 relative flex flex-col items-center text-center shadow-sm">
+                  <div className="absolute -top-4 left-6 bg-[#171717] dark:bg-zinc-100 text-white dark:text-zinc-900 font-mono text-xs w-7 h-7 rounded-full flex items-center justify-center font-bold shadow-md">
+                    1
+                  </div>
+                  <div className="h-12 w-12 rounded-xl bg-orange-50 dark:bg-orange-500/10 text-[#f97316] dark:text-orange-400 flex items-center justify-center mb-4 shadow-border">
+                    <Lock className="h-6 w-6" />
+                  </div>
+                  <h4 className="text-base font-extrabold mb-2 tracking-geist-ui">
+                    手元で自動ロック
+                  </h4>
+                  <JpText
+                    as="p"
+                    className="text-xs text-[#666666] dark:text-zinc-400 leading-relaxed"
+                  >
+                    インターネットに出る前に、ご家族だけの端末鍵（E2E暗号化）で完全に鍵が掛けられます。
+                  </JpText>
+                </div>
+
+                {/* モバイル向け矢印コネクター */}
+                <div className="flex md:hidden justify-center my-1 text-[#f97316]/50 dark:text-orange-400/30 animate-pulse">
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                  >
+                    <title>次のステップへ</title>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M19 13l-7 7-7-7"
+                    />
+                  </svg>
+                </div>
+
+                {/* ステップ2 */}
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800 rounded-2xl p-6 relative flex flex-col items-center text-center shadow-sm">
+                  <div className="absolute -top-4 left-6 bg-[#171717] dark:bg-zinc-100 text-white dark:text-zinc-900 font-mono text-xs w-7 h-7 rounded-full flex items-center justify-center font-bold shadow-md">
+                    2
+                  </div>
+                  <div className="h-12 w-12 rounded-xl bg-orange-50 dark:bg-orange-500/10 text-[#f97316] dark:text-orange-400 flex items-center justify-center mb-4 shadow-border">
+                    <Globe className="h-6 w-6" />
+                  </div>
+                  <h4 className="text-base font-extrabold mb-2 tracking-geist-ui">
+                    暗号化のまま安全通信
+                  </h4>
+                  <JpText
+                    as="p"
+                    className="text-xs text-[#666666] dark:text-zinc-400 leading-relaxed"
+                  >
+                    頑丈なデジタル金庫に守られた状態で通信経路を通るため、途中でハッキングされても解読は不可能です。
+                  </JpText>
+                </div>
+
+                {/* モバイル向け矢印コネクター */}
+                <div className="flex md:hidden justify-center my-1 text-[#f97316]/50 dark:text-orange-400/30 animate-pulse">
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                  >
+                    <title>次のステップへ</title>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M19 13l-7 7-7-7"
+                    />
+                  </svg>
+                </div>
+
+                {/* ステップ3 */}
+                <div className="bg-white dark:bg-zinc-900 border border-orange-200/60 dark:border-orange-500/30 rounded-2xl p-6 relative flex flex-col items-center text-center ring-2 ring-orange-500/10 dark:ring-orange-500/5 shadow-md">
+                  <div className="absolute -top-4 left-6 bg-[#f97316] text-white font-mono text-xs w-7 h-7 rounded-full flex items-center justify-center font-bold shadow-md">
+                    3
+                  </div>
+
+                  {/* 生成したお手上げ管理人クマ画像 */}
+                  <div className="h-16 w-16 rounded-full bg-orange-50 dark:bg-zinc-800 border border-orange-100 dark:border-zinc-700 flex items-center justify-center mb-3 overflow-hidden shadow-sm relative transition-all duration-300 hover:scale-105">
+                    <img
+                      src="/manager_bear.png"
+                      alt="管理人クマ"
+                      className="w-full h-full object-cover scale-110"
+                    />
+                  </div>
+
+                  <h4 className="text-base font-extrabold mb-2 tracking-geist-ui text-[#f97316] dark:text-orange-400">
+                    サーバー保管
+                  </h4>
+                  <p className="text-xs text-[#666666] dark:text-zinc-400 leading-relaxed">
+                    <JpText>カギは家族のスマホ内にのみ保管されるため、</JpText>
+                    <strong className="font-extrabold">
+                      <JpText>
+                        開発チームであっても中身を開けられません。
+                      </JpText>
+                    </strong>
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* フッター */}
-      <footer className="border-t border-border bg-white dark:bg-[#0c0a09] py-12 text-center text-sm text-muted-foreground">
-        <div className="mb-4 flex flex-wrap justify-center items-center gap-6">
-          <Link
-            to="/terms-of-service"
-            className="hover:text-foreground transition-colors tracking-geist-ui"
-          >
-            利用規約
-          </Link>
-          <Link
-            to="/privacy-policy"
-            className="hover:text-foreground transition-colors tracking-geist-ui"
-          >
-            プライバシーポリシー
-          </Link>
-          <a
-            href="https://github.com/luthpg/poohma-start"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-foreground transition-colors flex items-center gap-1.5 tracking-geist-ui"
-          >
-            <SiGithub className="h-4 w-4" />
-            GitHub
-          </a>
-        </div>
-        &copy; 2026 PoohMa - Family Password Hint Manager
-      </footer>
+        {/* ─── ⑥ FAQ / CTA SECTION ─── */}
+        <section
+          id="faq"
+          className="bg-zinc-50 dark:bg-zinc-900/20 py-16 md:py-32 border-t border-zinc-100 dark:border-zinc-850"
+        >
+          <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+            <div className="text-center max-w-xl mx-auto mb-16">
+              <span className="text-xs font-bold text-orange-500 dark:text-orange-400 uppercase tracking-widest">
+                よくある質問
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-geist-h1 mt-2 text-[#171717] dark:text-zinc-100">
+                よくある質問
+              </h2>
+            </div>
+
+            {/* 精緻なFAQアコーディオン */}
+            <div className="space-y-4 bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800 rounded-3xl p-4 sm:p-5 md:p-6 shadow-card transition-all overflow-hidden">
+              {[
+                {
+                  q: "パスワードを教え合うのが心配です。",
+                  a: "大丈夫です。\nPoohMaは「家族にだけ伝わる絶妙なヒント」を登録・共有する全く新しい仕組みです。\n「実パスワードそのもの」を入力・共有することは一切ありません。",
+                },
+                {
+                  q: "月額料金や追加費用はかかりますか？",
+                  a: "基本的な家族アカウント管理・共有機能はすべて無料でご利用いただけます。現状の共有機能で費用が発生することはございません。",
+                },
+                {
+                  q: "スマホを紛失した場合はどうなりますか？",
+                  a: "アカウントは端末に紐づいておらず、Googleアカウントにのみ紐づいていますので、端末復旧後に改めて同じGoogleアカウントでログインいただければ、引き続きデータにアクセスすることができます。",
+                },
+              ].map((item, index) => (
+                <div
+                  key={item.q}
+                  className="border-b border-zinc-100 dark:border-zinc-800/80 last:border-0 pb-4 last:pb-0 pt-4 first:pt-0"
+                >
+                  <Button
+                    type="button"
+                    className="flex w-full items-center justify-between font-bold text-left text-sm md:text-base py-2 bg-transparent hover:bg-zinc-50 dark:hover:bg-zinc-800/40 border-none shadow-none text-zinc-900 dark:text-zinc-100 focus-visible:ring-0 cursor-pointer"
+                    onClick={() => setOpenFaq(openFaq === index ? null : index)}
+                  >
+                    <span>{item.q}</span>
+                    <ChevronDown
+                      className={`h-4.5 w-4.5 text-zinc-400 transition-transform duration-300 ${
+                        openFaq === index
+                          ? "transform rotate-180 text-[#f97316] dark:text-orange-400"
+                          : ""
+                      }`}
+                    />
+                  </Button>
+
+                  {openFaq === index && (
+                    <div className="mt-3 text-[#4d4d4d] dark:text-zinc-400 text-xs md:text-sm leading-relaxed pl-1 pb-1 transition-all duration-300">
+                      <JpText>{item.a}</JpText>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* ボトムCTAカード (ブランドカラーの「点」の運用) */}
+            <div className="mt-16 md:mt-20 text-center bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800 rounded-3xl px-5 py-10 md:p-16 shadow-card relative overflow-hidden transition-all duration-300 hover:shadow-card-hover">
+              {/* 装飾グラデーションバブル */}
+              <div className="absolute -right-12 -top-12 w-32 h-32 bg-orange-500/10 dark:bg-orange-500/5 rounded-full blur-2xl z-0"></div>
+              <div className="absolute -left-12 -bottom-12 w-32 h-32 bg-emerald-500/5 dark:bg-emerald-500/2 rounded-full blur-2xl z-0"></div>
+
+              <div className="relative z-10 space-y-6">
+                <h3 className="text-xl sm:text-3xl md:text-4xl font-extrabold tracking-geist-hero text-[#171717] dark:text-zinc-100 leading-tight">
+                  <JpText>さあ、家族のパスワードメモ用紙を、</JpText>
+                  <br />
+                  <JpText>今すぐ無くそう。</JpText>
+                </h3>
+                <JpText
+                  as="p"
+                  className="text-[#666666] dark:text-zinc-400 text-sm md:text-base mt-4 max-w-md mx-auto leading-relaxed"
+                >
+                  初期設定はわずか1分。招待コードを家族に送るだけで、安全で穏やかな日常が始まります。
+                </JpText>
+
+                <div className="mt-10 max-w-sm mx-auto">
+                  <Button
+                    variant="default"
+                    className="w-full h-13 text-base font-bold shadow-md bg-[#f97316] hover:bg-orange-600 text-white dark:bg-orange-500 dark:hover:bg-orange-600 border-none rounded-lg transition-transform hover:scale-[1.02]"
+                  >
+                    <Link to="/login">無料で利用を開始する</Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
     </div>
   );
 }
