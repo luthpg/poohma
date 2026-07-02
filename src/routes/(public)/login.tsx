@@ -22,7 +22,7 @@ export const Route = createFileRoute("/(public)/login")({
   },
   beforeLoad: ({ context }) => {
     if (context.user) {
-      throw redirect({ to: "/dashboard" });
+      throw redirect({ to: "/dashboard", replace: true });
     }
   },
   component: LoginPage,

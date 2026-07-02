@@ -2,7 +2,6 @@ import {
   createFileRoute,
   getRouteApi,
   Link,
-  redirect,
   useNavigate,
 } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
@@ -38,12 +37,9 @@ export const Route = createFileRoute("/(app)/dashboard")({
   },
   loaderDeps: ({ search: { q, tag, sort, view } }) => ({ q, tag, sort, view }),
   loader: async ({ context, deps: { q, tag, sort, view } }) => {
-    if (!context.user) {
-      throw redirect({ to: "/login" });
-    }
-
     return {
-      user: context.user,
+      // biome-ignore lint/style/noNonNullAssertion: user is guaranteed to be non-null at this point
+      user: context.user!,
       prefs: context.prefs,
       searchParams: { q, tag, sort, view },
     };

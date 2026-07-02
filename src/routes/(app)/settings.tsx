@@ -1,7 +1,6 @@
 import {
   createFileRoute,
   getRouteApi,
-  redirect,
   useRouter,
 } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
@@ -28,11 +27,9 @@ import { isBiometricEnabledForUser } from "@/lib/biometric";
 import { auth } from "@/utils/firebase";
 
 export const Route = createFileRoute("/(app)/settings")({
-  loader: async ({ context }) => {
-    if (!context.user) {
-      throw redirect({ to: "/login" });
-    }
-    return { user: context.user };
+  loader: ({ context }) => {
+    // biome-ignore lint/style/noNonNullAssertion: user is guaranteed to be non-null at this point
+    return { user: context.user! };
   },
   component: SettingsComponent,
 });
