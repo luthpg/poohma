@@ -123,4 +123,16 @@ describe("validateUrlSafety", () => {
       "Access to private IP addresses is not allowed",
     );
   });
+
+  it("should allow direct public IPv4 address", async () => {
+    const ip = await validateUrlSafety("http://8.8.8.8");
+    expect(ip).toBe("8.8.8.8");
+  });
+
+  it("should detect IPv4-mapped IPv6 addresses correctly", () => {
+    expect(isPrivateIp("::ffff:127.0.0.1")).toBe(true);
+    expect(isPrivateIp("::ffff:10.0.0.1")).toBe(true);
+    expect(isPrivateIp("::ffff:8.8.8.8")).toBe(false);
+    expect(isPrivateIp("::ffff:7f00:0001")).toBe(true);
+  });
 });
