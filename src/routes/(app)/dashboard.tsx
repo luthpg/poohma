@@ -582,7 +582,10 @@ function RecordListSection({
                 </span>
               </label>
             ) : (
-              <div className="text-[14px] text-muted-foreground font-medium tracking-geist-ui">
+              <div
+                className="text-[14px] text-muted-foreground font-medium tracking-geist-ui"
+                data-testid="record-count"
+              >
                 {records.length} 件のレコード
               </div>
             )}

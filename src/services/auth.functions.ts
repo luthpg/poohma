@@ -24,7 +24,7 @@ const SESSION_EXPIRES_IN_MS = SESSION_EXPIRES_IN_SECONDS * 1000;
  * @returns 認証ユーザーID
  */
 export const syncUser = createServerFn({ method: "POST" })
-  .inputValidator((data: { idToken: string }) => data)
+  .validator((data: { idToken: string }) => data)
   .handler(async ({ data: { idToken } }) => {
     try {
       const decodedToken = await adminAuth().verifyIdToken(idToken);
