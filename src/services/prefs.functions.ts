@@ -10,7 +10,7 @@ export const getDashboardPrefsFn = createServerFn({ method: "GET" }).handler(
 );
 
 export const setDashboardPrefsFn = createServerFn({ method: "POST" })
-  .inputValidator((data: { sort?: string; view?: string }) => data)
+  .validator((data: { sort?: string; view?: string }) => data)
   .handler(async ({ data }) => {
     if (data.sort) {
       setCookie("poohma_dashboard_sort", data.sort, {

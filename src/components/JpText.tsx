@@ -1,6 +1,7 @@
 import { loadDefaultJapaneseParser } from "budoux";
 import type React from "react";
 import { Fragment, useMemo } from "react";
+import { cn } from "@/lib/utils";
 
 const parser = loadDefaultJapaneseParser();
 
@@ -33,5 +34,9 @@ export const JpText = ({
     });
   }, [children]);
 
-  return <Component className={className}>{parsedContent}</Component>;
+  return (
+    <Component className={cn("break-keep break-words", className)}>
+      {parsedContent}
+    </Component>
+  );
 };
