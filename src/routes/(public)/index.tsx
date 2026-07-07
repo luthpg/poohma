@@ -872,7 +872,6 @@ function RouteComponent() {
 
                   {/* PC向けコネクター */}
                   <div className="hidden md:flex absolute top-1/2 -right-8 -translate-y-1/2 w-6 h-6 items-center justify-center text-zinc-300 dark:text-zinc-600 z-20">
-                    <title>矢印コネクター</title>
                     <svg
                       className="w-8 h-8"
                       fill="none"
