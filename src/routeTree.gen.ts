@@ -9,61 +9,31 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as publicRouteRouteImport } from './routes/(public)/route'
 import { Route as appRouteRouteImport } from './routes/(app)/route'
-import { Route as publicIndexRouteImport } from './routes/(public)/index'
-import { Route as publicUsageRouteImport } from './routes/(public)/usage'
-import { Route as publicTermsOfServiceRouteImport } from './routes/(public)/terms-of-service'
-import { Route as publicPrivacyPolicyRouteImport } from './routes/(public)/privacy-policy'
-import { Route as publicLoginRouteImport } from './routes/(public)/login'
-import { Route as publicFaqRouteImport } from './routes/(public)/faq'
-import { Route as appSettingsRouteImport } from './routes/(app)/settings'
-import { Route as appFamilyRouteImport } from './routes/(app)/family'
+import { Route as publicRouteRouteImport } from './routes/(public)/route'
 import { Route as appDashboardRouteImport } from './routes/(app)/dashboard'
-import { Route as appRecordsNewRouteImport } from './routes/(app)/records/new'
+import { Route as appFamilyRouteImport } from './routes/(app)/family'
+import { Route as appSettingsRouteImport } from './routes/(app)/settings'
+import { Route as publicIndexRouteImport } from './routes/(public)/index'
+import { Route as publicFaqRouteImport } from './routes/(public)/faq'
+import { Route as publicLoginRouteImport } from './routes/(public)/login'
+import { Route as publicPrivacyPolicyRouteImport } from './routes/(public)/privacy-policy'
+import { Route as publicTermsOfServiceRouteImport } from './routes/(public)/terms-of-service'
+import { Route as publicUsageRouteImport } from './routes/(public)/usage'
 import { Route as appRecordsIdRouteImport } from './routes/(app)/records/$id'
+import { Route as appRecordsNewRouteImport } from './routes/(app)/records/new'
 
-const publicRouteRoute = publicRouteRouteImport.update({
-  id: '/(public)',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const appRouteRoute = appRouteRouteImport.update({
   id: '/(app)',
   getParentRoute: () => rootRouteImport,
 } as any)
-const publicIndexRoute = publicIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => publicRouteRoute,
+const publicRouteRoute = publicRouteRouteImport.update({
+  id: '/(public)',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const publicUsageRoute = publicUsageRouteImport.update({
-  id: '/usage',
-  path: '/usage',
-  getParentRoute: () => publicRouteRoute,
-} as any)
-const publicTermsOfServiceRoute = publicTermsOfServiceRouteImport.update({
-  id: '/terms-of-service',
-  path: '/terms-of-service',
-  getParentRoute: () => publicRouteRoute,
-} as any)
-const publicPrivacyPolicyRoute = publicPrivacyPolicyRouteImport.update({
-  id: '/privacy-policy',
-  path: '/privacy-policy',
-  getParentRoute: () => publicRouteRoute,
-} as any)
-const publicLoginRoute = publicLoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => publicRouteRoute,
-} as any)
-const publicFaqRoute = publicFaqRouteImport.update({
-  id: '/faq',
-  path: '/faq',
-  getParentRoute: () => publicRouteRoute,
-} as any)
-const appSettingsRoute = appSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
+const appDashboardRoute = appDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => appRouteRoute,
 } as any)
 const appFamilyRoute = appFamilyRouteImport.update({
@@ -71,19 +41,49 @@ const appFamilyRoute = appFamilyRouteImport.update({
   path: '/family',
   getParentRoute: () => appRouteRoute,
 } as any)
-const appDashboardRoute = appDashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
+const appSettingsRoute = appSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => appRouteRoute,
+} as any)
+const publicIndexRoute = publicIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => publicRouteRoute,
+} as any)
+const publicFaqRoute = publicFaqRouteImport.update({
+  id: '/faq',
+  path: '/faq',
+  getParentRoute: () => publicRouteRoute,
+} as any)
+const publicLoginRoute = publicLoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => publicRouteRoute,
+} as any)
+const publicPrivacyPolicyRoute = publicPrivacyPolicyRouteImport.update({
+  id: '/privacy-policy',
+  path: '/privacy-policy',
+  getParentRoute: () => publicRouteRoute,
+} as any)
+const publicTermsOfServiceRoute = publicTermsOfServiceRouteImport.update({
+  id: '/terms-of-service',
+  path: '/terms-of-service',
+  getParentRoute: () => publicRouteRoute,
+} as any)
+const publicUsageRoute = publicUsageRouteImport.update({
+  id: '/usage',
+  path: '/usage',
+  getParentRoute: () => publicRouteRoute,
+} as any)
+const appRecordsIdRoute = appRecordsIdRouteImport.update({
+  id: '/records/$id',
+  path: '/records/$id',
   getParentRoute: () => appRouteRoute,
 } as any)
 const appRecordsNewRoute = appRecordsNewRouteImport.update({
   id: '/records/new',
   path: '/records/new',
-  getParentRoute: () => appRouteRoute,
-} as any)
-const appRecordsIdRoute = appRecordsIdRouteImport.update({
-  id: '/records/$id',
-  path: '/records/$id',
   getParentRoute: () => appRouteRoute,
 } as any)
 
@@ -180,13 +180,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/(public)': {
-      id: '/(public)'
-      path: ''
-      fullPath: ''
-      preLoaderRoute: typeof publicRouteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/(app)': {
       id: '/(app)'
       path: ''
@@ -194,53 +187,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof appRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/(public)/': {
-      id: '/(public)/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof publicIndexRouteImport
-      parentRoute: typeof publicRouteRoute
+    '/(public)': {
+      id: '/(public)'
+      path: ''
+      fullPath: ''
+      preLoaderRoute: typeof publicRouteRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/(public)/usage': {
-      id: '/(public)/usage'
-      path: '/usage'
-      fullPath: '/usage'
-      preLoaderRoute: typeof publicUsageRouteImport
-      parentRoute: typeof publicRouteRoute
-    }
-    '/(public)/terms-of-service': {
-      id: '/(public)/terms-of-service'
-      path: '/terms-of-service'
-      fullPath: '/terms-of-service'
-      preLoaderRoute: typeof publicTermsOfServiceRouteImport
-      parentRoute: typeof publicRouteRoute
-    }
-    '/(public)/privacy-policy': {
-      id: '/(public)/privacy-policy'
-      path: '/privacy-policy'
-      fullPath: '/privacy-policy'
-      preLoaderRoute: typeof publicPrivacyPolicyRouteImport
-      parentRoute: typeof publicRouteRoute
-    }
-    '/(public)/login': {
-      id: '/(public)/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof publicLoginRouteImport
-      parentRoute: typeof publicRouteRoute
-    }
-    '/(public)/faq': {
-      id: '/(public)/faq'
-      path: '/faq'
-      fullPath: '/faq'
-      preLoaderRoute: typeof publicFaqRouteImport
-      parentRoute: typeof publicRouteRoute
-    }
-    '/(app)/settings': {
-      id: '/(app)/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof appSettingsRouteImport
+    '/(app)/dashboard': {
+      id: '/(app)/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof appDashboardRouteImport
       parentRoute: typeof appRouteRoute
     }
     '/(app)/family': {
@@ -250,11 +208,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof appFamilyRouteImport
       parentRoute: typeof appRouteRoute
     }
-    '/(app)/dashboard': {
-      id: '/(app)/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof appDashboardRouteImport
+    '/(app)/settings': {
+      id: '/(app)/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof appSettingsRouteImport
+      parentRoute: typeof appRouteRoute
+    }
+    '/(public)/': {
+      id: '/(public)/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof publicIndexRouteImport
+      parentRoute: typeof publicRouteRoute
+    }
+    '/(public)/faq': {
+      id: '/(public)/faq'
+      path: '/faq'
+      fullPath: '/faq'
+      preLoaderRoute: typeof publicFaqRouteImport
+      parentRoute: typeof publicRouteRoute
+    }
+    '/(public)/login': {
+      id: '/(public)/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof publicLoginRouteImport
+      parentRoute: typeof publicRouteRoute
+    }
+    '/(public)/privacy-policy': {
+      id: '/(public)/privacy-policy'
+      path: '/privacy-policy'
+      fullPath: '/privacy-policy'
+      preLoaderRoute: typeof publicPrivacyPolicyRouteImport
+      parentRoute: typeof publicRouteRoute
+    }
+    '/(public)/terms-of-service': {
+      id: '/(public)/terms-of-service'
+      path: '/terms-of-service'
+      fullPath: '/terms-of-service'
+      preLoaderRoute: typeof publicTermsOfServiceRouteImport
+      parentRoute: typeof publicRouteRoute
+    }
+    '/(public)/usage': {
+      id: '/(public)/usage'
+      path: '/usage'
+      fullPath: '/usage'
+      preLoaderRoute: typeof publicUsageRouteImport
+      parentRoute: typeof publicRouteRoute
+    }
+    '/(app)/records/$id': {
+      id: '/(app)/records/$id'
+      path: '/records/$id'
+      fullPath: '/records/$id'
+      preLoaderRoute: typeof appRecordsIdRouteImport
       parentRoute: typeof appRouteRoute
     }
     '/(app)/records/new': {
@@ -262,13 +269,6 @@ declare module '@tanstack/react-router' {
       path: '/records/new'
       fullPath: '/records/new'
       preLoaderRoute: typeof appRecordsNewRouteImport
-      parentRoute: typeof appRouteRoute
-    }
-    '/(app)/records/$id': {
-      id: '/(app)/records/$id'
-      path: '/records/$id'
-      fullPath: '/records/$id'
-      preLoaderRoute: typeof appRecordsIdRouteImport
       parentRoute: typeof appRouteRoute
     }
   }

@@ -5,25 +5,25 @@ export const isClient = typeof window !== "undefined";
  */
 export const isIosPwa = (): boolean => {
   if (!isClient) return false;
-  return (
-    // @ts-expect-error window.navigator.standalone はiOS Safari固有のプロパティ
-    window.navigator.standalone === true ||
-    window.matchMedia("(display-mode: standalone)").matches
-  );
+  // @ts-expect-error window.navigator.standalone はiOS Safari固有のプロパティ
+  return window.navigator.standalone === true;
 };
 
 const PWA_INIT_KEY = "pwa_auth_synchronized_v1";
 
 /**
- * iOS PWAの初回起動であるかを判定し、初回であればフラグを立てて true を返す
+ * iOS PWAの初回起動であるかを判定（読み取りのみ）
  */
-export const checkAndMarkPwaFirstLaunch = (): boolean => {
+export const isPwaFirstLaunch = (): boolean => {
   if (!isIosPwa()) return false;
-
   const isInitialized = localStorage.getItem(PWA_INIT_KEY);
-  if (!isInitialized) {
-    localStorage.setItem(PWA_INIT_KEY, "true");
-    return true; // 初回起動
-  }
-  return false; // 2回目以降の起動
+  return !isInitialized;
+};
+
+/**
+ * iOS PWA初回起動フラグを保存（トークン同期成功後に呼ぶ）
+ */
+export const markPwaAsInitialized = (): void => {
+  if (!isIosPwa()) return;
+  localStorage.setItem(PWA_INIT_KEY, "true");
 };

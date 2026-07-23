@@ -13,7 +13,7 @@ import { useEffect, useState } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import { syncUser } from "@/services/auth.functions";
 import { auth, googleProvider } from "@/utils/firebase";
-import { checkAndMarkPwaFirstLaunch } from "@/utils/pwa";
+import { isPwaFirstLaunch, markPwaAsInitialized } from "@/utils/pwa";
 
 export const Route = createFileRoute("/(public)/login")({
   validateSearch: (search: Record<string, unknown>): { redirect?: string } => {
@@ -84,9 +84,13 @@ function LoginPage() {
       if (user) {
         try {
           setIsLoading(true);
-          const isFirstPwaLaunch = checkAndMarkPwaFirstLaunch();
+          const isFirstPwaLaunch = isPwaFirstLaunch();
           const idToken = await user.getIdToken(isFirstPwaLaunch);
           await syncUser({ data: { idToken } });
+          // トークン同期成功後にのみPWA初回起動フラグを保存
+          if (isFirstPwaLaunch) {
+            markPwaAsInitialized();
+          }
           await queryClient.invalidateQueries({ queryKey: ["authUser"] });
 
           if (!isComponentMounted) return;
