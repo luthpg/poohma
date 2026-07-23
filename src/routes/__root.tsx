@@ -22,6 +22,8 @@ import "@fontsource/geist-mono/400.css";
 import "@fontsource/geist-mono/500.css";
 import "@fontsource/geist-mono/600.css";
 import "@fontsource/geist-mono/700.css";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import { PasscodeProvider } from "@/components/PasscodeProvider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -181,6 +183,8 @@ function RootDocument({ children }: { children: React.ReactNode }) {
               <PasscodeProvider>
                 <div className="min-h-screen bg-background text-foreground">
                   {children}
+                  <Analytics />
+                  <SpeedInsights />
                   <TanStackDevtools
                     config={{
                       position: "bottom-right",
