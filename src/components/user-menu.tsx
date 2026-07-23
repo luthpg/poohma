@@ -17,7 +17,6 @@ import {
   UserCog,
   Users,
 } from "lucide-react";
-import Papa from "papaparse";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
@@ -94,6 +93,7 @@ export function UserMenu({
 
     const toastId = toast.loading("CSVを解析中...");
     setIsImporting(true);
+    const Papa = (await import("papaparse")).default;
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,

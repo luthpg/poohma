@@ -1,3 +1,10 @@
+allowBuilds:
+  '@firebase/util': true
+  '@prisma/engines': true
+  esbuild: true
+  msw: true
+  prisma: true
+  protobufjs: true
 onlyBuiltDependencies:
   - '@firebase/util'
   - '@prisma/engines'

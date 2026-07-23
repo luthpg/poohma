@@ -1,6 +1,7 @@
 import { onIdTokenChanged } from "firebase/auth";
 import { useEffect, useMemo, useState } from "react";
 import { auth } from "@/utils/firebase";
+import { isPwaFirstLaunch, markPwaAsInitialized } from "@/utils/pwa";
 
 export function useConvexFirebaseAuth() {
   const [isLoading, setIsLoading] = useState(true);
@@ -31,7 +32,15 @@ export function useConvexFirebaseAuth() {
           return null;
         }
         try {
-          return await auth.currentUser.getIdToken(forceRefreshToken);
+          const isFirstPwaLaunch = isPwaFirstLaunch();
+          const token = await auth.currentUser.getIdToken(
+            isFirstPwaLaunch || forceRefreshToken,
+          );
+          // トークン取得成功後にのみPWA初回起動フラグを保存
+          if (isFirstPwaLaunch) {
+            markPwaAsInitialized();
+          }
+          return token;
         } catch (error) {
           console.error("Failed to fetch access token:", error);
           return null;

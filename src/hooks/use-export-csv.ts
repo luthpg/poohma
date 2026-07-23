@@ -1,5 +1,4 @@
 import { useConvex } from "convex/react";
-import Papa from "papaparse";
 import { useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
@@ -102,6 +101,7 @@ export function useExportCsv() {
         columns.push(`Label${i}`, `LoginID${i}`, `PasswordHint${i}`);
       }
 
+      const Papa = (await import("papaparse")).default;
       const csv = Papa.unparse(decryptedData, { columns });
       // Excelの文字化け対策としてBOM (UTF-8) を付与
       const bom = new Uint8Array([0xef, 0xbb, 0xbf]);

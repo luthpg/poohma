@@ -8,7 +8,6 @@ import {
   Lock,
   Plus,
   Search,
-  Shield,
   Users,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -62,17 +61,13 @@ function RouteComponent() {
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-12 gap-12 items-center">
             {/* 左側コピー・アクション */}
             <div className="md:col-span-6 text-center md:text-left flex flex-col items-center md:items-start z-10">
-              <div className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 dark:bg-orange-500/10 px-3.5 py-1 text-xs font-semibold text-orange-600 dark:text-orange-400 mb-6 border border-orange-100 dark:border-orange-500/20 tracking-geist-ui">
-                <Shield className="h-3.5 w-3.5" />{" "}
-                金融機関レベルのデータ暗号鍵保護を採用
-              </div>
               <h1 className="text-[26px] sm:text-5xl lg:text-6xl font-extrabold tracking-geist-hero leading-relaxed md:leading-[1.12] text-[#171717] dark:text-zinc-100">
-                <JpText>家族の「パスワード忘れた」を</JpText>
+                <JpText>家族の「パスワード忘れた」は</JpText>
                 <br />
                 <span className="text-[#f97316] dark:text-orange-400">
-                  <JpText>たった1分</JpText>
+                  <JpText>家族で解決</JpText>
                 </span>
-                <JpText>で解決する。</JpText>
+                <JpText>できる。</JpText>
               </h1>
 
               {/* モバイル専用: コンパクトなイラスト表示で情緒的つながりを創出 */}
@@ -84,12 +79,15 @@ function RouteComponent() {
                 />
               </div>
 
-              <JpText
-                as="p"
-                className="mt-6 max-w-xl text-base text-[#4d4d4d] dark:text-zinc-400 sm:text-lg leading-relaxed"
-              >
-                PoohMa（プーマ）は、実際のパスワードを1文字もサーバーに預けません。ご家族にしか分からない「ヒント」を安全に共有する、全く新しいアカウント管理帳です。
-              </JpText>
+              <p className="mt-6 max-w-xl text-base text-[#4d4d4d] dark:text-zinc-400 sm:text-lg leading-relaxed">
+                <JpText as="span">
+                  PoohMa（プーマ）は、実際のパスワードを1文字もサーバーに預けません。
+                </JpText>
+                <br />
+                <JpText as="span">
+                  ご家族にしか分からない「ヒント」を安全に共有する、家族みんなで使うアカウント管理帳です。
+                </JpText>
+              </p>
 
               <div className="mt-8 flex w-full flex-col sm:flex-row gap-4 justify-center md:justify-start">
                 <Button
@@ -811,7 +809,7 @@ function RouteComponent() {
                     as="p"
                     className="text-xs text-[#666666] dark:text-zinc-400 leading-relaxed"
                   >
-                    インターネットに出る前に、ご家族だけの端末鍵（E2E暗号化）で完全に鍵が掛けられます。
+                    インターネットに出る前に、家族だけが知る共通パスコードで暗号化。
                   </JpText>
 
                   {/* PC向けコネクター */}
@@ -927,7 +925,7 @@ function RouteComponent() {
                     サーバー保管
                   </h4>
                   <p className="text-xs text-[#666666] dark:text-zinc-400 leading-relaxed">
-                    <JpText>カギは家族のスマホ内にのみ保管されるため、</JpText>
+                    <JpText>復号するパスコードは家族しか知らないため、</JpText>
                     <strong className="font-extrabold">
                       <JpText>
                         開発チームであっても中身を開けられません。
