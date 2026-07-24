@@ -1,15 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  Check,
-  CheckCircle2,
-  Copy,
-  Download,
-  Globe,
-  Lock,
-  Plus,
-  Search,
-  Users,
-} from "lucide-react";
+import { CheckCircle2, Download, Globe, Lock, Plus, Users } from "lucide-react";
 import { useState } from "react";
 import { JpText } from "@/components/JpText";
 import { Button } from "@/components/ui/button";
