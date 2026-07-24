@@ -493,7 +493,7 @@ function RouteComponent() {
             </div>
 
             {/* スマートフォンモックアップ */}
-            <div className="w-full max-w-[340px] md:max-w-[320px] aspect-[9/19.5] bg-zinc-950 dark:bg-zinc-900 rounded-[46px] p-3 border-[8px] border-zinc-800 dark:border-zinc-700 shadow-2xl relative overflow-hidden transition-all duration-300">
+            <div className="w-full max-w-[340px] md:max-w-[320px] aspect-[800/1422] bg-zinc-950 dark:bg-zinc-900 rounded-[46px] p-3 border-[8px] border-zinc-800 dark:border-zinc-700 shadow-2xl relative overflow-hidden transition-all duration-300">
               {/* iPhoneスピーカー・ダイナミックアイランド */}
               <div className="absolute top-4 left-1/2 -translate-x-1/2 w-28 h-5 bg-zinc-850 rounded-full z-30 flex items-center justify-center">
                 <div className="w-1.5 h-1.5 rounded-full bg-zinc-900 mr-2"></div>
@@ -505,7 +505,7 @@ function RouteComponent() {
                 <img
                   src="/poohma_demo.gif"
                   alt="PoohMa 操作デモ"
-                  className="w-full h-full object-contain bg-zinc-100 object-top"
+                  className="w-full h-full object-cover"
                   decoding="async"
                   loading="lazy"
                 />
