@@ -1,16 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  Check,
-  CheckCircle2,
-  Copy,
-  Download,
-  Globe,
-  Lock,
-  Plus,
-  Search,
-  Users,
-} from "lucide-react";
-import { useEffect, useState } from "react";
+import { CheckCircle2, Download, Globe, Lock, Plus, Users } from "lucide-react";
+import { useState } from "react";
 import { JpText } from "@/components/JpText";
 import { Button } from "@/components/ui/button";
 
@@ -20,27 +10,6 @@ export const Route = createFileRoute("/(public)/")({
 
 function RouteComponent() {
   const [activeTab, setActiveTab] = useState("security");
-
-  // デモスマホ画面用のアニメーションステート
-  const [demoStep, setDemoStep] = useState(0);
-  const [_copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setDemoStep((prev) => {
-        const next = (prev + 1) % 5;
-        if (next === 0) {
-          setCopied(false);
-        }
-        if (next === 4) {
-          setCopied(true);
-        }
-        return next;
-      });
-    }, 2800);
-
-    return () => clearInterval(timer);
-  }, []);
 
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 antialiased font-sans transition-colors duration-300 break-words overflow-x-hidden">
@@ -524,207 +493,16 @@ function RouteComponent() {
             </div>
 
             {/* スマートフォンモックアップ */}
-            <div className="w-full max-w-[340px] md:max-w-[320px] aspect-[9/19.5] bg-zinc-950 dark:bg-zinc-900 rounded-[46px] p-3 border-[8px] border-zinc-800 dark:border-zinc-700 shadow-2xl relative overflow-hidden transition-all duration-300">
-              {/* iPhoneスピーカー・ダイナミックアイランド */}
-              <div className="absolute top-4 left-1/2 -translate-x-1/2 w-28 h-5 bg-zinc-850 rounded-full z-30 flex items-center justify-center">
-                <div className="w-1.5 h-1.5 rounded-full bg-zinc-900 mr-2"></div>
-                <div className="w-10 h-1 bg-zinc-900 rounded-full"></div>
-              </div>
-
+            <div className="w-full max-w-[340px] md:max-w-[320px] bg-zinc-950 dark:bg-zinc-900 rounded-[46px] p-3 border-[8px] border-zinc-800 dark:border-zinc-700 shadow-2xl relative transition-all duration-300 mx-auto">
               {/* スクリーン内部 */}
-              <div className="w-full h-full bg-white dark:bg-zinc-950 rounded-[36px] overflow-hidden relative flex flex-col pt-8 text-left text-zinc-800 dark:text-zinc-100 select-none">
-                {/* アプリケーションヘッダー */}
-                <div className="px-4 py-3.5 border-b border-zinc-100 dark:border-zinc-900 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-xs flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <img
-                      src="/poohma_icon.png"
-                      alt="PoohMa"
-                      className="h-5 w-5 object-contain"
-                    />
-                    <span className="font-bold text-[13px] tracking-geist-ui font-sans">
-                      PoohMa
-                    </span>
-                  </div>
-                  <span className="text-[10px] bg-orange-50 dark:bg-orange-950/40 text-[#f97316] dark:text-orange-400 px-2 py-0.5 rounded font-semibold border border-orange-100/30">
-                    ファミリー
-                  </span>
-                </div>
-
-                {/* スクリーン内部コンテンツ */}
-                <div className="flex-1 p-4 overflow-hidden relative">
-                  {/* ステップ0 & 1: アカウント一覧画面 */}
-                  {(demoStep === 0 || demoStep === 1) && (
-                    <div className="space-y-3.5 transition-opacity duration-300">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-400" />
-                        <div className="w-full bg-zinc-50 dark:bg-zinc-900 text-[11px] pl-8 pr-3 py-2.5 rounded-lg border border-zinc-200/50 dark:border-zinc-800 text-zinc-400 font-medium">
-                          サービスを検索...
-                        </div>
-                      </div>
-
-                      <div className="text-[10px] font-bold text-zinc-400 tracking-wider uppercase mt-4 pl-1">
-                        アカウント一覧
-                      </div>
-
-                      <div className="space-y-2">
-                        {/* Netflixアイテム */}
-                        <div
-                          className={`p-3 rounded-xl border flex items-center justify-between transition-all duration-300 ${
-                            demoStep === 1
-                              ? "bg-orange-50/60 dark:bg-orange-950/30 border-orange-200 dark:border-orange-500/40 scale-[0.98]"
-                              : "bg-white dark:bg-zinc-900 border-zinc-100 dark:border-zinc-800/80 shadow-xs"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-7 h-7 rounded-lg bg-red-100 dark:bg-red-950 flex items-center justify-center text-[11px] font-extrabold text-red-600">
-                              N
-                            </div>
-                            <div>
-                              <div className="text-[12px] font-bold">
-                                Netflix
-                              </div>
-                              <div className="text-[9px] text-zinc-400 mt-0.5">
-                                family@example.com
-                              </div>
-                            </div>
-                          </div>
-                          <span className="text-[9px] text-[#f97316] font-semibold bg-orange-50 dark:bg-orange-950/30 px-1.5 py-0.5 rounded">
-                            ヒントあり
-                          </span>
-                        </div>
-
-                        {/* 他のアカウント */}
-                        <div className="p-3 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between opacity-60">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-950 flex items-center justify-center text-[11px] font-extrabold text-blue-600">
-                              A
-                            </div>
-                            <div>
-                              <div className="text-[12px] font-bold">
-                                Amazon Prime
-                              </div>
-                              <div className="text-[9px] text-zinc-400 mt-0.5">
-                                family@example.com
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="p-3 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between opacity-60">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-[11px] font-extrabold text-emerald-600">
-                              W
-                            </div>
-                            <div>
-                              <div className="text-[12px] font-bold">
-                                Family Wi-Fi
-                              </div>
-                              <div className="text-[9px] text-zinc-400 mt-0.5">
-                                Router-5G-1024
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* モッククリックカーソル */}
-                      {demoStep === 1 && (
-                        <div className="absolute right-10 bottom-20 w-8 h-8 rounded-full bg-orange-500/30 border border-orange-500/80 flex items-center justify-center z-40 animate-ping">
-                          <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* ステップ2: フェード遷移中 */}
-                  {demoStep === 2 && (
-                    <div className="w-full h-full flex flex-col items-center justify-center transition-all duration-300">
-                      <div className="w-8 h-8 rounded-full border-[3px] border-orange-500 border-t-transparent animate-spin"></div>
-                    </div>
-                  )}
-
-                  {/* ステップ3 & 4: アカウント詳細/ヒント公開画面 */}
-                  {(demoStep === 3 || demoStep === 4) && (
-                    <div className="space-y-4 h-full flex flex-col justify-between pb-2 transition-opacity duration-300">
-                      <div className="space-y-4">
-                        {/* 戻るボタン風 */}
-                        <div className="text-[10px] text-zinc-400 font-bold flex items-center gap-1 cursor-pointer">
-                          <span>←</span> 戻る
-                        </div>
-
-                        {/* Netflixメイン情報 */}
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-xl bg-red-100 dark:bg-red-950 flex items-center justify-center text-[15px] font-black text-red-600 shadow-sm border border-red-200/20">
-                            N
-                          </div>
-                          <div>
-                            <h4 className="text-[15px] font-extrabold">
-                              Netflix
-                            </h4>
-                            <p className="text-[10px] text-[#666666] dark:text-zinc-400 mt-0.5">
-                              共有アカウント情報
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* ログイン情報 */}
-                        <div className="space-y-2.5 border border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-900/20 p-3 rounded-xl">
-                          <div>
-                            <span className="block text-[9px] font-bold text-zinc-400 tracking-wider">
-                              メールアドレス
-                            </span>
-                            <div className="text-[11px] font-semibold mt-1">
-                              family@example.com
-                            </div>
-                          </div>
-                          <div className="border-t border-zinc-100 dark:border-zinc-900 pt-2">
-                            <span className="block text-[9px] font-bold text-zinc-400 tracking-wider">
-                              パスワード
-                            </span>
-                            <div className="text-[11px] font-mono tracking-widest text-zinc-400 mt-1">
-                              ••••••••••••
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* スライドアップするヒントカード */}
-                      <div className="bg-[#fafafa] dark:bg-zinc-900 border border-orange-200 dark:border-orange-500/40 rounded-xl p-3.5 shadow-card transform translate-y-0 transition-transform duration-500 ease-out z-20">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-[9px] font-bold bg-[#f97316] text-white px-2 py-0.5 rounded-sm uppercase tracking-wider">
-                            ヒント
-                          </span>
-                          <span className="text-[9px] text-zinc-400 font-medium">
-                            ※ パスワードは預かっていません
-                          </span>
-                        </div>
-
-                        <p className="text-[13px] font-extrabold text-[#171717] dark:text-zinc-100 py-1.5 bg-white dark:bg-zinc-950 px-2.5 rounded-md border border-zinc-100 dark:border-zinc-800 shadow-inner">
-                          ポチの誕生日 ＋ いつもの4桁
-                        </p>
-
-                        <button
-                          type="button"
-                          className={`mt-3 w-full py-2 text-[10px] font-extrabold rounded-md border-none flex items-center justify-center gap-1.5 transition-all ${
-                            demoStep === 4
-                              ? "bg-emerald-500 text-white shadow-sm"
-                              : "bg-[#171717] hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-                          }`}
-                        >
-                          {demoStep === 4 ? (
-                            <>
-                              <Check className="w-3 h-3" /> コピー完了！
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-3 h-3" /> ヒントをコピー
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
+              <div className="w-full aspect-[800/1422] bg-zinc-100 dark:bg-zinc-950 rounded-[36px] overflow-hidden relative flex flex-col select-none">
+                <img
+                  src="/poohma_demo.gif"
+                  alt="PoohMa 操作デモ"
+                  className="w-full h-full object-cover"
+                  decoding="async"
+                  loading="lazy"
+                />
               </div>
             </div>
           </div>
