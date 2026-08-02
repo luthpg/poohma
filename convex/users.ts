@@ -1,7 +1,10 @@
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
-import { internalQuery, mutation, query } from "./_generated/server";
-import { authenticatedMutation } from "./customBuilders";
+import { internalQuery } from "./_generated/server";
+import {
+  authenticatedMutation,
+  identityVerifiedMutation,
+} from "./customBuilders";
 
 /**
  * ユーザー同期（ログイン時に呼ばれる）
@@ -9,15 +12,18 @@ import { authenticatedMutation } from "./customBuilders";
  * - 同じメールで別UIDのユーザーが存在する場合、データを移行
  * - 完全に新規の場合はユーザーを作成
  */
-export const syncUser = mutation({
+export const syncUser = identityVerifiedMutation({
   args: {
-    uid: v.string(),
-    email: v.string(),
     displayName: v.optional(v.string()),
     photoURL: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { uid, email, displayName, photoURL } = args;
+    const { identity } = ctx;
+    const uid = identity.subject;
+    const email = identity.email;
+    if (!email) throw new Error("Email is required");
+
+    const { displayName, photoURL } = args;
 
     // Firebase UID で検索
     const existingByUid = await ctx.db
@@ -153,7 +159,7 @@ export const deleteAccount = authenticatedMutation({
   },
 });
 
-export const getUserByFirebaseUid = query({
+export const getUserByFirebaseUid = internalQuery({
   args: { userId: v.string() },
   handler: async (ctx, args) => {
     const user = await ctx.db
