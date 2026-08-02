@@ -17,7 +17,28 @@ export default defineConfig(({ mode }) => {
       devtools(),
       nitro(),
       tailwindcss(),
-      tanstackStart(),
+      tanstackStart({
+        pages: [
+          {
+            path: "/",
+            prerender: {
+              enabled: true,
+            },
+          },
+          {
+            path: "/usage",
+            prerender: {
+              enabled: true,
+            },
+          },
+          {
+            path: "/faq",
+            prerender: {
+              enabled: true,
+            },
+          },
+        ],
+      }),
       viteReact(),
       basicSsl(),
     ],
