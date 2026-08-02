@@ -20,7 +20,9 @@ export const syncUser = identityVerifiedMutation({
   handler: async (ctx, args) => {
     const { identity } = ctx;
     const uid = identity.subject;
-    const email = identity.email as string;
+    const email = identity.email;
+    if (!email) throw new Error("Email is required");
+
     const { displayName, photoURL } = args;
 
     // Firebase UID で検索
