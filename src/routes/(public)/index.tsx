@@ -62,6 +62,7 @@ function RouteComponent() {
                 <Button
                   variant="default"
                   className="h-13 px-8 text-base w-full sm:w-auto font-semibold bg-[#171717] hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 transition-all shadow-md rounded-lg"
+                  asChild
                 >
                   <Link to="/login">アプリを使ってみる</Link>
                 </Button>
@@ -251,6 +252,7 @@ function RouteComponent() {
                     <Button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
+                      aria-pressed={isActive}
                       className={`relative flex-1 py-3 md:py-2.5 min-h-[44px] text-center text-[13px] sm:text-sm font-semibold rounded-lg transition-all duration-300 border-none shadow-none cursor-pointer ${
                         isActive
                           ? "bg-white dark:bg-zinc-800 text-[#171717] dark:text-zinc-50 shadow-[0_2px_8px_rgba(0,0,0,0.08)] border border-zinc-200/30 scale-[1.02] opacity-100"
@@ -289,8 +291,7 @@ function RouteComponent() {
                           {[
                             "サーバーに保存されるのはあなたが決めたヒントだけ",
                             "実際のパスワードは保存しなくてOK",
-                            "万が一データベースが漏れても、ヒントから元のパスワードは分かりません",
-                            "また、サーバーには暗号化されたパスワードヒントを保存するので、万が一流出しても安全です",
+                            "ヒント自体も暗号化されていますので、復元には家族パスコードが必要です",
                           ].map((item) => (
                             <JpText as="li" key={item}>
                               {item}
@@ -509,6 +510,7 @@ function RouteComponent() {
                     <button
                       key={tab}
                       type="button"
+                      aria-pressed={isActive}
                       onClick={() => setActiveTab(tab)}
                       aria-label={`タブ ${idx + 1} を切り替え`}
                       className={`rounded-full transition-all duration-300 cursor-pointer ${
@@ -797,6 +799,7 @@ function RouteComponent() {
                   <Button
                     variant="default"
                     className="w-full h-13 text-base font-bold shadow-md bg-[#f97316] hover:bg-orange-600 text-white dark:bg-orange-500 dark:hover:bg-orange-600 border-none rounded-lg transition-transform hover:scale-[1.02]"
+                    asChild
                   >
                     <Link to="/login">アプリを使ってみる</Link>
                   </Button>
