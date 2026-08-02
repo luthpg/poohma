@@ -3,9 +3,7 @@ import { getCookie, setCookie } from "@tanstack/react-start/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/../convex/_generated/api";
 import { env } from "@/env/client";
-
-const convexClient = new ConvexHttpClient(env.VITE_CONVEX_URL as string);
-
+import { env as serverEnv } from "@/env/server";
 import {
   adminAuth,
   getSessionCookie,
@@ -19,6 +17,15 @@ const SESSION_EXPIRES_IN_SECONDS = 60 * 60 * 24 * 14;
 const SESSION_EXPIRES_IN_MS = SESSION_EXPIRES_IN_SECONDS * 1000;
 
 /**
+ * リクエストごとに生成する
+ * (ConvexHttpClientはstateful(setAuth/setAdminAuthで状態を持つ)。
+ * 公式ドキュメントも "avoid sharing it between requests in a server" と明記しているため)
+ */
+function createConvexClient() {
+  return new ConvexHttpClient(env.VITE_CONVEX_URL as string);
+}
+
+/**
  * 認証ユーザーの同期とセッションクッキーの発行
  * @param idToken FirebaseのIDトークン
  * @returns 認証ユーザーID
@@ -28,14 +35,12 @@ export const syncUser = createServerFn({ method: "POST" })
   .handler(async ({ data: { idToken } }) => {
     try {
       const decodedToken = await adminAuth().verifyIdToken(idToken);
-      const { uid, email, name, picture } = decodedToken;
-
+      const { email, name, picture } = decodedToken;
       if (!email) throw new Error("Email is required");
 
-      // ユーザー同期（作成 or 更新 or マイグレーション）
+      const convexClient = createConvexClient();
+      convexClient.setAuth(idToken);
       const userId = await convexClient.mutation(api.users.syncUser, {
-        uid,
-        email,
         displayName: name,
         photoURL: picture,
       });
@@ -77,6 +82,14 @@ export const logout = createServerFn({ method: "POST" }).handler(async () => {
   });
 });
 
+// .convex.cloud → .convex.site (httpAction用ドメイン)
+function getConvexSiteUrl() {
+  return (env.VITE_CONVEX_URL as string).replace(
+    ".convex.cloud",
+    ".convex.site",
+  );
+}
+
 /**
  * 認証済みユーザーの取得
  * @returns 認証ユーザー情報 または null
@@ -85,17 +98,20 @@ export const getAuthUser = createServerFn({ method: "GET" }).handler(
   async () => {
     const sessionCookie = getCookie("session");
     if (!sessionCookie) return null;
-
     try {
       const decodedToken = await verifySessionCookie(sessionCookie);
       const { uid } = decodedToken;
 
-      // ユーザー検索
-      const user = await convexClient.query(api.users.getUserByFirebaseUid, {
-        userId: uid,
+      const res = await fetch(`${getConvexSiteUrl()}/getUserByFirebaseUid`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-internal-secret": serverEnv.CONVEX_INTERNAL_SECRET,
+        },
+        body: JSON.stringify({ userId: uid }),
       });
-
-      return user;
+      if (!res.ok) return null;
+      return await res.json();
     } catch (error) {
       console.error("getAuthUser: Auth verification failed:", error);
       return null;

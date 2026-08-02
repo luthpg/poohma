@@ -8,6 +8,34 @@ import {
 } from "./_generated/server";
 
 /**
+ * 認証済みクエリ
+ */
+export const identityVerifiedQuery = customQuery(baseQuery, {
+  args: {},
+  input: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+
+    // DBの存在チェックは行わず、検証済みのidentityのみを後続に渡す
+    return { ctx: { ...ctx, identity }, args };
+  },
+});
+
+/**
+ * 認証済みミューテーション
+ */
+export const identityVerifiedMutation = customMutation(baseMutation, {
+  args: {},
+  input: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+
+    // DBの存在チェックは行わず、検証済みのidentityのみを後続に渡す
+    return { ctx: { ...ctx, identity }, args };
+  },
+});
+
+/**
  * 認証済みユーザーを保証するビルダー
  */
 export const authenticatedQuery = customQuery(baseQuery, {
