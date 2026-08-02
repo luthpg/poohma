@@ -109,8 +109,10 @@ export const getAuthUser = createServerFn({ method: "GET" }).handler(
           "x-internal-secret": serverEnv.CONVEX_INTERNAL_SECRET,
         },
         body: JSON.stringify({ userId: uid }),
+        signal: AbortSignal.timeout(5000),
       });
-      if (!res.ok) return null;
+      if (res.status === 422) return null;
+      if (!res.ok) throw new Error("Failed to fetch user");
       return await res.json();
     } catch (error) {
       console.error("getAuthUser: Auth verification failed:", error);
