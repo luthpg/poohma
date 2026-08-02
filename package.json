@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev --port 3000",
-    "build": "cross-env NODE_TLS_REJECT_UNAUTHORIZED=0 vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "dev:convex": "convex dev",
     "test": "vitest run --coverage",
@@ -69,7 +69,6 @@
     "@vitejs/plugin-react": "^6.0.4",
     "@vitest/coverage-v8": "4.1.10",
     "convex-test": "^0.0.54",
-    "cross-env": "^10.1.0",
     "dotenv": "^17.4.2",
     "jsdom": "^29.1.1",
     "typescript": "^7.0.2",
