@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { CheckCircle2, Download, Globe, Lock, Plus, Users } from "lucide-react";
+import { CheckCircle2, Download, Globe, Lock, Users } from "lucide-react";
 import { useState } from "react";
 import { JpText } from "@/components/JpText";
 import { Button } from "@/components/ui/button";
@@ -143,7 +143,8 @@ function RouteComponent() {
                 我が家のあるある
               </span>
               <h2 className="text-2xl sm:text-3xl font-extrabold tracking-geist-h1 mt-2 text-[#171717] dark:text-zinc-100">
-                <JpText>こんな「パスワードどこだっけ？」ありませんか？</JpText>
+                <JpText>その「パスワード、どこだっけ？」は</JpText>
+                <JpText>今日で最後に</JpText>
               </h2>
             </div>
 
@@ -219,7 +220,7 @@ function RouteComponent() {
 
             <JpText
               as="p"
-              className="text-center text-[#666666] dark:text-zinc-400 text-sm mt-8 max-w-lg mx-auto leading-relaxed"
+              className="text-center text-[#666666] dark:text-zinc-400 text-base mt-8 max-w-lg mx-auto leading-relaxed"
             >
               デリケートなパスワードをLINEやメモ用紙でやり取りするのは、紛失や誤送信のリスクが高く危険です。PoohMaがあれば、紙も危険なテキスト送信も不要になります。
             </JpText>
@@ -244,23 +245,29 @@ function RouteComponent() {
             <div className="w-full max-w-5xl mx-auto">
               {/* タブナビゲーション (モダンピルタブ) */}
               <div className="flex gap-2 border border-zinc-200/50 dark:border-zinc-800 mb-10 p-1.5 bg-zinc-50 dark:bg-zinc-900/50 rounded-xl max-w-lg mx-auto shadow-inner">
-                {["security", "easy", "free"].map((tab, idx) => (
-                  <Button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`flex-1 py-3 md:py-2.5 min-h-[44px] text-center text-[13px] sm:text-sm font-semibold rounded-lg transition-all duration-300 border-none shadow-none cursor-pointer ${
-                      activeTab === tab
-                        ? "bg-white dark:bg-zinc-800 text-[#171717] dark:text-zinc-50 shadow-[0_2px_8px_rgba(0,0,0,0.08)] border border-zinc-200/30 scale-[1.02]"
-                        : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 bg-transparent hover:bg-zinc-100/50 dark:hover:bg-zinc-800/30"
-                    }`}
-                  >
-                    {idx === 0
-                      ? "安全に守る"
-                      : idx === 1
-                        ? "みんなで使う"
-                        : "データ出力"}
-                  </Button>
-                ))}
+                {["security", "easy", "free"].map((tab, idx) => {
+                  const isActive = activeTab === tab;
+                  return (
+                    <Button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={`relative flex-1 py-3 md:py-2.5 min-h-[44px] text-center text-[13px] sm:text-sm font-semibold rounded-lg transition-all duration-300 border-none shadow-none cursor-pointer ${
+                        isActive
+                          ? "bg-white dark:bg-zinc-800 text-[#171717] dark:text-zinc-50 shadow-[0_2px_8px_rgba(0,0,0,0.08)] border border-zinc-200/30 scale-[1.02] opacity-100"
+                          : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 bg-transparent hover:bg-zinc-100/50 dark:hover:bg-zinc-800/30 opacity-60 hover:opacity-90"
+                      }`}
+                    >
+                      {idx === 0
+                        ? "安全に守る"
+                        : idx === 1
+                          ? "みんなで使う"
+                          : "データ出力"}
+                      {isActive && (
+                        <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-6 h-[2.5px] bg-[#f97316] dark:bg-orange-400 rounded-full transition-all duration-300" />
+                      )}
+                    </Button>
+                  );
+                })}
               </div>
 
               {/* タブコンテンツ */}
@@ -278,9 +285,18 @@ function RouteComponent() {
                         <h3 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-geist-h2 text-[#171717] dark:text-zinc-100 leading-tight">
                           実パスワードを預からない「ヒント共有」
                         </h3>
-                        <p className="text-[#4d4d4d] dark:text-zinc-400 text-sm md:text-base leading-relaxed">
-                          サーバーに保存されるのは、家族にしか解けない「パスワードのヒント」だけ。もしデータベースが完全にハッキングされたとしても、実際のパスワードが流出することは物理的に不可能です。
-                        </p>
+                        <ul className="text-[#4d4d4d] dark:text-zinc-400 text-sm md:text-base leading-relaxed list-disc">
+                          {[
+                            "サーバーに保存されるのはあなたが決めたヒントだけ",
+                            "実際のパスワードは保存しなくてOK",
+                            "万が一データベースが漏れても、ヒントから元のパスワードは分かりません",
+                            "また、サーバーには暗号化されたパスワードヒントを保存するので、万が一流出しても安全です",
+                          ].map((item) => (
+                            <JpText as="li" key={item}>
+                              {item}
+                            </JpText>
+                          ))}
+                        </ul>
                       </div>
 
                       {/* SVG機能アイコン: 安全/保護 */}
@@ -333,11 +349,18 @@ function RouteComponent() {
                           <Users className="h-6 w-6" />
                         </div>
                         <h3 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-geist-h2 text-[#171717] dark:text-zinc-100 leading-tight">
-                          Wikiのように家族全員でかんたん編集
+                          家族全員でかんたん編集
                         </h3>
-                        <p className="text-[#4d4d4d] dark:text-zinc-400 text-sm md:text-base leading-relaxed">
-                          フォルダ作成や共有範囲の指定がボタン一つ。スマホ操作が苦手なおじいちゃんやおばあちゃんでも、アプリを開くだけで迷わず直感的に利用可能です。
-                        </p>
+                        <ul className="text-[#4d4d4d] dark:text-zinc-400 text-sm md:text-base leading-relaxed list-disc">
+                          {[
+                            "レコード作成や共有範囲の指定がボタン一つ",
+                            "直感的な操作性なので、操作が苦手な方でも、開くだけで迷わず利用可能",
+                          ].map((item) => (
+                            <JpText as="li" key={item}>
+                              {item}
+                            </JpText>
+                          ))}
+                        </ul>
                       </div>
 
                       {/* SVG機能アイコン: 簡単/家族 */}
@@ -413,9 +436,16 @@ function RouteComponent() {
                         <h3 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-geist-h2 text-[#171717] dark:text-zinc-100 leading-tight">
                           いつでもCSVエクスポート可能
                         </h3>
-                        <p className="text-[#4d4d4d] dark:text-zinc-400 text-sm md:text-base leading-relaxed">
-                          「サービスを解約したいけれどデータが残るのが不安」という心配は不要です。登録したすべてのデータはいつでも安全なCSV/プレーンテキストとして手元にエクスポートして退会できます。
-                        </p>
+                        <ul className="text-[#4d4d4d] dark:text-zinc-400 text-sm md:text-base leading-relaxed list-disc">
+                          {[
+                            "サービスを解約したいけれどデータが残るのが不安という心配は不要",
+                            "登録したすべてのデータはいつでも安全なCSV/プレーンテキストとして手元にエクスポートして退会できます",
+                          ].map((item) => (
+                            <JpText as="li" key={item}>
+                              {item}
+                            </JpText>
+                          ))}
+                        </ul>
                       </div>
 
                       {/* SVG機能アイコン: 自由/エクスポート */}
@@ -470,6 +500,26 @@ function RouteComponent() {
                   )}
                 </div>
               </div>
+
+              {/* ドットインジケーター (他にコンテンツがあることを提示) */}
+              <div className="flex items-center justify-center gap-3 mt-6">
+                {["security", "easy", "free"].map((tab, idx) => {
+                  const isActive = activeTab === tab;
+                  return (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => setActiveTab(tab)}
+                      aria-label={`タブ ${idx + 1} を切り替え`}
+                      className={`rounded-full transition-all duration-300 cursor-pointer ${
+                        isActive
+                          ? "w-3 h-3 bg-[#f97316] dark:bg-orange-400 ring-4 ring-orange-500/20 shadow-sm"
+                          : "w-2.5 h-2.5 bg-zinc-300 dark:bg-zinc-700 opacity-60 hover:opacity-100"
+                      }`}
+                    />
+                  );
+                })}
+              </div>
             </div>
           </div>
         </section>
@@ -520,7 +570,7 @@ function RouteComponent() {
               </span>
               <h2 className="text-2xl sm:text-3xl font-extrabold tracking-geist-h1 mt-2 text-[#171717] dark:text-zinc-100">
                 <JpText>
-                  開発チームであっても、あなたのパスワードを絶対に見られません
+                  開発チームであっても、あなたのパスワードは見られません
                 </JpText>
               </h2>
             </div>
@@ -528,7 +578,9 @@ function RouteComponent() {
             {/* パスワード不保持の強力な宣言 */}
             <div className="mb-14 bg-orange-50/50 dark:bg-orange-500/5 border border-orange-200/50 dark:border-orange-500/20 rounded-2xl p-5 sm:p-6 md:p-8 text-center max-w-3xl mx-auto overflow-hidden">
               <h3 className="text-lg sm:text-xl font-extrabold text-[#f97316] dark:text-orange-400 tracking-geist-h2 mb-2">
-                <JpText>「私たちは実パスワードを1文字も預かりません」</JpText>
+                <JpText>
+                  ゼロ知識設計により、開発チームを含め誰もパスワードを復号できません
+                </JpText>
               </h3>
               <JpText
                 as="p"
@@ -716,65 +768,14 @@ function RouteComponent() {
           </div>
         </section>
 
-        {/* ─── ⑥ FAQ / CTA SECTION ─── */}
+        {/* ─── ⑥ CTA SECTION ─── */}
         <section
-          id="faq"
+          id="cta"
           className="py-16 md:py-32 bg-[#fafafa]/50 dark:bg-zinc-950/50 border-t border-zinc-200/50 dark:border-zinc-800/50"
         >
           <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-10 md:mb-16">
-              <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">
-                FAQ
-              </span>
-              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-geist-h1 mt-2 text-[#171717] dark:text-zinc-100">
-                <JpText>よくある質問</JpText>
-              </h2>
-            </div>
-
-            <div className="space-y-3 sm:space-y-4">
-              {[
-                {
-                  q: "本当にパスワードは盗まれませんか？",
-                  a: "はい。PoohMaは実際のパスワードを保存せず、ご自身で設定した「ヒント」のみを保存します。そのため、万が一サーバーが攻撃を受けてもパスワードが流出することは物理的に不可能です。",
-                },
-                {
-                  q: "家族の中でスマホを持っていない人がいるのですが…",
-                  a: "パスワードのヒントを閲覧・登録するには、ご自身のスマートフォン（またはPC）のブラウザからPoohMaにアクセスできる環境が必要です。アプリのインストールは不要です。",
-                },
-                {
-                  q: "無料で使い続けることはできますか？",
-                  a: "はい、基本的なパスワードヒントの共有・管理機能はすべて無料でご利用いただけます。クレジットカードの登録も一切不要です。",
-                },
-                {
-                  q: "ヒントを忘れてしまった場合はどうなりますか？",
-                  a: "ヒントはあくまで「家族ならわかる」内容を推奨しています。もし全員が忘れてしまった場合、セキュリティの観点からサービス側で復元することはできないため、各サービス（NetflixやAmazonなど）のパスワードリセット機能をご利用ください。",
-                },
-              ].map((faq) => (
-                <details
-                  key={faq.q}
-                  className="group bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden transition-all duration-300 open:shadow-sm"
-                >
-                  <summary className="flex items-center justify-between cursor-pointer list-none p-4 sm:p-5 text-sm sm:text-base font-bold text-[#171717] dark:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400">
-                    <span className="pr-4 leading-snug">
-                      <JpText>{faq.q}</JpText>
-                    </span>
-
-                    {/* アイコンの回転アニメーション */}
-                    <div className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-500 group-open:rotate-45 transition-transform duration-300">
-                      <Plus className="w-3.5 h-3.5" />
-                    </div>
-                  </summary>
-
-                  {/* 回答エリア */}
-                  <div className="px-4 pb-4 sm:px-5 sm:pb-5 text-[13px] sm:text-sm text-[#666666] dark:text-zinc-400 leading-relaxed border-t border-zinc-100 dark:border-zinc-800/50 pt-3 sm:pt-4 mt-1 animate-in fade-in slide-in-from-top-2 duration-300">
-                    <JpText>{faq.a}</JpText>
-                  </div>
-                </details>
-              ))}
-            </div>
-
             {/* ボトムCTAカード (ブランドカラーの「点」の運用) */}
-            <div className="mt-16 md:mt-20 text-center bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800 rounded-3xl px-5 py-10 md:p-16 shadow-card relative overflow-hidden transition-all duration-300 hover:shadow-card-hover">
+            <div className="text-center bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800 rounded-3xl px-5 py-10 md:p-16 shadow-card relative overflow-hidden transition-all duration-300 hover:shadow-card-hover">
               {/* 装飾グラデーションバブル */}
               <div className="absolute -right-12 -top-12 w-32 h-32 bg-orange-500/10 dark:bg-orange-500/5 rounded-full blur-2xl z-0"></div>
               <div className="absolute -left-12 -bottom-12 w-32 h-32 bg-emerald-500/5 dark:bg-emerald-500/2 rounded-full blur-2xl z-0"></div>
@@ -787,9 +788,9 @@ function RouteComponent() {
                 </h3>
                 <JpText
                   as="p"
-                  className="text-[#666666] dark:text-zinc-400 text-sm md:text-base mt-4 max-w-md mx-auto leading-relaxed"
+                  className="text-[#666666] dark:text-zinc-400 text-base mt-4 max-w-md mx-auto leading-relaxed"
                 >
-                  初期設定はわずか1分。招待コードを家族に送るだけで、安全で穏やかな日常が始まります。
+                  初期設定はわずか1分。招待URLを家族に送るだけで、安全で穏やかな日常が始まります。
                 </JpText>
 
                 <div className="mt-10 max-w-sm mx-auto">
@@ -797,7 +798,7 @@ function RouteComponent() {
                     variant="default"
                     className="w-full h-13 text-base font-bold shadow-md bg-[#f97316] hover:bg-orange-600 text-white dark:bg-orange-500 dark:hover:bg-orange-600 border-none rounded-lg transition-transform hover:scale-[1.02]"
                   >
-                    <Link to="/login">無料で利用を開始する</Link>
+                    <Link to="/login">アプリを使ってみる</Link>
                   </Button>
                 </div>
               </div>
