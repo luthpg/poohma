@@ -11,6 +11,7 @@
     "test": "vitest run --coverage",
     "tsc": "tsc --noEmit",
     "check": "biome check --write",
+    "check:ci": "biome ci",
     "shadcn": "pnpm dlx shadcn@latest",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
