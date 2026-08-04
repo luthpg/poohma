@@ -35,8 +35,11 @@ describe("JpText", () => {
     );
 
     const span = container.querySelector("span");
-    expect(span).not.toBeNull();
-    expect(span!.querySelectorAll("wbr").length).toBeGreaterThan(0);
+    if (!span) {
+      throw new Error("Expected nested span to be rendered");
+    }
+
+    expect(span.querySelectorAll("wbr").length).toBeGreaterThan(0);
   });
 
   it("数値型の children も正常にレンダリングできること", () => {
