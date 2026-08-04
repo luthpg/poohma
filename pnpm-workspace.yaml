@@ -12,3 +12,5 @@ onlyBuiltDependencies:
   - msw
   - prisma
   - protobufjs
+overrides:
+  uuid: "^11.1.1"
