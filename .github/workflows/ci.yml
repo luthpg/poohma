@@ -24,6 +24,7 @@ jobs:
       VITE_CONVEX_SITE_URL: "https://dummy.convex.site"
       MICROCMS_SERVICE_DOMAIN: "dummy"
       MICROCMS_API_KEY: "dummy"
+      CONVEX_INTERNAL_SECRET: "dummy"
 
     steps:
       - name: Checkout code
