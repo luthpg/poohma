@@ -15,11 +15,9 @@ export type JpTextProps<T extends React.ElementType = "span"> = {
 
 // 単一文字列に対して \n での改行分割と BudouX パースを行う関数
 const processString = (text: string) => {
-  const lines = text.split("\n");
-  let lineOffset = 0;
-  return lines.map((line) => {
-    const lineKey = `line-${lineOffset}-${line}`;
-    lineOffset += line.length + 1;
+  const lines = text.split(/\r\n|\r|\n/);
+  return lines.map((line, index) => {
+    const lineKey = `line-${index}-${line}`;
     const tokens = parser.parse(line);
     let tokenOffset = 0;
     return (
@@ -34,7 +32,7 @@ const processString = (text: string) => {
             </Fragment>
           );
         })}
-        {lineOffset - 1 < text.length && <br />}
+        {index < lines.length - 1 && <br />}
       </Fragment>
     );
   });
