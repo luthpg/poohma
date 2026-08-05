@@ -349,10 +349,7 @@ function FamilyComponent() {
             } else {
               // 家族未所属: 旧マスターキーなし、新 DEK で暗号化
               const dek = await generateDEK();
-              const { encrypted, iv } = await encrypt(
-                cred.passwordHint,
-                cred.passwordHintIv,
-              );
+              const { encrypted, iv } = await encrypt(cred.passwordHint, dek);
               const dekWrapped = await wrapDEK(dek, newMasterKey);
               reEncryptedCredentials.push({
                 recordId: record._id,
