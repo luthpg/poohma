@@ -7,7 +7,6 @@ import * as cheerio from "cheerio";
 import { v } from "convex/values";
 import { Resend } from "resend";
 import { validateUrlSafety } from "../src/utils/url-safety";
-import { internal } from "./_generated/api";
 import { action, internalAction } from "./_generated/server";
 
 async function fetchSafeBuffer(
@@ -222,30 +221,6 @@ export const sendEmailReq = async ({
     return false;
   }
 };
-
-export const sendEmail = action({
-  args: { userId: v.id("users"), subject: v.string(), body: v.string() },
-  handler: async (ctx, args): Promise<boolean> => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Unauthenticated call to sendEmail");
-    }
-
-    const user = await ctx.runQuery(internal.users.getUserById, {
-      id: args.userId,
-    });
-
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    return sendEmailReq({
-      email: user.email,
-      subject: args.subject,
-      body: args.body,
-    });
-  },
-});
 
 export const sendEmailInternal = internalAction({
   args: { email: v.string(), subject: v.string(), body: v.string() },

@@ -23,14 +23,15 @@ export default defineConfig({
       exclude: [
         "node_modules/**",
         "tests/**",
+        ".storybook/**",
         "src/components/ui/**",
-        "src/routes/**",
         "src/utils/schemas.ts",
         "convex/_generated/**",
         "convex/schema.ts",
         "routeTree.gen.ts",
         "**/*.d.ts",
         "**/*.config.ts",
+        "**/*.css",
       ],
       thresholds: {
         statements: 50,
