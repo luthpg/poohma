@@ -201,7 +201,15 @@ export const cleanupExpiredMigrationsInternal = internalMutation({
           q.eq("familyId", migration.targetFamilyId),
         )
         .collect();
-      if (members.length === 0) {
+
+      const remainingRecord = await ctx.db
+        .query("serviceRecords")
+        .withIndex("by_familyId", (q) =>
+          q.eq("familyId", migration.targetFamilyId),
+        )
+        .first();
+
+      if (members.length === 0 && !remainingRecord) {
         await ctx.db.delete(migration.targetFamilyId);
       }
     }
@@ -233,7 +241,13 @@ export const prepareFamilyMigration = authenticatedMutation({
         .query("users")
         .withIndex("by_familyId", (q) => q.eq("familyId", stale.targetFamilyId))
         .collect();
-      if (members.length === 0) {
+
+      const remainingRecord = await ctx.db
+        .query("serviceRecords")
+        .withIndex("by_familyId", (q) => q.eq("familyId", stale.targetFamilyId))
+        .first();
+
+      if (members.length === 0 && !remainingRecord) {
         await ctx.db.delete(stale.targetFamilyId);
       }
     }
@@ -320,25 +334,25 @@ export const getMigrationForEncryption = authenticatedQuery({
       throw new Error("Migration has expired");
     }
 
-    const records = [];
-    for (const recordId of migration.serviceRecordIds) {
-      const record = await ctx.db.get(recordId);
-      if (record && record.userId === user.userId) {
-        records.push({
-          _id: record._id,
-          id: record._id,
-          credentials: record.credentials
-            .filter((c) => c.passwordHint && c.passwordHintIv)
-            .map((c) => ({
-              id: c.id,
-              passwordHint: c.passwordHint,
-              passwordHintIv: c.passwordHintIv,
-              passwordHintDekEncrypted: c.passwordHintDekEncrypted,
-              passwordHintDekIv: c.passwordHintDekIv,
-            })),
-        });
-      }
-    }
+    // prepare 後に作成されたレコードも含めるためリアルタイムで全件取得
+    const currentRecords = await ctx.db
+      .query("serviceRecords")
+      .withIndex("by_userId", (q) => q.eq("userId", user.userId))
+      .collect();
+
+    const records = currentRecords.map((record) => ({
+      _id: record._id,
+      id: record._id,
+      credentials: record.credentials
+        .filter((c) => c.passwordHint && c.passwordHintIv)
+        .map((c) => ({
+          id: c.id,
+          passwordHint: c.passwordHint,
+          passwordHintIv: c.passwordHintIv,
+          passwordHintDekEncrypted: c.passwordHintDekEncrypted,
+          passwordHintDekIv: c.passwordHintDekIv,
+        })),
+    }));
 
     return {
       migrationId: migration._id,
@@ -393,12 +407,13 @@ export const commitFamilyMigration = authenticatedMutation({
       }
     }
 
-    for (const recordId of migration.serviceRecordIds) {
-      const record = await ctx.db.get(recordId);
-      if (!record || record.userId !== user.userId) {
-        continue;
-      }
+    // prepare 後に作成されたレコードも含めるためリアルタイムで全件取得
+    const currentRecords = await ctx.db
+      .query("serviceRecords")
+      .withIndex("by_userId", (q) => q.eq("userId", user.userId))
+      .collect();
 
+    for (const record of currentRecords) {
       const newCredentials = record.credentials.map((cred) => {
         const update =
           credUpdates.get(`${record._id}:${cred.id}`) ??
@@ -447,7 +462,15 @@ export const commitFamilyMigration = authenticatedMutation({
         )
         .collect();
 
-      if (remainingUsers.length === 0) {
+      // serviceRecords が旧 Family に残っていないことも確認
+      const remainingRecord = await ctx.db
+        .query("serviceRecords")
+        .withIndex("by_familyId", (q) =>
+          q.eq("familyId", migration.sourceFamilyId),
+        )
+        .first();
+
+      if (remainingUsers.length === 0 && !remainingRecord) {
         await ctx.db.delete(migration.sourceFamilyId);
       }
     }
@@ -629,7 +652,13 @@ export const changeFamily = authenticatedMutation({
         .withIndex("by_familyId", (q) => q.eq("familyId", user.familyId))
         .collect();
 
-      if (remainingUsers.length === 0) {
+      // serviceRecords が旧 Family に残っていないことも確認
+      const remainingRecord = await ctx.db
+        .query("serviceRecords")
+        .withIndex("by_familyId", (q) => q.eq("familyId", user.familyId))
+        .first();
+
+      if (remainingUsers.length === 0 && !remainingRecord) {
         await ctx.db.delete(user.familyId);
       }
     }

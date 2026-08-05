@@ -762,6 +762,117 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         expect(family).toBeNull();
       });
     });
+
+    it("prepare 後に作成されたレコードも commit 時に移行対象に含まれること", async () => {
+      const t = convexTest(schema, modules);
+      let oldFamilyId!: Id<"families">;
+
+      await t.run(async (ctx) => {
+        oldFamilyId = await ctx.db.insert("families", {
+          name: "旧家族",
+          updatedAt: Date.now(),
+        });
+
+        await ctx.db.insert("users", {
+          userId: "user_mid",
+          email: "mid@example.com",
+          familyId: oldFamilyId,
+          updatedAt: Date.now(),
+        });
+
+        // prepare 前に存在するレコード
+        await ctx.db.insert("serviceRecords", {
+          title: "テストレコード1",
+          tags: [],
+          userId: "user_mid",
+          familyId: oldFamilyId,
+          visibility: "PRIVATE",
+          credentials: [
+            {
+              id: "cred_before",
+              passwordHint: "before_hint",
+              passwordHintIv: "before_iv",
+            },
+          ],
+          updatedAt: Date.now(),
+        });
+      });
+
+      const userMid = t.withIdentity({
+        subject: "user_mid",
+        email: "mid@example.com",
+      });
+
+      // 1. prepare
+      const prepareRes = await userMid.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "create",
+          name: "新家族",
+          masterKeyEncrypted: "enc_key",
+          masterKeyIv: "key_iv",
+          masterKeySalt: "key_salt",
+        },
+      );
+
+      // 2. prepare 後にレコードを追加 (30分以内を想定)
+      let newRecordId!: Id<"serviceRecords">;
+      await t.run(async (ctx) => {
+        newRecordId = await ctx.db.insert("serviceRecords", {
+          title: "テストレコード2",
+          tags: [],
+          userId: "user_mid",
+          familyId: oldFamilyId,
+          visibility: "PRIVATE",
+          credentials: [
+            {
+              id: "cred_after",
+              passwordHint: "after_hint",
+              passwordHintIv: "after_iv",
+            },
+          ],
+          updatedAt: Date.now(),
+        });
+      });
+
+      // 3. commit (新レコードの credentials は Map にないが familyId は更新されるべき)
+      await userMid.mutation(api.families.commitFamilyMigration, {
+        migrationId: prepareRes.migrationId,
+        credentials: [
+          {
+            id: "cred_before",
+            passwordHint: "new_before_hint",
+            passwordHintIv: "new_before_iv",
+          },
+          {
+            id: "cred_after",
+            passwordHint: "new_after_hint",
+            passwordHintIv: "new_after_iv",
+          },
+        ],
+      });
+
+      // 4. 検証: 両レコードとも新 Family に移行されていること
+      await t.run(async (ctx) => {
+        const allRecords = await ctx.db
+          .query("serviceRecords")
+          .withIndex("by_userId", (q) => q.eq("userId", "user_mid"))
+          .collect();
+
+        expect(allRecords.length).toBe(2);
+        for (const r of allRecords) {
+          expect(r.familyId).toBe(prepareRes.targetFamilyId);
+        }
+
+        // 新レコードの credentials も更新されていること
+        const newRecord = await ctx.db.get(newRecordId);
+        expect(newRecord?.credentials[0].passwordHint).toBe("new_after_hint");
+
+        // 旧 Family はメンバーもレコードも0なので削除
+        const oldFamily = await ctx.db.get(oldFamilyId);
+        expect(oldFamily).toBeNull();
+      });
+    });
   });
 });
 
