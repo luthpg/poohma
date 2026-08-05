@@ -451,6 +451,22 @@ export const commitFamilyMigration = authenticatedMutation({
       .withIndex("by_userId", (q) => q.eq("userId", user.userId))
       .collect();
 
+    // 再暗号化対象の全 credential に対して更新情報が存在するか事前に検証
+    for (const record of currentRecords) {
+      for (const cred of record.credentials) {
+        if (cred.passwordHint && cred.passwordHintIv) {
+          const hasUpdate =
+            credUpdates.has(`${record._id}:${cred.id}`) ||
+            credUpdates.has(cred.id);
+          if (!hasUpdate) {
+            throw new Error(
+              `Missing re-encrypted credential update for record ${record._id}, credential ${cred.id}`,
+            );
+          }
+        }
+      }
+    }
+
     for (const record of currentRecords) {
       const newCredentials = record.credentials.map((cred) => {
         const update =

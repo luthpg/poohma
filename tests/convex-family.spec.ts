@@ -489,11 +489,83 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           .unique();
         expect(record?.familyId).toBe(prepareRes.targetFamilyId);
         expect(record?.credentials[0].passwordHint).toBe("new_hint");
+        expect(record?.credentials[0].passwordHintIv).toBe("new_iv");
 
         // 旧Familyはメンバー0人になったので削除されていること
         const deletedOldFamily = await ctx.db.get(oldFamilyId);
         expect(deletedOldFamily).toBeNull();
       });
+    });
+
+    it("再暗号化対象の credential 更新を省略した commit は拒否されること", async () => {
+      const t = convexTest(schema, modules);
+      let oldFamilyId!: Id<"families">;
+
+      await t.run(async (ctx) => {
+        oldFamilyId = await ctx.db.insert("families", {
+          name: "省略テスト家族",
+          masterKeyEncrypted: "enc",
+          masterKeyIv: "iv",
+          masterKeySalt: "salt",
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("users", {
+          userId: "user_omit",
+          email: "omit@example.com",
+          familyId: oldFamilyId,
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("serviceRecords", {
+          title: "省略テストレコード",
+          tags: [],
+          userId: "user_omit",
+          familyId: oldFamilyId,
+          visibility: "PRIVATE",
+          credentials: [
+            {
+              id: "cred_a",
+              passwordHint: "hint_a",
+              passwordHintIv: "iv_a",
+            },
+            {
+              id: "cred_b",
+              passwordHint: "hint_b",
+              passwordHintIv: "iv_b",
+            },
+          ],
+          updatedAt: Date.now(),
+        });
+      });
+
+      const userOmit = t.withIdentity({
+        subject: "user_omit",
+        email: "omit@example.com",
+      });
+
+      const prepareRes = await userOmit.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "create",
+          name: "新省略テスト家族",
+          masterKeyEncrypted: "enc_key",
+          masterKeyIv: "key_iv",
+          masterKeySalt: "key_salt",
+        },
+      );
+
+      // cred_a のみ更新し cred_b を省略 → commit は失敗すべき
+      await expect(
+        userOmit.mutation(api.families.commitFamilyMigration, {
+          migrationId: prepareRes.migrationId,
+          credentials: [
+            {
+              id: "cred_a",
+              passwordHint: "new_hint_a",
+              passwordHintIv: "new_iv_a",
+            },
+          ],
+        }),
+      ).rejects.toThrow("Missing re-encrypted credential update");
     });
 
     it("旧Familyに他メンバーが残る場合は旧Familyが削除されないこと", async () => {
