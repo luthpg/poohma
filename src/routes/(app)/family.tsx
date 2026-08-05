@@ -193,6 +193,9 @@ function FamilyComponent() {
   const commitFamilyMigrationMut = useMutation(
     api.families.commitFamilyMigration,
   );
+  const abortFamilyMigrationMut = useMutation(
+    api.families.abortFamilyMigration,
+  );
   const createJoinRequestMut = useMutation(api.families.createJoinRequest);
   const cancelJoinRequestMut = useMutation(api.families.cancelJoinRequest);
   const dismissRejectedRequestMut = useMutation(
@@ -249,6 +252,7 @@ function FamilyComponent() {
     }
 
     setIsLoading(true);
+    let currentMigrationId: Id<"familyMigrations"> | null = null;
     try {
       const hasSourceFamily = !!family;
 
@@ -266,6 +270,7 @@ function FamilyComponent() {
         action: "join",
         inviteCode: myJoinRequest.familyId,
       });
+      currentMigrationId = migrationId;
 
       // 3. 移行先の家族情報を取得
       const existingFamily = await convex.query(
@@ -375,6 +380,13 @@ function FamilyComponent() {
       setIsChangingFamily(false);
       await router.invalidate();
     } catch (error) {
+      if (currentMigrationId) {
+        try {
+          await abortFamilyMigrationMut({ migrationId: currentMigrationId });
+        } catch (abortError) {
+          console.error("Failed to abort migration:", abortError);
+        }
+      }
       console.error(error);
       toast.error(
         "家族の変更に失敗しました（パスコードが間違っている可能性があります）",
@@ -392,6 +404,7 @@ function FamilyComponent() {
     convex,
     decryptHint,
     commitFamilyMigrationMut,
+    abortFamilyMigrationMut,
     queryClient,
     router,
   ]);
@@ -412,6 +425,7 @@ function FamilyComponent() {
       }
 
       setIsLoading(true);
+      let currentMigrationId: Id<"familyMigrations"> | null = null;
       try {
         // 1. セッションに旧マスターキーがあるか確認、なければロック解除を要求
         if (!getMasterKey()) {
@@ -436,6 +450,7 @@ function FamilyComponent() {
           masterKeyIv: wrapped.iv,
           masterKeySalt: salt,
         });
+        currentMigrationId = migrationId;
 
         // 4. 所有するレコードの暗号化対象を取得
         const migrationData = await convex.query(
@@ -504,6 +519,13 @@ function FamilyComponent() {
         setIsChangingFamily(false);
         await router.invalidate();
       } catch (error) {
+        if (currentMigrationId) {
+          try {
+            await abortFamilyMigrationMut({ migrationId: currentMigrationId });
+          } catch (abortError) {
+            console.error("Failed to abort migration:", abortError);
+          }
+        }
         console.error(error);
         toast.error("家族の変更に失敗しました");
       } finally {

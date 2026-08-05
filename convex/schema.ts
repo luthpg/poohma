@@ -31,6 +31,7 @@ export default defineSchema({
       v.literal("PREPARED"),
       v.literal("COMPLETED"),
       v.literal("EXPIRED"),
+      v.literal("ABORTED"),
     ),
     createdAt: v.number(),
     expiresAt: v.number(),

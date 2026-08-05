@@ -216,6 +216,44 @@ export const cleanupExpiredMigrationsInternal = internalMutation({
   },
 });
 
+export const abortFamilyMigration = authenticatedMutation({
+  args: { migrationId: v.id("familyMigrations") },
+  handler: async (ctx, args) => {
+    const { user } = ctx;
+
+    const migration = await ctx.db.get(args.migrationId);
+    if (!migration || migration.userId !== user.userId) {
+      throw new Error("Migration not found or access denied");
+    }
+
+    if (migration.status !== "PREPARED") {
+      return { success: false };
+    }
+
+    await ctx.db.patch(migration._id, { status: "ABORTED" });
+
+    const members = await ctx.db
+      .query("users")
+      .withIndex("by_familyId", (q) =>
+        q.eq("familyId", migration.targetFamilyId),
+      )
+      .collect();
+
+    const remainingRecord = await ctx.db
+      .query("serviceRecords")
+      .withIndex("by_familyId", (q) =>
+        q.eq("familyId", migration.targetFamilyId),
+      )
+      .first();
+
+    if (members.length === 0 && !remainingRecord) {
+      await ctx.db.delete(migration.targetFamilyId);
+    }
+
+    return { success: true };
+  },
+});
+
 export const prepareFamilyMigration = authenticatedMutation({
   args: {
     action: v.union(v.literal("create"), v.literal("join")),

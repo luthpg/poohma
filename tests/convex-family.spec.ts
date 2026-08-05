@@ -873,6 +873,49 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         expect(oldFamily).toBeNull();
       });
     });
+
+    it("abortFamilyMigration を呼び出した際、移行が ABORTED となりメンバー0人の targetFamily が削除されること", async () => {
+      const t = convexTest(schema, modules);
+
+      await t.run(async (ctx) => {
+        await ctx.db.insert("users", {
+          userId: "user_abort_test",
+          email: "abort@example.com",
+          updatedAt: Date.now(),
+        });
+      });
+
+      const userAbort = t.withIdentity({
+        subject: "user_abort_test",
+        email: "abort@example.com",
+      });
+
+      const prepareRes = await userAbort.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "create",
+          name: "キャンセル予定ファミリー",
+          masterKeyEncrypted: "enc_key",
+          masterKeyIv: "key_iv",
+          masterKeySalt: "key_salt",
+        },
+      );
+
+      const abortRes = await userAbort.mutation(
+        api.families.abortFamilyMigration,
+        { migrationId: prepareRes.migrationId },
+      );
+
+      expect(abortRes.success).toBe(true);
+
+      await t.run(async (ctx) => {
+        const migration = await ctx.db.get(prepareRes.migrationId);
+        expect(migration?.status).toBe("ABORTED");
+
+        const targetFamily = await ctx.db.get(prepareRes.targetFamilyId);
+        expect(targetFamily).toBeNull();
+      });
+    });
   });
 });
 
