@@ -372,6 +372,215 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
       expect(statusAfterDismiss).toBeNull();
     });
   });
+
+  describe("2.1.4 prepare / commit フローによる安全な家族移行機能の検証", () => {
+    it("prepare で移行対象が確定し、commit で一括更新・旧Family削除が行われること", async () => {
+      const t = convexTest(schema, modules);
+
+      let oldFamilyId!: Id<"families">;
+
+      await t.run(async (ctx) => {
+        oldFamilyId = await ctx.db.insert("families", {
+          name: "旧田中家",
+          updatedAt: Date.now(),
+        });
+
+        // ユーザーA (唯一のメンバー)
+        await ctx.db.insert("users", {
+          userId: "user_solo",
+          email: "solo@example.com",
+          familyId: oldFamilyId,
+          updatedAt: Date.now(),
+        });
+
+        await ctx.db.insert("serviceRecords", {
+          userId: "user_solo",
+          familyId: oldFamilyId,
+          title: "Solo's Record",
+          visibility: "SHARED",
+          credentials: [
+            {
+              id: "cred_solo",
+              passwordHint: "old_hint",
+              passwordHintIv: "old_iv",
+            },
+          ],
+          tags: [],
+          updatedAt: Date.now(),
+        });
+      });
+
+      const userSolo = t.withIdentity({
+        subject: "user_solo",
+        email: "solo@example.com",
+      });
+
+      // 1. prepare: 新家族作成
+      const prepareRes = await userSolo.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "create",
+          name: "新田中家",
+          masterKeyEncrypted: "enc_key",
+          masterKeyIv: "key_iv",
+          masterKeySalt: "key_salt",
+        },
+      );
+
+      expect(prepareRes.migrationId).toBeDefined();
+
+      // この時点ではまだユーザーの familyId もレコードの familyId も更新されていない
+      const userBeforeCommit = await t.run(async (ctx) => {
+        return await ctx.db
+          .query("users")
+          .withIndex("by_userId", (q) => q.eq("userId", "user_solo"))
+          .unique();
+      });
+      expect(userBeforeCommit?.familyId).toBe(oldFamilyId);
+
+      // 2. getMigrationForEncryption で暗号化対象を取得
+      const migrationData = await userSolo.query(
+        api.families.getMigrationForEncryption,
+        { migrationId: prepareRes.migrationId },
+      );
+      expect(migrationData.records.length).toBe(1);
+
+      // 3. commit
+      const commitRes = await userSolo.mutation(
+        api.families.commitFamilyMigration,
+        {
+          migrationId: prepareRes.migrationId,
+          credentials: [
+            {
+              id: "cred_solo",
+              passwordHint: "new_hint",
+              passwordHintIv: "new_iv",
+            },
+          ],
+        },
+      );
+
+      expect(commitRes.success).toBe(true);
+      expect(commitRes.familyId).toBe(prepareRes.targetFamilyId);
+
+      // 4. DB状態の検証
+      await t.run(async (ctx) => {
+        // ユーザーの familyId が更新されている
+        const updatedUser = await ctx.db
+          .query("users")
+          .withIndex("by_userId", (q) => q.eq("userId", "user_solo"))
+          .unique();
+        expect(updatedUser?.familyId).toBe(prepareRes.targetFamilyId);
+
+        // レコードの familyId と credentials が更新されている
+        const record = await ctx.db
+          .query("serviceRecords")
+          .withIndex("by_userId", (q) => q.eq("userId", "user_solo"))
+          .unique();
+        expect(record?.familyId).toBe(prepareRes.targetFamilyId);
+        expect(record?.credentials[0].passwordHint).toBe("new_hint");
+
+        // 旧Familyはメンバー0人になったので削除されていること
+        const deletedOldFamily = await ctx.db.get(oldFamilyId);
+        expect(deletedOldFamily).toBeNull();
+      });
+    });
+
+    it("旧Familyに他メンバーが残る場合は旧Familyが削除されないこと", async () => {
+      const t = convexTest(schema, modules);
+      let oldFamilyId!: Id<"families">;
+
+      await t.run(async (ctx) => {
+        oldFamilyId = await ctx.db.insert("families", {
+          name: "共有家族",
+          updatedAt: Date.now(),
+        });
+
+        await ctx.db.insert("users", {
+          userId: "user_leaving",
+          email: "leaving@example.com",
+          familyId: oldFamilyId,
+          updatedAt: Date.now(),
+        });
+
+        await ctx.db.insert("users", {
+          userId: "user_staying",
+          email: "staying@example.com",
+          familyId: oldFamilyId,
+          updatedAt: Date.now(),
+        });
+      });
+
+      const userLeaving = t.withIdentity({
+        subject: "user_leaving",
+        email: "leaving@example.com",
+      });
+
+      const prepareRes = await userLeaving.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "create",
+          name: "独立家族",
+          masterKeyEncrypted: "enc_key",
+          masterKeyIv: "key_iv",
+          masterKeySalt: "key_salt",
+        },
+      );
+
+      await userLeaving.mutation(api.families.commitFamilyMigration, {
+        migrationId: prepareRes.migrationId,
+        credentials: [],
+      });
+
+      // 検証: 旧Familyが削除されずに残っていること
+      await t.run(async (ctx) => {
+        const oldFamily = await ctx.db.get(oldFamilyId);
+        expect(oldFamily).not.toBeNull();
+      });
+    });
+
+    it("二重コミットが防止されること (COMPLETED 済みの migration は再コミットできない)", async () => {
+      const t = convexTest(schema, modules);
+
+      await t.run(async (ctx) => {
+        await ctx.db.insert("users", {
+          userId: "user_double",
+          email: "double@example.com",
+          updatedAt: Date.now(),
+        });
+      });
+
+      const userDouble = t.withIdentity({
+        subject: "user_double",
+        email: "double@example.com",
+      });
+
+      const prepareRes = await userDouble.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "create",
+          name: "二重テスト家族",
+          masterKeyEncrypted: "enc_key",
+          masterKeyIv: "key_iv",
+          masterKeySalt: "key_salt",
+        },
+      );
+
+      // 1回目のコミット
+      await userDouble.mutation(api.families.commitFamilyMigration, {
+        migrationId: prepareRes.migrationId,
+        credentials: [],
+      });
+
+      // 2回目のコミットはエラーになること
+      await expect(
+        userDouble.mutation(api.families.commitFamilyMigration, {
+          migrationId: prepareRes.migrationId,
+          credentials: [],
+        }),
+      ).rejects.toThrow("Migration is not in PREPARED status");
+    });
+  });
 });
 
 import {

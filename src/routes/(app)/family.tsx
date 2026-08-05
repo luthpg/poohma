@@ -187,7 +187,12 @@ function FamilyComponent() {
   };
 
   const createFamilyMut = useMutation(api.families.createFamily);
-  const changeFamilyMut = useMutation(api.families.changeFamily);
+  const prepareFamilyMigrationMut = useMutation(
+    api.families.prepareFamilyMigration,
+  );
+  const commitFamilyMigrationMut = useMutation(
+    api.families.commitFamilyMigration,
+  );
   const createJoinRequestMut = useMutation(api.families.createJoinRequest);
   const cancelJoinRequestMut = useMutation(api.families.cancelJoinRequest);
   const dismissRejectedRequestMut = useMutation(
@@ -254,7 +259,13 @@ function FamilyComponent() {
         }
       }
 
-      // 2. 移行先の家族情報を取得
+      // 2. prepare
+      const { migrationId } = await prepareFamilyMigrationMut({
+        action: "join",
+        inviteCode: myJoinRequest.familyId,
+      });
+
+      // 3. 移行先の家族情報を取得
       const existingFamily = await convex.query(
         api.families.getFamilyInfoByInviteCode,
         { inviteCode: myJoinRequest.familyId as Id<"families"> },
@@ -276,10 +287,10 @@ function FamilyComponent() {
         wrappingKey,
       );
 
-      // 3. 所有するレコードの再暗号化
-      const recordsToReEncrypt = await convex.query(
-        api.families.getRecordsForReEncryption,
-        {},
+      // 4. 所有するレコードの暗号化対象を取得
+      const migrationData = await convex.query(
+        api.families.getMigrationForEncryption,
+        { migrationId },
       );
       const reEncryptedCredentials: {
         id: string;
@@ -289,7 +300,7 @@ function FamilyComponent() {
         passwordHintDekIv?: string;
       }[] = [];
 
-      for (const record of recordsToReEncrypt) {
+      for (const record of migrationData.records) {
         for (const cred of record.credentials) {
           if (cred.passwordHint && cred.passwordHintIv) {
             if (cred.passwordHintDekEncrypted && cred.passwordHintDekIv) {
@@ -329,10 +340,9 @@ function FamilyComponent() {
         }
       }
 
-      // 4. サーバーへ送信
-      await changeFamilyMut({
-        action: "join",
-        inviteCode: myJoinRequest.familyId,
+      // 5. commit
+      await commitFamilyMigrationMut({
+        migrationId,
         credentials: reEncryptedCredentials,
       });
 
@@ -353,9 +363,10 @@ function FamilyComponent() {
     joinPasscode,
     getMasterKey,
     requireUnlock,
+    prepareFamilyMigrationMut,
     convex,
     decryptHint,
-    changeFamilyMut,
+    commitFamilyMigrationMut,
     queryClient,
     router,
   ]);
@@ -392,10 +403,19 @@ function FamilyComponent() {
         const newMasterKey = await generateMasterKey();
         const wrapped = await wrapMasterKey(newMasterKey, passcodeKey);
 
-        // 3. 所有するレコードの再暗号化
-        const recordsToReEncrypt = await convex.query(
-          api.families.getRecordsForReEncryption,
-          {},
+        // 3. prepare
+        const { migrationId } = await prepareFamilyMigrationMut({
+          action: "create",
+          name: createName,
+          masterKeyEncrypted: wrapped.encrypted,
+          masterKeyIv: wrapped.iv,
+          masterKeySalt: salt,
+        });
+
+        // 4. 所有するレコードの暗号化対象を取得
+        const migrationData = await convex.query(
+          api.families.getMigrationForEncryption,
+          { migrationId },
         );
         const reEncryptedCredentials: {
           id: string;
@@ -405,7 +425,7 @@ function FamilyComponent() {
           passwordHintDekIv?: string;
         }[] = [];
 
-        for (const record of recordsToReEncrypt) {
+        for (const record of migrationData.records) {
           for (const cred of record.credentials) {
             if (cred.passwordHint && cred.passwordHintIv) {
               if (cred.passwordHintDekEncrypted && cred.passwordHintDekIv) {
@@ -445,13 +465,9 @@ function FamilyComponent() {
           }
         }
 
-        // 4. サーバーへ送信
-        await changeFamilyMut({
-          action: "create",
-          name: createName,
-          masterKeyEncrypted: wrapped.encrypted,
-          masterKeyIv: wrapped.iv,
-          masterKeySalt: salt,
+        // 5. commit
+        await commitFamilyMigrationMut({
+          migrationId,
           credentials: reEncryptedCredentials,
         });
 

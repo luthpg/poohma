@@ -19,7 +19,24 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_userId", ["userId"])
-    .index("by_email", ["email"]),
+    .index("by_email", ["email"])
+    .index("by_familyId", ["familyId"]),
+
+  familyMigrations: defineTable({
+    userId: v.string(), // Firebase UID
+    sourceFamilyId: v.optional(v.id("families")),
+    targetFamilyId: v.id("families"),
+    serviceRecordIds: v.array(v.id("serviceRecords")),
+    status: v.union(
+      v.literal("PREPARED"),
+      v.literal("COMPLETED"),
+      v.literal("EXPIRED"),
+    ),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_status", ["status"]),
 
   joinRequests: defineTable({
     familyId: v.id("families"),
