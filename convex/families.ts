@@ -1,7 +1,11 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { internalQuery, type QueryCtx } from "./_generated/server";
+import {
+  internalMutation,
+  internalQuery,
+  type QueryCtx,
+} from "./_generated/server";
 import {
   authenticatedMutation,
   authenticatedQuery,
@@ -179,6 +183,31 @@ export const getFamilyInfoByInviteCode = authenticatedQuery({
   },
 });
 
+export const cleanupExpiredMigrationsInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const expiredMigrations = await ctx.db
+      .query("familyMigrations")
+      .withIndex("by_status", (q) => q.eq("status", "PREPARED"))
+      .filter((q) => q.lt(q.field("expiresAt"), now))
+      .collect();
+
+    for (const migration of expiredMigrations) {
+      await ctx.db.patch(migration._id, { status: "EXPIRED" });
+      const members = await ctx.db
+        .query("users")
+        .withIndex("by_familyId", (q) =>
+          q.eq("familyId", migration.targetFamilyId),
+        )
+        .collect();
+      if (members.length === 0) {
+        await ctx.db.delete(migration.targetFamilyId);
+      }
+    }
+  },
+});
+
 export const prepareFamilyMigration = authenticatedMutation({
   args: {
     action: v.union(v.literal("create"), v.literal("join")),
@@ -190,6 +219,25 @@ export const prepareFamilyMigration = authenticatedMutation({
   },
   handler: async (ctx, args) => {
     const { user } = ctx;
+
+    // 未完了の PREPARED 状態の移行を無効化し、メンバー0人の孤児 Family があれば削除
+    const staleMigrations = await ctx.db
+      .query("familyMigrations")
+      .withIndex("by_userId", (q) => q.eq("userId", user.userId))
+      .filter((q) => q.eq(q.field("status"), "PREPARED"))
+      .collect();
+
+    for (const stale of staleMigrations) {
+      await ctx.db.patch(stale._id, { status: "EXPIRED" });
+      const members = await ctx.db
+        .query("users")
+        .withIndex("by_familyId", (q) => q.eq("familyId", stale.targetFamilyId))
+        .collect();
+      if (members.length === 0) {
+        await ctx.db.delete(stale.targetFamilyId);
+      }
+    }
+
     let targetFamilyId: Id<"families">;
 
     if (args.action === "create") {

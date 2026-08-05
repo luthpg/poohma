@@ -1,6 +1,6 @@
 import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
-import { api } from "../convex/_generated/api";
+import { api, internal } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import schema from "../convex/schema";
 
@@ -665,6 +665,101 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
         expect(r1?.credentials[0].passwordHint).toBe("r1_hint_new");
         expect(r2?.credentials[0].passwordHint).toBe("r2_hint_new");
+      });
+    });
+
+    it("再度 prepare を呼び出した際、古い PREPARED 移行が EXPIRED となり孤児 Family が削除されること", async () => {
+      const t = convexTest(schema, modules);
+
+      await t.run(async (ctx) => {
+        await ctx.db.insert("users", {
+          userId: "user_orphan",
+          email: "orphan@example.com",
+          updatedAt: Date.now(),
+        });
+      });
+
+      const userOrphan = t.withIdentity({
+        subject: "user_orphan",
+        email: "orphan@example.com",
+      });
+
+      // 1回目の prepare (作成された targetFamilyId1 は放置される)
+      const prep1 = await userOrphan.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "create",
+          name: "放置ファミリー",
+          masterKeyEncrypted: "enc_key",
+          masterKeyIv: "key_iv",
+          masterKeySalt: "key_salt",
+        },
+      );
+
+      // 2回目の prepare
+      const prep2 = await userOrphan.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "create",
+          name: "最終ファミリー",
+          masterKeyEncrypted: "enc_key",
+          masterKeyIv: "key_iv",
+          masterKeySalt: "key_salt",
+        },
+      );
+
+      await t.run(async (ctx) => {
+        // 1回目の migration は EXPIRED
+        const m1 = await ctx.db.get(prep1.migrationId);
+        expect(m1?.status).toBe("EXPIRED");
+
+        // 1回目の targetFamilyId は孤児になったため削除されていること
+        const f1 = await ctx.db.get(prep1.targetFamilyId);
+        expect(f1).toBeNull();
+
+        // 2回目の targetFamilyId は存在していること
+        const f2 = await ctx.db.get(prep2.targetFamilyId);
+        expect(f2).not.toBeNull();
+      });
+    });
+
+    it("cleanupExpiredMigrationsInternal を実行した際、期限切れの PREPARED 移行が EXPIRED となり孤児 Family が削除されること", async () => {
+      const t = convexTest(schema, modules);
+      let expiredFamilyId!: Id<"families">;
+      let expiredMigrationId!: Id<"familyMigrations">;
+
+      await t.run(async (ctx) => {
+        await ctx.db.insert("users", {
+          userId: "user_cron_test",
+          email: "cron@example.com",
+          updatedAt: Date.now(),
+        });
+
+        expiredFamilyId = await ctx.db.insert("families", {
+          name: "期限切れ孤児ファミリー",
+          updatedAt: Date.now(),
+        });
+
+        // 過去の期限切れ PREPARED レコードをダミー挿入
+        expiredMigrationId = await ctx.db.insert("familyMigrations", {
+          userId: "user_cron_test",
+          targetFamilyId: expiredFamilyId,
+          serviceRecordIds: [],
+          status: "PREPARED",
+          createdAt: Date.now() - 3600 * 1000,
+          expiresAt: Date.now() - 1800 * 1000, // 過去の時刻
+        });
+      });
+
+      // cleanupExpiredMigrationsInternal の実行
+      await t.mutation(internal.families.cleanupExpiredMigrationsInternal, {});
+
+      await t.run(async (ctx) => {
+        const migration = await ctx.db.get(expiredMigrationId);
+        expect(migration?.status).toBe("EXPIRED");
+
+        const family = await ctx.db.get(expiredFamilyId);
+        expect(family).toBeNull();
       });
     });
   });
