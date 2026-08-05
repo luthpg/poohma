@@ -306,6 +306,7 @@ export const commitFamilyMigration = authenticatedMutation({
     migrationId: v.id("familyMigrations"),
     credentials: v.array(
       v.object({
+        recordId: v.optional(v.string()),
         id: v.string(),
         passwordHint: v.string(),
         passwordHintIv: v.string(),
@@ -335,7 +336,14 @@ export const commitFamilyMigration = authenticatedMutation({
       throw new Error("Current family does not match prepared source family");
     }
 
-    const credUpdates = new Map(args.credentials.map((c) => [c.id, c]));
+    const credUpdates = new Map<string, (typeof args.credentials)[number]>();
+    for (const c of args.credentials) {
+      if (c.recordId) {
+        credUpdates.set(`${c.recordId}:${c.id}`, c);
+      } else {
+        credUpdates.set(c.id, c);
+      }
+    }
 
     for (const recordId of migration.serviceRecordIds) {
       const record = await ctx.db.get(recordId);
@@ -344,7 +352,9 @@ export const commitFamilyMigration = authenticatedMutation({
       }
 
       const newCredentials = record.credentials.map((cred) => {
-        const update = credUpdates.get(cred.id);
+        const update =
+          credUpdates.get(`${record._id}:${cred.id}`) ??
+          credUpdates.get(cred.id);
         if (update) {
           return {
             ...cred,
@@ -445,6 +455,7 @@ export const changeFamily = authenticatedMutation({
     inviteCode: v.optional(v.string()),
     credentials: v.array(
       v.object({
+        recordId: v.optional(v.string()),
         id: v.string(),
         passwordHint: v.string(),
         passwordHintIv: v.string(),
@@ -513,12 +524,21 @@ export const changeFamily = authenticatedMutation({
       expiresAt: now + 30 * 60 * 1000,
     });
 
-    const credUpdates = new Map(args.credentials.map((c) => [c.id, c]));
+    const credUpdates = new Map<string, (typeof args.credentials)[number]>();
+    for (const c of args.credentials) {
+      if (c.recordId) {
+        credUpdates.set(`${c.recordId}:${c.id}`, c);
+      } else {
+        credUpdates.set(c.id, c);
+      }
+    }
 
     for (const record of userRecords) {
       let needsUpdate = false;
       const newCredentials = record.credentials.map((cred) => {
-        const update = credUpdates.get(cred.id);
+        const update =
+          credUpdates.get(`${record._id}:${cred.id}`) ??
+          credUpdates.get(cred.id);
         if (update) {
           needsUpdate = true;
           return {

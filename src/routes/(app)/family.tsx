@@ -293,6 +293,7 @@ function FamilyComponent() {
         { migrationId },
       );
       const reEncryptedCredentials: {
+        recordId?: string;
         id: string;
         passwordHint: string;
         passwordHintIv: string;
@@ -314,6 +315,7 @@ function FamilyComponent() {
               );
               const dekWrapped = await wrapDEK(dek, newMasterKey);
               reEncryptedCredentials.push({
+                recordId: record._id,
                 id: cred.id,
                 passwordHint: cred.passwordHint,
                 passwordHintIv: cred.passwordHintIv,
@@ -329,6 +331,7 @@ function FamilyComponent() {
               const { encrypted, iv } = await encrypt(plainHint, dek);
               const dekWrapped = await wrapDEK(dek, newMasterKey);
               reEncryptedCredentials.push({
+                recordId: record._id,
                 id: cred.id,
                 passwordHint: encrypted,
                 passwordHintIv: iv,
@@ -418,6 +421,7 @@ function FamilyComponent() {
           { migrationId },
         );
         const reEncryptedCredentials: {
+          recordId?: string;
           id: string;
           passwordHint: string;
           passwordHintIv: string;
@@ -439,6 +443,7 @@ function FamilyComponent() {
                 );
                 const dekWrapped = await wrapDEK(dek, newMasterKey);
                 reEncryptedCredentials.push({
+                  recordId: record._id,
                   id: cred.id,
                   passwordHint: cred.passwordHint,
                   passwordHintIv: cred.passwordHintIv,
@@ -454,6 +459,7 @@ function FamilyComponent() {
                 const { encrypted, iv } = await encrypt(plainHint, dek);
                 const dekWrapped = await wrapDEK(dek, newMasterKey);
                 reEncryptedCredentials.push({
+                  recordId: record._id,
                   id: cred.id,
                   passwordHint: encrypted,
                   passwordHintIv: iv,

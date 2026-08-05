@@ -580,6 +580,93 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         }),
       ).rejects.toThrow("Migration is not in PREPARED status");
     });
+
+    it("複数の serviceRecord 間で cred.id が重複する場合に recordId を含めることで誤更新を防止できること", async () => {
+      const t = convexTest(schema, modules);
+      let record1Id!: Id<"serviceRecords">;
+      let record2Id!: Id<"serviceRecords">;
+
+      await t.run(async (ctx) => {
+        await ctx.db.insert("users", {
+          userId: "user_dup_cred",
+          email: "dup@example.com",
+          updatedAt: Date.now(),
+        });
+
+        record1Id = await ctx.db.insert("serviceRecords", {
+          userId: "user_dup_cred",
+          title: "Service 1",
+          visibility: "PRIVATE",
+          credentials: [
+            {
+              id: "same_cred_id",
+              passwordHint: "r1_hint_old",
+              passwordHintIv: "iv1",
+            },
+          ],
+          tags: [],
+          updatedAt: Date.now(),
+        });
+
+        record2Id = await ctx.db.insert("serviceRecords", {
+          userId: "user_dup_cred",
+          title: "Service 2",
+          visibility: "PRIVATE",
+          credentials: [
+            {
+              id: "same_cred_id",
+              passwordHint: "r2_hint_old",
+              passwordHintIv: "iv2",
+            },
+          ],
+          tags: [],
+          updatedAt: Date.now(),
+        });
+      });
+
+      const userDup = t.withIdentity({
+        subject: "user_dup_cred",
+        email: "dup@example.com",
+      });
+
+      const prepareRes = await userDup.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "create",
+          name: "重複キーテスト家族",
+          masterKeyEncrypted: "enc_key",
+          masterKeyIv: "key_iv",
+          masterKeySalt: "key_salt",
+        },
+      );
+
+      // recordId を付与してコミット
+      await userDup.mutation(api.families.commitFamilyMigration, {
+        migrationId: prepareRes.migrationId,
+        credentials: [
+          {
+            recordId: record1Id,
+            id: "same_cred_id",
+            passwordHint: "r1_hint_new",
+            passwordHintIv: "iv1_new",
+          },
+          {
+            recordId: record2Id,
+            id: "same_cred_id",
+            passwordHint: "r2_hint_new",
+            passwordHintIv: "iv2_new",
+          },
+        ],
+      });
+
+      await t.run(async (ctx) => {
+        const r1 = await ctx.db.get(record1Id);
+        const r2 = await ctx.db.get(record2Id);
+
+        expect(r1?.credentials[0].passwordHint).toBe("r1_hint_new");
+        expect(r2?.credentials[0].passwordHint).toBe("r2_hint_new");
+      });
+    });
   });
 });
 
