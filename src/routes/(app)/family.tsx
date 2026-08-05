@@ -187,7 +187,15 @@ function FamilyComponent() {
   };
 
   const createFamilyMut = useMutation(api.families.createFamily);
-  const changeFamilyMut = useMutation(api.families.changeFamily);
+  const prepareFamilyMigrationMut = useMutation(
+    api.families.prepareFamilyMigration,
+  );
+  const commitFamilyMigrationMut = useMutation(
+    api.families.commitFamilyMigration,
+  );
+  const abortFamilyMigrationMut = useMutation(
+    api.families.abortFamilyMigration,
+  );
   const createJoinRequestMut = useMutation(api.families.createJoinRequest);
   const cancelJoinRequestMut = useMutation(api.families.cancelJoinRequest);
   const dismissRejectedRequestMut = useMutation(
@@ -234,7 +242,7 @@ function FamilyComponent() {
     [createJoinRequestMut],
   );
 
-  // 家族移行（既存メンバーが承認後に移行を完了する）
+  // 家族移行（承認後に移行を完了する。家族未所属ユーザーにも対応）
   const handleCompleteTransfer = useCallback(async () => {
     if (myJoinRequest?.status !== "approved") return;
 
@@ -244,9 +252,12 @@ function FamilyComponent() {
     }
 
     setIsLoading(true);
+    let currentMigrationId: Id<"familyMigrations"> | null = null;
     try {
-      // 1. セッションに旧マスターキーがあるか確認、なければロック解除を要求
-      if (!getMasterKey()) {
+      const hasSourceFamily = !!family;
+
+      // 1. 旧家族がある場合のみ旧マスターキーを解除
+      if (hasSourceFamily && !getMasterKey()) {
         const unlocked = await requireUnlock();
         if (!unlocked) {
           setIsLoading(false);
@@ -254,7 +265,14 @@ function FamilyComponent() {
         }
       }
 
-      // 2. 移行先の家族情報を取得
+      // 2. prepare
+      const { migrationId } = await prepareFamilyMigrationMut({
+        action: "join",
+        inviteCode: myJoinRequest.familyId,
+      });
+      currentMigrationId = migrationId;
+
+      // 3. 移行先の家族情報を取得
       const existingFamily = await convex.query(
         api.families.getFamilyInfoByInviteCode,
         { inviteCode: myJoinRequest.familyId as Id<"families"> },
@@ -276,12 +294,13 @@ function FamilyComponent() {
         wrappingKey,
       );
 
-      // 3. 所有するレコードの再暗号化
-      const recordsToReEncrypt = await convex.query(
-        api.families.getRecordsForReEncryption,
-        {},
+      // 4. 所有するレコードの暗号化対象を取得
+      const migrationData = await convex.query(
+        api.families.getMigrationForEncryption,
+        { migrationId },
       );
       const reEncryptedCredentials: {
+        recordId?: string;
         id: string;
         passwordHint: string;
         passwordHintIv: string;
@@ -289,10 +308,15 @@ function FamilyComponent() {
         passwordHintDekIv?: string;
       }[] = [];
 
-      for (const record of recordsToReEncrypt) {
+      for (const record of migrationData.records) {
         for (const cred of record.credentials) {
           if (cred.passwordHint && cred.passwordHintIv) {
-            if (cred.passwordHintDekEncrypted && cred.passwordHintDekIv) {
+            if (
+              hasSourceFamily &&
+              cred.passwordHintDekEncrypted &&
+              cred.passwordHintDekIv
+            ) {
+              // 旧家族あり: 旧マスターキーで DEK をアンラップし、新マスターキーで再ラップ
               const oldMasterKey = getMasterKey();
               if (!oldMasterKey)
                 throw new Error("旧マスターキーが利用できません");
@@ -303,13 +327,15 @@ function FamilyComponent() {
               );
               const dekWrapped = await wrapDEK(dek, newMasterKey);
               reEncryptedCredentials.push({
+                recordId: record._id,
                 id: cred.id,
                 passwordHint: cred.passwordHint,
                 passwordHintIv: cred.passwordHintIv,
                 passwordHintDekEncrypted: dekWrapped.encrypted,
                 passwordHintDekIv: dekWrapped.iv,
               });
-            } else {
+            } else if (hasSourceFamily) {
+              // 旧家族あり・DEK なし: 旧パスコードで復号し新 DEK で暗号化
               const plainHint = await decryptHint(
                 cred.passwordHint,
                 cred.passwordHintIv,
@@ -318,6 +344,20 @@ function FamilyComponent() {
               const { encrypted, iv } = await encrypt(plainHint, dek);
               const dekWrapped = await wrapDEK(dek, newMasterKey);
               reEncryptedCredentials.push({
+                recordId: record._id,
+                id: cred.id,
+                passwordHint: encrypted,
+                passwordHintIv: iv,
+                passwordHintDekEncrypted: dekWrapped.encrypted,
+                passwordHintDekIv: dekWrapped.iv,
+              });
+            } else {
+              // 家族未所属: 旧マスターキーなし、新 DEK で暗号化
+              const dek = await generateDEK();
+              const { encrypted, iv } = await encrypt(cred.passwordHint, dek);
+              const dekWrapped = await wrapDEK(dek, newMasterKey);
+              reEncryptedCredentials.push({
+                recordId: record._id,
                 id: cred.id,
                 passwordHint: encrypted,
                 passwordHintIv: iv,
@@ -329,18 +369,24 @@ function FamilyComponent() {
         }
       }
 
-      // 4. サーバーへ送信
-      await changeFamilyMut({
-        action: "join",
-        inviteCode: myJoinRequest.familyId,
+      // 5. commit
+      await commitFamilyMigrationMut({
+        migrationId,
         credentials: reEncryptedCredentials,
       });
 
       await queryClient.invalidateQueries({ queryKey: ["authUser"] });
-      toast.success("家族グループを変更し、データを移行しました");
+      toast.success("家族グループへの参加が完了しました");
       setIsChangingFamily(false);
       await router.invalidate();
     } catch (error) {
+      if (currentMigrationId) {
+        try {
+          await abortFamilyMigrationMut({ migrationId: currentMigrationId });
+        } catch (abortError) {
+          console.error("Failed to abort migration:", abortError);
+        }
+      }
       console.error(error);
       toast.error(
         "家族の変更に失敗しました（パスコードが間違っている可能性があります）",
@@ -351,11 +397,14 @@ function FamilyComponent() {
   }, [
     myJoinRequest,
     joinPasscode,
+    family,
     getMasterKey,
     requireUnlock,
+    prepareFamilyMigrationMut,
     convex,
     decryptHint,
-    changeFamilyMut,
+    commitFamilyMigrationMut,
+    abortFamilyMigrationMut,
     queryClient,
     router,
   ]);
@@ -376,6 +425,7 @@ function FamilyComponent() {
       }
 
       setIsLoading(true);
+      let currentMigrationId: Id<"familyMigrations"> | null = null;
       try {
         // 1. セッションに旧マスターキーがあるか確認、なければロック解除を要求
         if (!getMasterKey()) {
@@ -392,12 +442,23 @@ function FamilyComponent() {
         const newMasterKey = await generateMasterKey();
         const wrapped = await wrapMasterKey(newMasterKey, passcodeKey);
 
-        // 3. 所有するレコードの再暗号化
-        const recordsToReEncrypt = await convex.query(
-          api.families.getRecordsForReEncryption,
-          {},
+        // 3. prepare
+        const { migrationId } = await prepareFamilyMigrationMut({
+          action: "create",
+          name: createName,
+          masterKeyEncrypted: wrapped.encrypted,
+          masterKeyIv: wrapped.iv,
+          masterKeySalt: salt,
+        });
+        currentMigrationId = migrationId;
+
+        // 4. 所有するレコードの暗号化対象を取得
+        const migrationData = await convex.query(
+          api.families.getMigrationForEncryption,
+          { migrationId },
         );
         const reEncryptedCredentials: {
+          recordId?: string;
           id: string;
           passwordHint: string;
           passwordHintIv: string;
@@ -405,7 +466,7 @@ function FamilyComponent() {
           passwordHintDekIv?: string;
         }[] = [];
 
-        for (const record of recordsToReEncrypt) {
+        for (const record of migrationData.records) {
           for (const cred of record.credentials) {
             if (cred.passwordHint && cred.passwordHintIv) {
               if (cred.passwordHintDekEncrypted && cred.passwordHintDekIv) {
@@ -419,6 +480,7 @@ function FamilyComponent() {
                 );
                 const dekWrapped = await wrapDEK(dek, newMasterKey);
                 reEncryptedCredentials.push({
+                  recordId: record._id,
                   id: cred.id,
                   passwordHint: cred.passwordHint,
                   passwordHintIv: cred.passwordHintIv,
@@ -434,6 +496,7 @@ function FamilyComponent() {
                 const { encrypted, iv } = await encrypt(plainHint, dek);
                 const dekWrapped = await wrapDEK(dek, newMasterKey);
                 reEncryptedCredentials.push({
+                  recordId: record._id,
                   id: cred.id,
                   passwordHint: encrypted,
                   passwordHintIv: iv,
@@ -445,13 +508,9 @@ function FamilyComponent() {
           }
         }
 
-        // 4. サーバーへ送信
-        await changeFamilyMut({
-          action: "create",
-          name: createName,
-          masterKeyEncrypted: wrapped.encrypted,
-          masterKeyIv: wrapped.iv,
-          masterKeySalt: salt,
+        // 5. commit
+        await commitFamilyMigrationMut({
+          migrationId,
           credentials: reEncryptedCredentials,
         });
 
@@ -460,6 +519,13 @@ function FamilyComponent() {
         setIsChangingFamily(false);
         await router.invalidate();
       } catch (error) {
+        if (currentMigrationId) {
+          try {
+            await abortFamilyMigrationMut({ migrationId: currentMigrationId });
+          } catch (abortError) {
+            console.error("Failed to abort migration:", abortError);
+          }
+        }
         console.error(error);
         toast.error("家族の変更に失敗しました");
       } finally {
@@ -634,25 +700,64 @@ function FamilyComponent() {
                   参加申請が承認されました！
                 </h2>
                 <p className="text-[13px] text-muted-foreground">
-                  家族「{myJoinRequest.familyName}」への参加が承認されました
+                  家族「{myJoinRequest.familyName}」への参加を完了してください
                 </p>
               </div>
             </div>
-            <p className="text-[14px] text-muted-foreground leading-relaxed mb-2">
-              ページを再読み込みすると、家族グループに参加できます。
+            <p className="text-[14px] text-muted-foreground leading-relaxed mb-6">
+              参加を完了するには、家族のパスコードを入力してください。
             </p>
-            <button
-              type="button"
-              onClick={async () => {
-                await queryClient.invalidateQueries({
-                  queryKey: ["authUser"],
-                });
-                await router.invalidate();
-              }}
-              className="flex items-center justify-center w-full rounded-md bg-orange-500 px-4 py-2.5 text-[14px] font-medium text-white shadow-border transition hover:bg-orange-600 cursor-pointer"
-            >
-              ページを更新する
-            </button>
+            <div className="space-y-4">
+              <div>
+                <label
+                  htmlFor="join-passcode-approved-input"
+                  className="mb-1.5 block text-[14px] font-medium text-foreground"
+                >
+                  家族のパスコード <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type={showJoinPasscode ? "text" : "password"}
+                    id="join-passcode-approved-input"
+                    required
+                    minLength={8}
+                    value={joinPasscode}
+                    onChange={(e) => setJoinPasscode(e.target.value)}
+                    placeholder="8文字以上"
+                    className="w-full rounded-md bg-card p-2.5 text-base md:text-[14px] pr-10 shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowJoinPasscode(!showJoinPasscode)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+                  >
+                    {showJoinPasscode ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+                <p className="mt-1.5 text-[12px] text-muted-foreground">
+                  参加する家族のパスコードを入力してください。
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={handleCompleteTransfer}
+                className="flex items-center justify-center w-full rounded-md bg-orange-500 px-4 py-2.5 text-[14px] font-medium text-white shadow-border transition hover:bg-orange-600 disabled:opacity-50 cursor-pointer"
+              >
+                {isLoading ? (
+                  <>
+                    <Spinner className="mr-2 h-4 w-4" />
+                    参加処理中...
+                  </>
+                ) : (
+                  "家族への参加を完了する"
+                )}
+              </button>
+            </div>
           </div>
         )}
       </div>

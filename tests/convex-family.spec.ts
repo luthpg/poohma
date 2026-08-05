@@ -1,6 +1,6 @@
 import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
-import { api } from "../convex/_generated/api";
+import { api, internal } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import schema from "../convex/schema";
 
@@ -370,6 +370,633 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         api.families.getMyJoinRequest,
       );
       expect(statusAfterDismiss).toBeNull();
+    });
+  });
+
+  describe("2.1.4 prepare / commit フローによる安全な家族移行機能の検証", () => {
+    it("prepare で移行対象が確定し、commit で一括更新・旧Family削除が行われること", async () => {
+      const t = convexTest(schema, modules);
+
+      let oldFamilyId!: Id<"families">;
+
+      await t.run(async (ctx) => {
+        oldFamilyId = await ctx.db.insert("families", {
+          name: "旧田中家",
+          updatedAt: Date.now(),
+        });
+
+        // ユーザーA (唯一のメンバー)
+        await ctx.db.insert("users", {
+          userId: "user_solo",
+          email: "solo@example.com",
+          familyId: oldFamilyId,
+          updatedAt: Date.now(),
+        });
+
+        await ctx.db.insert("serviceRecords", {
+          userId: "user_solo",
+          familyId: oldFamilyId,
+          title: "Solo's Record",
+          visibility: "SHARED",
+          credentials: [
+            {
+              id: "cred_solo",
+              passwordHint: "old_hint",
+              passwordHintIv: "old_iv",
+            },
+          ],
+          tags: [],
+          updatedAt: Date.now(),
+        });
+      });
+
+      const userSolo = t.withIdentity({
+        subject: "user_solo",
+        email: "solo@example.com",
+      });
+
+      // 1. prepare: 新家族作成
+      const prepareRes = await userSolo.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "create",
+          name: "新田中家",
+          masterKeyEncrypted: "enc_key",
+          masterKeyIv: "key_iv",
+          masterKeySalt: "key_salt",
+        },
+      );
+
+      expect(prepareRes.migrationId).toBeDefined();
+
+      // この時点ではまだユーザーの familyId もレコードの familyId も更新されていない
+      const { userBeforeCommit, recordBeforeCommit } = await t.run(
+        async (ctx) => {
+          const user = await ctx.db
+            .query("users")
+            .withIndex("by_userId", (q) => q.eq("userId", "user_solo"))
+            .unique();
+          const record = await ctx.db
+            .query("serviceRecords")
+            .withIndex("by_userId", (q) => q.eq("userId", "user_solo"))
+            .unique();
+          return { userBeforeCommit: user, recordBeforeCommit: record };
+        },
+      );
+      expect(userBeforeCommit?.familyId).toBe(oldFamilyId);
+      expect(recordBeforeCommit?.familyId).toBe(oldFamilyId);
+      expect(recordBeforeCommit?.credentials[0].passwordHint).toBe("old_hint");
+      expect(recordBeforeCommit?.credentials[0].passwordHintIv).toBe("old_iv");
+
+      // 2. getMigrationForEncryption で暗号化対象を取得
+      const migrationData = await userSolo.query(
+        api.families.getMigrationForEncryption,
+        { migrationId: prepareRes.migrationId },
+      );
+      expect(migrationData.records.length).toBe(1);
+
+      // 3. commit
+      const commitRes = await userSolo.mutation(
+        api.families.commitFamilyMigration,
+        {
+          migrationId: prepareRes.migrationId,
+          credentials: [
+            {
+              id: "cred_solo",
+              passwordHint: "new_hint",
+              passwordHintIv: "new_iv",
+            },
+          ],
+        },
+      );
+
+      expect(commitRes.success).toBe(true);
+      expect(commitRes.familyId).toBe(prepareRes.targetFamilyId);
+
+      // 4. DB状態の検証
+      await t.run(async (ctx) => {
+        // ユーザーの familyId が更新されている
+        const updatedUser = await ctx.db
+          .query("users")
+          .withIndex("by_userId", (q) => q.eq("userId", "user_solo"))
+          .unique();
+        expect(updatedUser?.familyId).toBe(prepareRes.targetFamilyId);
+
+        // レコードの familyId と credentials が更新されている
+        const record = await ctx.db
+          .query("serviceRecords")
+          .withIndex("by_userId", (q) => q.eq("userId", "user_solo"))
+          .unique();
+        expect(record?.familyId).toBe(prepareRes.targetFamilyId);
+        expect(record?.credentials[0].passwordHint).toBe("new_hint");
+        expect(record?.credentials[0].passwordHintIv).toBe("new_iv");
+
+        // 旧Familyはメンバー0人になったので削除されていること
+        const deletedOldFamily = await ctx.db.get(oldFamilyId);
+        expect(deletedOldFamily).toBeNull();
+      });
+    });
+
+    it("再暗号化対象の credential 更新を省略した commit は拒否されること", async () => {
+      const t = convexTest(schema, modules);
+      let oldFamilyId!: Id<"families">;
+
+      await t.run(async (ctx) => {
+        oldFamilyId = await ctx.db.insert("families", {
+          name: "省略テスト家族",
+          masterKeyEncrypted: "enc",
+          masterKeyIv: "iv",
+          masterKeySalt: "salt",
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("users", {
+          userId: "user_omit",
+          email: "omit@example.com",
+          familyId: oldFamilyId,
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("serviceRecords", {
+          title: "省略テストレコード",
+          tags: [],
+          userId: "user_omit",
+          familyId: oldFamilyId,
+          visibility: "PRIVATE",
+          credentials: [
+            {
+              id: "cred_a",
+              passwordHint: "hint_a",
+              passwordHintIv: "iv_a",
+            },
+            {
+              id: "cred_b",
+              passwordHint: "hint_b",
+              passwordHintIv: "iv_b",
+            },
+          ],
+          updatedAt: Date.now(),
+        });
+      });
+
+      const userOmit = t.withIdentity({
+        subject: "user_omit",
+        email: "omit@example.com",
+      });
+
+      const prepareRes = await userOmit.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "create",
+          name: "新省略テスト家族",
+          masterKeyEncrypted: "enc_key",
+          masterKeyIv: "key_iv",
+          masterKeySalt: "key_salt",
+        },
+      );
+
+      // cred_a のみ更新し cred_b を省略 → commit は失敗すべき
+      await expect(
+        userOmit.mutation(api.families.commitFamilyMigration, {
+          migrationId: prepareRes.migrationId,
+          credentials: [
+            {
+              id: "cred_a",
+              passwordHint: "new_hint_a",
+              passwordHintIv: "new_iv_a",
+            },
+          ],
+        }),
+      ).rejects.toThrow("Missing re-encrypted credential update");
+    });
+
+    it("旧Familyに他メンバーが残る場合は旧Familyが削除されないこと", async () => {
+      const t = convexTest(schema, modules);
+      let oldFamilyId!: Id<"families">;
+
+      await t.run(async (ctx) => {
+        oldFamilyId = await ctx.db.insert("families", {
+          name: "共有家族",
+          updatedAt: Date.now(),
+        });
+
+        await ctx.db.insert("users", {
+          userId: "user_leaving",
+          email: "leaving@example.com",
+          familyId: oldFamilyId,
+          updatedAt: Date.now(),
+        });
+
+        await ctx.db.insert("users", {
+          userId: "user_staying",
+          email: "staying@example.com",
+          familyId: oldFamilyId,
+          updatedAt: Date.now(),
+        });
+      });
+
+      const userLeaving = t.withIdentity({
+        subject: "user_leaving",
+        email: "leaving@example.com",
+      });
+
+      const prepareRes = await userLeaving.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "create",
+          name: "独立家族",
+          masterKeyEncrypted: "enc_key",
+          masterKeyIv: "key_iv",
+          masterKeySalt: "key_salt",
+        },
+      );
+
+      await userLeaving.mutation(api.families.commitFamilyMigration, {
+        migrationId: prepareRes.migrationId,
+        credentials: [],
+      });
+
+      // 検証: 旧Familyが削除されずに残っていること
+      await t.run(async (ctx) => {
+        const oldFamily = await ctx.db.get(oldFamilyId);
+        expect(oldFamily).not.toBeNull();
+      });
+    });
+
+    it("二重コミットが防止されること (COMPLETED 済みの migration は再コミットできない)", async () => {
+      const t = convexTest(schema, modules);
+
+      await t.run(async (ctx) => {
+        await ctx.db.insert("users", {
+          userId: "user_double",
+          email: "double@example.com",
+          updatedAt: Date.now(),
+        });
+      });
+
+      const userDouble = t.withIdentity({
+        subject: "user_double",
+        email: "double@example.com",
+      });
+
+      const prepareRes = await userDouble.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "create",
+          name: "二重テスト家族",
+          masterKeyEncrypted: "enc_key",
+          masterKeyIv: "key_iv",
+          masterKeySalt: "key_salt",
+        },
+      );
+
+      // 1回目のコミット
+      await userDouble.mutation(api.families.commitFamilyMigration, {
+        migrationId: prepareRes.migrationId,
+        credentials: [],
+      });
+
+      // 2回目のコミットはエラーになること
+      await expect(
+        userDouble.mutation(api.families.commitFamilyMigration, {
+          migrationId: prepareRes.migrationId,
+          credentials: [],
+        }),
+      ).rejects.toThrow("Migration is not in PREPARED status");
+    });
+
+    it("複数の serviceRecord 間で cred.id が重複する場合に recordId を含めることで誤更新を防止できること", async () => {
+      const t = convexTest(schema, modules);
+      let record1Id!: Id<"serviceRecords">;
+      let record2Id!: Id<"serviceRecords">;
+
+      await t.run(async (ctx) => {
+        await ctx.db.insert("users", {
+          userId: "user_dup_cred",
+          email: "dup@example.com",
+          updatedAt: Date.now(),
+        });
+
+        record1Id = await ctx.db.insert("serviceRecords", {
+          userId: "user_dup_cred",
+          title: "Service 1",
+          visibility: "PRIVATE",
+          credentials: [
+            {
+              id: "same_cred_id",
+              passwordHint: "r1_hint_old",
+              passwordHintIv: "iv1",
+            },
+          ],
+          tags: [],
+          updatedAt: Date.now(),
+        });
+
+        record2Id = await ctx.db.insert("serviceRecords", {
+          userId: "user_dup_cred",
+          title: "Service 2",
+          visibility: "PRIVATE",
+          credentials: [
+            {
+              id: "same_cred_id",
+              passwordHint: "r2_hint_old",
+              passwordHintIv: "iv2",
+            },
+          ],
+          tags: [],
+          updatedAt: Date.now(),
+        });
+      });
+
+      const userDup = t.withIdentity({
+        subject: "user_dup_cred",
+        email: "dup@example.com",
+      });
+
+      const prepareRes = await userDup.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "create",
+          name: "重複キーテスト家族",
+          masterKeyEncrypted: "enc_key",
+          masterKeyIv: "key_iv",
+          masterKeySalt: "key_salt",
+        },
+      );
+
+      // recordId を付与してコミット
+      await userDup.mutation(api.families.commitFamilyMigration, {
+        migrationId: prepareRes.migrationId,
+        credentials: [
+          {
+            recordId: record1Id,
+            id: "same_cred_id",
+            passwordHint: "r1_hint_new",
+            passwordHintIv: "iv1_new",
+          },
+          {
+            recordId: record2Id,
+            id: "same_cred_id",
+            passwordHint: "r2_hint_new",
+            passwordHintIv: "iv2_new",
+          },
+        ],
+      });
+
+      await t.run(async (ctx) => {
+        const r1 = await ctx.db.get(record1Id);
+        const r2 = await ctx.db.get(record2Id);
+
+        expect(r1?.credentials[0].passwordHint).toBe("r1_hint_new");
+        expect(r2?.credentials[0].passwordHint).toBe("r2_hint_new");
+      });
+    });
+
+    it("再度 prepare を呼び出した際、古い PREPARED 移行が EXPIRED となり孤児 Family が削除されること", async () => {
+      const t = convexTest(schema, modules);
+
+      await t.run(async (ctx) => {
+        await ctx.db.insert("users", {
+          userId: "user_orphan",
+          email: "orphan@example.com",
+          updatedAt: Date.now(),
+        });
+      });
+
+      const userOrphan = t.withIdentity({
+        subject: "user_orphan",
+        email: "orphan@example.com",
+      });
+
+      // 1回目の prepare (作成された targetFamilyId1 は放置される)
+      const prep1 = await userOrphan.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "create",
+          name: "放置ファミリー",
+          masterKeyEncrypted: "enc_key",
+          masterKeyIv: "key_iv",
+          masterKeySalt: "key_salt",
+        },
+      );
+
+      // 2回目の prepare
+      const prep2 = await userOrphan.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "create",
+          name: "最終ファミリー",
+          masterKeyEncrypted: "enc_key",
+          masterKeyIv: "key_iv",
+          masterKeySalt: "key_salt",
+        },
+      );
+
+      await t.run(async (ctx) => {
+        // 1回目の migration は EXPIRED
+        const m1 = await ctx.db.get(prep1.migrationId);
+        expect(m1?.status).toBe("EXPIRED");
+
+        // 1回目の targetFamilyId は孤児になったため削除されていること
+        const f1 = await ctx.db.get(prep1.targetFamilyId);
+        expect(f1).toBeNull();
+
+        // 2回目の targetFamilyId は存在していること
+        const f2 = await ctx.db.get(prep2.targetFamilyId);
+        expect(f2).not.toBeNull();
+      });
+    });
+
+    it("cleanupExpiredMigrationsInternal を実行した際、期限切れの PREPARED 移行が EXPIRED となり孤児 Family が削除されること", async () => {
+      const t = convexTest(schema, modules);
+      let expiredFamilyId!: Id<"families">;
+      let expiredMigrationId!: Id<"familyMigrations">;
+
+      await t.run(async (ctx) => {
+        await ctx.db.insert("users", {
+          userId: "user_cron_test",
+          email: "cron@example.com",
+          updatedAt: Date.now(),
+        });
+
+        expiredFamilyId = await ctx.db.insert("families", {
+          name: "期限切れ孤児ファミリー",
+          updatedAt: Date.now(),
+        });
+
+        // 過去の期限切れ PREPARED レコードをダミー挿入
+        expiredMigrationId = await ctx.db.insert("familyMigrations", {
+          userId: "user_cron_test",
+          targetFamilyId: expiredFamilyId,
+          serviceRecordIds: [],
+          status: "PREPARED",
+          createdAt: Date.now() - 3600 * 1000,
+          expiresAt: Date.now() - 1800 * 1000, // 過去の時刻
+        });
+      });
+
+      // cleanupExpiredMigrationsInternal の実行
+      await t.mutation(internal.families.cleanupExpiredMigrationsInternal, {});
+
+      await t.run(async (ctx) => {
+        const migration = await ctx.db.get(expiredMigrationId);
+        expect(migration?.status).toBe("EXPIRED");
+
+        const family = await ctx.db.get(expiredFamilyId);
+        expect(family).toBeNull();
+      });
+    });
+
+    it("prepare 後に作成されたレコードも commit 時に移行対象に含まれること", async () => {
+      const t = convexTest(schema, modules);
+      let oldFamilyId!: Id<"families">;
+
+      await t.run(async (ctx) => {
+        oldFamilyId = await ctx.db.insert("families", {
+          name: "旧家族",
+          updatedAt: Date.now(),
+        });
+
+        await ctx.db.insert("users", {
+          userId: "user_mid",
+          email: "mid@example.com",
+          familyId: oldFamilyId,
+          updatedAt: Date.now(),
+        });
+
+        // prepare 前に存在するレコード
+        await ctx.db.insert("serviceRecords", {
+          title: "テストレコード1",
+          tags: [],
+          userId: "user_mid",
+          familyId: oldFamilyId,
+          visibility: "PRIVATE",
+          credentials: [
+            {
+              id: "cred_before",
+              passwordHint: "before_hint",
+              passwordHintIv: "before_iv",
+            },
+          ],
+          updatedAt: Date.now(),
+        });
+      });
+
+      const userMid = t.withIdentity({
+        subject: "user_mid",
+        email: "mid@example.com",
+      });
+
+      // 1. prepare
+      const prepareRes = await userMid.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "create",
+          name: "新家族",
+          masterKeyEncrypted: "enc_key",
+          masterKeyIv: "key_iv",
+          masterKeySalt: "key_salt",
+        },
+      );
+
+      // 2. prepare 後にレコードを追加 (30分以内を想定)
+      let newRecordId!: Id<"serviceRecords">;
+      await t.run(async (ctx) => {
+        newRecordId = await ctx.db.insert("serviceRecords", {
+          title: "テストレコード2",
+          tags: [],
+          userId: "user_mid",
+          familyId: oldFamilyId,
+          visibility: "PRIVATE",
+          credentials: [
+            {
+              id: "cred_after",
+              passwordHint: "after_hint",
+              passwordHintIv: "after_iv",
+            },
+          ],
+          updatedAt: Date.now(),
+        });
+      });
+
+      // 3. commit (新レコードの credentials は Map にないが familyId は更新されるべき)
+      await userMid.mutation(api.families.commitFamilyMigration, {
+        migrationId: prepareRes.migrationId,
+        credentials: [
+          {
+            id: "cred_before",
+            passwordHint: "new_before_hint",
+            passwordHintIv: "new_before_iv",
+          },
+          {
+            id: "cred_after",
+            passwordHint: "new_after_hint",
+            passwordHintIv: "new_after_iv",
+          },
+        ],
+      });
+
+      // 4. 検証: 両レコードとも新 Family に移行されていること
+      await t.run(async (ctx) => {
+        const allRecords = await ctx.db
+          .query("serviceRecords")
+          .withIndex("by_userId", (q) => q.eq("userId", "user_mid"))
+          .collect();
+
+        expect(allRecords.length).toBe(2);
+        for (const r of allRecords) {
+          expect(r.familyId).toBe(prepareRes.targetFamilyId);
+        }
+
+        // 新レコードの credentials も更新されていること
+        const newRecord = await ctx.db.get(newRecordId);
+        expect(newRecord?.credentials[0].passwordHint).toBe("new_after_hint");
+
+        // 旧 Family はメンバーもレコードも0なので削除
+        const oldFamily = await ctx.db.get(oldFamilyId);
+        expect(oldFamily).toBeNull();
+      });
+    });
+
+    it("abortFamilyMigration を呼び出した際、移行が ABORTED となりメンバー0人の targetFamily が削除されること", async () => {
+      const t = convexTest(schema, modules);
+
+      await t.run(async (ctx) => {
+        await ctx.db.insert("users", {
+          userId: "user_abort_test",
+          email: "abort@example.com",
+          updatedAt: Date.now(),
+        });
+      });
+
+      const userAbort = t.withIdentity({
+        subject: "user_abort_test",
+        email: "abort@example.com",
+      });
+
+      const prepareRes = await userAbort.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "create",
+          name: "キャンセル予定ファミリー",
+          masterKeyEncrypted: "enc_key",
+          masterKeyIv: "key_iv",
+          masterKeySalt: "key_salt",
+        },
+      );
+
+      const abortRes = await userAbort.mutation(
+        api.families.abortFamilyMigration,
+        { migrationId: prepareRes.migrationId },
+      );
+
+      expect(abortRes.success).toBe(true);
+
+      await t.run(async (ctx) => {
+        const migration = await ctx.db.get(prepareRes.migrationId);
+        expect(migration?.status).toBe("ABORTED");
+
+        const targetFamily = await ctx.db.get(prepareRes.targetFamilyId);
+        expect(targetFamily).toBeNull();
+      });
     });
   });
 });

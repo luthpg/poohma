@@ -1,7 +1,11 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { internalQuery, type QueryCtx } from "./_generated/server";
+import {
+  internalMutation,
+  internalQuery,
+  type QueryCtx,
+} from "./_generated/server";
 import {
   authenticatedMutation,
   authenticatedQuery,
@@ -179,6 +183,365 @@ export const getFamilyInfoByInviteCode = authenticatedQuery({
   },
 });
 
+export const cleanupExpiredMigrationsInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const expiredMigrations = await ctx.db
+      .query("familyMigrations")
+      .withIndex("by_status", (q) => q.eq("status", "PREPARED"))
+      .filter((q) => q.lt(q.field("expiresAt"), now))
+      .collect();
+
+    for (const migration of expiredMigrations) {
+      await ctx.db.patch(migration._id, { status: "EXPIRED" });
+      const members = await ctx.db
+        .query("users")
+        .withIndex("by_familyId", (q) =>
+          q.eq("familyId", migration.targetFamilyId),
+        )
+        .collect();
+
+      const remainingRecord = await ctx.db
+        .query("serviceRecords")
+        .withIndex("by_familyId", (q) =>
+          q.eq("familyId", migration.targetFamilyId),
+        )
+        .first();
+
+      if (members.length === 0 && !remainingRecord) {
+        await ctx.db.delete(migration.targetFamilyId);
+      }
+    }
+  },
+});
+
+export const abortFamilyMigration = authenticatedMutation({
+  args: { migrationId: v.id("familyMigrations") },
+  handler: async (ctx, args) => {
+    const { user } = ctx;
+
+    const migration = await ctx.db.get(args.migrationId);
+    if (!migration || migration.userId !== user.userId) {
+      throw new Error("Migration not found or access denied");
+    }
+
+    if (migration.status !== "PREPARED") {
+      return { success: false };
+    }
+
+    await ctx.db.patch(migration._id, { status: "ABORTED" });
+
+    const members = await ctx.db
+      .query("users")
+      .withIndex("by_familyId", (q) =>
+        q.eq("familyId", migration.targetFamilyId),
+      )
+      .collect();
+
+    const remainingRecord = await ctx.db
+      .query("serviceRecords")
+      .withIndex("by_familyId", (q) =>
+        q.eq("familyId", migration.targetFamilyId),
+      )
+      .first();
+
+    if (members.length === 0 && !remainingRecord) {
+      await ctx.db.delete(migration.targetFamilyId);
+    }
+
+    return { success: true };
+  },
+});
+
+export const prepareFamilyMigration = authenticatedMutation({
+  args: {
+    action: v.union(v.literal("create"), v.literal("join")),
+    name: v.optional(v.string()),
+    masterKeyEncrypted: v.optional(v.string()),
+    masterKeyIv: v.optional(v.string()),
+    masterKeySalt: v.optional(v.string()),
+    inviteCode: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { user } = ctx;
+
+    // 未完了の PREPARED 状態の移行を無効化し、メンバー0人の孤児 Family があれば削除
+    const staleMigrations = await ctx.db
+      .query("familyMigrations")
+      .withIndex("by_userId", (q) => q.eq("userId", user.userId))
+      .filter((q) => q.eq(q.field("status"), "PREPARED"))
+      .collect();
+
+    for (const stale of staleMigrations) {
+      await ctx.db.patch(stale._id, { status: "EXPIRED" });
+      const members = await ctx.db
+        .query("users")
+        .withIndex("by_familyId", (q) => q.eq("familyId", stale.targetFamilyId))
+        .collect();
+
+      const remainingRecord = await ctx.db
+        .query("serviceRecords")
+        .withIndex("by_familyId", (q) => q.eq("familyId", stale.targetFamilyId))
+        .first();
+
+      if (members.length === 0 && !remainingRecord) {
+        await ctx.db.delete(stale.targetFamilyId);
+      }
+    }
+
+    let targetFamilyId: Id<"families">;
+
+    if (args.action === "create") {
+      if (
+        !args.name ||
+        !args.masterKeyEncrypted ||
+        !args.masterKeyIv ||
+        !args.masterKeySalt
+      ) {
+        throw new Error("Missing fields for create");
+      }
+      targetFamilyId = await ctx.db.insert("families", {
+        name: args.name,
+        masterKeyEncrypted: args.masterKeyEncrypted,
+        masterKeyIv: args.masterKeyIv,
+        masterKeySalt: args.masterKeySalt,
+        updatedAt: Date.now(),
+      });
+    } else {
+      if (!args.inviteCode) throw new Error("Missing invite code");
+      const family = await ctx.db.get(args.inviteCode as Id<"families">);
+      if (!family) throw new Error("Invalid invite code");
+
+      // Verify approved join request
+      const approvedRequest = await ctx.db
+        .query("joinRequests")
+        .withIndex("by_familyId_userId", (q) =>
+          q.eq("familyId", family._id).eq("userId", user.userId),
+        )
+        .filter((q) => q.eq(q.field("status"), "approved"))
+        .unique();
+
+      if (!approvedRequest) {
+        throw new Error(
+          "Access denied: You must be approved to join this family",
+        );
+      }
+
+      targetFamilyId = family._id;
+    }
+
+    const userRecords = await ctx.db
+      .query("serviceRecords")
+      .withIndex("by_userId", (q) => q.eq("userId", user.userId))
+      .collect();
+
+    const serviceRecordIds = userRecords.map((r) => r._id);
+    const now = Date.now();
+    const expiresAt = now + 30 * 60 * 1000; // 30 mins
+
+    const migrationId = await ctx.db.insert("familyMigrations", {
+      userId: user.userId,
+      sourceFamilyId: user.familyId,
+      targetFamilyId,
+      serviceRecordIds,
+      status: "PREPARED",
+      createdAt: now,
+      expiresAt,
+    });
+
+    return { migrationId, targetFamilyId };
+  },
+});
+
+export const getMigrationForEncryption = authenticatedQuery({
+  args: { migrationId: v.id("familyMigrations") },
+  handler: async (ctx, args) => {
+    const { user } = ctx;
+
+    const migration = await ctx.db.get(args.migrationId);
+    if (!migration || migration.userId !== user.userId) {
+      throw new Error("Migration not found or access denied");
+    }
+
+    if (migration.status !== "PREPARED") {
+      throw new Error("Migration is not in PREPARED status");
+    }
+
+    if (migration.expiresAt < Date.now()) {
+      throw new Error("Migration has expired");
+    }
+
+    // prepare 後に作成されたレコードも含めるためリアルタイムで全件取得
+    const currentRecords = await ctx.db
+      .query("serviceRecords")
+      .withIndex("by_userId", (q) => q.eq("userId", user.userId))
+      .collect();
+
+    const records = currentRecords.map((record) => ({
+      _id: record._id,
+      id: record._id,
+      credentials: record.credentials
+        .filter((c) => c.passwordHint && c.passwordHintIv)
+        .map((c) => ({
+          id: c.id,
+          passwordHint: c.passwordHint,
+          passwordHintIv: c.passwordHintIv,
+          passwordHintDekEncrypted: c.passwordHintDekEncrypted,
+          passwordHintDekIv: c.passwordHintDekIv,
+        })),
+    }));
+
+    return {
+      migrationId: migration._id,
+      sourceFamilyId: migration.sourceFamilyId,
+      targetFamilyId: migration.targetFamilyId,
+      records: records.filter((r) => r.credentials.length > 0),
+    };
+  },
+});
+
+export const commitFamilyMigration = authenticatedMutation({
+  args: {
+    migrationId: v.id("familyMigrations"),
+    credentials: v.array(
+      v.object({
+        recordId: v.optional(v.string()),
+        id: v.string(),
+        passwordHint: v.string(),
+        passwordHintIv: v.string(),
+        passwordHintDekEncrypted: v.optional(v.string()),
+        passwordHintDekIv: v.optional(v.string()),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const { user } = ctx;
+
+    const migration = await ctx.db.get(args.migrationId);
+    if (!migration || migration.userId !== user.userId) {
+      throw new Error("Migration not found or access denied");
+    }
+
+    if (migration.status !== "PREPARED") {
+      throw new Error("Migration is not in PREPARED status");
+    }
+
+    if (migration.expiresAt < Date.now()) {
+      await ctx.db.patch(migration._id, { status: "EXPIRED" });
+      throw new Error("Migration has expired");
+    }
+
+    if (user.familyId !== migration.sourceFamilyId) {
+      throw new Error("Current family does not match prepared source family");
+    }
+
+    const credUpdates = new Map<string, (typeof args.credentials)[number]>();
+    for (const c of args.credentials) {
+      if (c.recordId) {
+        credUpdates.set(`${c.recordId}:${c.id}`, c);
+      } else {
+        credUpdates.set(c.id, c);
+      }
+    }
+
+    // prepare 後に作成されたレコードも含めるためリアルタイムで全件取得
+    const currentRecords = await ctx.db
+      .query("serviceRecords")
+      .withIndex("by_userId", (q) => q.eq("userId", user.userId))
+      .collect();
+
+    // 再暗号化対象の全 credential に対して更新情報が存在するか事前に検証
+    for (const record of currentRecords) {
+      for (const cred of record.credentials) {
+        if (cred.passwordHint && cred.passwordHintIv) {
+          const hasUpdate =
+            credUpdates.has(`${record._id}:${cred.id}`) ||
+            credUpdates.has(cred.id);
+          if (!hasUpdate) {
+            throw new Error(
+              `Missing re-encrypted credential update for record ${record._id}, credential ${cred.id}`,
+            );
+          }
+        }
+      }
+    }
+
+    for (const record of currentRecords) {
+      const newCredentials = record.credentials.map((cred) => {
+        const update =
+          credUpdates.get(`${record._id}:${cred.id}`) ??
+          credUpdates.get(cred.id);
+        if (update) {
+          return {
+            ...cred,
+            passwordHint: update.passwordHint,
+            passwordHintIv: update.passwordHintIv,
+            passwordHintDekEncrypted: update.passwordHintDekEncrypted,
+            passwordHintDekIv: update.passwordHintDekIv,
+          };
+        }
+        return cred;
+      });
+
+      await ctx.db.patch(record._id, {
+        familyId: migration.targetFamilyId,
+        credentials: newCredentials,
+        updatedAt: Date.now(),
+      });
+    }
+
+    await ctx.db.patch(user._id, { familyId: migration.targetFamilyId });
+
+    const approvedRequest = await ctx.db
+      .query("joinRequests")
+      .withIndex("by_familyId_userId", (q) =>
+        q.eq("familyId", migration.targetFamilyId).eq("userId", user.userId),
+      )
+      .filter((q) => q.eq(q.field("status"), "approved"))
+      .unique();
+
+    if (approvedRequest) {
+      await ctx.db.delete(approvedRequest._id);
+    }
+
+    if (
+      migration.sourceFamilyId &&
+      migration.sourceFamilyId !== migration.targetFamilyId
+    ) {
+      const remainingUsers = await ctx.db
+        .query("users")
+        .withIndex("by_familyId", (q) =>
+          q.eq("familyId", migration.sourceFamilyId),
+        )
+        .collect();
+
+      // serviceRecords が旧 Family に残っていないことも確認
+      const remainingRecord = await ctx.db
+        .query("serviceRecords")
+        .withIndex("by_familyId", (q) =>
+          q.eq("familyId", migration.sourceFamilyId),
+        )
+        .first();
+
+      if (remainingUsers.length === 0 && !remainingRecord) {
+        await ctx.db.delete(migration.sourceFamilyId);
+      }
+    }
+
+    await ctx.db.patch(migration._id, { status: "COMPLETED" });
+
+    const targetFamily = await ctx.db.get(migration.targetFamilyId);
+    await ctx.scheduler.runAfter(0, internal.actions.sendEmailInternal, {
+      email: user.email,
+      subject: "PoohMaからのお知らせ（家族変更完了）",
+      body: `-=-=-=-=-=-=-=-=-=-\n※本メールは送信専用アドレスから送信しています。\n-=-=-=-=-=-=-=-=-=-\n\n${user.displayName} さん\n\nこんにちは！家族間アカウント管理アプリ「PoohMa」からお知らせです。\n\n家族「${targetFamily?.name || ""}」への変更が完了しました。\n\n※なんらかの誤りであると考えられる場合はお手数ですが運営にご連絡ください。\n\n[PoohMa]\nhttps://poohma.vercel.app/`,
+    });
+
+    return { success: true, familyId: migration.targetFamilyId };
+  },
+});
+
 export const getRecordsForReEncryption = familyBoundQuery({
   args: {},
   handler: async (ctx) => {
@@ -207,16 +570,17 @@ export const getRecordsForReEncryption = familyBoundQuery({
   },
 });
 
-export const changeFamily = familyBoundMutation({
+export const changeFamily = authenticatedMutation({
   args: {
     action: v.union(v.literal("create"), v.literal("join")),
     name: v.optional(v.string()),
     masterKeyEncrypted: v.optional(v.string()),
     masterKeyIv: v.optional(v.string()),
     masterKeySalt: v.optional(v.string()),
-    inviteCode: v.optional(v.string()), // string as it comes from form, we'll validate
+    inviteCode: v.optional(v.string()),
     credentials: v.array(
       v.object({
+        recordId: v.optional(v.string()),
         id: v.string(),
         passwordHint: v.string(),
         passwordHintIv: v.string(),
@@ -227,7 +591,7 @@ export const changeFamily = familyBoundMutation({
   },
   handler: async (ctx, args) => {
     const { user } = ctx;
-    let parsedTargetFamilyId: Id<"families">;
+    let targetFamilyId: Id<"families">;
 
     if (args.action === "create") {
       if (
@@ -238,7 +602,7 @@ export const changeFamily = familyBoundMutation({
       ) {
         throw new Error("Missing fields for create");
       }
-      parsedTargetFamilyId = await ctx.db.insert("families", {
+      targetFamilyId = await ctx.db.insert("families", {
         name: args.name,
         masterKeyEncrypted: args.masterKeyEncrypted,
         masterKeyIv: args.masterKeyIv,
@@ -250,7 +614,6 @@ export const changeFamily = familyBoundMutation({
       const family = await ctx.db.get(args.inviteCode as Id<"families">);
       if (!family) throw new Error("Invalid invite code");
 
-      // Verify approved join request
       const approvedRequest = await ctx.db
         .query("joinRequests")
         .withIndex("by_familyId_userId", (q) =>
@@ -265,27 +628,42 @@ export const changeFamily = familyBoundMutation({
         );
       }
 
-      parsedTargetFamilyId = family._id;
-
-      // Delete approved request
-      await ctx.db.delete(approvedRequest._id);
+      targetFamilyId = family._id;
     }
 
-    // Update user familyId
-    await ctx.db.patch(user._id, { familyId: parsedTargetFamilyId });
-
-    // Update familyId for all records owned by user
-    const records = await ctx.db
+    const userRecords = await ctx.db
       .query("serviceRecords")
       .withIndex("by_userId", (q) => q.eq("userId", user.userId))
       .collect();
 
-    const credUpdates = new Map(args.credentials.map((c) => [c.id, c]));
+    const serviceRecordIds = userRecords.map((r) => r._id);
+    const now = Date.now();
 
-    for (const record of records) {
+    const migrationId = await ctx.db.insert("familyMigrations", {
+      userId: user.userId,
+      sourceFamilyId: user.familyId,
+      targetFamilyId,
+      serviceRecordIds,
+      status: "PREPARED",
+      createdAt: now,
+      expiresAt: now + 30 * 60 * 1000,
+    });
+
+    const credUpdates = new Map<string, (typeof args.credentials)[number]>();
+    for (const c of args.credentials) {
+      if (c.recordId) {
+        credUpdates.set(`${c.recordId}:${c.id}`, c);
+      } else {
+        credUpdates.set(c.id, c);
+      }
+    }
+
+    for (const record of userRecords) {
       let needsUpdate = false;
       const newCredentials = record.credentials.map((cred) => {
-        const update = credUpdates.get(cred.id);
+        const update =
+          credUpdates.get(`${record._id}:${cred.id}`) ??
+          credUpdates.get(cred.id);
         if (update) {
           needsUpdate = true;
           return {
@@ -299,22 +677,55 @@ export const changeFamily = familyBoundMutation({
         return cred;
       });
 
-      if (record.familyId !== parsedTargetFamilyId || needsUpdate) {
+      if (record.familyId !== targetFamilyId || needsUpdate) {
         await ctx.db.patch(record._id, {
-          familyId: parsedTargetFamilyId,
+          familyId: targetFamilyId,
           credentials: newCredentials,
           updatedAt: Date.now(),
         });
       }
     }
 
+    await ctx.db.patch(user._id, { familyId: targetFamilyId });
+
+    const approvedReq = await ctx.db
+      .query("joinRequests")
+      .withIndex("by_familyId_userId", (q) =>
+        q.eq("familyId", targetFamilyId).eq("userId", user.userId),
+      )
+      .filter((q) => q.eq(q.field("status"), "approved"))
+      .unique();
+
+    if (approvedReq) {
+      await ctx.db.delete(approvedReq._id);
+    }
+
+    if (user.familyId && user.familyId !== targetFamilyId) {
+      const remainingUsers = await ctx.db
+        .query("users")
+        .withIndex("by_familyId", (q) => q.eq("familyId", user.familyId))
+        .collect();
+
+      // serviceRecords が旧 Family に残っていないことも確認
+      const remainingRecord = await ctx.db
+        .query("serviceRecords")
+        .withIndex("by_familyId", (q) => q.eq("familyId", user.familyId))
+        .first();
+
+      if (remainingUsers.length === 0 && !remainingRecord) {
+        await ctx.db.delete(user.familyId);
+      }
+    }
+
+    await ctx.db.patch(migrationId, { status: "COMPLETED" });
+
     await ctx.scheduler.runAfter(0, internal.actions.sendEmailInternal, {
       email: user.email,
       subject: "PoohMaからのお知らせ（家族変更完了）",
-      body: `-=-=-=-=-=-=-=-=-=-\n※本メールは送信専用アドレスから送信しています。\n-=-=-=-=-=-=-=-=-=-\n\n${user.displayName} さん\n\nこんにちは！家族間アカウント管理アプリ「PoohMa」からお知らせです。\n\n家族名「${args.name}」へ変更が完了しました。\n\n※なんらかの誤りであると考えられる場合はお手数ですが運営にご連絡ください。\n\n[PoohMa]\nhttps://poohma.vercel.app/`,
+      body: `-=-=-=-=-=-=-=-=-=-\n※本メールは送信専用アドレスから送信しています。\n-=-=-=-=-=-=-=-=-=-\n\n${user.displayName} さん\n\nこんにちは！家族間アカウント管理アプリ「PoohMa」からお知らせです。\n\n家族名「${args.name || ""}」へ変更が完了しました。\n\n※なんらかの誤りであると考えられる場合はお手数ですが運営にご連絡ください。\n\n[PoohMa]\nhttps://poohma.vercel.app/`,
     });
 
-    return { success: true, familyId: parsedTargetFamilyId };
+    return { success: true, familyId: targetFamilyId };
   },
 });
 

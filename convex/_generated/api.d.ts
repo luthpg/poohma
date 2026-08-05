@@ -14,6 +14,7 @@ import type {
   FunctionReference,
 } from "convex/server";
 import type * as actions from "../actions.js";
+import type * as crons from "../crons.js";
 import type * as customBuilders from "../customBuilders.js";
 import type * as families from "../families.js";
 import type * as http from "../http.js";
@@ -23,6 +24,7 @@ import type * as users from "../users.js";
 
 declare const fullApi: ApiFromModules<{
   actions: typeof actions;
+  crons: typeof crons;
   customBuilders: typeof customBuilders;
   families: typeof families;
   http: typeof http;
