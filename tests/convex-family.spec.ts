@@ -430,13 +430,23 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
       expect(prepareRes.migrationId).toBeDefined();
 
       // この時点ではまだユーザーの familyId もレコードの familyId も更新されていない
-      const userBeforeCommit = await t.run(async (ctx) => {
-        return await ctx.db
-          .query("users")
-          .withIndex("by_userId", (q) => q.eq("userId", "user_solo"))
-          .unique();
-      });
+      const { userBeforeCommit, recordBeforeCommit } = await t.run(
+        async (ctx) => {
+          const user = await ctx.db
+            .query("users")
+            .withIndex("by_userId", (q) => q.eq("userId", "user_solo"))
+            .unique();
+          const record = await ctx.db
+            .query("serviceRecords")
+            .withIndex("by_userId", (q) => q.eq("userId", "user_solo"))
+            .unique();
+          return { userBeforeCommit: user, recordBeforeCommit: record };
+        },
+      );
       expect(userBeforeCommit?.familyId).toBe(oldFamilyId);
+      expect(recordBeforeCommit?.familyId).toBe(oldFamilyId);
+      expect(recordBeforeCommit?.credentials[0].passwordHint).toBe("old_hint");
+      expect(recordBeforeCommit?.credentials[0].passwordHintIv).toBe("old_iv");
 
       // 2. getMigrationForEncryption で暗号化対象を取得
       const migrationData = await userSolo.query(
