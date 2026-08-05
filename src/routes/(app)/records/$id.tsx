@@ -128,8 +128,16 @@ function RecordDetailComponent({
   const [ogpDescription, setOgpDescription] = useState(
     record.ogpDescription || "",
   );
-  const [credentials, setCredentials] = useState(
+  const [credentials, setCredentials] = useState<
+    {
+      id?: string;
+      label: string;
+      loginId: string;
+      passwordHint: string;
+    }[]
+  >(
     record.credentials.map((c) => ({
+      id: c.id,
       label: c.label || "",
       loginId: c.loginId || "",
       passwordHint: c.passwordHint || "",
@@ -196,6 +204,7 @@ function RecordDetailComponent({
                 c.passwordHintDekIv,
               );
               return {
+                id: c.id,
                 label: c.label || "",
                 loginId: c.loginId || "",
                 passwordHint: plain,
@@ -203,6 +212,7 @@ function RecordDetailComponent({
             } catch (e) {
               console.error("Decrypt failed during edit start", e);
               return {
+                id: c.id,
                 label: c.label || "",
                 loginId: c.loginId || "",
                 passwordHint: "",
@@ -210,6 +220,7 @@ function RecordDetailComponent({
             }
           }
           return {
+            id: c.id,
             label: c.label || "",
             loginId: c.loginId || "",
             passwordHint: c.passwordHint || "",
@@ -220,6 +231,7 @@ function RecordDetailComponent({
     } else {
       setCredentials(
         record.credentials.map((c) => ({
+          id: c.id,
           label: c.label || "",
           loginId: c.loginId || "",
           passwordHint: c.passwordHint || "",
@@ -267,12 +279,13 @@ function RecordDetailComponent({
 
       const encryptedCreds = await Promise.all(
         filteredCreds.map(async (cred) => {
+          const credId = cred.id || crypto.randomUUID();
           if (cred.passwordHint) {
             const { encrypted, iv, dekEncrypted, dekIv } = await encryptHint(
               cred.passwordHint,
             );
             return {
-              id: crypto.randomUUID(),
+              id: credId,
               label: cred.label,
               loginId: cred.loginId,
               passwordHint: encrypted,
@@ -282,7 +295,7 @@ function RecordDetailComponent({
             };
           }
           return {
-            id: crypto.randomUUID(),
+            id: credId,
             label: cred.label,
             loginId: cred.loginId,
             passwordHint: cred.passwordHint,
