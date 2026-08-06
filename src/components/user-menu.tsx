@@ -4,7 +4,6 @@ import { useConvex, useMutation } from "convex/react";
 import { signOut } from "firebase/auth";
 import {
   BookOpen,
-  Database,
   Download,
   Gavel,
   HelpCircle,
@@ -40,13 +39,16 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuPortal,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
 import { useExportCsv } from "@/hooks/use-export-csv";
 import { clearQueryCache } from "@/hooks/usePersistentQuery";
@@ -72,6 +74,7 @@ export function UserMenu({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { masterKey, requireUnlock, encryptHint } = usePasscode();
   const { handleExport, isExporting } = useExportCsv();
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -165,6 +168,21 @@ export function UserMenu({
                 }
               }
 
+              // ルビ情報の取得（Titleがあり、かつ未設定の場合）
+              if (newRow.Title && !newRow.titleReading) {
+                try {
+                  const reading = await convex.action(api.actions.getFurigana, {
+                    text: newRow.Title,
+                  });
+                  if (reading) newRow.titleReading = reading;
+                } catch (e) {
+                  console.error(
+                    `Failed to fetch furigana for ${newRow.Title}`,
+                    e,
+                  );
+                }
+              }
+
               for (let i = 1; i <= 10; i++) {
                 const hint = newRow[`PasswordHint${i}`];
                 if (hint) {
@@ -180,7 +198,6 @@ export function UserMenu({
             },
             10, // 10件ごとにスレッドを解放
             (current, total) => {
-              // オプション: トーストのメッセージを更新して進捗を伝える
               toast.loading(`データを処理中... (${current}/${total})`, {
                 id: toastId,
               });
@@ -223,6 +240,9 @@ export function UserMenu({
                 : [];
             return {
               title: String(row.Title || ""),
+              titleReading: row.titleReading
+                ? String(row.titleReading)
+                : undefined,
               url: row.URL ? String(row.URL) : undefined,
               ogpImage: row.ogpImage ? String(row.ogpImage) : undefined,
               ogpDescription: row.ogpDescription
@@ -275,6 +295,23 @@ export function UserMenu({
     });
   };
 
+  const avatarButton = (
+    <button
+      type="button"
+      className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary shadow-border outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50 transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+    >
+      <Avatar className="h-8 w-8">
+        <AvatarImage
+          src={user?.photoURL || undefined}
+          alt={user?.displayName || undefined}
+        />
+        <AvatarFallback className="bg-orange-500 text-white text-[12px] font-semibold">
+          {(user?.displayName || user?.email || "U").slice(0, 1).toUpperCase()}
+        </AvatarFallback>
+      </Avatar>
+    </button>
+  );
+
   return (
     <>
       <input
@@ -284,176 +321,371 @@ export function UserMenu({
         accept=".csv"
         className="hidden"
       />
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary shadow-border outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50 transition-transform hover:scale-105 active:scale-95"
+
+      {/* --- モバイル用 Bottom Sheet (sm未満) --- */}
+      <div className="block sm:hidden">
+        <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+          <SheetTrigger asChild>{avatarButton}</SheetTrigger>
+          <SheetContent
+            side="bottom"
+            className="rounded-t-2xl max-h-[90vh] overflow-y-auto p-6"
           >
-            <Avatar className="h-8 w-8">
-              <AvatarImage
-                src={user?.photoURL || undefined}
-                alt={user?.displayName || undefined}
-              />
-              <AvatarFallback className="bg-orange-500 text-white text-[12px] font-semibold">
-                {(user?.displayName || user?.email || "U")
-                  .slice(0, 1)
-                  .toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuLabel className="font-normal">
-            <div className="flex flex-col space-y-1">
-              <p className="text-sm font-medium leading-none text-foreground">
-                {user?.displayName || "ユーザー"}
-              </p>
-              <p className="text-xs leading-none text-muted-foreground">
-                {user?.email}
-              </p>
-            </div>
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            <DropdownMenuItem asChild>
-              <Link to="/settings" className="cursor-pointer">
-                <UserCog className="mr-2 h-4 w-4" />
-                <span>アカウント設定</span>
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link to="/family" className="cursor-pointer">
-                <Users className="mr-2 h-4 w-4" />
-                <span>家族管理</span>
-              </Link>
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-          <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <Database className="mr-2 h-4 w-4" />
-                <span>データ管理</span>
-              </DropdownMenuSubTrigger>
-              <DropdownMenuPortal>
-                <DropdownMenuSubContent>
-                  <DropdownMenuItem
-                    onClick={handleExport}
+            <SheetHeader className="text-left p-0 pb-4 border-b border-border/50">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage
+                    src={user?.photoURL || undefined}
+                    alt={user?.displayName || undefined}
+                  />
+                  <AvatarFallback className="bg-orange-500 text-white text-sm font-semibold">
+                    {(user?.displayName || user?.email || "U")
+                      .slice(0, 1)
+                      .toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <SheetTitle className="text-base font-semibold">
+                    {user?.displayName || "ユーザー"}
+                  </SheetTitle>
+                  <p className="text-xs text-muted-foreground">{user?.email}</p>
+                </div>
+              </div>
+            </SheetHeader>
+
+            <div className="py-4 space-y-5">
+              {/* アカウント・家族管理 */}
+              <div className="space-y-1">
+                <Link
+                  to="/settings"
+                  onClick={() => setIsSheetOpen(false)}
+                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-accent text-sm font-medium transition cursor-pointer"
+                >
+                  <UserCog className="h-5 w-5 text-orange-500" />
+                  <span>アカウント設定</span>
+                </Link>
+                <Link
+                  to="/family"
+                  onClick={() => setIsSheetOpen(false)}
+                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-accent text-sm font-medium transition cursor-pointer"
+                >
+                  <Users className="h-5 w-5 text-orange-500" />
+                  <span>家族管理</span>
+                </Link>
+              </div>
+
+              <div className="h-[1px] bg-border/50" />
+
+              {/* データ管理 */}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground px-1">
+                  データ管理
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSheetOpen(false);
+                      handleExport();
+                    }}
                     disabled={isExporting}
+                    className="flex items-center justify-center gap-2 p-3 rounded-lg border border-border bg-card hover:bg-accent text-xs font-medium transition cursor-pointer"
                   >
                     {isExporting ? (
-                      <Spinner className="mr-2 h-4 w-4" />
+                      <Spinner className="h-4 w-4" />
                     ) : (
-                      <Download className="mr-2 h-4 w-4" />
+                      <Download className="h-4 w-4 text-blue-500" />
                     )}
                     <span>
                       {isExporting ? "エクスポート中..." : "CSVエクスポート"}
                     </span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => fileInputRef.current?.click()}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSheetOpen(false);
+                      fileInputRef.current?.click();
+                    }}
                     disabled={isImporting}
+                    className="flex items-center justify-center gap-2 p-3 rounded-lg border border-border bg-card hover:bg-accent text-xs font-medium transition cursor-pointer"
                   >
                     {isImporting ? (
-                      <Spinner className="mr-2 h-4 w-4" />
+                      <Spinner className="h-4 w-4" />
                     ) : (
-                      <Upload className="mr-2 h-4 w-4" />
+                      <Upload className="h-4 w-4 text-green-500" />
                     )}
                     <span>
                       {isImporting ? "インポート中..." : "CSVインポート"}
                     </span>
-                  </DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuPortal>
-            </DropdownMenuSub>
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                {theme === "dark" ? (
-                  <Moon className="mr-2 h-4 w-4" />
-                ) : theme === "light" ? (
-                  <Sun className="mr-2 h-4 w-4" />
-                ) : (
-                  <Laptop className="mr-2 h-4 w-4" />
-                )}
-                <span>テーマ切り替え</span>
-              </DropdownMenuSubTrigger>
-              <DropdownMenuPortal>
-                <DropdownMenuSubContent>
-                  <DropdownMenuItem onClick={() => setTheme("light")}>
-                    <Sun className="mr-2 h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="h-[1px] bg-border/50" />
+
+              {/* テーマ切り替え */}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground px-1">
+                  テーマ
+                </p>
+                <div className="grid grid-cols-3 gap-2 bg-muted/50 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setTheme("light")}
+                    className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition ${
+                      theme === "light"
+                        ? "bg-card text-foreground shadow-sm font-semibold"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Sun className="h-4 w-4 text-amber-500" />
                     <span>ライト</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setTheme("dark")}>
-                    <Moon className="mr-2 h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTheme("dark")}
+                    className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition ${
+                      theme === "dark"
+                        ? "bg-card text-foreground shadow-sm font-semibold"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Moon className="h-4 w-4 text-indigo-400" />
                     <span>ダーク</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setTheme("system")}>
-                    <Laptop className="mr-2 h-4 w-4" />
-                    <span>システム設定</span>
-                  </DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuPortal>
-            </DropdownMenuSub>
-          </DropdownMenuGroup>
-          <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            <DropdownMenuItem asChild>
-              <Link to="/usage" className="cursor-pointer">
-                <BookOpen className="mr-2 h-4 w-4" />
-                <span>使い方</span>
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link to="/faq" className="cursor-pointer">
-                <HelpCircle className="mr-2 h-4 w-4" />
-                <span>FAQ</span>
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link to="/terms-of-service" className="cursor-pointer">
-                <Gavel className="mr-2 h-4 w-4" />
-                <span>利用規約</span>
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link to="/privacy-policy" className="cursor-pointer">
-                <ScrollText className="mr-2 h-4 w-4" />
-                <span>プライバシーポリシー</span>
-              </Link>
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-          <DropdownMenuSeparator />
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <DropdownMenuItem
-                onSelect={(e) => e.preventDefault()}
-                className="text-red-500 focus:text-red-500 cursor-pointer"
-              >
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>ログアウト</span>
-              </DropdownMenuItem>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>ログアウトしますか？</AlertDialogTitle>
-                <AlertDialogDescription>
-                  セッションが終了し、ログイン画面に戻ります。
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>キャンセル</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleLogout}
-                  className="text-white bg-red-500 hover:bg-red-600 focus:ring-red-500"
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTheme("system")}
+                    className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition ${
+                      theme === "system"
+                        ? "bg-card text-foreground shadow-sm font-semibold"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Laptop className="h-4 w-4 text-gray-400" />
+                    <span>自動</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="h-[1px] bg-border/50" />
+
+              {/* ヘルプ & 規約 */}
+              <div className="grid grid-cols-2 gap-1 text-xs">
+                <Link
+                  to="/usage"
+                  onClick={() => setIsSheetOpen(false)}
+                  className="flex items-center gap-2 p-2 rounded.md hover:bg-accent text-muted-foreground hover:text-foreground transition"
                 >
-                  ログアウト
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </DropdownMenuContent>
-      </DropdownMenu>
+                  <BookOpen className="h-4 w-4" />
+                  <span>使い方</span>
+                </Link>
+                <Link
+                  to="/faq"
+                  onClick={() => setIsSheetOpen(false)}
+                  className="flex items-center gap-2 p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition"
+                >
+                  <HelpCircle className="h-4 w-4" />
+                  <span>FAQ</span>
+                </Link>
+                <Link
+                  to="/terms-of-service"
+                  onClick={() => setIsSheetOpen(false)}
+                  className="flex items-center gap-2 p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition"
+                >
+                  <Gavel className="h-4 w-4" />
+                  <span>利用規約</span>
+                </Link>
+                <Link
+                  to="/privacy-policy"
+                  onClick={() => setIsSheetOpen(false)}
+                  className="flex items-center gap-2 p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition"
+                >
+                  <ScrollText className="h-4 w-4" />
+                  <span>プライバシー</span>
+                </Link>
+              </div>
+
+              <div className="h-[1px] bg-border/50" />
+
+              {/* ログアウト */}
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <button
+                    type="button"
+                    className="w-full flex items-center justify-center gap-2 p-3 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 text-sm font-medium transition cursor-pointer"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>ログアウト</span>
+                  </button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>ログアウトしますか？</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      セッションが終了し、ログイン画面に戻ります。
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleLogout}
+                      className="text-white bg-red-500 hover:bg-red-600 focus:ring-red-500"
+                    >
+                      ログアウト
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
+
+      {/* --- デスクトップ用 DropdownMenu (sm以上, ネスト全廃フラット構成) --- */}
+      <div className="hidden sm:block">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>{avatarButton}</DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-60">
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm font-medium leading-none text-foreground">
+                  {user?.displayName || "ユーザー"}
+                </p>
+                <p className="text-xs leading-none text-muted-foreground">
+                  {user?.email}
+                </p>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem asChild>
+                <Link to="/settings" className="cursor-pointer">
+                  <UserCog className="mr-2 h-4 w-4" />
+                  <span>アカウント設定</span>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/family" className="cursor-pointer">
+                  <Users className="mr-2 h-4 w-4" />
+                  <span>家族管理</span>
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+
+            {/* データ管理 (フラット配置) */}
+            <DropdownMenuLabel className="text-[11px] text-muted-foreground font-normal py-1">
+              データ管理
+            </DropdownMenuLabel>
+            <DropdownMenuGroup>
+              <DropdownMenuItem onClick={handleExport} disabled={isExporting}>
+                {isExporting ? (
+                  <Spinner className="mr-2 h-4 w-4" />
+                ) : (
+                  <Download className="mr-2 h-4 w-4 text-blue-500" />
+                )}
+                <span>
+                  {isExporting ? "エクスポート中..." : "CSVエクスポート"}
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isImporting}
+              >
+                {isImporting ? (
+                  <Spinner className="mr-2 h-4 w-4" />
+                ) : (
+                  <Upload className="mr-2 h-4 w-4 text-green-500" />
+                )}
+                <span>{isImporting ? "インポート中..." : "CSVインポート"}</span>
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+
+            {/* テーマ切り替え (フラット配置) */}
+            <DropdownMenuLabel className="text-[11px] text-muted-foreground font-normal py-1">
+              テーマ
+            </DropdownMenuLabel>
+            <DropdownMenuGroup>
+              <DropdownMenuItem onClick={() => setTheme("light")}>
+                <Sun className="mr-2 h-4 w-4 text-amber-500" />
+                <span className={theme === "light" ? "font-semibold" : ""}>
+                  ライト
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTheme("dark")}>
+                <Moon className="mr-2 h-4 w-4 text-indigo-400" />
+                <span className={theme === "dark" ? "font-semibold" : ""}>
+                  ダーク
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTheme("system")}>
+                <Laptop className="mr-2 h-4 w-4 text-gray-400" />
+                <span className={theme === "system" ? "font-semibold" : ""}>
+                  システム設定
+                </span>
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+
+            <DropdownMenuGroup>
+              <DropdownMenuItem asChild>
+                <Link to="/usage" className="cursor-pointer">
+                  <BookOpen className="mr-2 h-4 w-4" />
+                  <span>使い方</span>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/faq" className="cursor-pointer">
+                  <HelpCircle className="mr-2 h-4 w-4" />
+                  <span>FAQ</span>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/terms-of-service" className="cursor-pointer">
+                  <Gavel className="mr-2 h-4 w-4" />
+                  <span>利用規約</span>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/privacy-policy" className="cursor-pointer">
+                  <ScrollText className="mr-2 h-4 w-4" />
+                  <span>プライバシーポリシー</span>
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <DropdownMenuItem
+                  onSelect={(e) => e.preventDefault()}
+                  className="text-red-500 focus:text-red-500 cursor-pointer"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>ログアウト</span>
+                </DropdownMenuItem>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>ログアウトしますか？</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    セッションが終了し、ログイン画面に戻ります。
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleLogout}
+                    className="text-white bg-red-500 hover:bg-red-600 focus:ring-red-500"
+                  >
+                    ログアウト
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </>
   );
 }

@@ -6,7 +6,8 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
-import { type SubmitEvent, useEffect, useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { type SubmitEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import type { Doc, Id } from "@/../convex/_generated/dataModel";
@@ -123,6 +124,9 @@ function RecordDetailComponent({
   const [isEditing, setIsEditing] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const [title, setTitle] = useState(record.title);
+  const [titleReading, setTitleReading] = useState(record.titleReading || "");
+  const [showAdvancedTitle, setShowAdvancedTitle] = useState(false);
+  const [isFetchingFurigana, setIsFetchingFurigana] = useState(false);
   const [url, setUrl] = useState(record.url || "");
   const [ogpImage, setOgpImage] = useState(record.ogpImage || "");
   const [ogpDescription, setOgpDescription] = useState(
@@ -151,22 +155,59 @@ function RecordDetailComponent({
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingOgp, setIsFetchingOgp] = useState(false);
 
+  const furiganaReqIdRef = useRef(0);
   const getOgpInfo = useAction(api.actions.getOgpInfo);
+  const getFurigana = useAction(api.actions.getFurigana);
   const updateRecord = useMutation(api.records.updateRecord);
   const deleteRecord = useMutation(api.records.deleteRecord);
+
+  const fetchFuriganaForTitle = async (targetTitle: string) => {
+    const text = targetTitle.trim();
+    if (!text) return;
+
+    furiganaReqIdRef.current += 1;
+    const currentReqId = furiganaReqIdRef.current;
+    setIsFetchingFurigana(true);
+
+    try {
+      const reading = await getFurigana({ text });
+      if (
+        currentReqId === furiganaReqIdRef.current &&
+        typeof reading === "string" &&
+        reading
+      ) {
+        setTitleReading(reading);
+      }
+    } catch (e) {
+      console.error("Failed to fetch furigana", e);
+    } finally {
+      if (currentReqId === furiganaReqIdRef.current) {
+        setIsFetchingFurigana(false);
+      }
+    }
+  };
 
   const handleUrlBlur = async () => {
     if (!url) return;
     setIsFetchingOgp(true);
     try {
       const ogp = await getOgpInfo({ url });
-      if (ogp.title && !title) setTitle(ogp.title);
+      if (ogp.title && !title) {
+        setTitle(ogp.title);
+        fetchFuriganaForTitle(ogp.title);
+      }
       if (ogp.image) setOgpImage(ogp.image);
       if (ogp.description) setOgpDescription(ogp.description);
     } catch (e) {
       console.error("Failed to fetch OGP info", e);
     } finally {
       setIsFetchingOgp(false);
+    }
+  };
+
+  const handleTitleBlur = () => {
+    if (title && !titleReading) {
+      fetchFuriganaForTitle(title);
     }
   };
 
@@ -184,14 +225,16 @@ function RecordDetailComponent({
   const { encryptHint, decryptHint, masterKey, requireUnlock } = usePasscode();
 
   const handleEditStart = async () => {
-    // If there are encrypted credentials, we need to unlock and decrypt them first
+    setTitle(record.title);
+    setTitleReading(record.titleReading || "");
+
     const hasEncrypted = record.credentials.some(
       (c) => c.passwordHintIv && c.passwordHint,
     );
 
     if (hasEncrypted) {
       const unlocked = await requireUnlock();
-      if (!unlocked) return; // Cannot edit without unlocking
+      if (!unlocked) return;
 
       const decryptedCreds = await Promise.all(
         record.credentials.map(async (c) => {
@@ -262,12 +305,10 @@ function RecordDetailComponent({
     }
 
     try {
-      // E2EE: パスワードヒントを暗号化
       const filteredCreds = credentials.filter(
         (c) => c.label || c.loginId || c.passwordHint,
       );
 
-      // If we are about to save hints, we must ensure we have the masterKey to encrypt them
       const hasHintsToEncrypt = filteredCreds.some((c) => c.passwordHint);
       if (hasHintsToEncrypt && !masterKey) {
         const unlocked = await requireUnlock();
@@ -310,6 +351,7 @@ function RecordDetailComponent({
         id: record._id,
         data: {
           title,
+          titleReading: titleReading || undefined,
           url: url || undefined,
           ogpImage: ogpImage || undefined,
           ogpDescription: ogpDescription || undefined,
@@ -394,8 +436,69 @@ function RecordDetailComponent({
                   required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
+                  onBlur={handleTitleBlur}
                   className="mt-1 w-full rounded-md bg-card p-2 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
                 />
+              </div>
+
+              {/* 折りたたみ式：読み仮名（ふりがな）設定 */}
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedTitle(!showAdvancedTitle)}
+                  className="flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground hover:text-foreground transition cursor-pointer"
+                >
+                  {showAdvancedTitle ? (
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  )}
+                  <span>読み仮名（ルビ）の調整</span>
+                  {titleReading && !showAdvancedTitle && (
+                    <span className="ml-1 text-[11px] text-orange-500 font-normal">
+                      ({titleReading})
+                    </span>
+                  )}
+                </button>
+
+                {showAdvancedTitle && (
+                  <div className="mt-2 rounded-md bg-muted/40 p-3.5 border border-border/40 space-y-2 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between">
+                      <label
+                        htmlFor="title-reading-input"
+                        className="block text-[12px] font-medium text-foreground"
+                      >
+                        読み仮名 (ひらがな)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => fetchFuriganaForTitle(title)}
+                        disabled={!title || isFetchingFurigana}
+                        className="text-[11px] text-orange-500 hover:text-orange-600 disabled:opacity-50 transition cursor-pointer"
+                      >
+                        {isFetchingFurigana ? "取得中..." : "自動再取得"}
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <input
+                        id="title-reading-input"
+                        type="text"
+                        value={titleReading}
+                        onChange={(e) => setTitleReading(e.target.value)}
+                        placeholder="例: あまぞん / さんいんごうどうぎんこう"
+                        className="w-full rounded-md bg-card p-2 text-base md:text-[13px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                      />
+                      {isFetchingFurigana && (
+                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                          <Spinner className="h-3.5 w-3.5 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      インデックス検索・あいうえお順ジャンプに使用されます。自動読み取りが異なる場合、手動で修正できます。
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </section>

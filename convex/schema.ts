@@ -56,6 +56,7 @@ export default defineSchema({
 
   serviceRecords: defineTable({
     title: v.string(),
+    titleReading: v.optional(v.string()),
     url: v.optional(v.string()),
     ogpImage: v.optional(v.string()),
     ogpDescription: v.optional(v.string()),

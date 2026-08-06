@@ -125,6 +125,10 @@ export const RecordInputSchema = z.object({
     .string()
     .min(1, "タイトルは必須です")
     .max(255, "タイトルは255文字以内で入力してください"),
+  titleReading: z
+    .string()
+    .max(255, "読み仮名は255文字以内で入力してください")
+    .optional(),
   url: z.url().optional().or(z.literal("")),
   ogpImage: z.string().url().optional().or(z.literal("")),
   ogpDescription: z.string().optional(),

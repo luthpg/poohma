@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
-import { useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import { usePasscode } from "@/components/PasscodeProvider";
@@ -19,15 +20,49 @@ function NewRecordComponent() {
   const { encryptHint, masterKey, requireUnlock } = usePasscode();
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingOgp, setIsFetchingOgp] = useState(false);
+  const [isFetchingFurigana, setIsFetchingFurigana] = useState(false);
+  const [showAdvancedTitle, setShowAdvancedTitle] = useState(false);
 
   const createRecord = useMutation(api.records.createRecord);
   const getOgpInfo = useAction(api.actions.getOgpInfo);
+  const getFurigana = useAction(api.actions.getFurigana);
 
   // フォーム状態
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
+  const [titleReading, setTitleReading] = useState("");
   const [memo, setMemo] = useState("");
   const [visibility, setVisibility] = useState<"PRIVATE" | "SHARED">("PRIVATE");
+
+  // 非同期レース条件対策用
+  const furiganaReqIdRef = useRef(0);
+
+  // ルビ取得関数（非同期競合を防止）
+  const fetchFuriganaForTitle = async (targetTitle: string) => {
+    const text = targetTitle.trim();
+    if (!text) return;
+
+    furiganaReqIdRef.current += 1;
+    const currentReqId = furiganaReqIdRef.current;
+    setIsFetchingFurigana(true);
+
+    try {
+      const reading = await getFurigana({ text });
+      if (
+        currentReqId === furiganaReqIdRef.current &&
+        typeof reading === "string" &&
+        reading
+      ) {
+        setTitleReading(reading);
+      }
+    } catch (e) {
+      console.error("Failed to fetch furigana", e);
+    } finally {
+      if (currentReqId === furiganaReqIdRef.current) {
+        setIsFetchingFurigana(false);
+      }
+    }
+  };
 
   // アカウント情報（複数登録可能）
   const [credentials, setCredentials] = useState([
@@ -46,13 +81,23 @@ function NewRecordComponent() {
     setIsFetchingOgp(true);
     try {
       const ogp = await getOgpInfo({ url });
-      if (ogp.title && !title) setTitle(ogp.title);
+      if (ogp.title && !title) {
+        setTitle(ogp.title);
+        // OGP取得タイトルからルビを自動連携
+        fetchFuriganaForTitle(ogp.title);
+      }
       if (ogp.image) setOgpImage(ogp.image);
       if (ogp.description) setOgpDescription(ogp.description);
     } catch (e) {
       console.error("Failed to fetch OGP info", e);
     } finally {
       setIsFetchingOgp(false);
+    }
+  };
+
+  const handleTitleBlur = () => {
+    if (title && !titleReading) {
+      fetchFuriganaForTitle(title);
     }
   };
 
@@ -128,6 +173,7 @@ function NewRecordComponent() {
 
       await createRecord({
         title,
+        titleReading: titleReading || undefined,
         url: url || undefined,
         ogpImage: ogpImage || undefined,
         ogpDescription: ogpDescription || undefined,
@@ -200,8 +246,69 @@ function NewRecordComponent() {
                 required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
+                onBlur={handleTitleBlur}
                 className="mt-1 w-full rounded-md bg-card p-2 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
               />
+            </div>
+
+            {/* 折りたたみ式：読み仮名（ふりがな）設定 */}
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => setShowAdvancedTitle(!showAdvancedTitle)}
+                className="flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground hover:text-foreground transition cursor-pointer"
+              >
+                {showAdvancedTitle ? (
+                  <ChevronUp className="h-3.5 w-3.5" />
+                ) : (
+                  <ChevronDown className="h-3.5 w-3.5" />
+                )}
+                <span>読み仮名（ルビ）の調整</span>
+                {titleReading && !showAdvancedTitle && (
+                  <span className="ml-1 text-[11px] text-orange-500 font-normal">
+                    ({titleReading})
+                  </span>
+                )}
+              </button>
+
+              {showAdvancedTitle && (
+                <div className="mt-2 rounded-md bg-muted/40 p-3.5 border border-border/40 space-y-2 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between">
+                    <label
+                      htmlFor="title-reading-input"
+                      className="block text-[12px] font-medium text-foreground"
+                    >
+                      読み仮名 (ひらがな)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => fetchFuriganaForTitle(title)}
+                      disabled={!title || isFetchingFurigana}
+                      className="text-[11px] text-orange-500 hover:text-orange-600 disabled:opacity-50 transition cursor-pointer"
+                    >
+                      {isFetchingFurigana ? "取得中..." : "自動再取得"}
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <input
+                      id="title-reading-input"
+                      type="text"
+                      value={titleReading}
+                      onChange={(e) => setTitleReading(e.target.value)}
+                      placeholder="例: あまぞん / さんいんごうどうぎんこう"
+                      className="w-full rounded-md bg-card p-2 text-base md:text-[13px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                    />
+                    {isFetchingFurigana && (
+                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                        <Spinner className="h-3.5 w-3.5 text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    インデックス検索・あいうえお順ジャンプに使用されます。自動読み取りが異なる場合、手動で修正できます。
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </section>

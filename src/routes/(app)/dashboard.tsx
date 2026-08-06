@@ -6,19 +6,26 @@ import {
 } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { Globe, LayoutGrid, List, Lock, Tag, Trash2, X } from "lucide-react";
-import { type SubmitEvent, Suspense, useEffect, useState } from "react";
+import {
+  type SubmitEvent,
+  Suspense,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { api } from "@/../convex/_generated/api";
 import type { Doc, Id } from "@/../convex/_generated/dataModel";
+import { IndexScrollBar } from "@/components/IndexScrollBar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TagInput } from "@/components/ui/tag-input";
-
 import { usePersistentQuery } from "@/hooks/usePersistentQuery";
 import {
   getDashboardPrefsFn,
   setDashboardPrefsFn,
 } from "@/services/prefs.functions";
+import { groupRecordsByIndex } from "@/utils/index-group";
 
 const searchSchema = z.object({
   q: z.string().optional(),
@@ -552,6 +559,14 @@ function RecordListSection({
     },
   );
 
+  const groupedRecords = useMemo(() => {
+    return groupRecordsByIndex(records || []);
+  }, [records]);
+
+  const availableGroups = useMemo(() => {
+    return groupedRecords.map((g) => g.groupKey);
+  }, [groupedRecords]);
+
   if (records === undefined) {
     return <RecordListSkeleton />;
   }
@@ -644,37 +659,59 @@ function RecordListSection({
           右上のボタンから追加してみましょう！
         </div>
       ) : (
-        <div
-          className={
-            viewMode === "card"
-              ? "grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 lg:gap-6"
-              : "flex flex-col gap-3"
-          }
-        >
-          {records.map((record) =>
-            viewMode === "card" ? (
-              <ServiceCard
-                key={record._id}
-                record={record}
-                currentUserId={user.id}
-                onTagClick={handleTagClick}
-                isSelectMode={isSelectMode}
-                isSelected={selectedIds.includes(record._id)}
-                onToggleSelect={() => onToggleSelect(record._id)}
-              />
-            ) : (
-              <ServiceListItem
-                key={record._id}
-                record={record}
-                currentUserId={user.id}
-                onTagClick={handleTagClick}
-                isSelectMode={isSelectMode}
-                isSelected={selectedIds.includes(record._id)}
-                onToggleSelect={() => onToggleSelect(record._id)}
-              />
-            ),
-          )}
-        </div>
+        <>
+          <IndexScrollBar availableGroups={availableGroups} />
+          <div className="space-y-6">
+            {groupedRecords.map(({ groupKey, items }) => (
+              <div
+                key={groupKey}
+                id={`index-group-${groupKey}`}
+                className="scroll-mt-16"
+              >
+                <div className="sticky top-14 z-10 bg-background/90 backdrop-blur py-1.5 px-3 mb-3 border-b border-border/40 text-xs font-bold text-orange-500 tracking-wider flex items-center gap-2 rounded-md">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-orange-500/10 text-orange-500 text-[11px]">
+                    {groupKey}
+                  </span>
+                  <span>{groupKey}</span>
+                  <span className="text-[10px] font-normal text-muted-foreground ml-auto">
+                    {items.length}件
+                  </span>
+                </div>
+                <div
+                  className={
+                    viewMode === "card"
+                      ? "grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 lg:gap-6"
+                      : "flex flex-col gap-3"
+                  }
+                >
+                  {items.map((record) =>
+                    viewMode === "card" ? (
+                      <ServiceCard
+                        key={record._id}
+                        record={record}
+                        currentUserId={user.id}
+                        onTagClick={handleTagClick}
+                        isSelectMode={isSelectMode}
+                        isSelected={selectedIds.includes(record._id)}
+                        onToggleSelect={() => onToggleSelect(record._id)}
+                      />
+                    ) : (
+                      <ServiceListItem
+                        key={record._id}
+                        record={record}
+                        currentUserId={user.id}
+                        onTagClick={handleTagClick}
+                        isSelectMode={isSelectMode}
+                        isSelected={selectedIds.includes(record._id)}
+                        onToggleSelect={() => onToggleSelect(record._id)}
+                      />
+                    ),
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </>
   );

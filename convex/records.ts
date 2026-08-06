@@ -160,6 +160,7 @@ export const getOwnedRecords = authenticatedQuery({
 export const createRecord = familyBoundMutation({
   args: {
     title: v.string(),
+    titleReading: v.optional(v.string()),
     url: v.optional(v.string()),
     ogpImage: v.optional(v.string()),
     ogpDescription: v.optional(v.string()),
@@ -190,6 +191,7 @@ export const createRecord = familyBoundMutation({
 
     const recordId = await ctx.db.insert("serviceRecords", {
       title: args.title,
+      titleReading: args.titleReading,
       url: args.url,
       ogpImage: args.ogpImage,
       ogpDescription: args.ogpDescription,
@@ -211,6 +213,7 @@ export const updateRecord = familyBoundMutation({
     id: v.id("serviceRecords"),
     data: v.object({
       title: v.string(),
+      titleReading: v.optional(v.string()),
       url: v.optional(v.string()),
       ogpImage: v.optional(v.string()),
       ogpDescription: v.optional(v.string()),
@@ -284,6 +287,7 @@ export const importRecords = familyBoundMutation({
     records: v.array(
       v.object({
         title: v.string(),
+        titleReading: v.optional(v.string()),
         url: v.optional(v.string()),
         ogpImage: v.optional(v.string()),
         ogpDescription: v.optional(v.string()),
@@ -331,6 +335,7 @@ export const importRecords = familyBoundMutation({
         }
         await ctx.db.insert("serviceRecords", {
           title: record.title,
+          titleReading: record.titleReading,
           url: record.url,
           ogpImage: record.ogpImage,
           ogpDescription: record.ogpDescription,

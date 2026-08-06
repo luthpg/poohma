@@ -17,6 +17,7 @@ import {
   type Mock,
   vi,
 } from "vitest";
+import { api } from "@/../convex/_generated/api";
 import * as passcodeProvider from "@/components/PasscodeProvider";
 import { Route } from "@/routes/(app)/records/new";
 
@@ -88,7 +89,14 @@ describe("records/new Component", () => {
     });
 
     mockGetOgpInfo = vi.fn().mockReturnValue(ogpPromise);
-    (convexReact.useAction as Mock).mockReturnValue(mockGetOgpInfo);
+    const mockGetFurigana = vi.fn().mockResolvedValue("");
+
+    (convexReact.useAction as Mock).mockImplementation((action) => {
+      if (action === api.actions.getFurigana) {
+        return mockGetFurigana;
+      }
+      return mockGetOgpInfo;
+    });
 
     render(<NewRecordComponent />);
 
