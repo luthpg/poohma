@@ -67,8 +67,9 @@ export function getIndexGroupKey(record: {
   const rawText = (record.titleReading || record.title).trim();
   if (!rawText) return "#";
 
-  // カタカナをひらがなに変換
-  const normalized = katakanaToHiragana(rawText);
+  // Unicode NFKC正規化を適用してからカタカナをひらがなに変換
+  const nfkcNormalized = rawText.normalize("NFKC");
+  const normalized = katakanaToHiragana(nfkcNormalized);
   const firstChar = normalized.charAt(0);
   const code = firstChar.charCodeAt(0);
 

@@ -81,11 +81,13 @@ function NewRecordComponent() {
     setIsFetchingOgp(true);
     try {
       const ogp = await getOgpInfo({ url });
-      if (ogp.title && !title) {
-        setTitle(ogp.title);
-        // OGP取得タイトルからルビを自動連携
-        fetchFuriganaForTitle(ogp.title);
-      }
+      setTitle((currentTitle) => {
+        if (ogp.title && !currentTitle) {
+          fetchFuriganaForTitle(ogp.title);
+          return ogp.title;
+        }
+        return currentTitle;
+      });
       if (ogp.image) setOgpImage(ogp.image);
       if (ogp.description) setOgpDescription(ogp.description);
     } catch (e) {
@@ -245,7 +247,11 @@ function NewRecordComponent() {
                 type="text"
                 required
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  furiganaReqIdRef.current += 1;
+                  setTitleReading("");
+                }}
                 onBlur={handleTitleBlur}
                 className="mt-1 w-full rounded-md bg-card p-2 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
               />
@@ -294,7 +300,10 @@ function NewRecordComponent() {
                       id="title-reading-input"
                       type="text"
                       value={titleReading}
-                      onChange={(e) => setTitleReading(e.target.value)}
+                      onChange={(e) => {
+                        setTitleReading(e.target.value);
+                        furiganaReqIdRef.current += 1;
+                      }}
                       placeholder="例: あまぞん / さんいんごうどうぎんこう"
                       className="w-full rounded-md bg-card p-2 text-base md:text-[13px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
                     />

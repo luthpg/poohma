@@ -95,7 +95,12 @@ export function IndexScrollBar({
               key={key}
               type="button"
               data-index-key={key}
-              onClick={() => scrollToGroup(key)}
+              onClick={() => {
+                scrollToGroup(key);
+                setTimeout(() => {
+                  setActiveBubble(null);
+                }, 400);
+              }}
               className={`flex h-4 w-4 md:h-5 md:w-5 items-center justify-center rounded-full transition-transform cursor-pointer ${
                 isActive
                   ? "bg-orange-500 text-white font-bold scale-125 z-10"

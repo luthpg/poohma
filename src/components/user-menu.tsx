@@ -174,7 +174,9 @@ export function UserMenu({
                   const reading = await convex.action(api.actions.getFurigana, {
                     text: newRow.Title,
                   });
-                  if (reading) newRow.titleReading = reading;
+                  if (reading && reading !== newRow.Title) {
+                    newRow.titleReading = reading;
+                  }
                 } catch (e) {
                   console.error(
                     `Failed to fetch furigana for ${newRow.Title}`,
@@ -430,7 +432,10 @@ export function UserMenu({
                 <div className="grid grid-cols-3 gap-2 bg-muted/50 p-1 rounded-xl">
                   <button
                     type="button"
-                    onClick={() => setTheme("light")}
+                    onClick={() => {
+                      setTheme("light");
+                      setIsSheetOpen(false);
+                    }}
                     className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition ${
                       theme === "light"
                         ? "bg-card text-foreground shadow-sm font-semibold"
@@ -442,7 +447,10 @@ export function UserMenu({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setTheme("dark")}
+                    onClick={() => {
+                      setTheme("dark");
+                      setIsSheetOpen(false);
+                    }}
                     className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition ${
                       theme === "dark"
                         ? "bg-card text-foreground shadow-sm font-semibold"
@@ -454,7 +462,10 @@ export function UserMenu({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setTheme("system")}
+                    onClick={() => {
+                      setTheme("system");
+                      setIsSheetOpen(false);
+                    }}
                     className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition ${
                       theme === "system"
                         ? "bg-card text-foreground shadow-sm font-semibold"

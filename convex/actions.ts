@@ -207,6 +207,9 @@ export const getFurigana = action({
     }
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const response = await fetch("https://jlp.yahooapis.jp/jsonrpc", {
         method: "POST",
         headers: {
@@ -221,7 +224,10 @@ export const getFurigana = action({
             q: textToConvert,
           },
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         console.error("Yahoo Furigana API HTTP error:", response.statusText);
