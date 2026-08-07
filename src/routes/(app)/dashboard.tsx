@@ -672,7 +672,6 @@ function RecordListSection({
                   <span className="flex h-5 w-5 items-center justify-center rounded-full bg-orange-500/10 text-orange-500 text-[11px]">
                     {groupKey}
                   </span>
-                  <span>{groupKey}</span>
                   <span className="text-[10px] font-normal text-muted-foreground ml-auto">
                     {items.length}件
                   </span>
