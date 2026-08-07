@@ -21,7 +21,8 @@ export const syncUser = identityVerifiedMutation({
     const { identity } = ctx;
     const uid = identity.subject;
     const email = identity.email;
-    if (!email) throw new Error("Email is required");
+    const isEmailVerified = identity.emailVerified;
+    if (!email || !isEmailVerified) throw new Error("Email is required");
 
     const { displayName, photoURL } = args;
 
