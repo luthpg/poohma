@@ -1,8 +1,10 @@
+import { SiGithub } from "@icons-pack/react-simple-icons";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { CheckCircle2, Download, Globe, Lock, Users } from "lucide-react";
 import { useState } from "react";
 import { JpText } from "@/components/JpText";
 import { Button } from "@/components/ui/button";
+import { env } from "@/env/client";
 
 export const Route = createFileRoute("/(public)/")({
   component: RouteComponent,
@@ -10,6 +12,7 @@ export const Route = createFileRoute("/(public)/")({
 
 function RouteComponent() {
   const [activeTab, setActiveTab] = useState("security");
+  const githubUrl = env.VITE_GITHUB_REPO_URL ?? "https://github.com";
 
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 antialiased font-sans transition-colors duration-300 break-words overflow-x-hidden">
@@ -806,6 +809,22 @@ function RouteComponent() {
                 </div>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* ─── ⑦ GITHUB REPO SECTION ─── */}
+        <section className="py-10 bg-white dark:bg-zinc-950 border-t border-zinc-200/40 dark:border-zinc-800/60">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex items-center justify-center text-center">
+            <a
+              href={githubUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-zinc-100/80 dark:bg-zinc-900/80 hover:bg-zinc-200/80 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white border border-zinc-200/60 dark:border-zinc-800 text-sm font-semibold transition-all duration-200 shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98]"
+              aria-label="GitHub Repository"
+            >
+              <SiGithub className="w-4 h-4 fill-current transition-transform duration-200 group-hover:rotate-6" />
+              <span>GitHubでソースコードを見る</span>
+            </a>
           </div>
         </section>
       </main>
