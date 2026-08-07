@@ -92,7 +92,9 @@ export function IndexScrollBar({
         onPointerCancel={handlePointerUp}
         className={cn(
           "fixed right-1 top-1/2 -translate-y-1/2 z-30 select-none touch-none flex flex-col items-center py-1.5 px-0.5 rounded-full backdrop-blur border border-border/50 shadow-md text-[10px] md:text-[11px] font-semibold transition-all origin-right duration-200 ease-out max-h-[80vh] overflow-y-auto no-scrollbar",
-          isDragging ? "scale-125 text-foreground bg-background" : "scale-100 text-muted-foreground bg-background/85",
+          isDragging
+            ? "scale-125 text-foreground bg-background"
+            : "scale-100 text-muted-foreground bg-background/85",
         )}
       >
         {availableGroups.map((key) => {
