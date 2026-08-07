@@ -618,4 +618,54 @@ describe("Convexリプレース由来デグレ修正の追加テスト", () => {
       }),
     ).rejects.toThrow("Validation failed");
   });
+
+  it("updateRecord で titleReading を指定しない更新を行った場合、既存の titleReading が保持されること", async () => {
+    const t = convexTest(schema, modules);
+    let familyId!: Id<"families">;
+    let recordId!: Id<"serviceRecords">;
+
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        name: "Test Family",
+        updatedAt: Date.now(),
+      });
+
+      await ctx.db.insert("users", {
+        userId: "user_a",
+        email: "a@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+
+      recordId = await ctx.db.insert("serviceRecords", {
+        userId: "user_a",
+        familyId,
+        title: "Amazon",
+        titleReading: "あまぞん",
+        visibility: "PRIVATE",
+        credentials: [],
+        tags: [],
+        updatedAt: Date.now(),
+      });
+    });
+
+    const userA = t.withIdentity({ subject: "user_a", email: "a@example.com" });
+
+    // titleReading を含めずに更新を実行
+    await userA.mutation(api.records.updateRecord, {
+      id: recordId,
+      data: {
+        title: "Amazon Renewed",
+        visibility: "PRIVATE",
+        credentials: [],
+        tags: [],
+      },
+    });
+
+    await t.run(async (ctx) => {
+      const updated = await ctx.db.get(recordId);
+      expect(updated?.title).toBe("Amazon Renewed");
+      expect(updated?.titleReading).toBe("あまぞん");
+    });
+  });
 });

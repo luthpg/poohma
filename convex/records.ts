@@ -253,6 +253,7 @@ export const updateRecord = familyBoundMutation({
 
     await ctx.db.patch(args.id, {
       ...args.data,
+      titleReading: args.data.titleReading ?? record.titleReading,
       updatedAt: Date.now(),
     });
   },
