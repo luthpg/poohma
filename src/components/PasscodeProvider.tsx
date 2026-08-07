@@ -19,6 +19,12 @@ import {
 } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import {
+  AUTOLOCK_DEFAULT_MINUTES,
+  getAutolockTimeoutMinutes,
+  setAutolockTimeoutMinutes,
+  useInactivityLock,
+} from "@/hooks/useInactivityLock";
+import {
   decryptPasscodeWithBiometrics,
   disableBiometricUnlock,
   isBiometricEnabledForUser,
@@ -54,6 +60,8 @@ interface PasscodeContextType {
   }>;
   isLocked: boolean;
   disableBiometric: () => Promise<void>;
+  lockTimeoutMinutes: number;
+  setLockTimeoutMinutes: (minutes: number) => void;
 }
 
 const PasscodeContext = createContext<PasscodeContextType | null>(null);
@@ -68,6 +76,31 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
   const [isPromptOpen, setIsPromptOpen] = useState(false);
   const [showPasscode, setShowPasscode] = useState(false);
   const resolvePromiseRef = useRef<((value: boolean) => void) | null>(null);
+
+  // オートロック設定
+  const [lockTimeoutMinutes, setLockTimeoutMinutesState] = useState(
+    AUTOLOCK_DEFAULT_MINUTES,
+  );
+
+  // マウント時に localStorage から読み込み
+  useEffect(() => {
+    setLockTimeoutMinutesState(getAutolockTimeoutMinutes());
+  }, []);
+
+  const handleSetLockTimeoutMinutes = useCallback((minutes: number) => {
+    setAutolockTimeoutMinutes(minutes);
+    setLockTimeoutMinutesState(minutes);
+  }, []);
+
+  // オートロック: masterKey がセット済みの場合にタイマー稼働
+  useInactivityLock({
+    onLock: useCallback(() => {
+      setMasterKey(null);
+      masterKeyRef.current = null;
+      toast.info("セキュリティのため自動ロックされました");
+    }, []),
+    enabled: masterKey != null && lockTimeoutMinutes > 0,
+  });
 
   // 生体認証ステート
   const [biometricSupported, setBiometricSupported] = useState(false);
@@ -290,6 +323,8 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
         encryptHint,
         isLocked,
         disableBiometric,
+        lockTimeoutMinutes,
+        setLockTimeoutMinutes: handleSetLockTimeoutMinutes,
       }}
     >
       {children}
@@ -311,6 +346,12 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
               {user?.family?.name || "家族"}
               のパスコードを入力してください。
             </DialogDescription>
+            {lockTimeoutMinutes > 0 && (
+              <p className="text-xs text-muted-foreground/70 mt-1">
+                無操作状態が{lockTimeoutMinutes}
+                分を超えると自動ロックされます。
+              </p>
+            )}
           </DialogHeader>
           <form onSubmit={handleUnlockSubmit} className="space-y-4 pt-4">
             <div className="relative">

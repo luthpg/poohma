@@ -40,7 +40,8 @@ function SettingsComponent() {
   const { user } = routeApi.useLoaderData();
   const router = useRouter();
   const { queryClient } = Route.useRouteContext();
-  const { disableBiometric } = usePasscode();
+  const { disableBiometric, lockTimeoutMinutes, setLockTimeoutMinutes } =
+    usePasscode();
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -221,30 +222,64 @@ function SettingsComponent() {
         </form>
       </div>
 
-      {hasBiometric && (
-        <div className="rounded-lg bg-card p-6 shadow-card border border-border/50 mt-8">
-          <h2 className="text-[18px] font-semibold text-foreground tracking-geist-ui mb-2">
-            セキュリティ設定
-          </h2>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-6">
+      <div className="rounded-lg bg-card p-6 shadow-card border border-border/50 mt-8">
+        <h2 className="text-[18px] font-semibold text-foreground tracking-geist-ui mb-2 border-b border-border pb-4">
+          セキュリティ設定
+        </h2>
+        <div className="space-y-6 pt-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <p className="text-[14px] font-medium text-foreground">
-                生体認証の解除
+                オートロック（無操作タイムアウト）
               </p>
               <p className="text-[12px] text-muted-foreground mt-1">
-                この端末に保存されている生体認証（FaceID/指紋）のロック解除設定を削除します。
+                一定時間操作がない場合、またはアプリがバックグラウンドに回った際、自動で暗号化キーをロックします。
               </p>
             </div>
-            <button
-              type="button"
-              onClick={handleClearBiometric}
-              className="rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+            <select
+              value={lockTimeoutMinutes}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                setLockTimeoutMinutes(val);
+                toast.success(
+                  val === 0
+                    ? "オートロックを無効にしました"
+                    : `オートロック時間を ${val} 分に設定しました`,
+                );
+              }}
+              className="rounded-md border border-border/50 bg-card px-3 py-2 text-[13px] font-medium text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50 w-full sm:w-auto shrink-0"
             >
-              設定を削除
-            </button>
+              <option value={1}>1分</option>
+              <option value={3}>3分</option>
+              <option value={5}>5分（デフォルト）</option>
+              <option value={10}>10分</option>
+              <option value={15}>15分</option>
+              <option value={30}>30分</option>
+              <option value={0}>無効</option>
+            </select>
           </div>
+
+          {hasBiometric && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-border/40">
+              <div>
+                <p className="text-[14px] font-medium text-foreground">
+                  生体認証の解除
+                </p>
+                <p className="text-[12px] text-muted-foreground mt-1">
+                  この端末に保存されている生体認証（FaceID/指紋）のロック解除設定を削除します。
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleClearBiometric}
+                className="rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground shrink-0"
+              >
+                設定を削除
+              </button>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Danger Zone */}
       <div className="mt-8 rounded-lg border border-red-500/20 bg-red-500/5 p-6 shadow-sm">
