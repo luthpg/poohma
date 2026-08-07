@@ -6,7 +6,8 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
-import { type SubmitEvent, useEffect, useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { type SubmitEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import type { Doc, Id } from "@/../convex/_generated/dataModel";
@@ -123,6 +124,9 @@ function RecordDetailComponent({
   const [isEditing, setIsEditing] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const [title, setTitle] = useState(record.title);
+  const [titleReading, setTitleReading] = useState(record.titleReading || "");
+  const [showAdvancedTitle, setShowAdvancedTitle] = useState(false);
+  const [isFetchingFurigana, setIsFetchingFurigana] = useState(false);
   const [url, setUrl] = useState(record.url || "");
   const [ogpImage, setOgpImage] = useState(record.ogpImage || "");
   const [ogpDescription, setOgpDescription] = useState(
@@ -151,22 +155,90 @@ function RecordDetailComponent({
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingOgp, setIsFetchingOgp] = useState(false);
 
+  // 非同期レース条件対策用
+  const furiganaReqIdRef = useRef(0);
+  const furiganaPromiseRef = useRef<Promise<string | null> | null>(null);
+  const ogpPromiseRef = useRef<Promise<{
+    title?: string;
+    image?: string;
+    description?: string;
+  } | null> | null>(null);
+
   const getOgpInfo = useAction(api.actions.getOgpInfo);
+  const getFurigana = useAction(api.actions.getFurigana);
   const updateRecord = useMutation(api.records.updateRecord);
   const deleteRecord = useMutation(api.records.deleteRecord);
 
-  const handleUrlBlur = async () => {
-    if (!url) return;
+  // ルビ取得リクエストを無効化
+  const invalidateFuriganaRequest = () => {
+    furiganaReqIdRef.current += 1;
+    furiganaPromiseRef.current = null;
+    setIsFetchingFurigana(false);
+  };
+
+  const fetchFuriganaForTitle = (targetTitle: string) => {
+    const text = targetTitle.trim();
+    if (!text) return Promise.resolve(null);
+
+    furiganaReqIdRef.current += 1;
+    const currentReqId = furiganaReqIdRef.current;
+    setIsFetchingFurigana(true);
+
+    const promise = (async () => {
+      try {
+        const reading = await getFurigana({ text });
+        if (
+          currentReqId === furiganaReqIdRef.current &&
+          typeof reading === "string" &&
+          reading
+        ) {
+          setTitleReading(reading);
+          return reading;
+        }
+      } catch (e) {
+        console.error("Failed to fetch furigana", e);
+      } finally {
+        if (currentReqId === furiganaReqIdRef.current) {
+          setIsFetchingFurigana(false);
+        }
+      }
+      return null;
+    })();
+
+    furiganaPromiseRef.current = promise;
+    return promise;
+  };
+
+  const handleUrlBlur = () => {
+    if (!url) return Promise.resolve(null);
     setIsFetchingOgp(true);
-    try {
-      const ogp = await getOgpInfo({ url });
-      if (ogp.title && !title) setTitle(ogp.title);
-      if (ogp.image) setOgpImage(ogp.image);
-      if (ogp.description) setOgpDescription(ogp.description);
-    } catch (e) {
-      console.error("Failed to fetch OGP info", e);
-    } finally {
-      setIsFetchingOgp(false);
+
+    const promise = (async () => {
+      try {
+        const ogp = await getOgpInfo({ url });
+        const shouldSetTitle = ogp.title && !title;
+        if (shouldSetTitle) {
+          setTitle(ogp.title);
+          await fetchFuriganaForTitle(ogp.title);
+        }
+        if (ogp.image) setOgpImage(ogp.image);
+        if (ogp.description) setOgpDescription(ogp.description);
+        return ogp;
+      } catch (e) {
+        console.error("Failed to fetch OGP info", e);
+        return null;
+      } finally {
+        setIsFetchingOgp(false);
+      }
+    })();
+
+    ogpPromiseRef.current = promise;
+    return promise;
+  };
+
+  const handleTitleBlur = () => {
+    if (title && !titleReading) {
+      fetchFuriganaForTitle(title);
     }
   };
 
@@ -184,14 +256,16 @@ function RecordDetailComponent({
   const { encryptHint, decryptHint, masterKey, requireUnlock } = usePasscode();
 
   const handleEditStart = async () => {
-    // If there are encrypted credentials, we need to unlock and decrypt them first
+    setTitle(record.title);
+    setTitleReading(record.titleReading || "");
+
     const hasEncrypted = record.credentials.some(
       (c) => c.passwordHintIv && c.passwordHint,
     );
 
     if (hasEncrypted) {
       const unlocked = await requireUnlock();
-      if (!unlocked) return; // Cannot edit without unlocking
+      if (!unlocked) return;
 
       const decryptedCreds = await Promise.all(
         record.credentials.map(async (c) => {
@@ -262,12 +336,21 @@ function RecordDetailComponent({
     }
 
     try {
-      // E2EE: パスワードヒントを暗号化
+      let currentTitleReading = titleReading;
+      if (ogpPromiseRef.current) {
+        await ogpPromiseRef.current;
+      }
+      if (furiganaPromiseRef.current) {
+        const fetchedReading = await furiganaPromiseRef.current;
+        if (fetchedReading) {
+          currentTitleReading = fetchedReading;
+        }
+      }
+
       const filteredCreds = credentials.filter(
         (c) => c.label || c.loginId || c.passwordHint,
       );
 
-      // If we are about to save hints, we must ensure we have the masterKey to encrypt them
       const hasHintsToEncrypt = filteredCreds.some((c) => c.passwordHint);
       if (hasHintsToEncrypt && !masterKey) {
         const unlocked = await requireUnlock();
@@ -286,8 +369,8 @@ function RecordDetailComponent({
             );
             return {
               id: credId,
-              label: cred.label,
-              loginId: cred.loginId,
+              label: cred.label || undefined,
+              loginId: cred.loginId || undefined,
               passwordHint: encrypted,
               passwordHintIv: iv,
               passwordHintDekEncrypted: dekEncrypted,
@@ -296,9 +379,9 @@ function RecordDetailComponent({
           }
           return {
             id: credId,
-            label: cred.label,
-            loginId: cred.loginId,
-            passwordHint: cred.passwordHint,
+            label: cred.label || undefined,
+            loginId: cred.loginId || undefined,
+            passwordHint: cred.passwordHint || undefined,
             passwordHintIv: undefined,
             passwordHintDekEncrypted: undefined,
             passwordHintDekIv: undefined,
@@ -310,6 +393,7 @@ function RecordDetailComponent({
         id: record._id,
         data: {
           title,
+          titleReading: currentTitleReading || undefined,
           url: url || undefined,
           ogpImage: ogpImage || undefined,
           ogpDescription: ogpDescription || undefined,
@@ -371,6 +455,7 @@ function RecordDetailComponent({
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
                     onBlur={handleUrlBlur}
+                    placeholder="https://example.com"
                     className="mt-1 w-full rounded-md bg-card p-2 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
                   />
                   {isFetchingOgp && (
@@ -380,6 +465,9 @@ function RecordDetailComponent({
                     </div>
                   )}
                 </div>
+                <p className="mt-1.5 text-[12px] text-muted-foreground">
+                  入力後にフォーカスを外すと情報を自動取得します
+                </p>
               </div>
               <div>
                 <label
@@ -393,9 +481,77 @@ function RecordDetailComponent({
                   type="text"
                   required
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => {
+                    setTitle(e.target.value);
+                    invalidateFuriganaRequest();
+                    setTitleReading("");
+                  }}
+                  onBlur={handleTitleBlur}
                   className="mt-1 w-full rounded-md bg-card p-2 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
                 />
+              </div>
+
+              {/* 折りたたみ式：読み仮名（ふりがな）設定 */}
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedTitle(!showAdvancedTitle)}
+                  className="flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground hover:text-foreground transition cursor-pointer"
+                >
+                  {showAdvancedTitle ? (
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  )}
+                  <span>読み仮名（ルビ）の調整</span>
+                  {titleReading && !showAdvancedTitle && (
+                    <span className="ml-1 text-[11px] text-orange-500 font-normal">
+                      ({titleReading})
+                    </span>
+                  )}
+                </button>
+
+                {showAdvancedTitle && (
+                  <div className="mt-2 rounded-md bg-muted/40 p-3.5 border border-border/40 space-y-2 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between">
+                      <label
+                        htmlFor="title-reading-input"
+                        className="block text-[12px] font-medium text-foreground"
+                      >
+                        読み仮名 (ひらがな)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => fetchFuriganaForTitle(title)}
+                        disabled={!title || isFetchingFurigana}
+                        className="text-[11px] text-orange-500 hover:text-orange-600 disabled:opacity-50 transition cursor-pointer"
+                      >
+                        {isFetchingFurigana ? "取得中..." : "自動再取得"}
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <input
+                        id="title-reading-input"
+                        type="text"
+                        value={titleReading}
+                        onChange={(e) => {
+                          setTitleReading(e.target.value);
+                          invalidateFuriganaRequest();
+                        }}
+                        placeholder="例: あまぞん / さんいんごうどうぎんこう"
+                        className="w-full rounded-md bg-card p-2 text-base md:text-[13px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                      />
+                      {isFetchingFurigana && (
+                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                          <Spinner className="h-3.5 w-3.5 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      インデックス検索・あいうえお順ジャンプに使用されます。自動読み取りが異なる場合、手動で修正できます。
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </section>
@@ -436,7 +592,7 @@ function RecordDetailComponent({
                         htmlFor={`label-input-${index}`}
                         className="block text-[12px] font-medium text-muted-foreground uppercase tracking-wider mb-1"
                       >
-                        ラベル
+                        ラベル (例: パパ用)
                       </label>
                       <input
                         id={`label-input-${index}`}
@@ -485,6 +641,7 @@ function RecordDetailComponent({
                           newCreds[index].passwordHint = e.target.value;
                           setCredentials(newCreds);
                         }}
+                        placeholder="例: 愛犬の名前+結婚記念日"
                         className="w-full rounded-md bg-card p-2 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
                       />
                     </div>
@@ -554,13 +711,18 @@ function RecordDetailComponent({
             </button>
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || isFetchingFurigana || isFetchingOgp}
               className="flex items-center rounded-md bg-orange-500 px-6 py-2 text-[14px] font-medium text-white shadow-border hover:bg-orange-600 disabled:opacity-50 transition"
             >
               {isLoading ? (
                 <>
                   <Spinner className="mr-2 h-4 w-4" />
                   保存中...
+                </>
+              ) : isFetchingFurigana || isFetchingOgp ? (
+                <>
+                  <Spinner className="mr-2 h-4 w-4" />
+                  自動取得中...
                 </>
               ) : (
                 "保存する"

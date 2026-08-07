@@ -189,6 +189,75 @@ export const getOgpInfo = action({
   },
 });
 
+export const getFurigana = action({
+  args: { text: v.string() },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthenticated call to getFurigana");
+    }
+
+    const textToConvert = args.text.trim();
+    if (!textToConvert) return "";
+
+    const appId = process.env.YAHOO_CLIENT_ID;
+    if (!appId) {
+      console.warn("YAHOO_CLIENT_ID is not set in environment variables.");
+      return textToConvert;
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const response = await fetch("https://jlp.yahooapis.jp/jsonrpc", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": `Yahoo AppID: ${appId}`,
+        },
+        body: JSON.stringify({
+          id: "1",
+          jsonrpc: "2.0",
+          method: "jlp.furiganaservice.furigana",
+          params: {
+            q: textToConvert,
+          },
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        console.error("Yahoo Furigana API HTTP error:", response.statusText);
+        return textToConvert;
+      }
+
+      const data = (await response.json()) as {
+        result?: {
+          word?: Array<{
+            surface: string;
+            furigana?: string;
+          }>;
+        };
+      };
+
+      const words = data.result?.word;
+      if (!words || !Array.isArray(words)) {
+        return textToConvert;
+      }
+
+      const reading = words.map((w) => w.furigana || w.surface).join("");
+
+      return reading || textToConvert;
+    } catch (error) {
+      console.error("Failed to fetch furigana from Yahoo API:", error);
+      return textToConvert;
+    }
+  },
+});
+
 export const sendEmailReq = async ({
   email,
   subject,

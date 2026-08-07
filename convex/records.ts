@@ -71,8 +71,12 @@ export const getRecords = authenticatedQuery({
         return (a.url || "").localeCompare(b.url || "");
       if (args.sort === "url-desc")
         return (b.url || "").localeCompare(a.url || "");
-      // default: updatedAt-desc
-      return b.updatedAt - a.updatedAt;
+      if (args.sort === "date-asc" || args.sort === "updatedAt-asc")
+        return a.updatedAt - b.updatedAt;
+      if (args.sort === "date-desc" || args.sort === "updatedAt-desc")
+        return b.updatedAt - a.updatedAt;
+      // default: name-asc
+      return a.title.localeCompare(b.title);
     });
 
     return records;
@@ -160,6 +164,7 @@ export const getOwnedRecords = authenticatedQuery({
 export const createRecord = familyBoundMutation({
   args: {
     title: v.string(),
+    titleReading: v.optional(v.string()),
     url: v.optional(v.string()),
     ogpImage: v.optional(v.string()),
     ogpDescription: v.optional(v.string()),
@@ -190,6 +195,7 @@ export const createRecord = familyBoundMutation({
 
     const recordId = await ctx.db.insert("serviceRecords", {
       title: args.title,
+      titleReading: args.titleReading,
       url: args.url,
       ogpImage: args.ogpImage,
       ogpDescription: args.ogpDescription,
@@ -211,6 +217,7 @@ export const updateRecord = familyBoundMutation({
     id: v.id("serviceRecords"),
     data: v.object({
       title: v.string(),
+      titleReading: v.optional(v.string()),
       url: v.optional(v.string()),
       ogpImage: v.optional(v.string()),
       ogpDescription: v.optional(v.string()),
@@ -246,6 +253,7 @@ export const updateRecord = familyBoundMutation({
 
     await ctx.db.patch(args.id, {
       ...args.data,
+      titleReading: args.data.titleReading ?? record.titleReading,
       updatedAt: Date.now(),
     });
   },
@@ -284,6 +292,7 @@ export const importRecords = familyBoundMutation({
     records: v.array(
       v.object({
         title: v.string(),
+        titleReading: v.optional(v.string()),
         url: v.optional(v.string()),
         ogpImage: v.optional(v.string()),
         ogpDescription: v.optional(v.string()),
@@ -331,6 +340,7 @@ export const importRecords = familyBoundMutation({
         }
         await ctx.db.insert("serviceRecords", {
           title: record.title,
+          titleReading: record.titleReading,
           url: record.url,
           ogpImage: record.ogpImage,
           ogpDescription: record.ogpDescription,
