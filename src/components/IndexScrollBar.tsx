@@ -112,6 +112,7 @@ export function IndexScrollBar({
   useEffect(() => {
     const handleGlobalUp = () => {
       if (isDraggingRef.current) {
+        setIsDragging(false);
         isDraggingRef.current = false;
         setActiveBubble(null);
       }
