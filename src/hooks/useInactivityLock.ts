@@ -40,6 +40,8 @@ interface UseInactivityLockOptions {
   onLock: () => void;
   /** タイマーが有効か（masterKey がセットされている場合のみ true） */
   enabled: boolean;
+  /** オートロックタイムアウト（分） */
+  timeoutMinutes: number;
 }
 
 /**
@@ -54,6 +56,7 @@ interface UseInactivityLockOptions {
 export function useInactivityLock({
   onLock,
   enabled,
+  timeoutMinutes,
 }: UseInactivityLockOptions): void {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hiddenAtRef = useRef<number | null>(null);
@@ -74,7 +77,6 @@ export function useInactivityLock({
 
   const startTimer = useCallback(() => {
     clearTimer();
-    const timeoutMinutes = getAutolockTimeoutMinutes();
     // 0 = 無効
     if (timeoutMinutes === 0) return;
 
@@ -82,7 +84,7 @@ export function useInactivityLock({
     timerRef.current = setTimeout(() => {
       onLockRef.current();
     }, timeoutMs);
-  }, [clearTimer]);
+  }, [clearTimer, timeoutMinutes]);
 
   const resetTimer = useCallback(() => {
     lastActivityRef.current = Date.now();
@@ -113,7 +115,6 @@ export function useInactivityLock({
         clearTimer();
       } else {
         // visible 復帰時: 経過時間を判定
-        const timeoutMinutes = getAutolockTimeoutMinutes();
         if (timeoutMinutes === 0) {
           // 無効設定の場合はそのまま
           hiddenAtRef.current = null;
@@ -125,15 +126,15 @@ export function useInactivityLock({
         hiddenAtRef.current = null;
 
         if (hiddenAt != null) {
-          const elapsed = Date.now() - hiddenAt;
-          if (elapsed >= timeoutMs) {
+          const elapsedSinceLastActivity = Date.now() - lastActivityRef.current;
+          if (elapsedSinceLastActivity >= timeoutMs) {
             // タイムアウト超過 → ロック
             onLockRef.current();
             return;
           }
           // タイムアウト未満 → 残り時間でタイマー再開
           clearTimer();
-          const remaining = timeoutMs - elapsed;
+          const remaining = timeoutMs - elapsedSinceLastActivity;
           timerRef.current = setTimeout(() => {
             onLockRef.current();
           }, remaining);
@@ -157,5 +158,5 @@ export function useInactivityLock({
       }
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [enabled, clearTimer, startTimer, resetTimer]);
+  }, [enabled, clearTimer, startTimer, resetTimer, timeoutMinutes]);
 }

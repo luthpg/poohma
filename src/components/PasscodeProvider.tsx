@@ -100,6 +100,7 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
       toast.info("セキュリティのため自動ロックされました");
     }, []),
     enabled: masterKey != null && lockTimeoutMinutes > 0,
+    timeoutMinutes: lockTimeoutMinutes,
   });
 
   // 生体認証ステート

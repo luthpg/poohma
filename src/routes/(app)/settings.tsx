@@ -233,10 +233,14 @@ function SettingsComponent() {
                 オートロック（無操作タイムアウト）
               </p>
               <p className="text-[12px] text-muted-foreground mt-1">
-                一定時間操作がない場合、またはアプリがバックグラウンドに回った際、自動で暗号化キーをロックします。
+                一定時間操作がない場合、または設定時間以上バックグラウンドに置かれた状態からアプリに戻った際、自動で暗号化キーをロックします。
               </p>
             </div>
+            <label htmlFor="autolock-timeout" className="sr-only">
+              オートロック時間
+            </label>
             <select
+              id="autolock-timeout"
               value={lockTimeoutMinutes}
               onChange={(e) => {
                 const val = Number(e.target.value);
