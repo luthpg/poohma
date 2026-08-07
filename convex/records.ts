@@ -66,11 +66,13 @@ export const getRecords = authenticatedQuery({
     // ソート
     records.sort((a, b) => {
       if (args.sort === "name-asc")
-        return (a.titleReading || a.title)
-          .localeCompare(b.titleReading || b.title);
+        return (a.titleReading || a.title).localeCompare(
+          b.titleReading || b.title
+        );
       if (args.sort === "name-desc")
-        return (b.titleReading || b.title)
-          .localeCompare(a.titleReading || a.title);
+        return (b.titleReading || b.title).localeCompare(
+          a.titleReading || a.title
+        );
       if (args.sort === "url-asc")
         return (a.url || "").localeCompare(b.url || "");
       if (args.sort === "url-desc")
