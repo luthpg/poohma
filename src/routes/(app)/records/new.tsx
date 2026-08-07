@@ -37,6 +37,12 @@ function NewRecordComponent() {
   // 非同期レース条件対策用
   const furiganaReqIdRef = useRef(0);
 
+  // ルビ取得リクエストを無効化
+  const invalidateFuriganaRequest = () => {
+    furiganaReqIdRef.current += 1;
+    setIsFetchingFurigana(false);
+  };
+
   // ルビ取得関数（非同期競合を防止）
   const fetchFuriganaForTitle = async (targetTitle: string) => {
     const text = targetTitle.trim();
@@ -81,13 +87,11 @@ function NewRecordComponent() {
     setIsFetchingOgp(true);
     try {
       const ogp = await getOgpInfo({ url });
-      setTitle((currentTitle) => {
-        if (ogp.title && !currentTitle) {
-          fetchFuriganaForTitle(ogp.title);
-          return ogp.title;
-        }
-        return currentTitle;
-      });
+      const shouldSetTitle = ogp.title && !title;
+      if (shouldSetTitle) {
+        setTitle(ogp.title);
+        fetchFuriganaForTitle(ogp.title);
+      }
       if (ogp.image) setOgpImage(ogp.image);
       if (ogp.description) setOgpDescription(ogp.description);
     } catch (e) {
@@ -249,7 +253,7 @@ function NewRecordComponent() {
                 value={title}
                 onChange={(e) => {
                   setTitle(e.target.value);
-                  furiganaReqIdRef.current += 1;
+                  invalidateFuriganaRequest();
                   setTitleReading("");
                 }}
                 onBlur={handleTitleBlur}
@@ -302,7 +306,7 @@ function NewRecordComponent() {
                       value={titleReading}
                       onChange={(e) => {
                         setTitleReading(e.target.value);
-                        furiganaReqIdRef.current += 1;
+                        invalidateFuriganaRequest();
                       }}
                       placeholder="例: あまぞん / さんいんごうどうぎんこう"
                       className="w-full rounded-md bg-card p-2 text-base md:text-[13px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
