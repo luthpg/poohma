@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import { usePasscode } from "@/components/PasscodeProvider";
@@ -13,6 +13,10 @@ export const Route = createFileRoute("/(app)/records/new")({
 });
 
 function NewRecordComponent() {
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   const { isAuthenticated } = useConvexAuth();
   const availableTags =
     useQuery(api.records.getAvailableTags, isAuthenticated ? {} : "skip") || [];
@@ -36,38 +40,52 @@ function NewRecordComponent() {
 
   // 非同期レース条件対策用
   const furiganaReqIdRef = useRef(0);
+  const furiganaPromiseRef = useRef<Promise<string | null> | null>(null);
+  const ogpPromiseRef = useRef<Promise<{
+    title?: string;
+    image?: string;
+    description?: string;
+  } | null> | null>(null);
 
   // ルビ取得リクエストを無効化
   const invalidateFuriganaRequest = () => {
     furiganaReqIdRef.current += 1;
+    furiganaPromiseRef.current = null;
     setIsFetchingFurigana(false);
   };
 
   // ルビ取得関数（非同期競合を防止）
-  const fetchFuriganaForTitle = async (targetTitle: string) => {
+  const fetchFuriganaForTitle = (targetTitle: string) => {
     const text = targetTitle.trim();
-    if (!text) return;
+    if (!text) return Promise.resolve(null);
 
     furiganaReqIdRef.current += 1;
     const currentReqId = furiganaReqIdRef.current;
     setIsFetchingFurigana(true);
 
-    try {
-      const reading = await getFurigana({ text });
-      if (
-        currentReqId === furiganaReqIdRef.current &&
-        typeof reading === "string" &&
-        reading
-      ) {
-        setTitleReading(reading);
+    const promise = (async () => {
+      try {
+        const reading = await getFurigana({ text });
+        if (
+          currentReqId === furiganaReqIdRef.current &&
+          typeof reading === "string" &&
+          reading
+        ) {
+          setTitleReading(reading);
+          return reading;
+        }
+      } catch (e) {
+        console.error("Failed to fetch furigana", e);
+      } finally {
+        if (currentReqId === furiganaReqIdRef.current) {
+          setIsFetchingFurigana(false);
+        }
       }
-    } catch (e) {
-      console.error("Failed to fetch furigana", e);
-    } finally {
-      if (currentReqId === furiganaReqIdRef.current) {
-        setIsFetchingFurigana(false);
-      }
-    }
+      return null;
+    })();
+
+    furiganaPromiseRef.current = promise;
+    return promise;
   };
 
   // アカウント情報（複数登録可能）
@@ -82,23 +100,31 @@ function NewRecordComponent() {
   const [ogpImage, setOgpImage] = useState("");
   const [ogpDescription, setOgpDescription] = useState("");
 
-  const handleUrlBlur = async () => {
-    if (!url) return;
+  const handleUrlBlur = () => {
+    if (!url) return Promise.resolve(null);
     setIsFetchingOgp(true);
-    try {
-      const ogp = await getOgpInfo({ url });
-      const shouldSetTitle = ogp.title && !title;
-      if (shouldSetTitle) {
-        setTitle(ogp.title);
-        fetchFuriganaForTitle(ogp.title);
+
+    const promise = (async () => {
+      try {
+        const ogp = await getOgpInfo({ url });
+        const shouldSetTitle = ogp.title && !title;
+        if (shouldSetTitle) {
+          setTitle(ogp.title);
+          await fetchFuriganaForTitle(ogp.title);
+        }
+        if (ogp.image) setOgpImage(ogp.image);
+        if (ogp.description) setOgpDescription(ogp.description);
+        return ogp;
+      } catch (e) {
+        console.error("Failed to fetch OGP info", e);
+        return null;
+      } finally {
+        setIsFetchingOgp(false);
       }
-      if (ogp.image) setOgpImage(ogp.image);
-      if (ogp.description) setOgpDescription(ogp.description);
-    } catch (e) {
-      console.error("Failed to fetch OGP info", e);
-    } finally {
-      setIsFetchingOgp(false);
-    }
+    })();
+
+    ogpPromiseRef.current = promise;
+    return promise;
   };
 
   const handleTitleBlur = () => {
@@ -139,7 +165,22 @@ function NewRecordComponent() {
     }
 
     try {
-      const hasHintsToEncrypt = credentials.some((c) => c.passwordHint);
+      let currentTitleReading = titleReading;
+      if (ogpPromiseRef.current) {
+        await ogpPromiseRef.current;
+      }
+      if (furiganaPromiseRef.current) {
+        const fetchedReading = await furiganaPromiseRef.current;
+        if (fetchedReading) {
+          currentTitleReading = fetchedReading;
+        }
+      }
+
+      const filteredCreds = credentials.filter(
+        (c) => c.label || c.loginId || c.passwordHint,
+      );
+
+      const hasHintsToEncrypt = filteredCreds.some((c) => c.passwordHint);
       if (hasHintsToEncrypt && !masterKey) {
         const unlocked = await requireUnlock();
         if (!unlocked) {
@@ -150,7 +191,7 @@ function NewRecordComponent() {
 
       // E2EE: パスワードヒントを暗号化
       const encryptedCredentials = await Promise.all(
-        credentials.map(async (cred) => {
+        filteredCreds.map(async (cred) => {
           if (cred.passwordHint) {
             const { encrypted, iv, dekEncrypted, dekIv } = await encryptHint(
               cred.passwordHint,
@@ -179,7 +220,7 @@ function NewRecordComponent() {
 
       await createRecord({
         title,
-        titleReading: titleReading || undefined,
+        titleReading: currentTitleReading || undefined,
         url: url || undefined,
         ogpImage: ogpImage || undefined,
         ogpDescription: ogpDescription || undefined,
@@ -486,13 +527,18 @@ function NewRecordComponent() {
           </button>
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || isFetchingFurigana || isFetchingOgp}
             className="flex items-center rounded-md bg-orange-500 px-6 py-2 text-[14px] font-medium text-white shadow-border hover:bg-orange-600 disabled:opacity-50 transition"
           >
             {isLoading ? (
               <>
                 <Spinner className="mr-2 h-4 w-4" />
                 保存中...
+              </>
+            ) : isFetchingFurigana || isFetchingOgp ? (
+              <>
+                <Spinner className="mr-2 h-4 w-4" />
+                自動取得中...
               </>
             ) : (
               "登録する"
