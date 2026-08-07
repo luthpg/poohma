@@ -21,6 +21,7 @@ import { IndexScrollBar } from "@/components/IndexScrollBar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TagInput } from "@/components/ui/tag-input";
 import { usePersistentQuery } from "@/hooks/usePersistentQuery";
+import { cn } from "@/lib/utils";
 import {
   getDashboardPrefsFn,
   setDashboardPrefsFn,
@@ -291,7 +292,12 @@ function RouteComponent() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl p-6 relative">
+    <div
+      className={cn(
+        "mx-auto max-w-5xl p-6 relative",
+        sortParam === "name-asc" && "pr-8 md:pr-6",
+      )}
+    >
       {/* 検索・フィルターエリア */}
       <div className="mb-6">
         <form onSubmit={handleSearch} className="flex items-center gap-2">

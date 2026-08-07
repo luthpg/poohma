@@ -154,10 +154,10 @@ export function IndexScrollBar({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         className={cn(
-          "fixed right-1 md:right-2.5 top-1/2 -translate-y-1/2 z-30 select-none touch-none flex flex-col items-center py-1.5 px-0.5 md:px-1 rounded-2xl md:rounded-3xl backdrop-blur-md border shadow-lg transition-all duration-200 ease-out max-h-[85vh] overflow-hidden justify-between",
+          "fixed right-1 md:right-2.5 top-1/2 -translate-y-1/2 z-30 select-none touch-none flex flex-col items-center py-1.5 px-0.5 md:px-1 rounded-2xl md:rounded-3xl backdrop-blur-md border transition-all duration-200 ease-out max-h-[85vh] overflow-hidden justify-between",
           isDragging
             ? "w-10 md:w-12 text-foreground bg-background/95 border-orange-500/40 shadow-xl"
-            : "w-6 md:w-7 hover:w-10 md:hover:w-12 text-muted-foreground bg-background/80 hover:bg-background/95 border-border/60 hover:border-border/90 hover:text-foreground hover:shadow-xl",
+            : "w-6 md:w-7 hover:w-10 md:hover:w-12 text-muted-foreground/55 bg-background/55 border-border/35 shadow-sm hover:bg-background/85 hover:border-border/70 hover:text-foreground/85 hover:shadow-xl",
           className,
         )}
       >
@@ -182,7 +182,7 @@ export function IndexScrollBar({
                   "w-full flex-1 max-h-[22px] min-h-[12px] my-[0.5px] flex items-center justify-center rounded-full text-[10px] md:text-[11px] font-semibold transition-colors cursor-pointer shrink",
                   isActive
                     ? "bg-orange-500 text-white font-bold shadow-sm"
-                    : "hover:bg-orange-500/15 hover:text-orange-500 active:bg-orange-500/25 text-foreground/80",
+                    : "text-foreground/45 hover:bg-orange-500/15 hover:text-orange-500 active:bg-orange-500/25",
                 )}
               >
                 {key}
@@ -191,7 +191,7 @@ export function IndexScrollBar({
           })}
 
           {/* 区切り線 */}
-          <div className="w-3 md:w-3.5 h-[1px] bg-border/60 my-0.5 shrink-0" />
+          <div className="w-3 md:w-3.5 h-[1px] bg-border/35 my-0.5 shrink-0" />
 
           {/* 末尾までスクロールボタン */}
           <button
@@ -212,7 +212,7 @@ export function IndexScrollBar({
               "w-full flex-1 max-h-[22px] min-h-[14px] my-[0.5px] flex items-center justify-center rounded-full transition-colors cursor-pointer shrink",
               activeBubble === "BOTTOM"
                 ? "bg-orange-500 text-white shadow-sm"
-                : "hover:bg-orange-500/15 hover:text-orange-500 active:bg-orange-500/25 text-foreground/70",
+                : "text-foreground/45 hover:bg-orange-500/15 hover:text-orange-500 active:bg-orange-500/25",
             )}
           >
             <ArrowDown className="h-3 w-3 md:h-3.5 md:w-3.5" />
