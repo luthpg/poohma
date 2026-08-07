@@ -627,13 +627,13 @@ function RecordDetailComponent({
                     </div>
                     <div>
                       <label
-                        htmlFor={`password-hint-input-${index}`}
+                        htmlFor={`pw-hint-input-${index}`}
                         className="block text-[12px] font-medium text-muted-foreground uppercase tracking-wider mb-1"
                       >
                         パスワードヒント
                       </label>
                       <input
-                        id={`password-hint-input-${index}`}
+                        id={`pw-hint-input-${index}`}
                         type="text"
                         value={cred.passwordHint}
                         onChange={(e) => {
@@ -641,6 +641,7 @@ function RecordDetailComponent({
                           newCreds[index].passwordHint = e.target.value;
                           setCredentials(newCreds);
                         }}
+                        autoComplete="off"
                         placeholder="例: 愛犬の名前+結婚記念日"
                         className="w-full rounded-md bg-card p-2 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
                       />
