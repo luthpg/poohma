@@ -15,6 +15,7 @@ export const env = createEnv({
     VITE_FIREBASE_PROJECT_ID: z.string().min(1),
     VITE_FIREBASE_STORAGE_BUCKET: z.string().min(1),
     VITE_CONVEX_URL: z.string().url(),
+    VITE_GITHUB_REPO_URL: z.string().url().optional(),
   },
 
   /**
