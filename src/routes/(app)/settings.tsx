@@ -236,7 +236,6 @@ function SettingsComponent() {
                 一定時間操作がない場合、または設定時間以上バックグラウンドに置かれた状態からアプリに戻った際、自動で暗号化キーをロックします。
                 <br />
                 なお、この設定値は端末ごと（またはブラウザごと）に保存されます。
-
               </p>
             </div>
             <label htmlFor="autolock-timeout" className="sr-only">
