@@ -3,7 +3,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { JpText } from "../JpText";
+import { JpText } from "../src/components/JpText";
 
 describe("JpText", () => {
   it("日本語テキストをパースして <wbr /> タグを挿入すること", () => {

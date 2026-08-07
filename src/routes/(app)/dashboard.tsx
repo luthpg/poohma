@@ -142,6 +142,15 @@ function RouteComponent() {
   const { prefs, searchParams } = routeApi.useLoaderData();
   const navigate = useNavigate({ from: "/dashboard" });
 
+  useEffect(() => {
+    document.documentElement.classList.add("no-scrollbar");
+    document.body.classList.add("no-scrollbar");
+    return () => {
+      document.documentElement.classList.remove("no-scrollbar");
+      document.body.classList.remove("no-scrollbar");
+    };
+  }, []);
+
   const [searchInput, setSearchInput] = useState(searchParams.q || "");
   useEffect(() => {
     setSearchInput(searchParams.q || "");
@@ -660,7 +669,10 @@ function RecordListSection({
         </div>
       ) : (
         <>
-          <IndexScrollBar availableGroups={availableGroups} />
+          <IndexScrollBar
+            availableGroups={availableGroups}
+            className="mt-9 md:mt-4"
+          />
           <div className="space-y-6">
             {groupedRecords.map(({ groupKey, items }) => (
               <div
