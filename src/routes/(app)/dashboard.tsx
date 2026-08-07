@@ -31,7 +31,16 @@ const searchSchema = z.object({
   q: z.string().optional(),
   tag: z.string().optional(),
   sort: z
-    .enum(["name-asc", "name-desc", "url-asc", "url-desc", "updatedAt-desc"])
+    .enum([
+      "name-asc",
+      "name-desc",
+      "url-asc",
+      "url-desc",
+      "date-asc",
+      "date-desc",
+      "updatedAt-asc",
+      "updatedAt-desc",
+    ])
     .optional(),
   view: z.enum(["card", "list"]).optional(),
 });
@@ -136,20 +145,31 @@ type SortParam =
   | "name-desc"
   | "url-asc"
   | "url-desc"
+  | "date-asc"
+  | "date-desc"
+  | "updatedAt-asc"
   | "updatedAt-desc";
 
 function RouteComponent() {
   const { prefs, searchParams } = routeApi.useLoaderData();
   const navigate = useNavigate({ from: "/dashboard" });
 
+  const sortParam =
+    (searchParams.sort as SortParam) || (prefs.sort as SortParam) || "name-asc";
+
   useEffect(() => {
-    document.documentElement.classList.add("no-scrollbar");
-    document.body.classList.add("no-scrollbar");
+    if (sortParam === "name-asc") {
+      document.documentElement.classList.add("no-scrollbar");
+      document.body.classList.add("no-scrollbar");
+    } else {
+      document.documentElement.classList.remove("no-scrollbar");
+      document.body.classList.remove("no-scrollbar");
+    }
     return () => {
       document.documentElement.classList.remove("no-scrollbar");
       document.body.classList.remove("no-scrollbar");
     };
-  }, []);
+  }, [sortParam]);
 
   const [searchInput, setSearchInput] = useState(searchParams.q || "");
   useEffect(() => {
@@ -168,9 +188,6 @@ function RouteComponent() {
       }),
     });
   };
-
-  const sortParam =
-    (searchParams.sort as SortParam) || (prefs.sort as SortParam) || "name-asc";
 
   const handleSortChange = (newSort: SortParam) => {
     setDashboardPrefsFn({ data: { sort: newSort } }).catch(console.error);
@@ -630,14 +647,21 @@ function RecordListSection({
               {isSelectMode ? "選択終了" : "一括操作"}
             </button>
             <select
-              value={sortParam}
+              value={
+                sortParam === "updatedAt-desc"
+                  ? "date-desc"
+                  : sortParam === "updatedAt-asc"
+                    ? "date-asc"
+                    : sortParam
+              }
               onChange={(e) => handleSortChange(e.target.value as SortParam)}
               className="rounded-md border border-border/50 bg-card px-2 py-1.5 h-8 text-[12px] font-medium text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50"
             >
               <option value="name-asc">名前（昇順）</option>
-              <option value="name-desc">名前（降順）</option>
               <option value="url-asc">URL（昇順）</option>
               <option value="url-desc">URL（降順）</option>
+              <option value="date-desc">最終更新日（降順）</option>
+              <option value="date-asc">最終更新日（昇順）</option>
             </select>
             <div className="flex items-center rounded-md border border-border/50 bg-card shadow-sm h-8 overflow-hidden">
               <button
@@ -667,7 +691,7 @@ function RecordListSection({
           <br />
           右上のボタンから追加してみましょう！
         </div>
-      ) : (
+      ) : sortParam === "name-asc" ? (
         <>
           <IndexScrollBar
             availableGroups={availableGroups}
@@ -723,6 +747,38 @@ function RecordListSection({
             ))}
           </div>
         </>
+      ) : (
+        <div
+          className={
+            viewMode === "card"
+              ? "grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 lg:gap-6"
+              : "flex flex-col gap-3"
+          }
+        >
+          {records.map((record) =>
+            viewMode === "card" ? (
+              <ServiceCard
+                key={record._id}
+                record={record}
+                currentUserId={user.id}
+                onTagClick={handleTagClick}
+                isSelectMode={isSelectMode}
+                isSelected={selectedIds.includes(record._id)}
+                onToggleSelect={() => onToggleSelect(record._id)}
+              />
+            ) : (
+              <ServiceListItem
+                key={record._id}
+                record={record}
+                currentUserId={user.id}
+                onTagClick={handleTagClick}
+                isSelectMode={isSelectMode}
+                isSelected={selectedIds.includes(record._id)}
+                onToggleSelect={() => onToggleSelect(record._id)}
+              />
+            ),
+          )}
+        </div>
       )}
     </>
   );

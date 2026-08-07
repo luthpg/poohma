@@ -71,8 +71,12 @@ export const getRecords = authenticatedQuery({
         return (a.url || "").localeCompare(b.url || "");
       if (args.sort === "url-desc")
         return (b.url || "").localeCompare(a.url || "");
-      // default: updatedAt-desc
-      return b.updatedAt - a.updatedAt;
+      if (args.sort === "date-asc" || args.sort === "updatedAt-asc")
+        return a.updatedAt - b.updatedAt;
+      if (args.sort === "date-desc" || args.sort === "updatedAt-desc")
+        return b.updatedAt - a.updatedAt;
+      // default: name-asc
+      return a.title.localeCompare(b.title);
     });
 
     return records;
