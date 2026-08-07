@@ -19,6 +19,7 @@ export function IndexScrollBar({
   const isDraggingRef = useRef(false);
   const lastGroupKeyRef = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const activeBubbleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const scrollToGroup = useCallback(
     (key: IndexGroupKey) => {
@@ -100,7 +101,10 @@ export function IndexScrollBar({
         // ignore
       }
     }
-    setTimeout(() => {
+    if (activeBubbleTimerRef.current) {
+      clearTimeout(activeBubbleTimerRef.current);
+    }
+    activeBubbleTimerRef.current = setTimeout(() => {
       setActiveBubble(null);
     }, 400);
   };
@@ -114,6 +118,14 @@ export function IndexScrollBar({
     };
     window.addEventListener("pointerup", handleGlobalUp);
     return () => window.removeEventListener("pointerup", handleGlobalUp);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (activeBubbleTimerRef.current) {
+        clearTimeout(activeBubbleTimerRef.current);
+      }
+    };
   }, []);
 
   if (availableGroups.length === 0) return null;
@@ -158,7 +170,10 @@ export function IndexScrollBar({
                 data-index-key={key}
                 onClick={() => {
                   scrollToGroup(key);
-                  setTimeout(() => {
+                  if (activeBubbleTimerRef.current) {
+                    clearTimeout(activeBubbleTimerRef.current);
+                  }
+                  activeBubbleTimerRef.current = setTimeout(() => {
                     setActiveBubble(null);
                   }, 400);
                 }}
@@ -183,7 +198,10 @@ export function IndexScrollBar({
             data-index-key="BOTTOM"
             onClick={() => {
               scrollToBottom();
-              setTimeout(() => {
+              if (activeBubbleTimerRef.current) {
+                clearTimeout(activeBubbleTimerRef.current);
+              }
+              activeBubbleTimerRef.current = setTimeout(() => {
                 setActiveBubble(null);
               }, 400);
             }}
