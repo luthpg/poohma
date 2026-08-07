@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
 import type { IndexGroupKey } from "@/utils/index-group";
 
 interface IndexScrollBarProps {
@@ -11,6 +12,7 @@ export function IndexScrollBar({
   onSelectGroup,
 }: IndexScrollBarProps) {
   const [activeBubble, setActiveBubble] = useState<IndexGroupKey | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const isDraggingRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -30,6 +32,7 @@ export function IndexScrollBar({
   );
 
   const handlePointerDown = (e: React.PointerEvent) => {
+    setIsDragging(true);
     isDraggingRef.current = true;
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
     handlePointerMove(e);
@@ -49,6 +52,7 @@ export function IndexScrollBar({
   };
 
   const handlePointerUp = () => {
+    setIsDragging(false);
     isDraggingRef.current = false;
     setTimeout(() => {
       setActiveBubble(null);
@@ -86,7 +90,10 @@ export function IndexScrollBar({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        className="fixed right-1 top-1/2 -translate-y-1/2 z-30 select-none touch-none flex flex-col items-center py-1.5 px-0.5 rounded-full bg-background/85 backdrop-blur border border-border/50 shadow-md text-[10px] md:text-[11px] font-semibold text-muted-foreground transition-opacity max-h-[80vh] overflow-y-auto no-scrollbar"
+        className={cn(
+          "fixed right-1 top-1/2 -translate-y-1/2 z-30 select-none touch-none flex flex-col items-center py-1.5 px-0.5 rounded-full backdrop-blur border border-border/50 shadow-md text-[10px] md:text-[11px] font-semibold transition-all origin-right duration-200 ease-out max-h-[80vh] overflow-y-auto no-scrollbar",
+          isDragging ? "scale-125 text-foreground bg-background" : "scale-100 text-muted-foreground bg-background/85",
+        )}
       >
         {availableGroups.map((key) => {
           const isActive = activeBubble === key;
