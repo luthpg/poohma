@@ -53,8 +53,8 @@ Service Worker (Workbox等):
   - 静的アセット（JS/CSS/フォント）はCache Firstで配信
   - Convexへの getRecords / getRecordDetail 等の読み取り系レスポンスは、
     取得成功のたびにIndexedDB（暗号化済みのまま）へミラーリング保存する
-    （平文化はブラウザメモリ上でのみ行い、Service Worker / IndexedDBには
-    暗号化済みデータのみを永続化する。6章の鍵階層は据え置き）
+    （passwordHintはE2EE暗号化済み、サービス名・URL・メモ・タグ・ログインID等のメタデータは
+    平文としてIndexedDBへ永続化される。復号処理はブラウザメモリ上でのみ行う。6章の鍵階層は据え置き）
 
 オフライン時の閲覧フロー:
   1. ネットワーク不通を検知（Network First失敗 or navigator.onLine）
@@ -173,15 +173,17 @@ serviceRecords 1 ── * credentials(内包配列)
 
 #### familyMigrations
 
-| フィールド            | 型                                                   | 説明                    |
-| ---------------- | --------------------------------------------------- | --------------------- |
-| userId           | string                                              | 移行を実行したユーザー           |
-| sourceFamilyId   | Id<families>(optional)                              | 移行元家族（未所属からの移行時はnull） |
-| targetFamilyId   | Id<families>                                        | 移行先家族                 |
-| serviceRecordIds | Id<serviceRecords>\[]                               | 移行対象レコードIDのスナップショット   |
-| status           | "PREPARED" \| "COMPLETED" \| "EXPIRED" \| "ABORTED" | 移行処理の状態               |
-| createdAt        | number                                              | 作成日時                  |
-| expiresAt        | number                                              | 有効期限（作成から30分後）        |
+| フィールド                   | 型                                                   | 説明                                                                                                   |
+| ----------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| userId                  | string                                              | 移行を実行したユーザー                                                                                          |
+| sourceFamilyId          | Id<families>(optional)                              | 移行元家族（未所属からの移行時はnull）                                                                                |
+| targetFamilyId          | Id<families>                                        | 移行先家族                                                                                                |
+| serviceRecordIds        | Id<serviceRecords>\[]                               | 移行対象レコードIDのスナップショット                                                                                  |
+| recordUpdatedAtSnapshot | {recordId, updatedAt}\[](optional)                  | 各レコードのfetch時点のupdatedAtを保持する配列（楽観的ロック用のバージョンスナップショット。要素は{recordId: Id<serviceRecords>, updatedAt: number}） |
+| processedRecordIds      | Id<serviceRecords>\[](optional)                     | 処理済みレコードIDの配列（バッチ失敗時の再開カーソル。未処理レコードはserviceRecordIds差分で特定し、レジューム可能にする）                              |
+| status                  | "PREPARED" \| "COMPLETED" \| "EXPIRED" \| "ABORTED" | 移行処理の状態                                                                                              |
+| createdAt               | number                                              | 作成日時                                                                                                 |
+| expiresAt               | number                                              | 有効期限（作成から30分後）                                                                                       |
 
 インデックス: by\_userId, by\_status
 
@@ -224,15 +226,15 @@ serviceRecords 1 ── * credentials(内包配列)
 
 credentials要素：
 
-| フィールド                    | 型                | 説明                    |
-| ------------------------ | ---------------- | --------------------- |
-| id                       | string           | UUID                  |
-| label                    | string(optional) | 認証情報ラベル               |
-| loginId                  | string(optional) | ログインID（平文）            |
-| passwordHint             | string(optional) | 暗号化済みパスワードヒント（Base64） |
-| passwordHintIv           | string(optional) | 上記暗号化のIV              |
-| passwordHintDekEncrypted | string(optional) | マスターキーでラップされたDEK      |
-| passwordHintDekIv        | string(optional) | DEKラップ処理のIV           |
+| フィールド                    | 型                | 説明                                       |
+| ------------------------ | ---------------- | ---------------------------------------- |
+| id                       | string           | UUID                                     |
+| label                    | string(optional) | 認証情報ラベル（平文）                              |
+| loginId                  | string(optional) | ログインID（平文でサーバーに保存される）                   |
+| passwordHint             | string(optional) | 暗号化済みパスワードヒント（Base64、E2EE暗号化対象）          |
+| passwordHintIv           | string(optional) | 上記暗号化のIV                                |
+| passwordHintDekEncrypted | string(optional) | マスターキーでラップされたDEK                         |
+| passwordHintDekIv        | string(optional) | DEKラップ処理のIV                             |
 
 #### recordAccessLog（新設、FR-REC-16）
 
@@ -328,11 +330,16 @@ requireRecordAccess(user, record):
 ```
 ConvexReactClient / TanStack Query の Mutation実行を共通ラッパーでインターセプトし、
 認証エラー（セッションCookie失効・IDトークン失効）を検知した場合：
-  1. 実行しようとしていたMutationの引数（フォーム入力内容）をReact State上に保持したまま、
+  1. 実行しようとしていたMutationの引数（フォーム入力内容）とクライアント生成の
+     idempotency key（UUID等）をReact State上に保持したまま、
      画面を覆う再ログインモーダルを表示する（入力欄はアンマウントしない）
   2. 再ログイン（Firebase再認証 → syncUser → セッションCookie再発行）が完了した時点で、
-     保持しておいた引数を用いて元のMutationを自動的に再実行する
-  3. 再実行が成功した時点でモーダルを閉じ、通常のフィードバック（トースト等）を表示する
+     保持しておいた引数と同一のidempotency keyを用いて元のMutationを自動的に再実行する
+  3. サーバー側は、createRecord / updateRecord / importRecords 等の書き込みMutationに対して
+     idempotency keyを受け取り、既に同一キーで処理済みの場合は再実行せず既存結果を返却する
+     （初回リクエストがサーバー到達前にタイムアウトした場合のみ再実行し、
+     サーバー処理済み・レスポンス欠落の場合は既存結果を再利用して重複作成・通知を防ぐ）
+  4. 再実行が成功した時点でモーダルを閉じ、通常のフィードバック（トースト等）を表示する
 
 本フローはフォーム保存系Mutation（createRecord / updateRecord / importRecords 等）に対して
 共通的に適用できるよう、Mutation呼び出しの共通フックとして実装する。
@@ -425,6 +432,8 @@ decryptHint/encryptHint 側でマスターキー直接暗号化にフォール�
    - 移行先家族ID (targetFamilyId) を確定 (新規作成 or 承認済み参加申請の家族)
    - 呼び出しユーザーの既存 serviceRecords ID一覧・各レコードの updatedAt をスナップショットし、
      familyMigrations レコードを status=PREPARED, expiresAt=作成+30分 で作成
+     （recordUpdatedAtSnapshot フィールドに各レコードIDをキーとしたupdatedAtマッピングを保存し、
+     後続のcommit時に楽観的ロックの前提条件として検証する）
    - 呼び出し時点で残っている自分の他のPREPARED移行は先にEXPIRED化しクリーンアップ
 
 2. getMigrationForEncryption Query
@@ -440,16 +449,20 @@ decryptHint/encryptHint 側でマスターキー直接暗号化にフォール�
    - 再暗号化済みcredentialsを、1回あたり20〜50件程度のバッチに分割して複数回のMutation呼び出しで送信する
      （通信断・Convexのペイロード／実行時間制限に対する耐性を確保。familyMigrationsに
       processedRecordIds を保持し、失敗時は未処理分から再送してレジューム可能にする）
-   - 各バッチのレコード更新時、対象レコードの updatedAt が 1. で取得したスナップショット値と
-     一致することを前提条件として検証する（楽観的ロック）。不一致の場合は当該レコードの
-     更新を拒否し、「移行中に他メンバーが更新したため再取得が必要」として呼び出し元へ返す
+   - 各バッチのレコード更新時、対象レコードの updatedAt が 1. のrecordUpdatedAtSnapshotで
+     スナップショットされた値と一致することを前提条件として検証する（楽観的ロック）。
+     不一致の場合は当該レコードの更新を拒否し、「移行中に他メンバーが更新したため再取得が必要」として
+     呼び出し元へ返す
+   - 各バッチ成功時、処理済みレコードIDを processedRecordIds へ追記し、
+     次回レジューム時はserviceRecordIds との差分を未処理レコードとして特定する
    - 全バッチ成功後、ユーザーのfamilyIdを更新、参加申請があれば削除
    - 移行元家族が空（メンバー0・レコード0）になった場合は削除
    - familyMigrationsのstatusをCOMPLETEDに更新
 
 5. 失敗時：abortFamilyMigration Mutationで明示的中断、または放置時はCronで自動EXPIRED化
-   （バッチ途中で中断した場合、未処理のレコードは旧familyId・旧鍵のまま残るため、
-    再開時は processedRecordIds を差分として再開する）
+   （バッチ途中で中断した場合、processedRecordIdsを参照し、serviceRecordIdsとの差分を
+    未処理レコードとして再開する。未処理のレコードは旧familyId・旧鍵のまま残るため、
+    レジューム時は差分のみを再暗号化・送信する）
 ```
 
 ### 6.5 パスコードのみのローテーション（FR-FAM-10）
@@ -464,9 +477,14 @@ decryptHint/encryptHint 側でマスターキー直接暗号化にフォール�
    アンロックを先に要求する）を、新しい導出鍵で再wrap
 4. Mutation families.rotatePasscode を呼び出し、以下のみを更新する：
    masterKeyEncrypted / masterKeyIv / masterKeySalt / kdfIterations
-   （credentials・DEK・passwordHintは一切変更しない。O(1)で完了する軽量な操作）
+   （各レコードのcredentials・DEK・passwordHintは一切変更しない。
+   DEKはマスターキーでラップされており、マスターキー自体は不変であるため、
+   パスコード由来鍵の変更はDEKに影響しない。O(1)で完了する軽量な操作）
 5. リカバリーキーが発行済みの場合、masterKeyRecoveryEncrypted 等は
    同一マスターキーへの別経路のラップであるため、本操作による影響を受けず有効なまま残る
+
+注記：現行実装では rotatePasscode Mutation は未実装であり、パスコード変更は
+家族移行フロー（6.4）経由で新家族（同一家族ID）を作成する形で代替している。
 ```
 
 ### 6.6 リカバリーキー（復元コード, FR-CRYPT-06）
@@ -481,6 +499,9 @@ decryptHint/encryptHint 側でマスターキー直接暗号化にフォール�
      masterKeyRecoveryEncrypted / masterKeyRecoveryIv としてサーバーへ送信・保存
   4. リカバリーキーの文字列とQRコード（qrcode.react）をA4印刷用レイアウトのPDF
      （jsPDF等でクライアントサイド生成）としてダウンロードさせる
+  5. PDF保存後、リカバリーキーの平文はサーバー・アプリのメモリ・IndexedDBからすべて消去され、
+     再表示できないことを画面上で明示する。ダウンロードされたPDFのみが唯一の保管媒体となるため、
+     安全な保管と管理はユーザーの責任範囲であることをUI上で案内する
 
 利用（パスコード忘却時の復旧）フロー：
   1. 「パスコードを忘れた場合」導線からリカバリーキー入力画面へ
