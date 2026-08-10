@@ -1,5 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getCookie, setCookie } from "@tanstack/react-start/server";
+import {
+  getCookie,
+  setCookie,
+  setResponseHeader,
+} from "@tanstack/react-start/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/../convex/_generated/api";
 import { env } from "@/env/client";
@@ -127,6 +131,8 @@ export const getAuthUser = createServerFn({ method: "GET" }).handler(
 export const getCustomTokenFromSession = createServerFn({
   method: "GET",
 }).handler(async () => {
+  setResponseHeader("Cache-Control", "no-store");
+
   const sessionCookie = getCookie("session");
   if (!sessionCookie) return null;
   try {

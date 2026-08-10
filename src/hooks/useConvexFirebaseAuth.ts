@@ -8,6 +8,7 @@ export function useConvexFirebaseAuth() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const recoveryAttempted = useRef(false);
+  const recoverySnapshot = useRef<{ user: any; timestamp: number } | null>(null);
 
   useEffect(() => {
     if (!auth) {
@@ -15,12 +16,28 @@ export function useConvexFirebaseAuth() {
       return;
     }
     const firebaseAuth = auth;
+    let isCleanedUp = false;
+
     const unsubscribe = onIdTokenChanged(firebaseAuth, async (user) => {
+      // Invalidate any ongoing recovery when auth state changes
+      recoverySnapshot.current = null;
+
       if (!user && !recoveryAttempted.current) {
         recoveryAttempted.current = true;
+        // Capture auth state snapshot before starting async recovery
+        const snapshot = { user: firebaseAuth.currentUser, timestamp: Date.now() };
+        recoverySnapshot.current = snapshot;
+
         try {
           const result = await getCustomTokenFromSession();
-          if (result?.customToken) {
+
+          // Only apply recovery if snapshot is still valid and effect not cleaned up
+          if (
+            !isCleanedUp &&
+            recoverySnapshot.current === snapshot &&
+            firebaseAuth.currentUser === snapshot.user &&
+            result?.customToken
+          ) {
             await signInWithCustomToken(firebaseAuth, result.customToken);
             return;
           }
@@ -32,7 +49,11 @@ export function useConvexFirebaseAuth() {
       setIsLoading(false);
     });
 
-    return unsubscribe;
+    return () => {
+      isCleanedUp = true;
+      recoverySnapshot.current = null;
+      unsubscribe();
+    };
   }, []);
 
   return useMemo(
