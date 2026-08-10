@@ -11,18 +11,38 @@ export const AUTOLOCK_DEFAULT_MINUTES = 5;
  * 未設定または不正値の場合はデフォルト値を返す。
  */
 export function getAutolockTimeoutMinutes(): number {
-  const stored = localStorage.getItem(AUTOLOCK_TIMEOUT_KEY);
-  if (stored == null) return AUTOLOCK_DEFAULT_MINUTES;
-  const parsed = Number(stored);
-  if (Number.isNaN(parsed) || parsed < 0) return AUTOLOCK_DEFAULT_MINUTES;
-  return parsed;
+  if (typeof window === "undefined") {
+    return AUTOLOCK_DEFAULT_MINUTES;
+  }
+  try {
+    if (typeof localStorage === "undefined" || localStorage == null) {
+      return AUTOLOCK_DEFAULT_MINUTES;
+    }
+    const stored = localStorage.getItem(AUTOLOCK_TIMEOUT_KEY);
+    if (stored == null) return AUTOLOCK_DEFAULT_MINUTES;
+    const parsed = Number(stored);
+    if (Number.isNaN(parsed) || parsed < 0) return AUTOLOCK_DEFAULT_MINUTES;
+    return parsed;
+  } catch {
+    return AUTOLOCK_DEFAULT_MINUTES;
+  }
 }
 
 /**
  * localStorage にオートロックタイムアウト（分）を保存する。
  */
 export function setAutolockTimeoutMinutes(minutes: number): void {
-  localStorage.setItem(AUTOLOCK_TIMEOUT_KEY, String(minutes));
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    if (typeof localStorage === "undefined" || localStorage == null) {
+      return;
+    }
+    localStorage.setItem(AUTOLOCK_TIMEOUT_KEY, String(minutes));
+  } catch {
+    // ignore
+  }
 }
 
 /** ユーザー操作として監視するイベント */
