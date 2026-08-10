@@ -1,15 +1,49 @@
-// src/components/CmsRichText.tsx
 import parse, { type DOMNode, domToReact, Element } from "html-react-parser";
 
 interface CmsRichTextProps {
   htmlContent: string;
 }
 
+// Allowlist of permitted HTML tags from microCMS (XSS mitigation)
+const ALLOWED_TAGS = new Set([
+  "h1",
+  "h2",
+  "h3",
+  "p",
+  "code",
+  "ol",
+  "ul",
+  "li",
+  "strong",
+  "em",
+  "a",
+  "hr",
+  "br",
+]);
+
 export function CmsRichText({ htmlContent }: CmsRichTextProps) {
   // microCMSのHTMLタグを、Shadcn / Geist風クラスに動的に置換・装飾するパーサー
+  // セキュリティ: 許可されたタグのみを描画し、それ以外は除去する（基本的なXSS対策）
   const options = {
     replace: (domNode: DOMNode) => {
       if (domNode instanceof Element) {
+        // Reject any tag not in the allowlist
+        if (!ALLOWED_TAGS.has(domNode.name)) {
+          // Return null to strip the element, or return its children to preserve text content
+          return domNode.children?.length
+            ? domToReact(domNode.children as DOMNode[], options)
+            : null;
+        }
+
+        // Strip any inline event handlers (onclick, onerror, etc.) from attributes
+        if (domNode.attribs) {
+          for (const attr of Object.keys(domNode.attribs)) {
+            if (attr.toLowerCase().startsWith("on")) {
+              delete domNode.attribs[attr];
+            }
+          }
+        }
+
         // 見出し H2 (Geist風にタイトな文字間隔を設定)
         if (domNode.name === "h2") {
           return (
@@ -49,6 +83,29 @@ export function CmsRichText({ htmlContent }: CmsRichTextProps) {
               {domToReact(domNode.children as DOMNode[], options)}
             </ul>
           );
+        }
+        // リンク (href属性のみ許可、javascript:等の危険なスキームは除外)
+        if (domNode.name === "a") {
+          const href = domNode.attribs?.href || "";
+          // Only allow http, https, and mailto schemes
+          if (
+            href.startsWith("http://") ||
+            href.startsWith("https://") ||
+            href.startsWith("mailto:")
+          ) {
+            return (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-orange-600 underline hover:text-orange-700"
+              >
+                {domToReact(domNode.children as DOMNode[], options)}
+              </a>
+            );
+          }
+          // Strip dangerous hrefs
+          return <>{domToReact(domNode.children as DOMNode[], options)}</>;
         }
       }
     },
