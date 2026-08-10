@@ -158,20 +158,6 @@ function RouteComponent() {
   const sortParam =
     (searchParams.sort as SortParam) || (prefs.sort as SortParam) || "name-asc";
 
-  useEffect(() => {
-    if (sortParam === "name-asc") {
-      document.documentElement.classList.add("no-scrollbar");
-      document.body.classList.add("no-scrollbar");
-    } else {
-      document.documentElement.classList.remove("no-scrollbar");
-      document.body.classList.remove("no-scrollbar");
-    }
-    return () => {
-      document.documentElement.classList.remove("no-scrollbar");
-      document.body.classList.remove("no-scrollbar");
-    };
-  }, [sortParam]);
-
   const [searchInput, setSearchInput] = useState(searchParams.q || "");
   useEffect(() => {
     setSearchInput(searchParams.q || "");
@@ -296,8 +282,20 @@ function RouteComponent() {
       className={cn(
         "mx-auto max-w-5xl p-6 relative",
         sortParam === "name-asc" && "pr-8 md:pr-6",
+        isSelectMode && selectedIds.length > 0 && "pb-28",
       )}
     >
+      {sortParam === "name-asc" && (
+        <style>{`
+          html, body {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+          }
+          html::-webkit-scrollbar, body::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
+      )}
       {/* 検索・フィルターエリア */}
       <div className="mb-6">
         <form onSubmit={handleSearch} className="flex items-center gap-2">

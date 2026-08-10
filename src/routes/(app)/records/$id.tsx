@@ -970,9 +970,15 @@ function CredentialCard({
     passwordHintDekIv?: string;
   };
 }) {
-  const { decryptHint, requireUnlock } = usePasscode();
+  const { decryptHint, requireUnlock, masterKey } = usePasscode();
   const [decryptedHint, setDecryptedHint] = useState<string | null>(null);
   const [isDecrypting, setIsDecrypting] = useState(false);
+
+  useEffect(() => {
+    if (masterKey == null) {
+      setDecryptedHint(null);
+    }
+  }, [masterKey]);
 
   const isEncrypted = !!cred.passwordHintIv && !!cred.passwordHint;
 
