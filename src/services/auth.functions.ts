@@ -1,5 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getCookie, setCookie } from "@tanstack/react-start/server";
+import {
+  getCookie,
+  setCookie,
+  setResponseHeader,
+} from "@tanstack/react-start/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/../convex/_generated/api";
 import { env } from "@/env/client";
@@ -120,3 +124,23 @@ export const getAuthUser = createServerFn({ method: "GET" }).handler(
     }
   },
 );
+
+/**
+ * セッションクッキーからカスタムトークンを生成する（iOS PWA復元用）
+ */
+export const getCustomTokenFromSession = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  setResponseHeader("Cache-Control", "no-store");
+
+  const sessionCookie = getCookie("session");
+  if (!sessionCookie) return null;
+  try {
+    const { uid } = await verifySessionCookie(sessionCookie);
+    const customToken = await adminAuth().createCustomToken(uid);
+    return { customToken };
+  } catch (error) {
+    console.error("getCustomTokenFromSession failed:", error);
+    return null;
+  }
+});
