@@ -27,17 +27,6 @@ export default defineSchema({
     sourceFamilyId: v.optional(v.id("families")),
     targetFamilyId: v.id("families"),
     serviceRecordIds: v.array(v.id("serviceRecords")),
-    // Snapshot of each record's updatedAt at fetch time for optimistic locking
-    recordUpdatedAtSnapshot: v.optional(
-      v.array(
-        v.object({
-          recordId: v.id("serviceRecords"),
-          updatedAt: v.number(),
-        }),
-      ),
-    ),
-    // Array of record IDs that have been successfully processed (for resumption)
-    processedRecordIds: v.optional(v.array(v.id("serviceRecords"))),
     status: v.union(
       v.literal("PREPARED"),
       v.literal("COMPLETED"),

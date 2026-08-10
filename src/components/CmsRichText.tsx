@@ -1,4 +1,3 @@
-// src/components/CmsRichText.tsx
 import parse, { type DOMNode, domToReact, Element } from "html-react-parser";
 
 interface CmsRichTextProps {
@@ -7,15 +6,18 @@ interface CmsRichTextProps {
 
 // Allowlist of permitted HTML tags from microCMS (XSS mitigation)
 const ALLOWED_TAGS = new Set([
+  "h1",
   "h2",
   "h3",
   "p",
   "code",
+  "ol",
   "ul",
   "li",
   "strong",
   "em",
   "a",
+  "hr",
   "br",
 ]);
 
@@ -29,7 +31,7 @@ export function CmsRichText({ htmlContent }: CmsRichTextProps) {
         if (!ALLOWED_TAGS.has(domNode.name)) {
           // Return null to strip the element, or return its children to preserve text content
           return domNode.children?.length
-            ? <>{domToReact(domNode.children as DOMNode[], options)}</>
+            ? domToReact(domNode.children as DOMNode[], options)
             : null;
         }
 
