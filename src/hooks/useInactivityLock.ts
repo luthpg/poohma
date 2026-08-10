@@ -11,14 +11,13 @@ export const AUTOLOCK_DEFAULT_MINUTES = 5;
  * 未設定または不正値の場合はデフォルト値を返す。
  */
 export function getAutolockTimeoutMinutes(): number {
-  if (
-    typeof window === "undefined" ||
-    typeof localStorage === "undefined" ||
-    localStorage == null
-  ) {
+  if (typeof window === "undefined") {
     return AUTOLOCK_DEFAULT_MINUTES;
   }
   try {
+    if (typeof localStorage === "undefined" || localStorage == null) {
+      return AUTOLOCK_DEFAULT_MINUTES;
+    }
     const stored = localStorage.getItem(AUTOLOCK_TIMEOUT_KEY);
     if (stored == null) return AUTOLOCK_DEFAULT_MINUTES;
     const parsed = Number(stored);
@@ -33,14 +32,13 @@ export function getAutolockTimeoutMinutes(): number {
  * localStorage にオートロックタイムアウト（分）を保存する。
  */
 export function setAutolockTimeoutMinutes(minutes: number): void {
-  if (
-    typeof window === "undefined" ||
-    typeof localStorage === "undefined" ||
-    localStorage == null
-  ) {
+  if (typeof window === "undefined") {
     return;
   }
   try {
+    if (typeof localStorage === "undefined" || localStorage == null) {
+      return;
+    }
     localStorage.setItem(AUTOLOCK_TIMEOUT_KEY, String(minutes));
   } catch {
     // ignore
