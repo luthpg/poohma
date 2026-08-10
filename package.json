@@ -41,6 +41,7 @@
     "convex-helpers": "^0.1.120",
     "firebase": "^12.17.0",
     "firebase-admin": "^13.10.0",
+    "get-nonce": "^1.0.1",
     "html-react-parser": "^6.1.5",
     "idb-keyval": "^6.3.0",
     "lucide-react": "^1.28.0",

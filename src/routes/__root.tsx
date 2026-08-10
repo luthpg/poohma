@@ -22,6 +22,7 @@ import "@fontsource/geist-mono/400.css";
 import "@fontsource/geist-mono/500.css";
 import "@fontsource/geist-mono/600.css";
 import "@fontsource/geist-mono/700.css";
+import { getGlobalStartContext } from "@tanstack/react-start";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { PasscodeProvider } from "@/components/PasscodeProvider";
@@ -43,80 +44,85 @@ export const authUserQueryOptions = queryOptions({
 });
 
 export const Route = createRootRouteWithContext<RouterContext>()({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      {
-        name: "viewport",
-        content: "width=device-width, initial-scale=1",
-      },
-      { title: "PoohMa — 家族で使えるアカウント管理" },
-      {
-        name: "description",
-        content:
-          "PoohMaは家族でアカウント情報を安全に共有・管理できるWebアプリです。暗号化で大切なパスワードヒントを守ります。",
-      },
-      // Google Search Console認証用
-      {
-        name: "google-site-verification",
-        content: "Xwlu3JEEZcvhMmYC-BoHyCRizCC90oefBJCbX5852lM",
-      },
-      // OGP
-      { property: "og:type", content: "website" },
-      {
-        property: "og:title",
-        content: "PoohMa — 家族で使えるアカウント管理",
-      },
-      {
-        property: "og:description",
-        content:
-          "家族でアカウント情報を安全に共有・管理。パスワードのヒントを暗号化して安全に管理しよう！",
-      },
-      { property: "og:image", content: "/android-chrome-512x512.png" },
-      { property: "og:site_name", content: "PoohMa" },
-      { property: "og:locale", content: "ja_JP" },
-      // Twitter Card
-      { name: "twitter:card", content: "summary" },
-      {
-        name: "twitter:title",
-        content: "PoohMa — 家族で使えるアカウント管理",
-      },
-      {
-        name: "twitter:description",
-        content:
-          "家族でアカウント情報を安全に共有・管理。E2E暗号化対応のパスワードマネージャー。",
-      },
-      { name: "twitter:image", content: "/android-chrome-512x512.png" },
-      // PWA / Mobile
-      { name: "theme-color", content: "#f97316" },
-      { name: "mobile-web-app-capable", content: "yes" },
-      { name: "apple-mobile-web-app-capable", content: "yes" },
-      {
-        name: "apple-mobile-web-app-status-bar-style",
-        content: "default",
-      },
-      { name: "apple-mobile-web-app-title", content: "PoohMa" },
-      { name: "format-detection", content: "telephone=no" },
-    ],
-    links: [
-      { rel: "stylesheet", href: appCss },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
-      {
-        rel: "icon",
-        href: "/icon-32x32.png",
-        type: "image/png",
-        sizes: "32x32",
-      },
-      {
-        rel: "icon",
-        href: "/icon-192x192.png",
-        type: "image/png",
-        sizes: "192x192",
-      },
-      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
-      { rel: "manifest", href: "/manifest.json" },
-    ],
-  }),
+  head: () => {
+    const nonce = getGlobalStartContext()?.nonce;
+    return {
+      meta: [
+        { charSet: "utf-8" },
+        {
+          name: "viewport",
+          content: "width=device-width, initial-scale=1",
+        },
+        { title: "PoohMa — 家族で使えるアカウント管理" },
+        {
+          name: "description",
+          content:
+            "PoohMaは家族でアカウント情報を安全に共有・管理できるWebアプリです。暗号化で大切なパスワードヒントを守ります。",
+        },
+        // Google Search Console認証用
+        {
+          name: "google-site-verification",
+          content: "Xwlu3JEEZcvhMmYC-BoHyCRizCC90oefBJCbX5852lM",
+        },
+        // OGP
+        { property: "og:type", content: "website" },
+        {
+          property: "og:title",
+          content: "PoohMa — 家族で使えるアカウント管理",
+        },
+        {
+          property: "og:description",
+          content:
+            "家族でアカウント情報を安全に共有・管理。パスワードのヒントを暗号化して安全に管理しよう！",
+        },
+        { property: "og:image", content: "/android-chrome-512x512.png" },
+        { property: "og:site_name", content: "PoohMa" },
+        { property: "og:locale", content: "ja_JP" },
+        // Twitter Card
+        { name: "twitter:card", content: "summary" },
+        {
+          name: "twitter:title",
+          content: "PoohMa — 家族で使えるアカウント管理",
+        },
+        {
+          name: "twitter:description",
+          content:
+            "家族でアカウント情報を安全に共有・管理。E2E暗号化対応のパスワードマネージャー。",
+        },
+        { name: "twitter:image", content: "/android-chrome-512x512.png" },
+        // PWA / Mobile
+        { name: "theme-color", content: "#f97316" },
+        { name: "mobile-web-app-capable", content: "yes" },
+        { name: "apple-mobile-web-app-capable", content: "yes" },
+        {
+          name: "apple-mobile-web-app-status-bar-style",
+          content: "default",
+        },
+        { name: "apple-mobile-web-app-title", content: "PoohMa" },
+        { name: "format-detection", content: "telephone=no" },
+        // nonce
+        ...(nonce ? [{ name: "csp-nonce", content: nonce }] : []),
+      ],
+      links: [
+        { rel: "stylesheet", href: appCss },
+        { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+        {
+          rel: "icon",
+          href: "/icon-32x32.png",
+          type: "image/png",
+          sizes: "32x32",
+        },
+        {
+          rel: "icon",
+          href: "/icon-192x192.png",
+          type: "image/png",
+          sizes: "192x192",
+        },
+        { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+        { rel: "manifest", href: "/manifest.json" },
+      ],
+    };
+  },
 
   beforeLoad: async ({ context }) => {
     const user = await context.queryClient.fetchQuery(authUserQueryOptions);

@@ -83,6 +83,9 @@ importers:
       firebase-admin:
         specifier: ^13.10.0
         version: 13.10.0(@firebase/app-compat@0.5.16)(@firebase/app@0.16.0)(supports-color@7.2.0)
+      get-nonce:
+        specifier: ^1.0.1
+        version: 1.0.1
       html-react-parser:
         specifier: ^6.1.5
         version: 6.1.5(@types/react@19.2.18)(react@19.2.8)
