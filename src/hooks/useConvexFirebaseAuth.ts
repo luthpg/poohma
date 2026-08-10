@@ -1,4 +1,8 @@
-import { onIdTokenChanged, signInWithCustomToken } from "firebase/auth";
+import {
+  type User as FirebaseUser,
+  onIdTokenChanged,
+  signInWithCustomToken,
+} from "firebase/auth";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getCustomTokenFromSession } from "@/services/auth.functions";
 import { auth } from "@/utils/firebase";
@@ -8,7 +12,10 @@ export function useConvexFirebaseAuth() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const recoveryAttempted = useRef(false);
-  const recoverySnapshot = useRef<{ user: any; timestamp: number } | null>(null);
+  const recoverySnapshot = useRef<{
+    user: FirebaseUser | null;
+    timestamp: number;
+  } | null>(null);
 
   useEffect(() => {
     if (!auth) {
@@ -25,7 +32,10 @@ export function useConvexFirebaseAuth() {
       if (!user && !recoveryAttempted.current) {
         recoveryAttempted.current = true;
         // Capture auth state snapshot before starting async recovery
-        const snapshot = { user: firebaseAuth.currentUser, timestamp: Date.now() };
+        const snapshot = {
+          user: firebaseAuth.currentUser,
+          timestamp: Date.now(),
+        };
         recoverySnapshot.current = snapshot;
 
         try {
