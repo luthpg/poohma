@@ -1,21 +1,37 @@
-import { onIdTokenChanged } from "firebase/auth";
-import { useEffect, useMemo, useState } from "react";
+import { onIdTokenChanged, signInWithCustomToken } from "firebase/auth";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { getCustomTokenFromSession } from "@/services/auth.functions";
 import { auth } from "@/utils/firebase";
 import { isPwaFirstLaunch, markPwaAsInitialized } from "@/utils/pwa";
 
 export function useConvexFirebaseAuth() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const recoveryAttempted = useRef(false);
 
   useEffect(() => {
     if (!auth) {
       setIsLoading(false);
       return;
     }
-    const unsubscribe = onIdTokenChanged(auth, (user) => {
+    const firebaseAuth = auth;
+    const unsubscribe = onIdTokenChanged(firebaseAuth, async (user) => {
+      if (!user && !recoveryAttempted.current) {
+        recoveryAttempted.current = true;
+        try {
+          const result = await getCustomTokenFromSession();
+          if (result?.customToken) {
+            await signInWithCustomToken(firebaseAuth, result.customToken);
+            return;
+          }
+        } catch (error) {
+          console.error("Silent re-auth failed:", error);
+        }
+      }
       setIsAuthenticated(!!user);
       setIsLoading(false);
     });
+
     return unsubscribe;
   }, []);
 

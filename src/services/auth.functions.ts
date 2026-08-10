@@ -120,3 +120,21 @@ export const getAuthUser = createServerFn({ method: "GET" }).handler(
     }
   },
 );
+
+/**
+ * セッションクッキーからカスタムトークンを生成する（iOS PWA復元用）
+ */
+export const getCustomTokenFromSession = createServerFn({
+  method: "GET",
+}).handler(async () => {
+  const sessionCookie = getCookie("session");
+  if (!sessionCookie) return null;
+  try {
+    const { uid } = await verifySessionCookie(sessionCookie);
+    const customToken = await adminAuth().createCustomToken(uid);
+    return { customToken };
+  } catch (error) {
+    console.error("getCustomTokenFromSession failed:", error);
+    return null;
+  }
+});
