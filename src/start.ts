@@ -26,14 +26,10 @@ const cspMiddleware = createMiddleware().server(({ next, request }) => {
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
-    `script-src 'strict-dynamic' 'nonce-${nonce}'`,
-    `style-src 'self' 'nonce-${nonce}'`,
+    "style-src 'self' 'unsafe-inline'",
     "style-src-attr 'unsafe-inline'",
     "img-src 'self' data: https:",
-    "font-src 'self'",
-    "connect-src 'self'" +
-      (convexHost ? ` wss://${convexHost} https://${convexHost}` : "") +
-      " https://securetoken.googleapis.com https://identitytoolkit.googleapis.com",
+    "font-src 'self' data:",
     "frame-src 'self'",
     "object-src 'none'",
     "manifest-src 'self'",
@@ -46,7 +42,12 @@ const cspMiddleware = createMiddleware().server(({ next, request }) => {
             (convexHost ? ` wss://${convexHost} https://${convexHost}` : "") +
             " https://securetoken.googleapis.com https://identitytoolkit.googleapis.com",
         ]
-      : []),
+      : [
+          `script-src 'strict-dynamic' 'nonce-${nonce}'`,
+          "connect-src 'self'" +
+            (convexHost ? ` wss://${convexHost} https://${convexHost}` : "") +
+            " https://securetoken.googleapis.com https://identitytoolkit.googleapis.com",
+        ]),
   ].join("; ");
 
   const headerName =
