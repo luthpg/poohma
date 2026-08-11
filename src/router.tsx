@@ -1,5 +1,7 @@
 import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
+import { getGlobalStartContext } from "@tanstack/react-start";
+import { setNonce } from "get-nonce";
 
 // Import the generated route tree
 import { routeTree } from "@/routeTree.gen";
@@ -14,11 +16,25 @@ export const getRouter = () => {
     },
   });
 
+  if (typeof document !== "undefined") {
+    const nonceInDocument = document.querySelector<HTMLMetaElement>(
+      'meta[name="csp-nonce"]',
+    )?.content;
+    if (nonceInDocument) setNonce(nonceInDocument);
+  }
+
+  // CSPミドルウェアが設定したnonceを取得
+  // getGlobalStartContext() はリクエストミドルウェアのcontextを返す
+  const startContext = getGlobalStartContext();
+  const nonce =
+    typeof startContext?.nonce === "string" ? startContext.nonce : undefined;
+
   const router = createRouter({
     routeTree,
     context: {
       queryClient,
     },
+    ssr: { nonce },
 
     defaultPreload: "intent",
     scrollRestoration: true,

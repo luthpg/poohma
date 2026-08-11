@@ -7,6 +7,8 @@ export const env = createEnv({
     MICROCMS_SERVICE_DOMAIN: z.string().min(1),
     MICROCMS_API_KEY: z.string().min(1),
     CONVEX_INTERNAL_SECRET: z.string().min(1),
+    VERCEL_ENV: z.enum(["production", "preview", "development"]).optional(),
+    CSP_MODE: z.enum(["report-only", "enforce"]).optional(),
   },
 
   /**
