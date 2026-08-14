@@ -9,13 +9,21 @@ export type MicroCMSBase = {
   revisedAt: string;
 };
 
+// FAQのカテゴリ型定義（microCMSのセレクト/参照フィールドまたは文字列）
+export type FAQCategoryField =
+  | {
+      id?: string;
+      name: string;
+    }
+  | string;
+
 // FAQの型定義
 export type FAQContent = {
   id: string;
   slug: string;
   question: string;
   answer: string; // リッチテキスト（HTML文字列）
-  category: string;
+  category: FAQCategoryField;
 } & MicroCMSBase;
 
 // 利用規約・プライバシーポリシー（オブジェクト形式）の型定義
