@@ -285,17 +285,6 @@ function RouteComponent() {
         isSelectMode && selectedIds.length > 0 && "pb-28",
       )}
     >
-      {sortParam === "name-asc" && (
-        <style>{`
-          html, body {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-          }
-          html::-webkit-scrollbar, body::-webkit-scrollbar {
-            display: none;
-          }
-        `}</style>
-      )}
       {/* 検索・フィルターエリア */}
       <div className="mb-6">
         <form onSubmit={handleSearch} className="flex items-center gap-2">
