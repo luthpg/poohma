@@ -173,16 +173,11 @@ code {
     letter-spacing: -0.32px;
   }
 
-  /* Hide scrollbar for Chrome, Safari and Opera */
-  .no-scrollbar::-webkit-scrollbar,
-  html.no-scrollbar::-webkit-scrollbar,
-  body.no-scrollbar::-webkit-scrollbar {
+  /* Hide scrollbar utility */
+  .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
-  /* Hide scrollbar for IE, Edge and Firefox */
-  .no-scrollbar,
-  html.no-scrollbar,
-  body.no-scrollbar {
+  .no-scrollbar {
     -ms-overflow-style: none; /* IE and Edge */
     scrollbar-width: none; /* Firefox */
   }

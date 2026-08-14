@@ -154,10 +154,10 @@ export function IndexScrollBar({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         className={cn(
-          "fixed right-1 md:right-2.5 top-1/2 -translate-y-1/2 z-30 select-none touch-none flex flex-col items-center py-1.5 px-0.5 md:px-1 rounded-2xl md:rounded-3xl backdrop-blur-md border transition-all duration-200 ease-out max-h-[85vh] overflow-hidden justify-between",
+          "fixed right-0.5 md:right-2.5 top-1/2 -translate-y-1/2 z-30 select-none touch-none flex flex-col items-center py-1.5 px-0.5 md:px-1 rounded-2xl md:rounded-3xl border transition-all duration-200 ease-out max-h-[85vh] overflow-hidden justify-between",
           isDragging
-            ? "w-10 md:w-12 text-foreground bg-background/95 border-orange-500/40 shadow-xl"
-            : "w-6 md:w-7 hover:w-10 md:hover:w-12 text-muted-foreground/55 bg-background/55 border-border/35 shadow-sm hover:bg-background/85 hover:border-border/70 hover:text-foreground/85 hover:shadow-xl",
+            ? "w-10 md:w-12 text-foreground bg-background/95 border-orange-500/40 shadow-xl backdrop-blur-md"
+            : "w-6 md:w-7 hover:w-10 md:hover:w-12 text-muted-foreground/50 hover:text-foreground/85 bg-transparent md:bg-background/55 border-transparent md:border-border/35 shadow-none md:shadow-sm md:backdrop-blur-md hover:bg-background/85 hover:border-border/70 hover:shadow-xl",
           className,
         )}
       >
