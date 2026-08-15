@@ -7,7 +7,7 @@ import { defineEmailTemplate } from "../../types";
 const props = v.object({
   displayName: v.string(),
   familyName: v.string(),
-  ctaUrl: v.optional(v.string()),
+  ctaUrl: v.string(),
 });
 
 type Props = Infer<typeof props>;
@@ -24,7 +24,7 @@ const buttonWrapper = {
 export function FamilyMigrationCompletedEmail({
   displayName,
   familyName,
-  ctaUrl = "https://poohma.ciderlabs.link",
+  ctaUrl,
 }: Props) {
   return (
     <Layout preview={`家族「${familyName}」への変更が完了しました`}>

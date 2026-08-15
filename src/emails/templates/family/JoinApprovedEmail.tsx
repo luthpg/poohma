@@ -8,7 +8,7 @@ const props = v.object({
   displayName: v.string(),
   familyName: v.string(),
   variant: v.union(v.literal("join"), v.literal("migration")),
-  ctaUrl: v.optional(v.string()),
+  ctaUrl: v.string(),
 });
 
 type Props = Infer<typeof props>;
@@ -26,7 +26,7 @@ export function JoinApprovedEmail({
   displayName,
   familyName,
   variant,
-  ctaUrl = "https://poohma.ciderlabs.link/family",
+  ctaUrl,
 }: Props) {
   const isMigration = variant === "migration";
   const title = isMigration ? "移行申請" : "参加申請";

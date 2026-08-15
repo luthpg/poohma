@@ -97,6 +97,7 @@ describe("メールテンプレート基盤", () => {
         displayName: "山田 太郎",
         familyName: "佐藤家",
         variant: "migration",
+        ctaUrl: "https://poohma.ciderlabs.link/family",
       },
     };
 
