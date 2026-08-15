@@ -21,11 +21,7 @@ const buttonWrapper = {
   textAlign: "center" as const,
 };
 
-export function FamilyWelcomeEmail({
-  displayName,
-  familyName,
-  ctaUrl,
-}: Props) {
+export function FamilyWelcomeEmail({ displayName, familyName, ctaUrl }: Props) {
   return (
     <Layout preview={`家族「${familyName}」への参加が完了しました`}>
       <Text style={text}>{displayName} さん</Text>
