@@ -29,6 +29,7 @@ export default defineConfig({
         "convex/_generated/**",
         "convex/schema.ts",
         "routeTree.gen.ts",
+        "src/emails/**",
         "**/*.d.ts",
         "**/*.config.ts",
         "**/*.css",
