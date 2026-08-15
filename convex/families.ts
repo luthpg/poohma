@@ -82,11 +82,22 @@ export const createFamily = authenticatedMutation({
 
     await ctx.db.patch(user._id, { familyId });
 
-    await ctx.scheduler.runAfter(0, internal.actions.sendEmailInternal, {
-      email: user.email,
-      subject: "PoohMaへようこそ",
-      body: `-=-=-=-=-=-=-=-=-=-\n※本メールは送信専用アドレスから送信しています。\n-=-=-=-=-=-=-=-=-=-\n\n${user.displayName} さん\n\nこんにちは！家族間アカウント管理アプリ「PoohMa」からお知らせです。\n\n家族名「${args.name}」へ参加が完了しました。\n\n※なんらかの誤りであると考えられる場合はお手数ですが運営にご連絡ください。\n\n[PoohMa]\nhttps://poohma.vercel.app/`,
-    });
+    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
+    await ctx.scheduler.runAfter(
+      0,
+      internal.actions.sendTemplatedEmailInternal,
+      {
+        email: user.email,
+        payload: {
+          template: "familyWelcome",
+          props: {
+            displayName: user.displayName || "メンバー",
+            familyName: args.name,
+            ctaUrl: `${appUrl}/dashboard`,
+          },
+        },
+      },
+    );
 
     return familyId;
   },
@@ -122,11 +133,22 @@ export const joinFamily = authenticatedMutation({
     // Delete approved request
     await ctx.db.delete(approvedRequest._id);
 
-    await ctx.scheduler.runAfter(0, internal.actions.sendEmailInternal, {
-      email: user.email,
-      subject: "PoohMaへようこそ",
-      body: `-=-=-=-=-=-=-=-=-=-\n※本メールは送信専用アドレスから送信しています。\n-=-=-=-=-=-=-=-=-=-\n\n${user.displayName} さん\n\nこんにちは！家族間アカウント管理アプリ「PoohMa」からお知らせです。\n\n家族名「${family.name}」へ参加が完了しました。\n\n※なんらかの誤りであると考えられる場合はお手数ですが運営にご連絡ください。\n\n[PoohMa]\nhttps://poohma.vercel.app/`,
-    });
+    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
+    await ctx.scheduler.runAfter(
+      0,
+      internal.actions.sendTemplatedEmailInternal,
+      {
+        email: user.email,
+        payload: {
+          template: "familyWelcome",
+          props: {
+            displayName: user.displayName || "メンバー",
+            familyName: family.name,
+            ctaUrl: `${appUrl}/dashboard`,
+          },
+        },
+      },
+    );
 
     const familyMembers = await ctx.runQuery(
       internal.families.getFamilyMembersInternal,
@@ -138,11 +160,23 @@ export const joinFamily = authenticatedMutation({
       await Promise.all(
         familyMembers.users.map((member) => {
           if (member.email === user.email) return null;
-          return ctx.scheduler.runAfter(0, internal.actions.sendEmailInternal, {
-            email: member.email,
-            subject: `[PoohMa] ${family.name} に新しいメンバーが参加しました！`,
-            body: `-=-=-=-=-=-=-=-=-=-\n※本メールは送信専用アドレスから送信しています。\n-=-=-=-=-=-=-=-=-=-\n\n${member.displayName} さん\n\nこんにちは！家族間アカウント管理アプリ「PoohMa」からお知らせです。\n\n家族名「${family.name}」へ新しいメンバーが参加しました。\n\n※なんらかの誤りであると考えられる場合はお手数ですが運営にご連絡ください。\n\n[PoohMa]\nhttps://poohma.vercel.app/`,
-          });
+          return ctx.scheduler.runAfter(
+            0,
+            internal.actions.sendTemplatedEmailInternal,
+            {
+              email: member.email,
+              payload: {
+                template: "newMemberJoined",
+                props: {
+                  displayName: member.displayName || "メンバー",
+                  familyName: family.name,
+                  newMemberDisplayName: user.displayName || undefined,
+                  newMemberEmail: user.email,
+                  ctaUrl: `${appUrl}/family`,
+                },
+              },
+            },
+          );
         }),
       );
     }
@@ -532,11 +566,22 @@ export const commitFamilyMigration = authenticatedMutation({
     await ctx.db.patch(migration._id, { status: "COMPLETED" });
 
     const targetFamily = await ctx.db.get(migration.targetFamilyId);
-    await ctx.scheduler.runAfter(0, internal.actions.sendEmailInternal, {
-      email: user.email,
-      subject: "PoohMaからのお知らせ（家族変更完了）",
-      body: `-=-=-=-=-=-=-=-=-=-\n※本メールは送信専用アドレスから送信しています。\n-=-=-=-=-=-=-=-=-=-\n\n${user.displayName} さん\n\nこんにちは！家族間アカウント管理アプリ「PoohMa」からお知らせです。\n\n家族「${targetFamily?.name || ""}」への変更が完了しました。\n\n※なんらかの誤りであると考えられる場合はお手数ですが運営にご連絡ください。\n\n[PoohMa]\nhttps://poohma.vercel.app/`,
-    });
+    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
+    await ctx.scheduler.runAfter(
+      0,
+      internal.actions.sendTemplatedEmailInternal,
+      {
+        email: user.email,
+        payload: {
+          template: "familyMigrationCompleted",
+          props: {
+            displayName: user.displayName || "メンバー",
+            familyName: targetFamily?.name || "",
+            ctaUrl: `${appUrl}/family`,
+          },
+        },
+      },
+    );
 
     return { success: true, familyId: migration.targetFamilyId };
   },
@@ -719,11 +764,23 @@ export const changeFamily = authenticatedMutation({
 
     await ctx.db.patch(migrationId, { status: "COMPLETED" });
 
-    await ctx.scheduler.runAfter(0, internal.actions.sendEmailInternal, {
-      email: user.email,
-      subject: "PoohMaからのお知らせ（家族変更完了）",
-      body: `-=-=-=-=-=-=-=-=-=-\n※本メールは送信専用アドレスから送信しています。\n-=-=-=-=-=-=-=-=-=-\n\n${user.displayName} さん\n\nこんにちは！家族間アカウント管理アプリ「PoohMa」からお知らせです。\n\n家族名「${args.name || ""}」へ変更が完了しました。\n\n※なんらかの誤りであると考えられる場合はお手数ですが運営にご連絡ください。\n\n[PoohMa]\nhttps://poohma.vercel.app/`,
-    });
+    const targetFamily = await ctx.db.get(targetFamilyId);
+    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
+    await ctx.scheduler.runAfter(
+      0,
+      internal.actions.sendTemplatedEmailInternal,
+      {
+        email: user.email,
+        payload: {
+          template: "familyMigrationCompleted",
+          props: {
+            displayName: user.displayName || "メンバー",
+            familyName: targetFamily?.name || "",
+            ctaUrl: `${appUrl}/family`,
+          },
+        },
+      },
+    );
 
     return { success: true, familyId: targetFamilyId };
   },
@@ -807,12 +864,25 @@ export const createJoinRequest = authenticatedMutation({
       .filter((q) => q.eq(q.field("familyId"), family._id))
       .collect();
 
+    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
     for (const member of familyMembers) {
-      await ctx.scheduler.runAfter(0, internal.actions.sendEmailInternal, {
-        email: member.email,
-        subject: `[PoohMa] 家族「${family.name}」への参加申請が届きました`,
-        body: `-=-=-=-=-=-=-=-=-=-\n※本メールは送信専用アドレスから送信しています。\n-=-=-=-=-=-=-=-=-=-\n\n${member.displayName || "メンバー"} さん\n\nこんにちは！家族間アカウント管理アプリ「PoohMa」からお知らせです。\n\n家族「${family.name}」に新しい参加申請が届きました。\n\n【申請者】\n表示名: ${user.displayName || "名無し"}\nメールアドレス: ${user.email}\n\n以下のリンクから承認または却下を行ってください。\n\n[PoohMa 家族管理]\nhttps://poohma.vercel.app/family`,
-      });
+      await ctx.scheduler.runAfter(
+        0,
+        internal.actions.sendTemplatedEmailInternal,
+        {
+          email: member.email,
+          payload: {
+            template: "joinRequestReceived",
+            props: {
+              displayName: member.displayName || "メンバー",
+              familyName: family.name,
+              applicantDisplayName: user.displayName || "名無し",
+              applicantEmail: user.email,
+              ctaUrl: `${appUrl}/family`,
+            },
+          },
+        },
+      );
     }
 
     return requestId;
@@ -959,11 +1029,23 @@ export const approveJoinRequest = familyBoundMutation({
       });
 
       const family = await ctx.db.get(familyId);
-      await ctx.scheduler.runAfter(0, internal.actions.sendEmailInternal, {
-        email: applicant.email,
-        subject: `[PoohMa] 家族「${family?.name}」への参加申請が承認されました！`,
-        body: `-=-=-=-=-=-=-=-=-=-\n※本メールは送信専用アドレスから送信しています。\n-=-=-=-=-=-=-=-=-=-\n\n${applicant.displayName || "メンバー"} さん\n\nこんにちは！家族間アカウント管理アプリ「PoohMa」からお知らせです。\n\n家族「${family?.name}」への参加申請が承認されました。\n\nログインして家族の暗号キーをセットアップしてください。\n\n[PoohMa]\nhttps://poohma.vercel.app/family`,
-      });
+      const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
+      await ctx.scheduler.runAfter(
+        0,
+        internal.actions.sendTemplatedEmailInternal,
+        {
+          email: applicant.email,
+          payload: {
+            template: "joinApproved",
+            props: {
+              displayName: applicant.displayName || "メンバー",
+              familyName: family?.name || "",
+              variant: "join",
+              ctaUrl: `${appUrl}/family`,
+            },
+          },
+        },
+      );
     } else {
       await ctx.db.patch(request._id, {
         status: "approved",
@@ -971,11 +1053,23 @@ export const approveJoinRequest = familyBoundMutation({
       });
 
       const family = await ctx.db.get(familyId);
-      await ctx.scheduler.runAfter(0, internal.actions.sendEmailInternal, {
-        email: applicant.email,
-        subject: `[PoohMa] 家族「${family?.name}」への移行申請が承認されました！`,
-        body: `-=-=-=-=-=-=-=-=-=-\n※本メールは送信専用アドレスから送信しています。\n-=-=-=-=-=-=-=-=-=-\n\n${applicant.displayName || "メンバー"} さん\n\nこんにちは！家族間アカウント管理アプリ「PoohMa」からお知らせです。\n\n家族「${family?.name}」への移行申請が承認されました。\n\n移行処理を完了するために、アプリにアクセスして新しい家族のパスコードを入力してください。\n\n[PoohMa]\nhttps://poohma.vercel.app/family`,
-      });
+      const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
+      await ctx.scheduler.runAfter(
+        0,
+        internal.actions.sendTemplatedEmailInternal,
+        {
+          email: applicant.email,
+          payload: {
+            template: "joinApproved",
+            props: {
+              displayName: applicant.displayName || "メンバー",
+              familyName: family?.name || "",
+              variant: "migration",
+              ctaUrl: `${appUrl}/family`,
+            },
+          },
+        },
+      );
     }
 
     return { success: true };
@@ -1006,11 +1100,20 @@ export const rejectJoinRequest = familyBoundMutation({
 
     if (applicant) {
       const family = await ctx.db.get(familyId);
-      await ctx.scheduler.runAfter(0, internal.actions.sendEmailInternal, {
-        email: applicant.email,
-        subject: `[PoohMa] 家族「${family?.name}」への参加申請が見送られました`,
-        body: `-=-=-=-=-=-=-=-=-=-\n※本メールは送信専用アドレスから送信しています。\n-=-=-=-=-=-=-=-=-=-\n\n${applicant.displayName || "メンバー"} さん\n\nこんにちは！家族間アカウント管理アプリ「PoohMa」からお知らせです。\n\n家族「${family?.name}」への参加申請は、承認されませんでした。\n詳細については家族メンバーへ直接ご確認ください。\n\n[PoohMa]\nhttps://poohma.vercel.app/`,
-      });
+      await ctx.scheduler.runAfter(
+        0,
+        internal.actions.sendTemplatedEmailInternal,
+        {
+          email: applicant.email,
+          payload: {
+            template: "joinRequestRejected",
+            props: {
+              displayName: applicant.displayName || "メンバー",
+              familyName: family?.name || "",
+            },
+          },
+        },
+      );
     }
 
     return { success: true };

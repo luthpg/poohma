@@ -3,9 +3,12 @@
 import http from "node:http";
 import https from "node:https";
 import { URL } from "node:url";
+import { render } from "@react-email/render";
 import * as cheerio from "cheerio";
 import { v } from "convex/values";
 import { Resend } from "resend";
+import { resolveEmail } from "../src/emails/dispatch";
+import { emailPayload } from "../src/emails/registry";
 import { validateUrlSafety } from "../src/utils/url-safety";
 import { action, internalAction } from "./_generated/server";
 
@@ -261,11 +264,15 @@ export const getFurigana = action({
 export const sendEmailReq = async ({
   email,
   subject,
-  body,
+  html,
+  text,
+  replyTo,
 }: {
   email: string;
   subject: string;
-  body: string;
+  html: string;
+  text: string;
+  replyTo?: string;
 }): Promise<boolean> => {
   try {
     const mailApiKey = process.env.RESEND_API_KEY;
@@ -279,7 +286,9 @@ export const sendEmailReq = async ({
       from: `PoohMa <${mailFrom}>`,
       to: [...email.split(/,\s*/g)].map((e) => e.trim()).filter(Boolean),
       subject: subject,
-      text: body,
+      html: html,
+      text: text,
+      replyTo: replyTo,
     });
     if (response.error != null) {
       throw Error(response.error.message);
@@ -291,9 +300,24 @@ export const sendEmailReq = async ({
   }
 };
 
-export const sendEmailInternal = internalAction({
-  args: { email: v.string(), subject: v.string(), body: v.string() },
+export const sendTemplatedEmailInternal = internalAction({
+  args: {
+    email: v.string(),
+    payload: emailPayload,
+    replyTo: v.optional(v.string()),
+  },
   handler: async (_ctx, args): Promise<boolean> => {
-    return sendEmailReq(args);
+    const { subject, element } = resolveEmail(args.payload);
+    const [html, text] = await Promise.all([
+      render(element),
+      render(element, { plainText: true }),
+    ]);
+    return sendEmailReq({
+      email: args.email,
+      subject,
+      html,
+      text,
+      replyTo: args.replyTo,
+    });
   },
 });

@@ -14,12 +14,16 @@
     "check:ci": "biome ci",
     "shadcn": "pnpm dlx shadcn@latest",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "email:dev": "email dev --dir src/emails/templates --port 7878",
+    "email:export": "email export --dir src/emails/templates"
   },
   "dependencies": {
     "@fontsource/geist-mono": "^5.3.0",
     "@fontsource/geist-sans": "^5.3.0",
     "@icons-pack/react-simple-icons": "^13.13.0",
+    "@react-email/components": "^1.0.12",
+    "@react-email/render": "^2.1.0",
     "@t3-oss/env-core": "^0.13.11",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-devtools": "^0.10.9",
@@ -53,6 +57,7 @@
     "radix-ui": "^1.6.7",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "react-email": "^6.9.2",
     "resend": "^6.18.1",
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.6.0",
@@ -63,6 +68,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.7",
     "@chromatic-com/storybook": "^5.3.0",
+    "@react-email/ui": "6.9.2",
     "@storybook/addon-a11y": "^10.5.6",
     "@storybook/addon-docs": "^10.5.6",
     "@storybook/addon-onboarding": "^10.5.6",
