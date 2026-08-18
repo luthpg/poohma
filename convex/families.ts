@@ -36,11 +36,21 @@ export const getFamilyMembersByFamilyId = async (
   };
 };
 
-export const getFamilyMembersById = async (ctx: QueryCtx, userId: string) => {
-  const user = await ctx.db
+export const getFamilyMembersById = async (
+  ctx: QueryCtx,
+  userOrAccountId: string,
+) => {
+  let user = await ctx.db
     .query("users")
-    .withIndex("by_userId", (q) => q.eq("userId", userId))
+    .filter((q) => q.eq(q.field("_id"), userOrAccountId))
     .first();
+
+  if (!user) {
+    user = await ctx.db
+      .query("users")
+      .withIndex("by_userId", (q) => q.eq("userId", userOrAccountId))
+      .first();
+  }
 
   if (!user?.familyId) return null;
 
@@ -115,13 +125,21 @@ export const joinFamily = authenticatedMutation({
     if (!family) throw new Error("Invalid invite code");
 
     // Verify approved request
-    const approvedRequest = await ctx.db
-      .query("joinRequests")
-      .withIndex("by_familyId_userId", (q) =>
-        q.eq("familyId", family._id).eq("userId", user.userId),
-      )
-      .filter((q) => q.eq(q.field("status"), "approved"))
-      .unique();
+    const approvedRequest =
+      (await ctx.db
+        .query("joinRequests")
+        .withIndex("by_familyId_accountId", (q) =>
+          q.eq("familyId", family._id).eq("accountId", user._id),
+        )
+        .filter((q) => q.eq(q.field("status"), "approved"))
+        .first()) ||
+      (await ctx.db
+        .query("joinRequests")
+        .withIndex("by_familyId_userId", (q) =>
+          q.eq("familyId", family._id).eq("userId", user.userId),
+        )
+        .filter((q) => q.eq(q.field("status"), "approved"))
+        .first());
 
     if (!approvedRequest) {
       throw new Error(
@@ -194,13 +212,21 @@ export const getFamilyInfoByInviteCode = authenticatedQuery({
     if (!family) throw new Error("Invalid invite code");
 
     const isMember = user.familyId === family._id;
-    const approvedRequest = await ctx.db
-      .query("joinRequests")
-      .withIndex("by_familyId_userId", (q) =>
-        q.eq("familyId", family._id).eq("userId", user.userId),
-      )
-      .filter((q) => q.eq(q.field("status"), "approved"))
-      .unique();
+    const approvedRequest =
+      (await ctx.db
+        .query("joinRequests")
+        .withIndex("by_familyId_accountId", (q) =>
+          q.eq("familyId", family._id).eq("accountId", user._id),
+        )
+        .filter((q) => q.eq(q.field("status"), "approved"))
+        .first()) ||
+      (await ctx.db
+        .query("joinRequests")
+        .withIndex("by_familyId_userId", (q) =>
+          q.eq("familyId", family._id).eq("userId", user.userId),
+        )
+        .filter((q) => q.eq(q.field("status"), "approved"))
+        .first());
 
     if (!isMember && !approvedRequest) {
       throw new Error(
@@ -528,13 +554,21 @@ export const commitFamilyMigration = authenticatedMutation({
 
     await ctx.db.patch(user._id, { familyId: migration.targetFamilyId });
 
-    const approvedRequest = await ctx.db
-      .query("joinRequests")
-      .withIndex("by_familyId_userId", (q) =>
-        q.eq("familyId", migration.targetFamilyId).eq("userId", user.userId),
-      )
-      .filter((q) => q.eq(q.field("status"), "approved"))
-      .unique();
+    const approvedRequest =
+      (await ctx.db
+        .query("joinRequests")
+        .withIndex("by_familyId_accountId", (q) =>
+          q.eq("familyId", migration.targetFamilyId).eq("accountId", user._id),
+        )
+        .filter((q) => q.eq(q.field("status"), "approved"))
+        .first()) ||
+      (await ctx.db
+        .query("joinRequests")
+        .withIndex("by_familyId_userId", (q) =>
+          q.eq("familyId", migration.targetFamilyId).eq("userId", user.userId),
+        )
+        .filter((q) => q.eq(q.field("status"), "approved"))
+        .first());
 
     if (approvedRequest) {
       await ctx.db.delete(approvedRequest._id);
@@ -660,13 +694,21 @@ export const changeFamily = authenticatedMutation({
       const family = await ctx.db.get(args.inviteCode as Id<"families">);
       if (!family) throw new Error("Invalid invite code");
 
-      const approvedRequest = await ctx.db
-        .query("joinRequests")
-        .withIndex("by_familyId_userId", (q) =>
-          q.eq("familyId", family._id).eq("userId", user.userId),
-        )
-        .filter((q) => q.eq(q.field("status"), "approved"))
-        .unique();
+      const approvedRequest =
+        (await ctx.db
+          .query("joinRequests")
+          .withIndex("by_familyId_accountId", (q) =>
+            q.eq("familyId", family._id).eq("accountId", user._id),
+          )
+          .filter((q) => q.eq(q.field("status"), "approved"))
+          .first()) ||
+        (await ctx.db
+          .query("joinRequests")
+          .withIndex("by_familyId_userId", (q) =>
+            q.eq("familyId", family._id).eq("userId", user.userId),
+          )
+          .filter((q) => q.eq(q.field("status"), "approved"))
+          .first());
 
       if (!approvedRequest) {
         throw new Error(
@@ -734,13 +776,21 @@ export const changeFamily = authenticatedMutation({
 
     await ctx.db.patch(user._id, { familyId: targetFamilyId });
 
-    const approvedReq = await ctx.db
-      .query("joinRequests")
-      .withIndex("by_familyId_userId", (q) =>
-        q.eq("familyId", targetFamilyId).eq("userId", user.userId),
-      )
-      .filter((q) => q.eq(q.field("status"), "approved"))
-      .unique();
+    const approvedReq =
+      (await ctx.db
+        .query("joinRequests")
+        .withIndex("by_familyId_accountId", (q) =>
+          q.eq("familyId", targetFamilyId).eq("accountId", user._id),
+        )
+        .filter((q) => q.eq(q.field("status"), "approved"))
+        .first()) ||
+      (await ctx.db
+        .query("joinRequests")
+        .withIndex("by_familyId_userId", (q) =>
+          q.eq("familyId", targetFamilyId).eq("userId", user.userId),
+        )
+        .filter((q) => q.eq(q.field("status"), "approved"))
+        .first());
 
     if (approvedReq) {
       await ctx.db.delete(approvedReq._id);
@@ -811,13 +861,20 @@ export const createJoinRequest = authenticatedMutation({
       throw new Error("You are already a member of this family");
     }
 
-    // Check if there is any pending request by this user for ANY family
-    const anyPendingRequest = await ctx.db
-      .query("joinRequests")
-      .withIndex("by_userId_status", (q) =>
-        q.eq("userId", user.userId).eq("status", "pending"),
-      )
-      .first();
+    // Check if there is any pending request by this user/account for ANY family
+    const anyPendingRequest =
+      (await ctx.db
+        .query("joinRequests")
+        .withIndex("by_accountId_status", (q) =>
+          q.eq("accountId", user._id).eq("status", "pending"),
+        )
+        .first()) ||
+      (await ctx.db
+        .query("joinRequests")
+        .withIndex("by_userId_status", (q) =>
+          q.eq("userId", user.userId).eq("status", "pending"),
+        )
+        .first());
 
     if (anyPendingRequest) {
       throw new Error(
@@ -825,35 +882,45 @@ export const createJoinRequest = authenticatedMutation({
       );
     }
 
-    // Check if there is already an active (approved) request for this family
-    const existingApproved = await ctx.db
-      .query("joinRequests")
-      .withIndex("by_familyId_userId", (q) =>
-        q.eq("familyId", family._id).eq("userId", user.userId),
-      )
-      .filter((q) => q.eq(q.field("status"), "approved"))
-      .unique();
+    // Check if there is already an active (approved) request for this family & account
+    const existingApproved =
+      (await ctx.db
+        .query("joinRequests")
+        .withIndex("by_familyId_accountId", (q) =>
+          q.eq("familyId", family._id).eq("accountId", user._id),
+        )
+        .filter((q) => q.eq(q.field("status"), "approved"))
+        .first()) ||
+      (await ctx.db
+        .query("joinRequests")
+        .withIndex("by_familyId_userId", (q) =>
+          q.eq("familyId", family._id).eq("userId", user.userId),
+        )
+        .filter((q) => q.eq(q.field("status"), "approved"))
+        .first());
 
     if (existingApproved) {
       return existingApproved._id;
     }
 
-    // Delete any rejected requests for this family first
-    const rejectedRequest = await ctx.db
-      .query("joinRequests")
-      .withIndex("by_familyId_userId", (q) =>
-        q.eq("familyId", family._id).eq("userId", user.userId),
-      )
-      .filter((q) => q.eq(q.field("status"), "rejected"))
-      .unique();
+    // Delete any rejected requests for this family and account first
+    const rejectedRequests =
+      (await ctx.db
+        .query("joinRequests")
+        .withIndex("by_familyId_accountId", (q) =>
+          q.eq("familyId", family._id).eq("accountId", user._id),
+        )
+        .filter((q) => q.eq(q.field("status"), "rejected"))
+        .collect()) || [];
 
-    if (rejectedRequest) {
-      await ctx.db.delete(rejectedRequest._id);
+    for (const r of rejectedRequests) {
+      await ctx.db.delete(r._id);
     }
 
     const requestId = await ctx.db.insert("joinRequests", {
       familyId: family._id,
       userId: user.userId,
+      accountId: user._id,
       status: "pending",
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -897,7 +964,10 @@ export const cancelJoinRequest = authenticatedMutation({
     const request = await ctx.db.get(args.requestId);
     if (!request) throw new Error("Request not found");
 
-    if (request.userId !== user.userId) {
+    if (
+      request.userId !== user.userId &&
+      (!request.accountId || request.accountId !== user._id)
+    ) {
       throw new Error("Unauthorized: This is not your request");
     }
 
@@ -914,24 +984,50 @@ export const getMyJoinRequest = authenticatedQuery({
   args: {},
   handler: async (ctx) => {
     const { user } = ctx;
-    const request = await ctx.db
+    // 申請元アカウントに紐づくリクエストを優先検索
+    let request = await ctx.db
       .query("joinRequests")
-      .withIndex("by_userId_status", (q) => q.eq("userId", user.userId))
-      .filter((q) =>
-        q.or(
-          q.eq(q.field("status"), "pending"),
-          q.eq(q.field("status"), "approved"),
-        ),
+      .withIndex("by_accountId_status", (q) =>
+        q.eq("accountId", user._id).eq("status", "pending"),
       )
       .first();
 
     if (!request) {
-      const rejected = await ctx.db
+      request = await ctx.db
         .query("joinRequests")
-        .withIndex("by_userId_status", (q) =>
-          q.eq("userId", user.userId).eq("status", "rejected"),
+        .withIndex("by_accountId_status", (q) =>
+          q.eq("accountId", user._id).eq("status", "approved"),
         )
         .first();
+    }
+
+    if (!request) {
+      request = await ctx.db
+        .query("joinRequests")
+        .withIndex("by_userId_status", (q) => q.eq("userId", user.userId))
+        .filter((q) =>
+          q.or(
+            q.eq(q.field("status"), "pending"),
+            q.eq(q.field("status"), "approved"),
+          ),
+        )
+        .first();
+    }
+
+    if (!request) {
+      const rejected =
+        (await ctx.db
+          .query("joinRequests")
+          .withIndex("by_accountId_status", (q) =>
+            q.eq("accountId", user._id).eq("status", "rejected"),
+          )
+          .first()) ||
+        (await ctx.db
+          .query("joinRequests")
+          .withIndex("by_userId_status", (q) =>
+            q.eq("userId", user.userId).eq("status", "rejected"),
+          )
+          .first());
       if (rejected) {
         const family = await ctx.db.get(rejected.familyId);
         return {
@@ -960,7 +1056,12 @@ export const dismissRejectedRequest = authenticatedMutation({
     const { user } = ctx;
     const request = await ctx.db.get(args.requestId);
     if (!request) throw new Error("Request not found");
-    if (request.userId !== user.userId) throw new Error("Unauthorized");
+    if (
+      request.userId !== user.userId &&
+      (!request.accountId || request.accountId !== user._id)
+    ) {
+      throw new Error("Unauthorized");
+    }
     if (request.status !== "rejected") {
       throw new Error("Only rejected requests can be dismissed");
     }
@@ -984,13 +1085,16 @@ export const getPendingRequests = familyBoundQuery({
 
     const results = [];
     for (const req of pendingRequests) {
-      const user = await ctx.db
-        .query("users")
-        .withIndex("by_userId", (q) => q.eq("userId", req.userId))
-        .first();
+      const user = req.accountId
+        ? await ctx.db.get(req.accountId)
+        : await ctx.db
+            .query("users")
+            .withIndex("by_userId", (q) => q.eq("userId", req.userId))
+            .first();
       results.push({
         id: req._id,
         userId: req.userId,
+        accountId: req.accountId,
         status: req.status,
         createdAt: req.createdAt,
         displayName: user?.displayName || "名無し",
@@ -1016,10 +1120,12 @@ export const approveJoinRequest = familyBoundMutation({
       throw new Error("Only pending requests can be approved");
     }
 
-    const applicant = await ctx.db
-      .query("users")
-      .withIndex("by_userId", (q) => q.eq("userId", request.userId))
-      .first();
+    const applicant = request.accountId
+      ? await ctx.db.get(request.accountId)
+      : await ctx.db
+          .query("users")
+          .withIndex("by_userId", (q) => q.eq("userId", request.userId))
+          .first();
     if (!applicant) throw new Error("Applicant not found");
 
     if (!applicant.familyId) {
@@ -1094,10 +1200,12 @@ export const rejectJoinRequest = familyBoundMutation({
       updatedAt: Date.now(),
     });
 
-    const applicant = await ctx.db
-      .query("users")
-      .withIndex("by_userId", (q) => q.eq("userId", request.userId))
-      .first();
+    const applicant = request.accountId
+      ? await ctx.db.get(request.accountId)
+      : await ctx.db
+          .query("users")
+          .withIndex("by_userId", (q) => q.eq("userId", request.userId))
+          .first();
 
     if (applicant) {
       const family = await ctx.db.get(familyId);

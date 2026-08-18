@@ -43,6 +43,7 @@ export default defineSchema({
   joinRequests: defineTable({
     familyId: v.id("families"),
     userId: v.string(), // 申請者の Firebase UID
+    accountId: v.optional(v.id("users")), // 申請元 PoohMa Account ID
     status: v.union(
       v.literal("pending"),
       v.literal("approved"),
@@ -53,7 +54,9 @@ export default defineSchema({
   })
     .index("by_familyId_status", ["familyId", "status"])
     .index("by_userId_status", ["userId", "status"])
-    .index("by_familyId_userId", ["familyId", "userId"]),
+    .index("by_familyId_userId", ["familyId", "userId"])
+    .index("by_accountId_status", ["accountId", "status"])
+    .index("by_familyId_accountId", ["familyId", "accountId"]),
 
   serviceRecords: defineTable({
     title: v.string(),

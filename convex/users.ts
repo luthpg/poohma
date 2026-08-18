@@ -34,23 +34,26 @@ export const syncUser = identityVerifiedMutation({
       .collect();
 
     if (existingAccounts.length > 0) {
-      // 既存のアカウントが存在する場合、先頭アカウント（または全アカウント）のプロフィール情報を更新
-      const primaryAccount = existingAccounts[0];
-      const patchData: {
-        email: string;
-        photoURL?: string;
-        updatedAt: number;
-        displayName?: string;
-      } = {
-        email,
-        photoURL,
-        updatedAt: Date.now(),
-      };
-      if (!primaryAccount.displayName && displayName) {
-        patchData.displayName = displayName;
+      // 既存のアカウントが存在する場合、全アカウントの email / photoURL 情報を最新に同期
+      const now = Date.now();
+      for (const account of existingAccounts) {
+        const patchData: {
+          email: string;
+          photoURL?: string;
+          updatedAt: number;
+          displayName?: string;
+        } = {
+          email,
+          photoURL: photoURL ?? account.photoURL,
+          updatedAt: now,
+        };
+        // 初期状態等で displayName が未設定の場合のみ初期値を補完
+        if (!account.displayName && displayName) {
+          patchData.displayName = displayName;
+        }
+        await ctx.db.patch(account._id, patchData);
       }
-      await ctx.db.patch(primaryAccount._id, patchData);
-      return primaryAccount.userId;
+      return existingAccounts[0].userId;
     }
 
     // UIDが一致しない → 同じemailの古いレコードがないか確認

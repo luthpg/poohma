@@ -69,7 +69,7 @@ export function UserMenu({
   const router = useRouter();
   const queryClient = useQueryClient();
   const convex = useConvex();
-  const { activeAccount } = useAccount();
+  const { activeAccount, activeAccountId } = useAccount();
   const importRecordsMut = useMutation(api.records.importRecords);
   const { theme, setTheme } = useTheme();
   const [isImporting, setIsImporting] = useState(false);
@@ -267,6 +267,7 @@ export function UserMenu({
           });
 
           const response = await importRecordsMut({
+            accountId: activeAccountId || undefined,
             records: recordsToImport,
           });
 

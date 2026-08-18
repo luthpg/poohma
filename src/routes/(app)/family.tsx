@@ -230,6 +230,7 @@ function FamilyComponent() {
       setIsLoading(true);
       try {
         await createJoinRequestMut({
+          accountId: activeAccountId || undefined,
           inviteCode: code as Id<"families">,
         });
         toast.success(
@@ -243,7 +244,7 @@ function FamilyComponent() {
         setIsLoading(false);
       }
     },
-    [createJoinRequestMut],
+    [createJoinRequestMut, activeAccountId],
   );
 
   // 家族移行（承認後に移行を完了する。家族未所属ユーザーにも対応）
@@ -271,6 +272,7 @@ function FamilyComponent() {
 
       // 2. prepare
       const { migrationId } = await prepareFamilyMigrationMut({
+        accountId: activeAccountId || undefined,
         action: "join",
         inviteCode: myJoinRequest.familyId,
       });
@@ -279,7 +281,10 @@ function FamilyComponent() {
       // 3. 移行先の家族情報を取得
       const existingFamily = await convex.query(
         api.families.getFamilyInfoByInviteCode,
-        { inviteCode: myJoinRequest.familyId as Id<"families"> },
+        {
+          accountId: activeAccountId || undefined,
+          inviteCode: myJoinRequest.familyId as Id<"families">,
+        },
       );
       if (
         !existingFamily.masterKeyEncrypted ||
@@ -375,6 +380,7 @@ function FamilyComponent() {
 
       // 5. commit
       await commitFamilyMigrationMut({
+        accountId: activeAccountId || undefined,
         migrationId,
         credentials: reEncryptedCredentials,
       });
@@ -386,7 +392,10 @@ function FamilyComponent() {
     } catch (error) {
       if (currentMigrationId) {
         try {
-          await abortFamilyMigrationMut({ migrationId: currentMigrationId });
+          await abortFamilyMigrationMut({
+            accountId: activeAccountId || undefined,
+            migrationId: currentMigrationId,
+          });
         } catch (abortError) {
           console.error("Failed to abort migration:", abortError);
         }
@@ -411,6 +420,7 @@ function FamilyComponent() {
     abortFamilyMigrationMut,
     queryClient,
     router,
+    activeAccountId,
   ]);
 
   const handleChangeFamily = async (
@@ -448,6 +458,7 @@ function FamilyComponent() {
 
         // 3. prepare
         const { migrationId } = await prepareFamilyMigrationMut({
+          accountId: activeAccountId || undefined,
           action: "create",
           name: createName,
           masterKeyEncrypted: wrapped.encrypted,
@@ -459,7 +470,10 @@ function FamilyComponent() {
         // 4. 所有するレコードの暗号化対象を取得
         const migrationData = await convex.query(
           api.families.getMigrationForEncryption,
-          { migrationId },
+          {
+            accountId: activeAccountId || undefined,
+            migrationId,
+          },
         );
         const reEncryptedCredentials: {
           recordId?: string;
@@ -514,6 +528,7 @@ function FamilyComponent() {
 
         // 5. commit
         await commitFamilyMigrationMut({
+          accountId: activeAccountId || undefined,
           migrationId,
           credentials: reEncryptedCredentials,
         });
@@ -525,7 +540,10 @@ function FamilyComponent() {
       } catch (error) {
         if (currentMigrationId) {
           try {
-            await abortFamilyMigrationMut({ migrationId: currentMigrationId });
+            await abortFamilyMigrationMut({
+              accountId: activeAccountId || undefined,
+              migrationId: currentMigrationId,
+            });
           } catch (abortError) {
             console.error("Failed to abort migration:", abortError);
           }
@@ -560,6 +578,7 @@ function FamilyComponent() {
       const wrapped = await wrapMasterKey(masterKey, passcodeKey);
 
       await createFamilyMut({
+        accountId: activeAccountId || undefined,
         name: createName,
         masterKeyEncrypted: wrapped.encrypted,
         masterKeyIv: wrapped.iv,
@@ -628,6 +647,7 @@ function FamilyComponent() {
                 setIsLoading(true);
                 try {
                   await cancelJoinRequestMut({
+                    accountId: activeAccountId || undefined,
                     requestId: myJoinRequest.id as Id<"joinRequests">,
                   });
                   toast.success("参加申請をキャンセルしました");
@@ -678,6 +698,7 @@ function FamilyComponent() {
                 setIsLoading(true);
                 try {
                   await dismissRejectedRequestMut({
+                    accountId: activeAccountId || undefined,
                     requestId: myJoinRequest.id as Id<"joinRequests">,
                   });
                 } catch {
@@ -704,12 +725,12 @@ function FamilyComponent() {
                   参加申請が承認されました！
                 </h2>
                 <p className="text-[13px] text-muted-foreground">
-                  家族「{myJoinRequest.familyName}」への参加を完了してください
+                  家族「{myJoinRequest.familyName}」への参加が承認されました
                 </p>
               </div>
             </div>
             <p className="text-[14px] text-muted-foreground leading-relaxed mb-6">
-              参加を完了するには、家族のパスコードを入力してください。
+              家族グループのパスコードを入力して、参加を完了してください。
             </p>
             <div className="space-y-4">
               <div>
@@ -717,12 +738,12 @@ function FamilyComponent() {
                   htmlFor="join-passcode-approved-input"
                   className="mb-1.5 block text-[14px] font-medium text-foreground"
                 >
-                  家族のパスコード <span className="text-red-500">*</span>
+                  家族パスコード <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <input
-                    type={showJoinPasscode ? "text" : "password"}
                     id="join-passcode-approved-input"
+                    type={showJoinPasscode ? "text" : "password"}
                     required
                     minLength={8}
                     value={joinPasscode}
@@ -1012,6 +1033,7 @@ function FamilyComponent() {
                           setIsLoading(true);
                           try {
                             await approveJoinRequestMut({
+                              accountId: activeAccountId || undefined,
                               requestId: req.id as Id<"joinRequests">,
                             });
                             toast.success(
@@ -1035,6 +1057,7 @@ function FamilyComponent() {
                           setIsLoading(true);
                           try {
                             await rejectJoinRequestMut({
+                              accountId: activeAccountId || undefined,
                               requestId: req.id as Id<"joinRequests">,
                             });
                             toast.success(

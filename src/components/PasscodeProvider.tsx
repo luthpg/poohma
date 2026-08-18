@@ -116,6 +116,9 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
 
   const targetUserId = activeAccount?.id || currentAccount?.id;
 
+  // アカウント変更世代カウンタ（非同期 unlock 処理中にアカウントが切り替わった場合の競合防止）
+  const accountGenerationRef = useRef(0);
+
   // 生体認証のサポート状況と有効状態をチェック
   useEffect(() => {
     let isMounted = true;
@@ -150,6 +153,8 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
+      const startGen = accountGenerationRef.current;
+
       try {
         setIsUnlocking(true);
         const wrappingKey = await deriveKeyFromPasscode(
@@ -161,6 +166,12 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
           currentAccount.family.masterKeyIv,
           wrappingKey,
         );
+
+        // 処理中にアカウントが切り替わっていた場合は古い鍵を設定せず破棄
+        if (accountGenerationRef.current !== startGen) {
+          return false;
+        }
+
         masterKeyRef.current = key;
         setMasterKey(key);
 
@@ -313,9 +324,10 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isPromptOpen, biometricEnabled, biometricSupported]);
 
-  // アカウントや家族IDが変わったら（アカウント切り替え・ログアウトなど）鍵をクリアする
+  // アカウントや家族IDが変わったら（アカウント切り替え・ログアウトなど）世代を更新し鍵をクリアする
   // biome-ignore lint/correctness/useExhaustiveDependencies: clear key when account or familyId changes
   useEffect(() => {
+    accountGenerationRef.current += 1;
     setMasterKey(null);
     masterKeyRef.current = null;
   }, [activeAccountId, currentAccount?.familyId]);
