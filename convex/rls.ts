@@ -14,8 +14,11 @@ export function requireRecordAccess(
     );
   }
 
-  // PRIVATE レコードの所有権はアカウントID単位で判定
-  const isOwner = record.accountId === user._id;
+  // PRIVATE レコードの所有権はアカウントID単位で判定（レガシー互換フォールバック含む）
+  // TODO: `record.userId === user.userId;` はマイグレ後に削除
+  const isOwner = record.accountId
+    ? record.accountId === user._id
+    : record.userId === user.userId;
   const isFamilyShared =
     record.visibility === "SHARED" &&
     record.familyId !== undefined &&
