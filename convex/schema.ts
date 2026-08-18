@@ -67,8 +67,7 @@ export default defineSchema({
     memo: v.optional(v.string()),
     visibility: v.union(v.literal("PRIVATE"), v.literal("SHARED")),
     userId: v.string(), // 作成者の Firebase UID
-    // TODO: `v.optional` はマイグレ後に削除
-    accountId: v.optional(v.id("users")), // 作成者の PoohMa アカウント ID（ownership境界）
+    accountId: v.id("users"), // 作成者の PoohMa アカウント ID（ownership境界）
     familyId: v.optional(v.id("families")),
 
     // 子エンティティ（アカウント情報）をドキュメント内に埋め込み

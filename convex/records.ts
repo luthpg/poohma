@@ -101,13 +101,7 @@ export const getRecordDetail = authenticatedQuery({
     // アクセス権のチェック（IDOR対策の確実な実行）
     requireRecordAccess(ctx.user, record);
 
-    // TODO: `const recordOwner = await ctx.db.get(record.accountId);` へマイグレ後に戻す
-    const recordOwner = record.accountId
-      ? await ctx.db.get(record.accountId)
-      : await ctx.db
-          .query("users")
-          .withIndex("by_userId", (q) => q.eq("userId", record.userId))
-          .first();
+    const recordOwner = await ctx.db.get(record.accountId);
 
     return {
       ...record,
