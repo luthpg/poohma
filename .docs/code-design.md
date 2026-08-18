@@ -192,14 +192,15 @@ serviceRecords 1 ── * credentials(内包配列)
 
 #### joinRequests
 
-| フィールド                 | 型                                     | 説明      |
-| --------------------- | ------------------------------------- | ------- |
-| familyId              | Id<families>                          | 申請対象の家族 |
-| userId                | string                                | 申請者     |
-| status                | "pending" \| "approved" \| "rejected" | 申請状態    |
-| createdAt / updatedAt | number                                | 作成・更新日時 |
+| フィールド                 | 型                                     | 説明                    |
+| --------------------- | ------------------------------------- | --------------------- |
+| familyId              | Id<families>                          | 申請対象の家族               |
+| userId                | string                                | 申請者の Firebase UID     |
+| accountId             | Id<users>(optional)                   | 申請元の PoohMa Account ID |
+| status                | "pending" \| "approved" \| "rejected" | 申請状態                  |
+| createdAt / updatedAt | number                                | 作成・更新日時               |
 
-インデックス: by\_familyId\_status, by\_userId\_status, by\_familyId\_userId
+インデックス: by\_familyId\_status, by\_userId\_status, by\_familyId\_userId, by\_accountId\_status, by\_familyId\_accountId
 
 #### serviceRecords
 
@@ -212,7 +213,8 @@ serviceRecords 1 ── * credentials(内包配列)
 | customIcon                  | string(optional)                    | ファビコン取得失敗時のフォールバック表示（絵文字＋カラーコード等、FR-REC-19）                                                                                                      |
 | memo                        | string(optional)                    | メモ（最大10,000文字）                                                                                                                                   |
 | visibility                  | "PRIVATE" \| "SHARED"               | 公開範囲                                                                                                                                             |
-| userId                      | string                              | 所有者（Firebase UID）                                                                                                                                |
+| userId                      | string                              | 作成者の Firebase UID                                                                                                                                |
+| accountId                   | Id<users>                           | 作成者の PoohMa Account ID（所有権・PRIVATE境界）                                                                                                          |
 | familyId                    | Id<families>(optional)              | 所属家族                                                                                                                                             |
 | credentials                 | object\[]                           | 認証情報配列（下記、最大10件）                                                                                                                                 |
 | tags                        | string\[]                           | タグ                                                                                                                                               |
@@ -225,7 +227,7 @@ serviceRecords 1 ── * credentials(内包配列)
 | lastViewedAt / lastViewedBy | number(optional) / string(optional) | 直近の閲覧日時・閲覧者（FR-REC-16、簡易サマリ用。詳細な履歴は recordAccessLog を参照）                                                                                         |
 | updatedAt                   | number                              | 更新日時                                                                                                                                             |
 
-インデックス: by\_userId, by\_familyId, by\_familyId\_visibility, by\_updatedAt, **by\_access（accessList用、NFR-PERF-03で追加）**
+インデックス: by\_userId, by\_accountId, by\_familyId, by\_familyId\_visibility, by\_updatedAt, **by\_access（accessList用、NFR-PERF-03で追加）**
 
 credentials要素：
 
@@ -328,7 +330,7 @@ export const updateRecord = familyBoundMutation({
 
 ```
 requireRecordAccess(user, record):
-  isOwner = record.userId === user.userId
+  isOwner = record.accountId === user._id
   isFamilyShared = record.visibility === "SHARED" && record.familyId === user.familyId
   isOwner または isFamilyShared でなければ Access denied エラーを送出
 

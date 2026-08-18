@@ -189,4 +189,62 @@ describe("PoohMa Multi-Account & Authorization Tests", () => {
     expect(accounts[0]._id).toBe(keepAccountId);
     expect(accounts[0].displayName).toBe("Keep Account");
   });
+
+  it("全体退会（deleteAllAccounts）を実行した際、該当Firebase UIDの全アカウントと関連データが完全に削除されること", async () => {
+    const t = convexTest(schema, modules);
+
+    const user = t.withIdentity({
+      subject: "firebase_user_delete_all",
+      email: "delall@example.com",
+      emailVerified: true,
+    });
+
+    // Account 1
+    await user.mutation(api.users.syncUser, { displayName: "Account 1" });
+    const accounts1 = await user.query(api.users.getAccounts, {});
+    const acc1Id = accounts1[0]._id;
+
+    // Family 1
+    await user.mutation(api.families.createFamily, {
+      accountId: acc1Id,
+      name: "Del Family",
+    });
+
+    await user.mutation(api.records.createRecord, {
+      accountId: acc1Id,
+      title: "Family Record",
+      visibility: "PRIVATE",
+      credentials: [],
+      tags: [],
+    });
+
+    // Account 2
+    const acc2Id = await user.mutation(api.users.createAccount, {
+      name: "Account 2",
+    });
+
+    await user.mutation(api.families.createFamily, {
+      accountId: acc2Id,
+      name: "Family 2",
+    });
+
+    await user.mutation(api.records.createRecord, {
+      accountId: acc2Id,
+      title: "Family 2 Record",
+      visibility: "PRIVATE",
+      credentials: [],
+      tags: [],
+    });
+
+    let allAccs = await user.query(api.users.getAccounts, {});
+    expect(allAccs).toHaveLength(2);
+
+    // 全体退会実行
+    const result = await user.mutation(api.users.deleteAllAccounts, {});
+    expect(result.success).toBe(true);
+    expect(result.deletedCount).toBe(2);
+
+    allAccs = await user.query(api.users.getAccounts, {});
+    expect(allAccs).toHaveLength(0);
+  });
 });
