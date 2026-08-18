@@ -162,16 +162,15 @@ serviceRecords 1 ── * credentials(内包配列)
 
 1つのFirebase User (`userId`) に対して複数のPoohMa Account（`_id: Id<"users">`）を保持可能（1:N）。各レコードが独立した所属家族（`familyId`）・表示名・プロファイル・暗号化境界を持ちます。
 
-| フィールド       | 型                      | 説明                                         |
-| ----------- | ---------------------- | ------------------------------------------ |
-| userId      | string                 | Firebase UID（複数のusersレコードで同一の値を取りうる） |
-| email       | string                 | メールアドレス                                    |
-| name        | string(optional)       | アカウント識別名（例：「仕事用」「個人用」）                 |
-| displayName | string(optional)       | 表示名                                        |
-| photoURL    | string(optional)       | プロフィール画像URL                                |
-| familyId    | Id<families>(optional) | 所属家族グループ（アカウントごとに独立）                       |
-| createdAt   | number(optional)       | 作成日時                                       |
-| updatedAt   | number                 | 更新日時                                       |
+| フィールド       | 型                      | 説明                                                                  |
+| ----------- | ---------------------- | ------------------------------------------------------------------- |
+| userId      | string                 | Firebase UID（複数のusersレコードで同一の値を取りうる）                          |
+| email       | string                 | メールアドレス                                                             |
+| displayName | string(optional)       | 表示名（アカウント識別子としても機能。createAccountで必須、syncUserでは初期補完に使用） |
+| photoURL    | string(optional)       | プロフィール画像URL                                                         |
+| familyId    | Id<families>(optional) | 所属家族グループ（アカウントごとに独立）                                                |
+| createdAt   | number(optional)       | 作成日時                                                                |
+| updatedAt   | number                 | 更新日時                                                                |
 
 インデックス: by\_userId, by\_email, by\_familyId
 

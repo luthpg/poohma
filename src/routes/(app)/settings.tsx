@@ -87,7 +87,7 @@ function SettingsComponent() {
   const { handleExport, isExporting } = useExportCsv();
 
   const updateProfile = useMutation(api.users.updateProfile);
-  const deleteAccountConvex = useMutation(api.users.deleteAccount);
+  const deleteAllAccountsConvex = useMutation(api.users.deleteAllAccounts);
 
   const handleSubmit = async (e: SubmitEvent) => {
     e.preventDefault();
@@ -135,11 +135,11 @@ function SettingsComponent() {
         throw new Error("認証情報が見つかりません。再ログインしてください。");
       }
 
-      // 1. Firebase Auth ユーザーの削除を先に実行
-      await currentUser.delete();
+      // 1. Convexで全アカウント削除を先に実行
+      await deleteAllAccountsConvex({});
 
-      // 2. Auth削除成功後にConvexのデータ削除
-      await deleteAccountConvex({ accountId: activeAccount?._id });
+      // 2. Convex削除成功後にFirebase Auth ユーザーの削除
+      await currentUser.delete();
 
       // 3. キャッシュのクリア
       clearQueryCache();

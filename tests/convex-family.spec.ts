@@ -52,6 +52,8 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
       const t = convexTest(schema, modules);
 
       let family1Id!: Id<"families">;
+      let userAId!: Id<"users">;
+      let userBId!: Id<"users">;
       const credAId = "cred_a";
       const credBId = "cred_b";
 
@@ -67,14 +69,14 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         });
 
         // ユーザーA と ユーザーB
-        await ctx.db.insert("users", {
+        userAId = await ctx.db.insert("users", {
           userId: "ua",
           email: "a@a.com",
           familyId: family1Id,
           updatedAt: Date.now(),
         });
 
-        await ctx.db.insert("users", {
+        userBId = await ctx.db.insert("users", {
           userId: "ub",
           email: "b@b.com",
           familyId: family1Id,
@@ -84,6 +86,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         // ユーザーAのサービスレコードとクレデンシャル
         await ctx.db.insert("serviceRecords", {
           userId: "ua",
+          accountId: userAId,
           familyId: family1Id,
           title: "RA",
           visibility: "PRIVATE",
@@ -103,6 +106,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         // ユーザーBのサービスレコードとクレデンシャル
         await ctx.db.insert("serviceRecords", {
           userId: "ub",
+          accountId: userBId,
           familyId: family1Id,
           title: "RB",
           visibility: "PRIVATE",
@@ -384,6 +388,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
       const t = convexTest(schema, modules);
 
       let oldFamilyId!: Id<"families">;
+      let userSoloId!: Id<"users">;
 
       await t.run(async (ctx) => {
         oldFamilyId = await ctx.db.insert("families", {
@@ -392,7 +397,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         });
 
         // ユーザーA (唯一のメンバー)
-        await ctx.db.insert("users", {
+        userSoloId = await ctx.db.insert("users", {
           userId: "user_solo",
           email: "solo@example.com",
           familyId: oldFamilyId,
@@ -401,6 +406,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
         await ctx.db.insert("serviceRecords", {
           userId: "user_solo",
+          accountId: userSoloId,
           familyId: oldFamilyId,
           title: "Solo's Record",
           visibility: "SHARED",
@@ -506,6 +512,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
     it("再暗号化対象の credential 更新を省略した commit は拒否されること", async () => {
       const t = convexTest(schema, modules);
       let oldFamilyId!: Id<"families">;
+      let userOmitId!: Id<"users">;
 
       await t.run(async (ctx) => {
         oldFamilyId = await ctx.db.insert("families", {
@@ -515,7 +522,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           masterKeySalt: "salt",
           updatedAt: Date.now(),
         });
-        await ctx.db.insert("users", {
+        userOmitId = await ctx.db.insert("users", {
           userId: "user_omit",
           email: "omit@example.com",
           familyId: oldFamilyId,
@@ -525,6 +532,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           title: "省略テストレコード",
           tags: [],
           userId: "user_omit",
+          accountId: userOmitId,
           familyId: oldFamilyId,
           visibility: "PRIVATE",
           credentials: [
@@ -673,9 +681,10 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
       const t = convexTest(schema, modules);
       let record1Id!: Id<"serviceRecords">;
       let record2Id!: Id<"serviceRecords">;
+      let userDupCredId!: Id<"users">;
 
       await t.run(async (ctx) => {
-        await ctx.db.insert("users", {
+        userDupCredId = await ctx.db.insert("users", {
           userId: "user_dup_cred",
           email: "dup@example.com",
           updatedAt: Date.now(),
@@ -683,6 +692,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
         record1Id = await ctx.db.insert("serviceRecords", {
           userId: "user_dup_cred",
+          accountId: userDupCredId,
           title: "Service 1",
           visibility: "PRIVATE",
           credentials: [
@@ -698,6 +708,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
         record2Id = await ctx.db.insert("serviceRecords", {
           userId: "user_dup_cred",
+          accountId: userDupCredId,
           title: "Service 2",
           visibility: "PRIVATE",
           credentials: [
@@ -854,6 +865,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
     it("prepare 後に作成されたレコードも commit 時に移行対象に含まれること", async () => {
       const t = convexTest(schema, modules);
       let oldFamilyId!: Id<"families">;
+      let userMidId!: Id<"users">;
 
       await t.run(async (ctx) => {
         oldFamilyId = await ctx.db.insert("families", {
@@ -861,7 +873,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           updatedAt: Date.now(),
         });
 
-        await ctx.db.insert("users", {
+        userMidId = await ctx.db.insert("users", {
           userId: "user_mid",
           email: "mid@example.com",
           familyId: oldFamilyId,
@@ -873,6 +885,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           title: "テストレコード1",
           tags: [],
           userId: "user_mid",
+          accountId: userMidId,
           familyId: oldFamilyId,
           visibility: "PRIVATE",
           credentials: [
@@ -910,6 +923,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           title: "テストレコード2",
           tags: [],
           userId: "user_mid",
+          accountId: userMidId,
           familyId: oldFamilyId,
           visibility: "PRIVATE",
           credentials: [

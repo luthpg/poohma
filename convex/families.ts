@@ -28,7 +28,8 @@ export const getFamilyMembersByFamilyId = async (
   return {
     ...family,
     users: usersInFamily.map((u) => ({
-      id: u.userId,
+      id: u._id,
+      userId: u.userId,
       email: u.email,
       displayName: u.displayName,
     })),
@@ -145,6 +146,17 @@ export const joinFamily = authenticatedMutation({
       throw new Error(
         "Access denied: You must be approved to join this family",
       );
+    }
+
+    // migrate serviceRecords to family before changing familyId
+    const userRecords = await ctx.db
+      .query("serviceRecords")
+      .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
+      .collect();
+    for (const record of userRecords) {
+      if (!record.familyId) {
+        await ctx.db.patch(record._id, { familyId: family._id });
+      }
     }
 
     await ctx.db.patch(user._id, { familyId: family._id });
@@ -394,7 +406,7 @@ export const prepareFamilyMigration = authenticatedMutation({
 
     const userRecords = await ctx.db
       .query("serviceRecords")
-      .withIndex("by_userId", (q) => q.eq("userId", user.userId))
+      .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
       .collect();
 
     const serviceRecordIds = userRecords.map((r) => r._id);
@@ -436,7 +448,7 @@ export const getMigrationForEncryption = authenticatedQuery({
     // prepare 後に作成されたレコードも含めるためリアルタイムで全件取得
     const currentRecords = await ctx.db
       .query("serviceRecords")
-      .withIndex("by_userId", (q) => q.eq("userId", user.userId))
+      .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
       .collect();
 
     const records = currentRecords.map((record) => ({
@@ -509,7 +521,7 @@ export const commitFamilyMigration = authenticatedMutation({
     // prepare 後に作成されたレコードも含めるためリアルタイムで全件取得
     const currentRecords = await ctx.db
       .query("serviceRecords")
-      .withIndex("by_userId", (q) => q.eq("userId", user.userId))
+      .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
       .collect();
 
     // 再暗号化対象の全 credential に対して更新情報が存在するか事前に検証
@@ -721,7 +733,7 @@ export const changeFamily = authenticatedMutation({
 
     const userRecords = await ctx.db
       .query("serviceRecords")
-      .withIndex("by_userId", (q) => q.eq("userId", user.userId))
+      .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
       .collect();
 
     const serviceRecordIds = userRecords.map((r) => r._id);
@@ -1129,6 +1141,17 @@ export const approveJoinRequest = familyBoundMutation({
     if (!applicant) throw new Error("Applicant not found");
 
     if (!applicant.familyId) {
+      // migrate serviceRecords to family before changing familyId
+      const applicantRecords = await ctx.db
+        .query("serviceRecords")
+        .withIndex("by_accountId", (q) => q.eq("accountId", applicant._id))
+        .collect();
+      for (const record of applicantRecords) {
+        if (!record.familyId) {
+          await ctx.db.patch(record._id, { familyId });
+        }
+      }
+
       await ctx.db.patch(applicant._id, { familyId });
       await ctx.db.patch(request._id, {
         status: "approved",

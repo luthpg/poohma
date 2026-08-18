@@ -32,7 +32,7 @@ export const getRecords = authenticatedQuery({
         .withIndex("by_familyId", (q) => q.eq("familyId", user.familyId))
         .filter((q) =>
           q.or(
-            q.eq(q.field("userId"), user.userId),
+            q.eq(q.field("accountId"), user._id),
             q.eq(q.field("visibility"), "SHARED"),
           ),
         )
@@ -41,7 +41,7 @@ export const getRecords = authenticatedQuery({
       // 家族未所属時：自身が作成した家族未所属のレコードのみ
       records = await ctx.db
         .query("serviceRecords")
-        .withIndex("by_userId", (q) => q.eq("userId", user.userId))
+        .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
         .filter((q) => q.eq(q.field("familyId"), undefined))
         .collect();
     }
@@ -101,10 +101,7 @@ export const getRecordDetail = authenticatedQuery({
     // アクセス権のチェック（IDOR対策の確実な実行）
     requireRecordAccess(ctx.user, record);
 
-    const recordOwner = await ctx.db
-      .query("users")
-      .withIndex("by_userId", (q) => q.eq("userId", record.userId))
-      .first();
+    const recordOwner = await ctx.db.get(record.accountId);
 
     return {
       ...record,
@@ -130,7 +127,7 @@ export const getAvailableTags = authenticatedQuery({
         .withIndex("by_familyId", (q) => q.eq("familyId", user.familyId))
         .filter((q) =>
           q.or(
-            q.eq(q.field("userId"), user.userId),
+            q.eq(q.field("accountId"), user._id),
             q.eq(q.field("visibility"), "SHARED"),
           ),
         )
@@ -138,7 +135,7 @@ export const getAvailableTags = authenticatedQuery({
     } else {
       visibleRecords = await ctx.db
         .query("serviceRecords")
-        .withIndex("by_userId", (q) => q.eq("userId", user.userId))
+        .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
         .filter((q) => q.eq(q.field("familyId"), undefined))
         .collect();
     }
@@ -163,13 +160,13 @@ export const getOwnedRecords = authenticatedQuery({
       return await ctx.db
         .query("serviceRecords")
         .withIndex("by_familyId", (q) => q.eq("familyId", user.familyId))
-        .filter((q) => q.eq(q.field("userId"), user.userId))
+        .filter((q) => q.eq(q.field("accountId"), user._id))
         .collect();
     }
 
     return await ctx.db
       .query("serviceRecords")
-      .withIndex("by_userId", (q) => q.eq("userId", user.userId))
+      .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
       .filter((q) => q.eq(q.field("familyId"), undefined))
       .collect();
   },
@@ -218,6 +215,7 @@ export const createRecord = familyBoundMutation({
       memo: args.memo,
       visibility: args.visibility,
       userId: user.userId,
+      accountId: user._id,
       familyId: user.familyId,
       credentials: args.credentials,
       tags: args.tags,
@@ -363,6 +361,7 @@ export const importRecords = familyBoundMutation({
           memo: record.memo,
           visibility: record.visibility,
           userId: user.userId,
+          accountId: user._id,
           familyId: user.familyId,
           credentials: record.credentials,
           tags: record.tags,

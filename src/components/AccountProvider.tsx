@@ -181,25 +181,27 @@ export function AccountProvider({
       clearQueryCache();
       await queryClient.invalidateQueries();
 
-      // 削除したアカウントがアクティブだった場合、別のアカウントへ切り替え
-      const remaining = accounts.filter((a) => a._id !== accountId);
-      if (remaining.length > 0) {
-        const nextId = remaining[0]._id;
-        setActiveAccountId(nextId);
-        if (typeof window !== "undefined") {
-          localStorage.setItem(STORAGE_KEY, nextId);
-        }
-      } else {
-        setActiveAccountId(null);
-        if (typeof window !== "undefined") {
-          localStorage.removeItem(STORAGE_KEY);
+      // 削除したアカウントがアクティブだった場合のみ、別のアカウントへ切り替え
+      if (accountId === activeAccountId) {
+        const remaining = accounts.filter((a) => a._id !== accountId);
+        if (remaining.length > 0) {
+          const nextId = remaining[0]._id;
+          setActiveAccountId(nextId);
+          if (typeof window !== "undefined") {
+            localStorage.setItem(STORAGE_KEY, nextId);
+          }
+        } else {
+          setActiveAccountId(null);
+          if (typeof window !== "undefined") {
+            localStorage.removeItem(STORAGE_KEY);
+          }
         }
       }
 
       toast.success("アカウントを削除しました");
       await router.invalidate();
     },
-    [accounts, deleteAccountMutation, queryClient, router],
+    [accounts, activeAccountId, deleteAccountMutation, queryClient, router],
   );
 
   const isLoading =

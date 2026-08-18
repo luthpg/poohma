@@ -19,9 +19,16 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
       const t = convexTest(schema, modules);
 
       let recordId!: Id<"serviceRecords">;
+      let someUserId!: Id<"users">;
       await t.run(async (ctx) => {
+        someUserId = await ctx.db.insert("users", {
+          userId: "some_user",
+          email: "some@example.com",
+          updatedAt: Date.now(),
+        });
         recordId = await ctx.db.insert("serviceRecords", {
           userId: "some_user",
+          accountId: someUserId,
           title: "Dummy",
           visibility: "PRIVATE",
           credentials: [],
@@ -53,10 +60,11 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
       const t = convexTest(schema, modules);
 
       let recordAId!: Id<"serviceRecords">;
+      let userAId!: Id<"users">;
 
       await t.run(async (ctx) => {
         // ユーザーA と B
-        await ctx.db.insert("users", {
+        userAId = await ctx.db.insert("users", {
           userId: "user_a",
           email: "a@example.com",
           updatedAt: Date.now(),
@@ -70,6 +78,7 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
         // ユーザーAの PRIVATE レコード
         recordAId = await ctx.db.insert("serviceRecords", {
           userId: "user_a",
+          accountId: userAId,
           title: "User A Private",
           visibility: "PRIVATE",
           credentials: [],
@@ -93,13 +102,14 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
       const t = convexTest(schema, modules);
 
       let recordAId!: Id<"serviceRecords">;
+      let userAId!: Id<"users">;
 
       await t.run(async (ctx) => {
         const familyId = await ctx.db.insert("families", {
           name: "Test Family",
           updatedAt: Date.now(),
         });
-        await ctx.db.insert("users", {
+        userAId = await ctx.db.insert("users", {
           userId: "user_a",
           email: "a@example.com",
           familyId,
@@ -114,6 +124,7 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
 
         recordAId = await ctx.db.insert("serviceRecords", {
           userId: "user_a",
+          accountId: userAId,
           familyId,
           title: "User A Record",
           visibility: "PRIVATE",
@@ -146,13 +157,14 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
       const t = convexTest(schema, modules);
 
       let recordAId!: Id<"serviceRecords">;
+      let userAId!: Id<"users">;
 
       await t.run(async (ctx) => {
         const familyId = await ctx.db.insert("families", {
           name: "Test Family",
           updatedAt: Date.now(),
         });
-        await ctx.db.insert("users", {
+        userAId = await ctx.db.insert("users", {
           userId: "user_a",
           email: "a@example.com",
           familyId,
@@ -167,6 +179,7 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
 
         recordAId = await ctx.db.insert("serviceRecords", {
           userId: "user_a",
+          accountId: userAId,
           familyId,
           title: "User A Record",
           visibility: "PRIVATE",
@@ -190,13 +203,14 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
     it("同一ファミリー内のSHAREDレコードは他のメンバーからも取得できること", async () => {
       const t = convexTest(schema, modules);
       let recordAId!: Id<"serviceRecords">;
+      let userAId!: Id<"users">;
 
       await t.run(async (ctx) => {
         const familyId = await ctx.db.insert("families", {
           name: "Shared Family",
           updatedAt: Date.now(),
         });
-        await ctx.db.insert("users", {
+        userAId = await ctx.db.insert("users", {
           userId: "user_a",
           email: "a@example.com",
           familyId,
@@ -211,6 +225,7 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
 
         recordAId = await ctx.db.insert("serviceRecords", {
           userId: "user_a",
+          accountId: userAId,
           familyId,
           title: "Shared Record",
           visibility: "SHARED",
@@ -234,6 +249,7 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
     it("異なるファミリーに属するレコードに対してはアクセス拒否されること", async () => {
       const t = convexTest(schema, modules);
       let recordAId!: Id<"serviceRecords">;
+      let userF1Id!: Id<"users">;
 
       await t.run(async (ctx) => {
         const family1 = await ctx.db.insert("families", {
@@ -245,7 +261,7 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
           updatedAt: Date.now(),
         });
 
-        await ctx.db.insert("users", {
+        userF1Id = await ctx.db.insert("users", {
           userId: "user_f1",
           email: "f1@example.com",
           familyId: family1,
@@ -260,6 +276,7 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
 
         recordAId = await ctx.db.insert("serviceRecords", {
           userId: "user_f1",
+          accountId: userF1Id,
           familyId: family1,
           title: "Family 1 Secret",
           visibility: "SHARED",

@@ -14,7 +14,8 @@ export function requireRecordAccess(
     );
   }
 
-  const isOwner = record.userId === user.userId;
+  // PRIVATE レコードの所有権はアカウントID単位で判定
+  const isOwner = record.accountId === user._id;
   const isFamilyShared =
     record.visibility === "SHARED" &&
     record.familyId !== undefined &&

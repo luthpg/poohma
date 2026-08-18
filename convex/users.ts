@@ -60,38 +60,44 @@ export const syncUser = identityVerifiedMutation({
     const existingByEmail = await ctx.db
       .query("users")
       .withIndex("by_email", (q) => q.eq("email", email))
-      .first();
+      .collect();
 
-    if (existingByEmail) {
+    if (existingByEmail.length > 0) {
       // 同じemailで別UIDのレコードが存在
       // → Firebase Auth側でアカウント再作成されたケース
-      // 旧ユーザーのServiceRecordを新UIDに移行
+      // 旧UIDを持つ全アカウントのServiceRecordを新UIDに移行
+      const oldUid = existingByEmail[0].userId;
       const records = await ctx.db
         .query("serviceRecords")
-        .withIndex("by_userId", (q) => q.eq("userId", existingByEmail.userId))
+        .withIndex("by_userId", (q) => q.eq("userId", oldUid))
         .collect();
 
       for (const record of records) {
         await ctx.db.patch(record._id, { userId: uid });
       }
 
-      // 旧ユーザーを更新（UIDとプロフィールを新しいものに差し替え）
-      const patchData: {
-        userId: string;
-        email: string;
-        photoURL?: string;
-        updatedAt: number;
-        displayName?: string;
-      } = {
-        userId: uid,
-        email,
-        photoURL,
-        updatedAt: Date.now(),
-      };
-      if (!existingByEmail.displayName && displayName) {
-        patchData.displayName = displayName;
+      // 旧UIDを持つ全アカウントを更新（UIDとプロフィールを新しいものに差し替え）
+      const now = Date.now();
+      for (const account of existingByEmail) {
+        if (account.userId === oldUid) {
+          const patchData: {
+            userId: string;
+            email: string;
+            photoURL?: string;
+            updatedAt: number;
+            displayName?: string;
+          } = {
+            userId: uid,
+            email,
+            photoURL,
+            updatedAt: now,
+          };
+          if (!account.displayName && displayName) {
+            patchData.displayName = displayName;
+          }
+          await ctx.db.patch(account._id, patchData);
+        }
       }
-      await ctx.db.patch(existingByEmail._id, patchData);
 
       return uid;
     }
@@ -220,6 +226,91 @@ export const updateProfile = authenticatedMutation({
 /**
  * アカウントの削除
  */
+/**
+ * Firebase UID に紐づく全 PoohMa アカウントを削除する（退会処理用）
+ */
+export const deleteAllAccounts = identityVerifiedMutation({
+  args: {},
+  handler: async (ctx) => {
+    const { identity } = ctx;
+    const uid = identity.subject;
+
+    // この Firebase UID に紐づく全アカウントを取得
+    const allAccounts = await ctx.db
+      .query("users")
+      .withIndex("by_userId", (q) => q.eq("userId", uid))
+      .collect();
+
+    // 各アカウントについて deleteAccount と同じ処理を実行
+    for (const account of allAccounts) {
+      // 1. 家族に関する処理
+      if (account.familyId) {
+        const familyId = account.familyId;
+        // 同じ家族のメンバーをカウント
+        const familyMembers = await ctx.db
+          .query("users")
+          .withIndex("by_familyId", (q) => q.eq("familyId", familyId))
+          .collect();
+
+        const otherMembers = familyMembers.filter((u) => u._id !== account._id);
+
+        // 他のメンバーがいない場合は家族およびそのレコードも削除
+        if (otherMembers.length === 0) {
+          const familyRecords = await ctx.db
+            .query("serviceRecords")
+            .withIndex("by_familyId", (q) => q.eq("familyId", familyId))
+            .collect();
+          for (const record of familyRecords) {
+            await ctx.db.delete(record._id);
+          }
+
+          const joinReqs = await ctx.db
+            .query("joinRequests")
+            .withIndex("by_familyId_userId", (q) => q.eq("familyId", familyId))
+            .collect();
+          for (const req of joinReqs) {
+            await ctx.db.delete(req._id);
+          }
+
+          await ctx.db.delete(familyId);
+        } else {
+          // 他のメンバーがいる場合は、このアカウントが作成した非公開レコードのみ削除
+          const privateRecords = await ctx.db
+            .query("serviceRecords")
+            .withIndex("by_familyId_visibility", (q) =>
+              q.eq("familyId", familyId).eq("visibility", "PRIVATE"),
+            )
+            .collect();
+          for (const record of privateRecords.filter(
+            (r) => r.accountId === account._id,
+          )) {
+            await ctx.db.delete(record._id);
+          }
+        }
+      } else {
+        // 家族未所属の場合、このアカウントが作成した全レコードを削除
+        const records = await ctx.db
+          .query("serviceRecords")
+          .withIndex("by_accountId", (q) => q.eq("accountId", account._id))
+          .collect();
+        for (const record of records) {
+          if (!record.familyId) {
+            await ctx.db.delete(record._id);
+          }
+        }
+      }
+
+      // 2. アカウント自身の削除
+      await ctx.db.delete(account._id);
+    }
+
+    return { success: true, deletedCount: allAccounts.length };
+  },
+});
+
+/**
+ * アカウントの削除（個別アカウント削除用）
+ */
 export const deleteAccount = authenticatedMutation({
   args: {},
   handler: async (ctx) => {
@@ -264,16 +355,16 @@ export const deleteAccount = authenticatedMutation({
           )
           .collect();
         for (const record of privateRecords.filter(
-          (r) => r.userId === user.userId,
+          (r) => r.accountId === user._id,
         )) {
           await ctx.db.delete(record._id);
         }
       }
     } else {
-      // 家族未所属の場合、このユーザーが作成した全レコードを削除
+      // 家族未所属の場合、このアカウントが作成した全レコードを削除
       const records = await ctx.db
         .query("serviceRecords")
-        .withIndex("by_userId", (q) => q.eq("userId", user.userId))
+        .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
         .collect();
       for (const record of records) {
         if (!record.familyId) {

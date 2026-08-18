@@ -81,6 +81,7 @@ PoohMaの暗号化アーキテクチャは、3つの信頼領域にまたがる�
 
 - **防御**：
   - **IDOR（アカウント偽装）の防止**：Convexの `customBuilders.ts`（`resolveAccount`）にて、リクエストされた `accountId` の所有者（`user.userId`）が認証コンテキストの `identity.subject` と一致することを必ず検証し、他人の `accountId` の指定は `Unauthorized` 例外で拒否。
+  - **レコード所有権の分離**：`serviceRecords` テーブルに `accountId` フィールド（`Id<"users">`型）を追加し、PRIVATE レコードの所有権判定を Firebase UID (`userId`) ではなくアカウント ID (`accountId`) 単位で実施。RLS（`convex/rls.ts`）および全クエリ・削除処理で `record.accountId === user._id` による厳密な照合を強制。同一 Firebase UID を共有する別アカウント間でも、PRIVATE レコードは互いにアクセス・変更・削除不可。
   - **E2EE境界と鍵の破棄**：フロントエンド（`PasscodeProvider`）にて、アカウント切り替えが発生した瞬間に前アカウントの MasterKey を揮発性メモリから即時破棄し、再パスコードロック状態へ遷移。
   - **キャッシュの分離**：アカウント切り替え時に `clearQueryCache()` と `queryClient.invalidateQueries()` を連動実行し、IndexedDB/TanStack Query キャッシュの残留・混用を防止。
   - **ファミリー境界の隔離**：Convex RLS（`convex/rls.ts`）およびクエリにて `familyId` によるデータ境界を強制。

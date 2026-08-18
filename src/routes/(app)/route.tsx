@@ -18,10 +18,6 @@ export const Route = createFileRoute("/(app)")({
         replace: true,
       });
     }
-
-    if (!context.user.familyId && location.pathname !== "/family") {
-      throw redirect({ to: "/family", replace: true });
-    }
   },
   component: RouteComponent,
 });

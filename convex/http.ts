@@ -13,10 +13,18 @@ http.route({
     if (!secret || secret !== process.env.CONVEX_INTERNAL_SECRET) {
       return new Response("Unauthorized", { status: 401 });
     }
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return new Response("Bad Request: Invalid JSON", { status: 400 });
+    }
     const { userId, accountId } = body;
     if (typeof userId !== "string") {
-      return new Response("Bad Request", { status: 400 });
+      return new Response("Bad Request: userId must be a string", { status: 400 });
+    }
+    if (accountId !== undefined && typeof accountId !== "string") {
+      return new Response("Bad Request: accountId must be a string or undefined", { status: 400 });
     }
     const user = await ctx.runQuery(internal.users.getUserByFirebaseUid, {
       userId,
