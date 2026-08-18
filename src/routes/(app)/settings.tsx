@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { useExportCsv } from "@/hooks/use-export-csv";
+import { useAccount } from "@/hooks/useAccount";
 import { clearQueryCache } from "@/hooks/usePersistentQuery";
 import { isBiometricEnabledForUser } from "@/lib/biometric";
 import { auth } from "@/utils/firebase";
@@ -40,6 +41,12 @@ function SettingsComponent() {
   const { user } = routeApi.useLoaderData();
   const router = useRouter();
   const { queryClient } = Route.useRouteContext();
+  const {
+    accounts,
+    activeAccount,
+    activeAccountId,
+    deleteAccount: deletePoohMaAccount,
+  } = useAccount();
   const { disableBiometric, lockTimeoutMinutes, setLockTimeoutMinutes } =
     usePasscode();
 
@@ -47,12 +54,16 @@ function SettingsComponent() {
     window.scrollTo(0, 0);
   }, []);
 
-  const [displayName, setDisplayName] = useState(user.displayName || "");
+  const currentAccount = activeAccount || user;
+  const [displayName, setDisplayName] = useState(
+    currentAccount.displayName || "",
+  );
   const [hasBiometric, setHasBiometric] = useState(false);
 
   useEffect(() => {
-    isBiometricEnabledForUser(user.id).then(setHasBiometric);
-  }, [user.id]);
+    const targetId = activeAccount?.id || user.id;
+    isBiometricEnabledForUser(targetId).then(setHasBiometric);
+  }, [activeAccount?.id, user.id]);
 
   const handleClearBiometric = async () => {
     try {
@@ -65,17 +76,18 @@ function SettingsComponent() {
     }
   };
 
-  // ローダーデータの user.displayName が変わった場合にフォームの値を同期
+  // アクティブアカウントが変わった場合にフォームの値を同期
   useEffect(() => {
-    setDisplayName(user.displayName || "");
-  }, [user.displayName]);
+    setDisplayName(currentAccount.displayName || "");
+  }, [currentAccount.displayName]);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeletingSubAccount, setIsDeletingSubAccount] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const { handleExport, isExporting } = useExportCsv();
 
   const updateProfile = useMutation(api.users.updateProfile);
-  const deleteAccount = useMutation(api.users.deleteAccount);
+  const deleteAccountConvex = useMutation(api.users.deleteAccount);
 
   const handleSubmit = async (e: SubmitEvent) => {
     e.preventDefault();
@@ -86,7 +98,10 @@ function SettingsComponent() {
 
     setIsSaving(true);
     try {
-      await updateProfile({ displayName: displayName.trim() });
+      await updateProfile({
+        accountId: activeAccount?._id,
+        displayName: displayName.trim(),
+      });
       await queryClient.invalidateQueries({ queryKey: ["authUser"] });
       toast.success("プロフィールを更新しました");
       await router.invalidate();
@@ -95,6 +110,20 @@ function SettingsComponent() {
       toast.error("プロフィールの更新に失敗しました");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDeleteSingleAccount = async () => {
+    if (!activeAccountId) return;
+    setIsDeletingSubAccount(true);
+    try {
+      await deletePoohMaAccount(activeAccountId);
+      toast.success("アカウントを削除しました");
+    } catch (error) {
+      console.error(error);
+      toast.error("アカウントの削除に失敗しました");
+    } finally {
+      setIsDeletingSubAccount(false);
     }
   };
 
@@ -110,7 +139,7 @@ function SettingsComponent() {
       await currentUser.delete();
 
       // 2. Auth削除成功後にConvexのデータ削除
-      await deleteAccount();
+      await deleteAccountConvex({ accountId: activeAccount?._id });
 
       // 3. キャッシュのクリア
       clearQueryCache();
@@ -294,112 +323,154 @@ function SettingsComponent() {
           Danger Zone
         </h2>
         <p className="text-[14px] text-muted-foreground mb-6">
-          アカウントの削除（退会）を行います。この操作は取り消すことができません。
+          アカウントの削除を行います。この操作は取り消すことができません。
         </p>
 
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <button
-              type="button"
-              className="flex items-center justify-center rounded-md border border-red-500/30 bg-red-500/10 px-6 py-2.5 text-[14px] font-medium text-red-600 dark:text-red-400 transition-colors hover:bg-red-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-500/50 w-full md:w-auto"
-            >
-              退会する
-            </button>
-          </AlertDialogTrigger>
-          <AlertDialogContent className="max-w-md">
-            <AlertDialogHeader>
-              <AlertDialogTitle className="text-red-600 dark:text-red-400">
-                本当に退会しますか？
-              </AlertDialogTitle>
-              <AlertDialogDescription asChild>
-                <div className="space-y-4 pt-2 text-foreground">
-                  <div className="rounded-md bg-muted p-3 text-[14px]">
-                    <p className="font-semibold mb-2">退会時の注意事項</p>
-                    <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                      <li>
-                        あなたが登録したアカウント情報はすべて削除されます。
-                      </li>
-                      <li>
-                        家族と「共有
-                        (Shared)」に設定している情報も、他の家族から見られなくなります。
-                      </li>
-                      <li>
-                        退会操作は取り消せません。事前にCSVエクスポートをおすすめします。
-                      </li>
-                    </ul>
-                  </div>
+        <div className="flex flex-col sm:flex-row gap-3">
+          {accounts.length > 1 && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center justify-center rounded-md border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-[14px] font-medium text-red-600 dark:text-red-400 transition-colors hover:bg-red-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-500/50 w-full sm:w-auto cursor-pointer"
+                >
+                  このアカウント（{currentAccount.displayName}）のみ削除
+                </button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="max-w-md">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-red-600 dark:text-red-400">
+                    アカウント「{currentAccount.displayName}」を削除しますか？
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    このPoohMaアカウントおよび所属ファミリーのデータが削除されます。他のPoohMaアカウントやFirebaseログインはそのまま保持されます。
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="mt-4">
+                  <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDeleteSingleAccount}
+                    disabled={isDeletingSubAccount}
+                    className="bg-red-500 hover:bg-red-600 focus:ring-red-500 text-white"
+                  >
+                    {isDeletingSubAccount ? (
+                      <>
+                        <Spinner className="mr-2 h-4 w-4" />
+                        削除中...
+                      </>
+                    ) : (
+                      "削除する"
+                    )}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
 
-                  <div className="flex justify-center py-2">
-                    <button
-                      type="button"
-                      onClick={handleExport}
-                      disabled={isExporting}
-                      className="flex items-center justify-center w-full rounded-md border border-border bg-background px-4 py-2.5 text-[14px] font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-                    >
-                      {isExporting ? (
-                        <>
-                          <Spinner className="mr-2 h-4 w-4" />
-                          エクスポート中...
-                        </>
-                      ) : (
-                        <>
-                          <Download className="mr-2 h-4 w-4" />
-                          CSVエクスポートする
-                        </>
-                      )}
-                    </button>
-                  </div>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <button
+                type="button"
+                className="flex items-center justify-center rounded-md border border-red-500/30 bg-red-500/10 px-6 py-2.5 text-[14px] font-medium text-red-600 dark:text-red-400 transition-colors hover:bg-red-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-500/50 w-full sm:w-auto cursor-pointer"
+              >
+                PoohMa全体から退会する
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent className="max-w-md">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-red-600 dark:text-red-400">
+                  本当に退会しますか？
+                </AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-4 pt-2 text-foreground">
+                    <div className="rounded-md bg-muted p-3 text-[14px]">
+                      <p className="font-semibold mb-2">退会時の注意事項</p>
+                      <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                        <li>
+                          あなたが登録したアカウント情報はすべて削除されます。
+                        </li>
+                        <li>
+                          家族と「共有
+                          (Shared)」に設定している情報も、他の家族から見られなくなります。
+                        </li>
+                        <li>
+                          退会操作は取り消せません。事前にCSVエクスポートをおすすめします。
+                        </li>
+                      </ul>
+                    </div>
 
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="confirm-delete"
-                      className="text-[14px] font-medium text-foreground"
-                    >
-                      確認のため、「
-                      <span className="font-bold text-red-500">退会する</span>
-                      」と入力してください
-                    </label>
-                    <input
-                      id="confirm-delete"
-                      type="text"
-                      value={deleteConfirmation}
-                      onChange={(e) => setDeleteConfirmation(e.target.value)}
-                      placeholder="退会する"
-                      className="w-full rounded-md bg-card p-2.5 text-base md:text-[14px] border border-border shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500/50"
-                    />
+                    <div className="flex justify-center py-2">
+                      <button
+                        type="button"
+                        onClick={handleExport}
+                        disabled={isExporting}
+                        className="flex items-center justify-center w-full rounded-md border border-border bg-background px-4 py-2.5 text-[14px] font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                      >
+                        {isExporting ? (
+                          <>
+                            <Spinner className="mr-2 h-4 w-4" />
+                            エクスポート中...
+                          </>
+                        ) : (
+                          <>
+                            <Download className="mr-2 h-4 w-4" />
+                            CSVエクスポートする
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="confirm-delete"
+                        className="text-[14px] font-medium text-foreground"
+                      >
+                        確認のため、「
+                        <span className="font-bold text-red-500">退会する</span>
+                        」と入力してください
+                      </label>
+                      <input
+                        id="confirm-delete"
+                        type="text"
+                        value={deleteConfirmation}
+                        onChange={(e) => setDeleteConfirmation(e.target.value)}
+                        placeholder="退会する"
+                        className="w-full rounded-md bg-card p-2.5 text-base md:text-[14px] border border-border shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500/50"
+                      />
+                    </div>
                   </div>
-                </div>
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter className="mt-6">
-              <AlertDialogCancel
-                onClick={() => setDeleteConfirmation("")}
-                className="mt-2 sm:mt-0"
-              >
-                キャンセル
-              </AlertDialogCancel>
-              <AlertDialogAction
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (deleteConfirmation === "退会する") {
-                    handleDeleteAccount();
-                  }
-                }}
-                disabled={deleteConfirmation !== "退会する" || isDeleting}
-                className="bg-red-500 hover:bg-red-600 focus:ring-red-500 text-white disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
-              >
-                {isDeleting ? (
-                  <>
-                    <Spinner className="mr-2 h-4 w-4" />
-                    退会処理中...
-                  </>
-                ) : (
-                  "理解した上で退会する"
-                )}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="mt-6">
+                <AlertDialogCancel
+                  onClick={() => setDeleteConfirmation("")}
+                  className="mt-2 sm:mt-0"
+                >
+                  キャンセル
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (deleteConfirmation === "退会する") {
+                      handleDeleteAccount();
+                    }
+                  }}
+                  disabled={deleteConfirmation !== "退会する" || isDeleting}
+                  className="bg-red-500 hover:bg-red-600 focus:ring-red-500 text-white disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+                >
+                  {isDeleting ? (
+                    <>
+                      <Spinner className="mr-2 h-4 w-4" />
+                      退会処理中...
+                    </>
+                  ) : (
+                    "理解した上で退会する"
+                  )}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </div>
     </div>
   );

@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
+import { useAccount } from "@/hooks/useAccount";
 import {
   AUTOLOCK_DEFAULT_MINUTES,
   getAutolockTimeoutMinutes,
@@ -68,6 +69,9 @@ const PasscodeContext = createContext<PasscodeContextType | null>(null);
 
 export function PasscodeProvider({ children }: { children: React.ReactNode }) {
   const { user } = useRouteContext({ from: "__root__" });
+  const { activeAccount, activeAccountId } = useAccount();
+  const currentAccount = activeAccount || user;
+
   const passcodeInputRef = useRef<HTMLInputElement>(null);
   const [masterKey, setMasterKey] = useState<CryptoKey | null>(null);
   const masterKeyRef = useRef<CryptoKey | null>(null);
@@ -110,6 +114,8 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
   const [isBiometricAuthenticating, setIsBiometricAuthenticating] =
     useState(false);
 
+  const targetUserId = activeAccount?.id || currentAccount?.id;
+
   // 生体認証のサポート状況と有効状態をチェック
   useEffect(() => {
     let isMounted = true;
@@ -118,8 +124,8 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
       if (!isMounted) return;
       setBiometricSupported(supported);
 
-      if (supported && user?.id) {
-        const enabled = await isBiometricEnabledForUser(user.id);
+      if (supported && targetUserId) {
+        const enabled = await isBiometricEnabledForUser(targetUserId);
         if (!isMounted) return;
         setBiometricEnabled(enabled);
       } else {
@@ -132,14 +138,14 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
     return () => {
       isMounted = false;
     };
-  }, [user?.id]);
+  }, [targetUserId]);
 
   const unlock = useCallback(
     async (code: string) => {
       if (
-        !user?.family?.masterKeyEncrypted ||
-        !user?.family?.masterKeyIv ||
-        !user?.family?.masterKeySalt
+        !currentAccount?.family?.masterKeyEncrypted ||
+        !currentAccount?.family?.masterKeyIv ||
+        !currentAccount?.family?.masterKeySalt
       ) {
         return false;
       }
@@ -148,11 +154,11 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
         setIsUnlocking(true);
         const wrappingKey = await deriveKeyFromPasscode(
           code,
-          user.family.masterKeySalt,
+          currentAccount.family.masterKeySalt,
         );
         const key = await unwrapMasterKey(
-          user.family.masterKeyEncrypted,
-          user.family.masterKeyIv,
+          currentAccount.family.masterKeyEncrypted,
+          currentAccount.family.masterKeyIv,
           wrappingKey,
         );
         masterKeyRef.current = key;
@@ -167,7 +173,7 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
         setIsUnlocking(false);
       }
     },
-    [user],
+    [currentAccount],
   );
 
   const decryptHint = useCallback(
@@ -208,26 +214,26 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const isLocked = !!user?.familyId && !masterKey;
+  const isLocked = !!currentAccount?.familyId && !masterKey;
 
   const requireUnlock = useCallback(async () => {
     if (!isLocked) return true;
-    if (!user?.family?.masterKeyEncrypted) return false;
+    if (!currentAccount?.family?.masterKeyEncrypted) return false;
 
     setIsPromptOpen(true);
     return new Promise<boolean>((resolve) => {
       resolvePromiseRef.current = resolve;
     });
-  }, [isLocked, user]);
+  }, [isLocked, currentAccount]);
 
   const disableBiometric = useCallback(async () => {
-    if (!user?.id) return;
-    await disableBiometricUnlock(user.id);
+    if (!targetUserId) return;
+    await disableBiometricUnlock(targetUserId);
     setBiometricEnabled(false); // グローバルなステートもオフにする
     // ロック解除した状態をリセット
     setMasterKey(null);
     masterKeyRef.current = null;
-  }, [user?.id]);
+  }, [targetUserId]);
 
   const handleUnlockSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
@@ -236,12 +242,12 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
       setIsPromptOpen(false);
 
       // パスコード認証成功後に生体認証登録を行う
-      if (shouldRegisterBiometric && user?.id) {
+      if (shouldRegisterBiometric && targetUserId && currentAccount) {
         try {
           await registerBiometricUnlock(
-            user.id,
+            targetUserId,
             passcode,
-            `${user.email}${user?.family != null ? ` [${user.family.name}]` : ""}`,
+            `${currentAccount.email}${currentAccount?.family != null ? ` [${currentAccount.family.name}]` : ""}`,
           );
           setBiometricEnabled(true);
           toast.success("指紋/FaceIDでのロック解除を有効にしました。");
@@ -263,10 +269,11 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
   };
 
   const handleBiometricUnlock = async () => {
-    if (!user?.id) return;
+    if (!targetUserId) return;
     try {
       setIsBiometricAuthenticating(true);
-      const decryptedPasscode = await decryptPasscodeWithBiometrics(user.id);
+      const decryptedPasscode =
+        await decryptPasscodeWithBiometrics(targetUserId);
       const success = await unlock(decryptedPasscode);
       if (success) {
         setIsPromptOpen(false);
@@ -306,12 +313,12 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isPromptOpen, biometricEnabled, biometricSupported]);
 
-  // ユーザーや家族IDが変わったら（ログアウトなど）鍵をクリアする
-  // biome-ignore lint/correctness/useExhaustiveDependencies: clear key when familyId changes
+  // アカウントや家族IDが変わったら（アカウント切り替え・ログアウトなど）鍵をクリアする
+  // biome-ignore lint/correctness/useExhaustiveDependencies: clear key when account or familyId changes
   useEffect(() => {
     setMasterKey(null);
     masterKeyRef.current = null;
-  }, [user?.familyId]);
+  }, [activeAccountId, currentAccount?.familyId]);
 
   return (
     <PasscodeContext.Provider
@@ -344,7 +351,7 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
             </DialogTitle>
             <DialogDescription>
               暗号化されたデータの読み書きを行うには、
-              {user?.family?.name || "家族"}
+              {currentAccount?.family?.name || "家族"}
               のパスコードを入力してください。
             </DialogDescription>
             {lockTimeoutMinutes > 0 && (

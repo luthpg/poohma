@@ -40,7 +40,7 @@ export const getFamilyMembersById = async (ctx: QueryCtx, userId: string) => {
   const user = await ctx.db
     .query("users")
     .withIndex("by_userId", (q) => q.eq("userId", userId))
-    .unique();
+    .first();
 
   if (!user?.familyId) return null;
 
@@ -58,7 +58,8 @@ export const getFamilyMembers = authenticatedQuery({
   args: {},
   handler: async (ctx) => {
     const { user } = ctx;
-    return await getFamilyMembersById(ctx, user.userId);
+    if (!user.familyId) return null;
+    return await getFamilyMembersByFamilyId(ctx, user.familyId);
   },
 });
 
@@ -986,7 +987,7 @@ export const getPendingRequests = familyBoundQuery({
       const user = await ctx.db
         .query("users")
         .withIndex("by_userId", (q) => q.eq("userId", req.userId))
-        .unique();
+        .first();
       results.push({
         id: req._id,
         userId: req.userId,
@@ -1018,7 +1019,7 @@ export const approveJoinRequest = familyBoundMutation({
     const applicant = await ctx.db
       .query("users")
       .withIndex("by_userId", (q) => q.eq("userId", request.userId))
-      .unique();
+      .first();
     if (!applicant) throw new Error("Applicant not found");
 
     if (!applicant.familyId) {
@@ -1096,7 +1097,7 @@ export const rejectJoinRequest = familyBoundMutation({
     const applicant = await ctx.db
       .query("users")
       .withIndex("by_userId", (q) => q.eq("userId", request.userId))
-      .unique();
+      .first();
 
     if (applicant) {
       const family = await ctx.db.get(familyId);

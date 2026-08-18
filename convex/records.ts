@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { z } from "zod";
 import { CredentialInputSchema, RecordInputSchema } from "../src/utils/schemas";
+import type { Doc } from "./_generated/dataModel";
 import { authenticatedQuery, familyBoundMutation } from "./customBuilders";
 import { requireRecordAccess } from "./rls";
 
@@ -19,31 +20,31 @@ export const getRecords = authenticatedQuery({
     q: v.optional(v.string()),
     tag: v.optional(v.string()),
     sort: v.optional(v.string()),
-    // page: v.optional(v.number()), // TODO: Implement cursor-based pagination with Convex paginated query
   },
   handler: async (ctx, args) => {
     const { user } = ctx;
 
-    // 自身のレコードと家族で共有設定のレコードをインデックスを活用して個別に取得
-    const ownRecords = await ctx.db
-      .query("serviceRecords")
-      .withIndex("by_userId", (q) => q.eq("userId", user.userId))
-      .collect();
-
-    const sharedRecords = user.familyId
-      ? await ctx.db
-          .query("serviceRecords")
-          .withIndex("by_familyId_visibility", (q) =>
-            q.eq("familyId", user.familyId).eq("visibility", "SHARED"),
-          )
-          .collect()
-      : [];
-
-    const ownIds = new Set(ownRecords.map((r) => r._id));
-    let records = [
-      ...ownRecords,
-      ...sharedRecords.filter((r) => !ownIds.has(r._id)),
-    ];
+    let records: Doc<"serviceRecords">[] = [];
+    if (user.familyId) {
+      // 家族所属時：その家族内の自分自身のレコード（PRIVATE含む）と家族共有(SHARED)のレコードを取得
+      records = await ctx.db
+        .query("serviceRecords")
+        .withIndex("by_familyId", (q) => q.eq("familyId", user.familyId))
+        .filter((q) =>
+          q.or(
+            q.eq(q.field("userId"), user.userId),
+            q.eq(q.field("visibility"), "SHARED"),
+          ),
+        )
+        .collect();
+    } else {
+      // 家族未所属時：自身が作成した家族未所属のレコードのみ
+      records = await ctx.db
+        .query("serviceRecords")
+        .withIndex("by_userId", (q) => q.eq("userId", user.userId))
+        .filter((q) => q.eq(q.field("familyId"), undefined))
+        .collect();
+    }
 
     if (args.tag) {
       records = records.filter((r) => r.tags.includes(args.tag as string));
@@ -103,7 +104,7 @@ export const getRecordDetail = authenticatedQuery({
     const recordOwner = await ctx.db
       .query("users")
       .withIndex("by_userId", (q) => q.eq("userId", record.userId))
-      .unique();
+      .first();
 
     return {
       ...record,
@@ -122,25 +123,25 @@ export const getAvailableTags = authenticatedQuery({
   handler: async (ctx) => {
     const { user } = ctx;
 
-    const ownRecords = await ctx.db
-      .query("serviceRecords")
-      .withIndex("by_userId", (q) => q.eq("userId", user.userId))
-      .collect();
-
-    const sharedRecords = user.familyId
-      ? await ctx.db
-          .query("serviceRecords")
-          .withIndex("by_familyId_visibility", (q) =>
-            q.eq("familyId", user.familyId).eq("visibility", "SHARED"),
-          )
-          .collect()
-      : [];
-
-    const ownIds = new Set(ownRecords.map((r) => r._id));
-    const visibleRecords = [
-      ...ownRecords,
-      ...sharedRecords.filter((r) => !ownIds.has(r._id)),
-    ];
+    let visibleRecords: Doc<"serviceRecords">[] = [];
+    if (user.familyId) {
+      visibleRecords = await ctx.db
+        .query("serviceRecords")
+        .withIndex("by_familyId", (q) => q.eq("familyId", user.familyId))
+        .filter((q) =>
+          q.or(
+            q.eq(q.field("userId"), user.userId),
+            q.eq(q.field("visibility"), "SHARED"),
+          ),
+        )
+        .collect();
+    } else {
+      visibleRecords = await ctx.db
+        .query("serviceRecords")
+        .withIndex("by_userId", (q) => q.eq("userId", user.userId))
+        .filter((q) => q.eq(q.field("familyId"), undefined))
+        .collect();
+    }
 
     const tagsSet = new Set<string>();
     for (const r of visibleRecords) {
@@ -158,9 +159,18 @@ export const getOwnedRecords = authenticatedQuery({
   handler: async (ctx) => {
     const { user } = ctx;
 
+    if (user.familyId) {
+      return await ctx.db
+        .query("serviceRecords")
+        .withIndex("by_familyId", (q) => q.eq("familyId", user.familyId))
+        .filter((q) => q.eq(q.field("userId"), user.userId))
+        .collect();
+    }
+
     return await ctx.db
       .query("serviceRecords")
       .withIndex("by_userId", (q) => q.eq("userId", user.userId))
+      .filter((q) => q.eq(q.field("familyId"), undefined))
       .collect();
   },
 });

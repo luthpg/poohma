@@ -11,6 +11,7 @@ import { usePasscode } from "@/components/PasscodeProvider";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { useAccount } from "@/hooks/useAccount";
 import { clearQueryCache } from "@/hooks/usePersistentQuery";
 import {
   deriveKeyFromPasscode,
@@ -81,17 +82,20 @@ function FamilyPending() {
 
 function FamilyComponent() {
   const { isAuthenticated } = useConvexAuth();
+  const { activeAccountId } = useAccount();
   const family = useQuery(
     api.families.getFamilyMembers,
-    isAuthenticated ? {} : "skip",
+    isAuthenticated ? { accountId: activeAccountId || undefined } : "skip",
   );
   const myJoinRequest = useQuery(
     api.families.getMyJoinRequest,
-    isAuthenticated ? {} : "skip",
+    isAuthenticated ? { accountId: activeAccountId || undefined } : "skip",
   );
   const pendingRequests = useQuery(
     api.families.getPendingRequests,
-    isAuthenticated && family ? {} : "skip",
+    isAuthenticated && family
+      ? { accountId: activeAccountId || undefined }
+      : "skip",
   );
   const search = Route.useSearch();
   const router = useRouter();

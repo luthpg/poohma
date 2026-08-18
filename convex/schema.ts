@@ -16,6 +16,7 @@ export default defineSchema({
     displayName: v.optional(v.string()),
     photoURL: v.optional(v.string()),
     familyId: v.optional(v.id("families")),
+    createdAt: v.optional(v.number()),
     updatedAt: v.number(),
   })
     .index("by_userId", ["userId"])

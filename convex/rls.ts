@@ -7,6 +7,13 @@ export function requireRecordAccess(
   user: Doc<"users">,
   record: Doc<"serviceRecords">,
 ) {
+  // レコードがファミリーに属している場合、ユーザーも同一ファミリーに所属していなければならない
+  if (record.familyId !== undefined && record.familyId !== user.familyId) {
+    throw new Error(
+      "Access denied: You don't have permission to access this record",
+    );
+  }
+
   const isOwner = record.userId === user.userId;
   const isFamilyShared =
     record.visibility === "SHARED" &&

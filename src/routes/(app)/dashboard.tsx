@@ -20,6 +20,7 @@ import type { Doc, Id } from "@/../convex/_generated/dataModel";
 import { IndexScrollBar } from "@/components/IndexScrollBar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TagInput } from "@/components/ui/tag-input";
+import { useAccount } from "@/hooks/useAccount";
 import { usePersistentQuery } from "@/hooks/usePersistentQuery";
 import { cn } from "@/lib/utils";
 import {
@@ -84,8 +85,10 @@ function TagCloud({
   activeTag: string | undefined;
   onTagClick: (tag: string) => void;
 }) {
+  const { activeAccountId } = useAccount();
   const availableTags = usePersistentQuery<string[]>(
     api.records.getAvailableTags,
+    { accountId: activeAccountId || undefined },
   );
 
   if (availableTags === undefined) return <TagCloudSkeleton />;
@@ -501,8 +504,11 @@ function BulkTagModal({
   onSubmit: () => void;
   onCancel: () => void;
 }) {
+  const { activeAccountId } = useAccount();
   const availableTags =
-    usePersistentQuery<string[]>(api.records.getAvailableTags) || [];
+    usePersistentQuery<string[]>(api.records.getAvailableTags, {
+      accountId: activeAccountId || undefined,
+    }) || [];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
@@ -569,9 +575,11 @@ function RecordListSection({
   onSelectAll: (ids: string[]) => void;
 }) {
   const { user } = routeApi.useLoaderData();
+  const { activeAccountId } = useAccount();
   const records = usePersistentQuery<Doc<"serviceRecords">[]>(
     api.records.getRecords,
     {
+      accountId: activeAccountId || undefined,
       q: searchParams.q,
       tag: searchParams.tag,
       sort: sortParam,

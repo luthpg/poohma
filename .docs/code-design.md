@@ -160,14 +160,18 @@ serviceRecords 1 ── * credentials(内包配列)
 
 #### users
 
-| フィールド       | 型                      | 説明           |
-| ----------- | ---------------------- | ------------ |
-| userId      | string                 | Firebase UID |
-| email       | string                 | メールアドレス      |
-| displayName | string(optional)       | 表示名          |
-| photoURL    | string(optional)       | プロフィール画像URL  |
-| familyId    | Id<families>(optional) | 所属家族グループ     |
-| updatedAt   | number                 | 更新日時         |
+1つのFirebase User (`userId`) に対して複数のPoohMa Account（`_id: Id<"users">`）を保持可能（1:N）。各レコードが独立した所属家族（`familyId`）・表示名・プロファイル・暗号化境界を持ちます。
+
+| フィールド       | 型                      | 説明                                         |
+| ----------- | ---------------------- | ------------------------------------------ |
+| userId      | string                 | Firebase UID（複数のusersレコードで同一の値を取りうる） |
+| email       | string                 | メールアドレス                                    |
+| name        | string(optional)       | アカウント識別名（例：「仕事用」「個人用」）                 |
+| displayName | string(optional)       | 表示名                                        |
+| photoURL    | string(optional)       | プロフィール画像URL                                |
+| familyId    | Id<families>(optional) | 所属家族グループ（アカウントごとに独立）                       |
+| createdAt   | number(optional)       | 作成日時                                       |
+| updatedAt   | number                 | 更新日時                                       |
 
 インデックス: by\_userId, by\_email, by\_familyId
 
@@ -292,8 +296,16 @@ Convex 側は auth.config.ts の Issuer 設定 (securetoken.google.com/poohma) �
 | ビルダー                             | チェック内容                                    | 用途                        |
 | -------------------------------- | ----------------------------------------- | ------------------------- |
 | identityVerifiedQuery / Mutation | Firebase Identity の存在のみ検証                 | ユーザー新規同期処理など              |
-| authenticatedQuery / Mutation    | Identity検証 + Convex usersテーブルにレコードが存在すること | 一般的な認証必須API               |
-| familyBoundQuery / Mutation      | 上記 + user.familyId が設定されていること             | 家族所属が前提の機能（招待承認、家族固有クエリ等） |
+| authenticatedQuery / Mutation    | Identity検証 + `resolveAccount` によるアカウント解決（所有権検証） | 一般的な認証必須API               |
+| familyBoundQuery / Mutation      | 上記 + 対象アカウントの `user.familyId` が設定されていること | 家族所属が前提の機能（招待承認、家族固有クエリ等） |
+
+#### アカウント解決（resolveAccount）の仕組み
+`authenticatedQuery` / `authenticatedMutation` / `familyBoundQuery` / `familyBoundMutation` は共通引数として `accountId?: v.optional(v.id("users"))` をサポートします。
+1. `accountId` が明示的に渡された場合：
+   - DB から当該 `users` レコードを取得。
+   - `user.userId === identity.subject`（ログイン中 Firebase UID）であることを検証（IDOR 防止）。不一致の場合は `Unauthorized` 例外を送出。
+2. `accountId` が省略された場合：
+   - ログイン中 Firebase UID に紐づく先頭の `users` レコードへ自動フォールバック（下位互換性確保）。
 
 生のConvex `query` / `mutation` を直接エクスポートすることは禁止し、必ず上記のカスタムビルダーを経由する。実装例（ `convex/records.ts` の `updateRecord` ）：
 
@@ -301,7 +313,7 @@ Convex 側は auth.config.ts の Issuer 設定 (securetoken.google.com/poohma) �
 export const updateRecord = familyBoundMutation({
   args: { id: v.id("serviceRecords"), data: ConvexRecordInputSchema },
   handler: async (ctx, args) => {
-    // 認証と家族所属チェックは familyBoundMutation により自動化済み
+    // 認証と家族所属チェック・対象アカウント解決は familyBoundMutation により自動化済み
     const record = await ctx.db.get(args.id);
     if (!record) throw new Error("Record not found");
 

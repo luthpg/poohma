@@ -1,4 +1,5 @@
 import { Link, useMatches } from "@tanstack/react-router";
+import { AccountSwitcher } from "@/components/AccountSwitcher";
 import { UserMenu } from "@/components/user-menu";
 
 interface AppHeaderProps {
@@ -12,6 +13,7 @@ interface AppHeaderProps {
 /**
  * (app) 配下の全ページで共通表示されるヘッダーコンポーネント。
  * - ロゴ（ダッシュボードへのリンク）
+ * - AccountSwitcher（アカウント切り替えドロップダウン）
  * - ダッシュボード表示時のみ「+ 新規登録」ボタン
  * - UserMenu（アバター＋ドロップダウン）
  */
@@ -35,7 +37,8 @@ export function AppHeader({ user }: AppHeaderProps) {
             Pooh<span className="text-orange-500">Ma</span>
           </span>
         </Link>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <AccountSwitcher />
           {isDashboard && (
             <Link
               to="/records/new"

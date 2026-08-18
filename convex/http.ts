@@ -13,12 +13,14 @@ http.route({
     if (!secret || secret !== process.env.CONVEX_INTERNAL_SECRET) {
       return new Response("Unauthorized", { status: 401 });
     }
-    const { userId } = await request.json();
+    const body = await request.json();
+    const { userId, accountId } = body;
     if (typeof userId !== "string") {
       return new Response("Bad Request", { status: 400 });
     }
     const user = await ctx.runQuery(internal.users.getUserByFirebaseUid, {
       userId,
+      accountId,
     });
     return new Response(JSON.stringify(user), {
       headers: { "Content-Type": "application/json" },

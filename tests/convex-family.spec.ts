@@ -261,13 +261,17 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
       ).rejects.toThrow("pending join request");
 
       // 5. 申請状態を確認できること
-      const myRequest = await applicantB.query(api.families.getMyJoinRequest);
+      const myRequest = await applicantB.query(
+        api.families.getMyJoinRequest,
+        {},
+      );
       expect(myRequest?.status).toBe("pending");
       expect(myRequest?.familyName).toBe("田中家");
 
       // 6. 既存メンバーが保留中の申請一覧を取得できること
       const pendingRequests = await memberA.query(
         api.families.getPendingRequests,
+        {},
       );
       expect(pendingRequests.length).toBe(1);
       expect(pendingRequests[0].userId).toBe("applicant_b");
@@ -279,7 +283,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         email: "stranger@example.com",
       });
       await expect(
-        stranger.query(api.families.getPendingRequests),
+        stranger.query(api.families.getPendingRequests, {}),
       ).rejects.toThrow("User does not belong to a family");
 
       // 8. 既存メンバーが申請を承認すること
@@ -313,6 +317,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
       // 12. 正式参加後は申請データが削除されていること
       const myRequestAfterJoin = await applicantB.query(
         api.families.getMyJoinRequest,
+        {},
       );
       expect(myRequestAfterJoin).toBeNull();
     });
@@ -358,7 +363,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
       await memberY.mutation(api.families.rejectJoinRequest, { requestId });
 
       // 却下された状態を確認
-      const status = await applicantZ.query(api.families.getMyJoinRequest);
+      const status = await applicantZ.query(api.families.getMyJoinRequest, {});
       expect(status?.status).toBe("rejected");
 
       // 却下状態を消去して再申請できるようにする
@@ -368,6 +373,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
       const statusAfterDismiss = await applicantZ.query(
         api.families.getMyJoinRequest,
+        {},
       );
       expect(statusAfterDismiss).toBeNull();
     });
