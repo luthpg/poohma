@@ -138,6 +138,7 @@ describe("PoohMa Multi-Account & Authorization Tests", () => {
     });
     expect(recordsA).toHaveLength(1);
     expect(recordsA[0].title).toBe("Record in Family A");
+    expect(recordsA[0].accountId).toBe(accountAId);
 
     const tagsA = await user.query(api.records.getAvailableTags, {
       accountId: accountAId,
@@ -150,6 +151,7 @@ describe("PoohMa Multi-Account & Authorization Tests", () => {
     });
     expect(recordsB).toHaveLength(1);
     expect(recordsB[0].title).toBe("Record in Family B");
+    expect(recordsB[0].accountId).toBe(accountBId);
 
     const tagsB = await user.query(api.records.getAvailableTags, {
       accountId: accountBId,
