@@ -41,11 +41,15 @@ export const getFamilyMembersById = async (
   ctx: QueryCtx,
   userOrAccountId: string,
 ) => {
-  let user = await ctx.db
-    .query("users")
-    .filter((q) => q.eq(q.field("_id"), userOrAccountId))
-    .first();
+  // まず ID として正規化を試みる
+  const normalizedId = ctx.db.normalizeId("users", userOrAccountId);
+  let user = null;
 
+  if (normalizedId !== null) {
+    user = await ctx.db.get(normalizedId);
+  }
+
+  // ID として見つからなければ userId で検索（レガシーフォールバック）
   if (!user) {
     user = await ctx.db
       .query("users")
@@ -139,7 +143,12 @@ export const joinFamily = authenticatedMutation({
         .withIndex("by_familyId_userId", (q) =>
           q.eq("familyId", family._id).eq("userId", user.userId),
         )
-        .filter((q) => q.eq(q.field("status"), "approved"))
+        .filter((q) =>
+          q.and(
+            q.eq(q.field("status"), "approved"),
+            q.eq(q.field("accountId"), undefined),
+          ),
+        )
         .first());
 
     if (!approvedRequest) {
@@ -237,7 +246,12 @@ export const getFamilyInfoByInviteCode = authenticatedQuery({
         .withIndex("by_familyId_userId", (q) =>
           q.eq("familyId", family._id).eq("userId", user.userId),
         )
-        .filter((q) => q.eq(q.field("status"), "approved"))
+        .filter((q) =>
+          q.and(
+            q.eq(q.field("status"), "approved"),
+            q.eq(q.field("accountId"), undefined),
+          ),
+        )
         .first());
 
     if (!isMember && !approvedRequest) {
@@ -579,7 +593,12 @@ export const commitFamilyMigration = authenticatedMutation({
         .withIndex("by_familyId_userId", (q) =>
           q.eq("familyId", migration.targetFamilyId).eq("userId", user.userId),
         )
-        .filter((q) => q.eq(q.field("status"), "approved"))
+        .filter((q) =>
+          q.and(
+            q.eq(q.field("status"), "approved"),
+            q.eq(q.field("accountId"), undefined),
+          ),
+        )
         .first());
 
     if (approvedRequest) {
@@ -719,7 +738,12 @@ export const changeFamily = authenticatedMutation({
           .withIndex("by_familyId_userId", (q) =>
             q.eq("familyId", family._id).eq("userId", user.userId),
           )
-          .filter((q) => q.eq(q.field("status"), "approved"))
+          .filter((q) =>
+            q.and(
+              q.eq(q.field("status"), "approved"),
+              q.eq(q.field("accountId"), undefined),
+            ),
+          )
           .first());
 
       if (!approvedRequest) {
@@ -801,7 +825,12 @@ export const changeFamily = authenticatedMutation({
         .withIndex("by_familyId_userId", (q) =>
           q.eq("familyId", targetFamilyId).eq("userId", user.userId),
         )
-        .filter((q) => q.eq(q.field("status"), "approved"))
+        .filter((q) =>
+          q.and(
+            q.eq(q.field("status"), "approved"),
+            q.eq(q.field("accountId"), undefined),
+          ),
+        )
         .first());
 
     if (approvedReq) {
@@ -886,6 +915,7 @@ export const createJoinRequest = authenticatedMutation({
         .withIndex("by_userId_status", (q) =>
           q.eq("userId", user.userId).eq("status", "pending"),
         )
+        .filter((q) => q.eq(q.field("accountId"), undefined))
         .first());
 
     if (anyPendingRequest) {
@@ -908,7 +938,12 @@ export const createJoinRequest = authenticatedMutation({
         .withIndex("by_familyId_userId", (q) =>
           q.eq("familyId", family._id).eq("userId", user.userId),
         )
-        .filter((q) => q.eq(q.field("status"), "approved"))
+        .filter((q) =>
+          q.and(
+            q.eq(q.field("status"), "approved"),
+            q.eq(q.field("accountId"), undefined),
+          ),
+        )
         .first());
 
     if (existingApproved) {
@@ -1018,9 +1053,12 @@ export const getMyJoinRequest = authenticatedQuery({
         .query("joinRequests")
         .withIndex("by_userId_status", (q) => q.eq("userId", user.userId))
         .filter((q) =>
-          q.or(
-            q.eq(q.field("status"), "pending"),
-            q.eq(q.field("status"), "approved"),
+          q.and(
+            q.or(
+              q.eq(q.field("status"), "pending"),
+              q.eq(q.field("status"), "approved"),
+            ),
+            q.eq(q.field("accountId"), undefined),
           ),
         )
         .first();
@@ -1039,6 +1077,7 @@ export const getMyJoinRequest = authenticatedQuery({
           .withIndex("by_userId_status", (q) =>
             q.eq("userId", user.userId).eq("status", "rejected"),
           )
+          .filter((q) => q.eq(q.field("accountId"), undefined))
           .first());
       if (rejected) {
         const family = await ctx.db.get(rejected.familyId);

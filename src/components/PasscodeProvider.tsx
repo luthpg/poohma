@@ -283,8 +283,19 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
     if (!targetUserId) return;
     try {
       setIsBiometricAuthenticating(true);
+      // 生体認証開始時の世代とターゲットアカウントを保存
+      const startGen = accountGenerationRef.current;
+      const startTargetUserId = targetUserId;
+
       const decryptedPasscode =
         await decryptPasscodeWithBiometrics(targetUserId);
+
+      // 復号後、unlock 呼び出し前に世代とアカウントIDを再検証
+      if (accountGenerationRef.current !== startGen || targetUserId !== startTargetUserId) {
+        // アカウントが切り替わっている場合は処理を中断
+        return;
+      }
+
       const success = await unlock(decryptedPasscode);
       if (success) {
         setIsPromptOpen(false);

@@ -330,6 +330,11 @@ export const updateRecord = familyBoundMutation({
 
 ```
 requireRecordAccess(user, record):
+  // 家族境界チェック（レコードが家族に属している場合、ユーザーも同一家族でなければならない）
+  if record.familyId !== undefined && record.familyId !== user.familyId:
+    Access denied エラーを送出
+
+  // 所有権または共有権限チェック
   isOwner = record.accountId === user._id
   isFamilyShared = record.visibility === "SHARED" && record.familyId === user.familyId
   isOwner または isFamilyShared でなければ Access denied エラーを送出
