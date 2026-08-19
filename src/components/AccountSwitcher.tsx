@@ -171,7 +171,7 @@ export function AccountSwitcher({ className = "" }: AccountSwitcherProps) {
                 onChange={(e) => setNewAccountName(e.target.value)}
                 placeholder="例: 個人用、仕事用、実家用"
                 maxLength={30}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary/20"
                 disabled={isSubmitting}
                 autoFocus
               />

@@ -14,6 +14,7 @@ import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
 import { useConvexFirebaseAuth } from "@/hooks/useConvexFirebaseAuth";
 import { clearQueryCache } from "@/hooks/usePersistentQuery";
+import { auth } from "@/utils/firebase";
 
 export interface Account {
   _id: Id<"users">;
@@ -47,8 +48,6 @@ export interface AccountContextValue {
 
 export const AccountContext = createContext<AccountContextValue | null>(null);
 
-const STORAGE_KEY = "poohma_active_account_id";
-
 export function AccountProvider({
   children,
   initialUser,
@@ -70,12 +69,9 @@ export function AccountProvider({
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const {
-    user,
-    isAuthenticated,
-    isLoading: isAuthLoading,
-  } = useConvexFirebaseAuth();
-  const currentUid = user?.id;
+  const { isAuthenticated, isLoading: isAuthLoading } = useConvexFirebaseAuth();
+  const currentUid =
+    auth?.currentUser?.uid || initialUser?.accounts?.[0]?.userId;
 
   const getStorageKey = useCallback((uid?: string) => {
     return uid ? `poohma_active_account_id_${uid}` : "poohma_active_account_id";
