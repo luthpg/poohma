@@ -26,6 +26,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { TagInput } from "@/components/ui/tag-input";
+import { useAccount } from "@/hooks/useAccount";
 
 export const Route = createFileRoute("/(app)/records/$id")({
   loader: ({ params }) => {
@@ -80,13 +81,14 @@ const routeApi = getRouteApi("/(app)/records/$id");
 function RecordDetailWrapper() {
   const { id } = routeApi.useLoaderData();
   const { isAuthenticated } = useConvexAuth();
+  const { activeAccountId } = useAccount();
   const availableTags = useQuery(
     api.records.getAvailableTags,
-    isAuthenticated ? {} : "skip",
+    isAuthenticated ? { accountId: activeAccountId || undefined } : "skip",
   );
   const record = useQuery(
     api.records.getRecordDetail,
-    isAuthenticated ? { id } : "skip",
+    isAuthenticated ? { id, accountId: activeAccountId || undefined } : "skip",
   );
 
   if (record === undefined || availableTags === undefined) {
@@ -94,13 +96,18 @@ function RecordDetailWrapper() {
   }
 
   return (
-    <RecordDetailComponent record={record} availableTags={availableTags} />
+    <RecordDetailComponent
+      record={record}
+      availableTags={availableTags}
+      activeAccountId={activeAccountId}
+    />
   );
 }
 
 function RecordDetailComponent({
   record,
   availableTags,
+  activeAccountId,
 }: {
   record: Doc<"serviceRecords"> & {
     user: {
@@ -109,10 +116,13 @@ function RecordDetailComponent({
     } | null;
   };
   availableTags: string[];
+  activeAccountId?: Id<"users"> | null;
 }) {
   const { user } = routeApi.useRouteContext();
   const currentUserId = user?.id;
-  const isOwner = record.userId === currentUserId;
+  const isOwner = record.accountId
+    ? record.accountId === activeAccountId
+    : record.userId === currentUserId;
   const isEditable = isOwner || record.visibility === "SHARED";
   const navigate = useNavigate();
   const router = useRouter();
@@ -390,6 +400,7 @@ function RecordDetailComponent({
       );
 
       await updateRecord({
+        accountId: activeAccountId || undefined,
         id: record._id,
         data: {
           title,
@@ -419,7 +430,10 @@ function RecordDetailComponent({
     setIsLoading(true);
 
     try {
-      await deleteRecord({ id: record._id });
+      await deleteRecord({
+        accountId: activeAccountId || undefined,
+        id: record._id,
+      });
       toast.success("レコードを削除しました");
       await navigate({ to: "/dashboard" });
     } catch (error) {

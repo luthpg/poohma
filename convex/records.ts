@@ -1,6 +1,8 @@
 import { v } from "convex/values";
 import { z } from "zod";
 import { CredentialInputSchema, RecordInputSchema } from "../src/utils/schemas";
+import type { Doc } from "./_generated/dataModel";
+import type { QueryCtx } from "./_generated/server";
 import { authenticatedQuery, familyBoundMutation } from "./customBuilders";
 import { requireRecordAccess } from "./rls";
 
@@ -12,6 +14,36 @@ const ConvexRecordInputSchema = RecordInputSchema.extend({
   credentials: z.array(ConvexCredentialInputSchema),
 });
 
+/**
+ * ユーザーがアクセス可能な可視レコード（または所有レコード）を取得するヘルパー
+ */
+async function collectVisibleRecords(
+  ctx: { db: QueryCtx["db"] },
+  user: Doc<"users">,
+  ownedOnly = false,
+): Promise<Doc<"serviceRecords">[]> {
+  if (user.familyId) {
+    const q = ctx.db
+      .query("serviceRecords")
+      .withIndex("by_familyId", (i) => i.eq("familyId", user.familyId));
+    return ownedOnly
+      ? await q.filter((f) => f.eq(f.field("accountId"), user._id)).collect()
+      : await q
+          .filter((f) =>
+            f.or(
+              f.eq(f.field("accountId"), user._id),
+              f.eq(f.field("visibility"), "SHARED"),
+            ),
+          )
+          .collect();
+  }
+  return await ctx.db
+    .query("serviceRecords")
+    .withIndex("by_accountId", (i) => i.eq("accountId", user._id))
+    .filter((f) => f.eq(f.field("familyId"), undefined))
+    .collect();
+}
+
 // === Queries ===
 
 export const getRecords = authenticatedQuery({
@@ -19,31 +51,11 @@ export const getRecords = authenticatedQuery({
     q: v.optional(v.string()),
     tag: v.optional(v.string()),
     sort: v.optional(v.string()),
-    // page: v.optional(v.number()), // TODO: Implement cursor-based pagination with Convex paginated query
   },
   handler: async (ctx, args) => {
     const { user } = ctx;
 
-    // 自身のレコードと家族で共有設定のレコードをインデックスを活用して個別に取得
-    const ownRecords = await ctx.db
-      .query("serviceRecords")
-      .withIndex("by_userId", (q) => q.eq("userId", user.userId))
-      .collect();
-
-    const sharedRecords = user.familyId
-      ? await ctx.db
-          .query("serviceRecords")
-          .withIndex("by_familyId_visibility", (q) =>
-            q.eq("familyId", user.familyId).eq("visibility", "SHARED"),
-          )
-          .collect()
-      : [];
-
-    const ownIds = new Set(ownRecords.map((r) => r._id));
-    let records = [
-      ...ownRecords,
-      ...sharedRecords.filter((r) => !ownIds.has(r._id)),
-    ];
+    let records = await collectVisibleRecords(ctx, user);
 
     if (args.tag) {
       records = records.filter((r) => r.tags.includes(args.tag as string));
@@ -100,10 +112,7 @@ export const getRecordDetail = authenticatedQuery({
     // アクセス権のチェック（IDOR対策の確実な実行）
     requireRecordAccess(ctx.user, record);
 
-    const recordOwner = await ctx.db
-      .query("users")
-      .withIndex("by_userId", (q) => q.eq("userId", record.userId))
-      .unique();
+    const recordOwner = await ctx.db.get(record.accountId);
 
     return {
       ...record,
@@ -122,25 +131,7 @@ export const getAvailableTags = authenticatedQuery({
   handler: async (ctx) => {
     const { user } = ctx;
 
-    const ownRecords = await ctx.db
-      .query("serviceRecords")
-      .withIndex("by_userId", (q) => q.eq("userId", user.userId))
-      .collect();
-
-    const sharedRecords = user.familyId
-      ? await ctx.db
-          .query("serviceRecords")
-          .withIndex("by_familyId_visibility", (q) =>
-            q.eq("familyId", user.familyId).eq("visibility", "SHARED"),
-          )
-          .collect()
-      : [];
-
-    const ownIds = new Set(ownRecords.map((r) => r._id));
-    const visibleRecords = [
-      ...ownRecords,
-      ...sharedRecords.filter((r) => !ownIds.has(r._id)),
-    ];
+    const visibleRecords = await collectVisibleRecords(ctx, user);
 
     const tagsSet = new Set<string>();
     for (const r of visibleRecords) {
@@ -158,10 +149,7 @@ export const getOwnedRecords = authenticatedQuery({
   handler: async (ctx) => {
     const { user } = ctx;
 
-    return await ctx.db
-      .query("serviceRecords")
-      .withIndex("by_userId", (q) => q.eq("userId", user.userId))
-      .collect();
+    return await collectVisibleRecords(ctx, user, true);
   },
 });
 
@@ -208,6 +196,7 @@ export const createRecord = familyBoundMutation({
       memo: args.memo,
       visibility: args.visibility,
       userId: user.userId,
+      accountId: user._id,
       familyId: user.familyId,
       credentials: args.credentials,
       tags: args.tags,
@@ -353,6 +342,7 @@ export const importRecords = familyBoundMutation({
           memo: record.memo,
           visibility: record.visibility,
           userId: user.userId,
+          accountId: user._id,
           familyId: user.familyId,
           credentials: record.credentials,
           tags: record.tags,

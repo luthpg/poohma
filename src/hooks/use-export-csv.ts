@@ -3,17 +3,21 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import { usePasscode } from "@/components/PasscodeProvider";
+import { useAccount } from "@/hooks/useAccount";
 import { sanitizeCsvValue } from "@/utils/csv-sanitize";
 
 export function useExportCsv() {
   const [isExporting, setIsExporting] = useState(false);
   const { masterKey, requireUnlock, decryptHint } = usePasscode();
+  const { activeAccountId } = useAccount();
   const convex = useConvex();
 
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      const records = await convex.query(api.records.getOwnedRecords, {});
+      const records = await convex.query(api.records.getOwnedRecords, {
+        accountId: activeAccountId || undefined,
+      });
 
       // Convex レコードを CSV 行フォーマットに変換
       const data: Record<string, string>[] = records.map((record) => {

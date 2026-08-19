@@ -19,9 +19,16 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
       const t = convexTest(schema, modules);
 
       let recordId!: Id<"serviceRecords">;
+      let someUserId!: Id<"users">;
       await t.run(async (ctx) => {
+        someUserId = await ctx.db.insert("users", {
+          userId: "some_user",
+          email: "some@example.com",
+          updatedAt: Date.now(),
+        });
         recordId = await ctx.db.insert("serviceRecords", {
           userId: "some_user",
+          accountId: someUserId,
           title: "Dummy",
           visibility: "PRIVATE",
           credentials: [],
@@ -53,10 +60,11 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
       const t = convexTest(schema, modules);
 
       let recordAId!: Id<"serviceRecords">;
+      let userAId!: Id<"users">;
 
       await t.run(async (ctx) => {
         // ユーザーA と B
-        await ctx.db.insert("users", {
+        userAId = await ctx.db.insert("users", {
           userId: "user_a",
           email: "a@example.com",
           updatedAt: Date.now(),
@@ -70,6 +78,7 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
         // ユーザーAの PRIVATE レコード
         recordAId = await ctx.db.insert("serviceRecords", {
           userId: "user_a",
+          accountId: userAId,
           title: "User A Private",
           visibility: "PRIVATE",
           credentials: [],
@@ -93,13 +102,14 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
       const t = convexTest(schema, modules);
 
       let recordAId!: Id<"serviceRecords">;
+      let userAId!: Id<"users">;
 
       await t.run(async (ctx) => {
         const familyId = await ctx.db.insert("families", {
           name: "Test Family",
           updatedAt: Date.now(),
         });
-        await ctx.db.insert("users", {
+        userAId = await ctx.db.insert("users", {
           userId: "user_a",
           email: "a@example.com",
           familyId,
@@ -114,6 +124,7 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
 
         recordAId = await ctx.db.insert("serviceRecords", {
           userId: "user_a",
+          accountId: userAId,
           familyId,
           title: "User A Record",
           visibility: "PRIVATE",
@@ -146,13 +157,14 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
       const t = convexTest(schema, modules);
 
       let recordAId!: Id<"serviceRecords">;
+      let userAId!: Id<"users">;
 
       await t.run(async (ctx) => {
         const familyId = await ctx.db.insert("families", {
           name: "Test Family",
           updatedAt: Date.now(),
         });
-        await ctx.db.insert("users", {
+        userAId = await ctx.db.insert("users", {
           userId: "user_a",
           email: "a@example.com",
           familyId,
@@ -167,6 +179,7 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
 
         recordAId = await ctx.db.insert("serviceRecords", {
           userId: "user_a",
+          accountId: userAId,
           familyId,
           title: "User A Record",
           visibility: "PRIVATE",
@@ -184,6 +197,102 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
 
       await expect(
         userB.mutation(api.records.deleteRecord, { id: recordAId }),
+      ).rejects.toThrow("Access denied");
+    });
+
+    it("同一ファミリー内のSHAREDレコードは他のメンバーからも取得できること", async () => {
+      const t = convexTest(schema, modules);
+      let recordAId!: Id<"serviceRecords">;
+      let userAId!: Id<"users">;
+
+      await t.run(async (ctx) => {
+        const familyId = await ctx.db.insert("families", {
+          name: "Shared Family",
+          updatedAt: Date.now(),
+        });
+        userAId = await ctx.db.insert("users", {
+          userId: "user_a",
+          email: "a@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("users", {
+          userId: "user_b",
+          email: "b@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+
+        recordAId = await ctx.db.insert("serviceRecords", {
+          userId: "user_a",
+          accountId: userAId,
+          familyId,
+          title: "Shared Record",
+          visibility: "SHARED",
+          credentials: [],
+          tags: [],
+          updatedAt: Date.now(),
+        });
+      });
+
+      const userB = t.withIdentity({
+        subject: "user_b",
+        email: "b@example.com",
+      });
+
+      const detail = await userB.query(api.records.getRecordDetail, {
+        id: recordAId,
+      });
+      expect(detail.title).toBe("Shared Record");
+    });
+
+    it("異なるファミリーに属するレコードに対してはアクセス拒否されること", async () => {
+      const t = convexTest(schema, modules);
+      let recordAId!: Id<"serviceRecords">;
+      let userF1Id!: Id<"users">;
+
+      await t.run(async (ctx) => {
+        const family1 = await ctx.db.insert("families", {
+          name: "Family 1",
+          updatedAt: Date.now(),
+        });
+        const family2 = await ctx.db.insert("families", {
+          name: "Family 2",
+          updatedAt: Date.now(),
+        });
+
+        userF1Id = await ctx.db.insert("users", {
+          userId: "user_f1",
+          email: "f1@example.com",
+          familyId: family1,
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("users", {
+          userId: "user_f2",
+          email: "f2@example.com",
+          familyId: family2,
+          updatedAt: Date.now(),
+        });
+
+        recordAId = await ctx.db.insert("serviceRecords", {
+          userId: "user_f1",
+          accountId: userF1Id,
+          familyId: family1,
+          title: "Family 1 Secret",
+          visibility: "SHARED",
+          credentials: [],
+          tags: [],
+          updatedAt: Date.now(),
+        });
+      });
+
+      const userF2 = t.withIdentity({
+        subject: "user_f2",
+        email: "f2@example.com",
+      });
+
+      await expect(
+        userF2.query(api.records.getRecordDetail, { id: recordAId }),
       ).rejects.toThrow("Access denied");
     });
   });

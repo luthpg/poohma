@@ -38,6 +38,7 @@ describe("2.2.1 閲覧権限（Visibility）の境界値テスト (Convex版)", 
     const t = convexTest(schema, modules);
 
     let family1Id!: Id<"families">;
+    let userAId!: Id<"users">;
 
     // 1. 初期シードデータのインサート
     await t.run(async (ctx) => {
@@ -48,7 +49,7 @@ describe("2.2.1 閲覧権限（Visibility）の境界値テスト (Convex版)", 
       });
 
       // ユーザーA と ユーザーB (家族1所属)
-      await ctx.db.insert("users", {
+      userAId = await ctx.db.insert("users", {
         userId: "user_a",
         email: "a@example.com",
         familyId: family1Id,
@@ -72,6 +73,7 @@ describe("2.2.1 閲覧権限（Visibility）の境界値テスト (Convex版)", 
       // AがPRIVATEレコードを作成
       await ctx.db.insert("serviceRecords", {
         userId: "user_a",
+        accountId: userAId,
         familyId: family1Id,
         title: "Private Record A",
         visibility: "PRIVATE",
@@ -83,6 +85,7 @@ describe("2.2.1 閲覧権限（Visibility）の境界値テスト (Convex版)", 
       // AがSHAREDレコードを作成
       await ctx.db.insert("serviceRecords", {
         userId: "user_a",
+        accountId: userAId,
         familyId: family1Id,
         title: "Shared Record A",
         visibility: "SHARED",
@@ -428,6 +431,8 @@ describe("Convexリプレース由来デグレ修正の追加テスト", () => {
   it("getOwnedRecords は自分が所有するレコードのみを返し、家族の共有レコードは含まないこと", async () => {
     const t = convexTest(schema, modules);
     let family1Id!: Id<"families">;
+    let userAId!: Id<"users">;
+    let userBId!: Id<"users">;
 
     await t.run(async (ctx) => {
       family1Id = await ctx.db.insert("families", {
@@ -436,14 +441,14 @@ describe("Convexリプレース由来デグレ修正の追加テスト", () => {
       });
 
       // User A and User B belong to Family 1
-      await ctx.db.insert("users", {
+      userAId = await ctx.db.insert("users", {
         userId: "user_a",
         email: "a@example.com",
         familyId: family1Id,
         updatedAt: Date.now(),
       });
 
-      await ctx.db.insert("users", {
+      userBId = await ctx.db.insert("users", {
         userId: "user_b",
         email: "b@example.com",
         familyId: family1Id,
@@ -453,6 +458,7 @@ describe("Convexリプレース由来デグレ修正の追加テスト", () => {
       // User A owns record
       await ctx.db.insert("serviceRecords", {
         userId: "user_a",
+        accountId: userAId,
         familyId: family1Id,
         title: "A's Private",
         visibility: "PRIVATE",
@@ -464,6 +470,7 @@ describe("Convexリプレース由来デグレ修正の追加テスト", () => {
       // User B owns record (SHARED)
       await ctx.db.insert("serviceRecords", {
         userId: "user_b",
+        accountId: userBId,
         familyId: family1Id,
         title: "B's Shared",
         visibility: "SHARED",
@@ -490,6 +497,7 @@ describe("Convexリプレース由来デグレ修正の追加テスト", () => {
     let family1Id!: Id<"families">;
     let sharedRecordId!: Id<"serviceRecords">;
     let privateRecordId!: Id<"serviceRecords">;
+    let userAId!: Id<"users">;
 
     await t.run(async (ctx) => {
       family1Id = await ctx.db.insert("families", {
@@ -497,7 +505,7 @@ describe("Convexリプレース由来デグレ修正の追加テスト", () => {
         updatedAt: Date.now(),
       });
 
-      await ctx.db.insert("users", {
+      userAId = await ctx.db.insert("users", {
         userId: "user_a",
         email: "a@example.com",
         familyId: family1Id,
@@ -514,6 +522,7 @@ describe("Convexリプレース由来デグレ修正の追加テスト", () => {
       // User A creates a SHARED record
       sharedRecordId = await ctx.db.insert("serviceRecords", {
         userId: "user_a",
+        accountId: userAId,
         familyId: family1Id,
         title: "Shared Record",
         visibility: "SHARED",
@@ -525,6 +534,7 @@ describe("Convexリプレース由来デグレ修正の追加テスト", () => {
       // User A creates a PRIVATE record
       privateRecordId = await ctx.db.insert("serviceRecords", {
         userId: "user_a",
+        accountId: userAId,
         familyId: family1Id,
         title: "Private Record",
         visibility: "PRIVATE",
@@ -623,6 +633,7 @@ describe("Convexリプレース由来デグレ修正の追加テスト", () => {
     const t = convexTest(schema, modules);
     let familyId!: Id<"families">;
     let recordId!: Id<"serviceRecords">;
+    let userAId!: Id<"users">;
 
     await t.run(async (ctx) => {
       familyId = await ctx.db.insert("families", {
@@ -630,7 +641,7 @@ describe("Convexリプレース由来デグレ修正の追加テスト", () => {
         updatedAt: Date.now(),
       });
 
-      await ctx.db.insert("users", {
+      userAId = await ctx.db.insert("users", {
         userId: "user_a",
         email: "a@example.com",
         familyId,
@@ -639,6 +650,7 @@ describe("Convexリプレース由来デグレ修正の追加テスト", () => {
 
       recordId = await ctx.db.insert("serviceRecords", {
         userId: "user_a",
+        accountId: userAId,
         familyId,
         title: "Amazon",
         titleReading: "あまぞん",

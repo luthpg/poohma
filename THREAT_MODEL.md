@@ -77,6 +77,16 @@ PoohMaの暗号化アーキテクチャは、3つの信頼領域にまたがる�
 - **防御**：各SaaSへの認証情報（APIキー等）は環境変数として管理し、内部API（`getUserByFirebaseUid`）は共有シークレットで保護している（NFR-SEC-08）。
 - **残存リスク**：Firebase Authentication自体が侵害された場合、なりすましログインのリスクがある（ただしE2EEデータの復号にはパスコードが別途必要なため、ヒント自体の即時漏洩には直結しない）。Resend・microCMSの侵害は、それぞれメール送信内容の窃取・公開コンテンツの改ざんに限定され、E2EEデータへの影響はない。
 
+### T8: マルチアカウント間のクロスアカウント・データ侵害（IDOR・鍵混用・キャッシュ漏洩）
+
+- **防御**：
+  - **IDOR（アカウント偽装）の防止**：Convexの `customBuilders.ts`（`resolveAccount`）にて、リクエストされた `accountId` の所有者（`user.userId`）が認証コンテキストの `identity.subject` と一致することを必ず検証し、他人の `accountId` の指定は `Unauthorized` 例外で拒否。
+  - **レコード所有権の分離**：`serviceRecords` テーブルに `accountId` フィールド（`Id<"users">`型）を追加し、PRIVATE レコードの所有権判定を Firebase UID (`userId`) ではなくアカウント ID (`accountId`) 単位で実施。RLS（`convex/rls.ts`）および全クエリ・削除処理で `record.accountId === user._id` による厳密な照合を強制。同一 Firebase UID を共有する別アカウント間でも、PRIVATE レコードは互いにアクセス・変更・削除不可。
+  - **E2EE境界と鍵の破棄**：フロントエンド（`PasscodeProvider`）にて、アカウント切り替えが発生した瞬間に前アカウントの MasterKey を揮発性メモリから即時破棄し、再パスコードロック状態へ遷移。
+  - **キャッシュの分離**：アカウント切り替え時に `clearQueryCache()` と `queryClient.invalidateQueries()` を連動実行し、IndexedDB/TanStack Query キャッシュの残留・混用を防止。
+  - **ファミリー境界の隔離**：Convex RLS（`convex/rls.ts`）およびクエリにて `familyId` によるデータ境界を強制。
+- **残存リスク**：アカウント切り替え時にユーザー自身が同一パスコードを複数ファミリーで使い回している場合、片方のファミリーのパスコード漏洩が他方へ波及するリスクがある（ユーザー運用上の注意喚起が必要）。
+
 ## 5. 明示的に「守らない」こと（非対象の宣言）
 
 - **実際のパスワードそのもの**：PoohMaはそもそも実パスワードを入力・保存する機能を提供しない。ユーザーが誤ってヒント欄に実パスワードを入力した場合、暗号化はされるが、これはPoohMaの設計が防げる範囲外のユーザー操作である。

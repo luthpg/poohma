@@ -25,6 +25,7 @@ import "@fontsource/geist-mono/700.css";
 import { getGlobalStartContext } from "@tanstack/react-start";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
+import { AccountProvider } from "@/components/AccountProvider";
 import { PasscodeProvider } from "@/components/PasscodeProvider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -186,25 +187,27 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <ConvexProviderWithAuth client={convex} useAuth={useConvexFirebaseAuth}>
           <QueryClientProvider client={Route.useRouteContext().queryClient}>
             <ThemeProvider defaultTheme="system" storageKey="theme">
-              <PasscodeProvider>
-                <div className="min-h-screen bg-background text-foreground">
-                  {children}
-                  <Analytics />
-                  <SpeedInsights />
-                  <TanStackDevtools
-                    config={{
-                      position: "bottom-right",
-                    }}
-                    plugins={[
-                      {
-                        name: "Tanstack Router",
-                        render: <TanStackRouterDevtoolsPanel />,
-                      },
-                    ]}
-                  />
-                  <Toaster />
-                </div>
-              </PasscodeProvider>
+              <AccountProvider initialUser={Route.useRouteContext().user}>
+                <PasscodeProvider>
+                  <div className="min-h-screen bg-background text-foreground">
+                    {children}
+                    <Analytics />
+                    <SpeedInsights />
+                    <TanStackDevtools
+                      config={{
+                        position: "bottom-right",
+                      }}
+                      plugins={[
+                        {
+                          name: "Tanstack Router",
+                          render: <TanStackRouterDevtoolsPanel />,
+                        },
+                      ]}
+                    />
+                    <Toaster />
+                  </div>
+                </PasscodeProvider>
+              </AccountProvider>
             </ThemeProvider>
           </QueryClientProvider>
         </ConvexProviderWithAuth>

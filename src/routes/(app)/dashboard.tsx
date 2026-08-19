@@ -20,6 +20,7 @@ import type { Doc, Id } from "@/../convex/_generated/dataModel";
 import { IndexScrollBar } from "@/components/IndexScrollBar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TagInput } from "@/components/ui/tag-input";
+import { useAccount } from "@/hooks/useAccount";
 import { usePersistentQuery } from "@/hooks/usePersistentQuery";
 import { cn } from "@/lib/utils";
 import {
@@ -84,8 +85,10 @@ function TagCloud({
   activeTag: string | undefined;
   onTagClick: (tag: string) => void;
 }) {
+  const { activeAccountId } = useAccount();
   const availableTags = usePersistentQuery<string[]>(
     api.records.getAvailableTags,
+    { accountId: activeAccountId || undefined },
   );
 
   if (availableTags === undefined) return <TagCloudSkeleton />;
@@ -206,6 +209,7 @@ function RouteComponent() {
   };
 
   // 一括操作用状態
+  const { activeAccountId } = useAccount();
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeModal, setActiveModal] = useState<
@@ -219,7 +223,10 @@ function RouteComponent() {
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
     try {
-      await deleteRecordsMut({ ids: selectedIds as Id<"serviceRecords">[] });
+      await deleteRecordsMut({
+        accountId: activeAccountId || undefined,
+        ids: selectedIds as Id<"serviceRecords">[],
+      });
       toast.success(`${selectedIds.length} 件のレコードを削除しました`);
       setSelectedIds([]);
       setIsSelectMode(false);
@@ -240,6 +247,7 @@ function RouteComponent() {
 
     try {
       await bulkUpdateRecordsMut({
+        accountId: activeAccountId || undefined,
         ids: selectedIds as Id<"serviceRecords">[],
         data: { tags: bulkTagInput },
       });
@@ -260,6 +268,7 @@ function RouteComponent() {
     if (selectedIds.length === 0) return;
     try {
       await bulkUpdateRecordsMut({
+        accountId: activeAccountId || undefined,
         ids: selectedIds as Id<"serviceRecords">[],
         data: { visibility },
       });
@@ -501,8 +510,11 @@ function BulkTagModal({
   onSubmit: () => void;
   onCancel: () => void;
 }) {
+  const { activeAccountId } = useAccount();
   const availableTags =
-    usePersistentQuery<string[]>(api.records.getAvailableTags) || [];
+    usePersistentQuery<string[]>(api.records.getAvailableTags, {
+      accountId: activeAccountId || undefined,
+    }) || [];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
@@ -569,9 +581,11 @@ function RecordListSection({
   onSelectAll: (ids: string[]) => void;
 }) {
   const { user } = routeApi.useLoaderData();
+  const { activeAccountId } = useAccount();
   const records = usePersistentQuery<Doc<"serviceRecords">[]>(
     api.records.getRecords,
     {
+      accountId: activeAccountId || undefined,
       q: searchParams.q,
       tag: searchParams.tag,
       sort: sortParam,
@@ -718,6 +732,7 @@ function RecordListSection({
                         key={record._id}
                         record={record}
                         currentUserId={user.id}
+                        currentAccountId={activeAccountId}
                         onTagClick={handleTagClick}
                         isSelectMode={isSelectMode}
                         isSelected={selectedIds.includes(record._id)}
@@ -728,6 +743,7 @@ function RecordListSection({
                         key={record._id}
                         record={record}
                         currentUserId={user.id}
+                        currentAccountId={activeAccountId}
                         onTagClick={handleTagClick}
                         isSelectMode={isSelectMode}
                         isSelected={selectedIds.includes(record._id)}
@@ -754,6 +770,7 @@ function RecordListSection({
                 key={record._id}
                 record={record}
                 currentUserId={user.id}
+                currentAccountId={activeAccountId}
                 onTagClick={handleTagClick}
                 isSelectMode={isSelectMode}
                 isSelected={selectedIds.includes(record._id)}
@@ -764,6 +781,7 @@ function RecordListSection({
                 key={record._id}
                 record={record}
                 currentUserId={user.id}
+                currentAccountId={activeAccountId}
                 onTagClick={handleTagClick}
                 isSelectMode={isSelectMode}
                 isSelected={selectedIds.includes(record._id)}
@@ -783,6 +801,7 @@ type RecordType = Doc<"serviceRecords">;
 function ServiceListItem({
   record,
   currentUserId,
+  currentAccountId,
   onTagClick,
   isSelectMode,
   isSelected,
@@ -790,12 +809,15 @@ function ServiceListItem({
 }: {
   record: RecordType;
   currentUserId: string;
+  currentAccountId?: Id<"users"> | null;
   onTagClick: (tag: string) => void;
   isSelectMode?: boolean;
   isSelected?: boolean;
   onToggleSelect?: () => void;
 }) {
-  const isOwner = record.userId === currentUserId;
+  const isOwner = record.accountId
+    ? record.accountId === currentAccountId
+    : record.userId === currentUserId;
   return (
     <Link
       to="/records/$id"
@@ -904,6 +926,7 @@ function ServiceListItem({
 function ServiceCard({
   record,
   currentUserId,
+  currentAccountId,
   onTagClick,
   isSelectMode,
   isSelected,
@@ -911,12 +934,15 @@ function ServiceCard({
 }: {
   record: RecordType;
   currentUserId: string;
+  currentAccountId?: Id<"users"> | null;
   onTagClick: (tag: string) => void;
   isSelectMode?: boolean;
   isSelected?: boolean;
   onToggleSelect?: () => void;
 }) {
-  const isOwner = record.userId === currentUserId;
+  const isOwner = record.accountId
+    ? record.accountId === currentAccountId
+    : record.userId === currentUserId;
   return (
     <Link
       to="/records/$id"

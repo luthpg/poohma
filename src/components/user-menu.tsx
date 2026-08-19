@@ -51,6 +51,7 @@ import {
 } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
 import { useExportCsv } from "@/hooks/use-export-csv";
+import { useAccount } from "@/hooks/useAccount";
 import { clearQueryCache } from "@/hooks/usePersistentQuery";
 import { logout } from "@/services/auth.functions";
 import { processInChunks } from "@/utils/chunk-processor";
@@ -68,6 +69,7 @@ export function UserMenu({
   const router = useRouter();
   const queryClient = useQueryClient();
   const convex = useConvex();
+  const { activeAccount, activeAccountId } = useAccount();
   const importRecordsMut = useMutation(api.records.importRecords);
   const { theme, setTheme } = useTheme();
   const [isImporting, setIsImporting] = useState(false);
@@ -75,6 +77,11 @@ export function UserMenu({
   const { masterKey, requireUnlock, encryptHint } = usePasscode();
   const { handleExport, isExporting } = useExportCsv();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+
+  const displayName =
+    activeAccount?.displayName || user?.displayName || "ユーザー";
+  const photoURL = activeAccount?.photoURL || user?.photoURL || undefined;
+  const email = activeAccount?.email || user?.email || "";
 
   const handleLogout = async () => {
     try {
@@ -260,6 +267,7 @@ export function UserMenu({
           });
 
           const response = await importRecordsMut({
+            accountId: activeAccountId || undefined,
             records: recordsToImport,
           });
 
@@ -303,12 +311,9 @@ export function UserMenu({
       className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary shadow-border outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50 transition-transform hover:scale-105 active:scale-95 cursor-pointer"
     >
       <Avatar className="h-8 w-8">
-        <AvatarImage
-          src={user?.photoURL || undefined}
-          alt={user?.displayName || undefined}
-        />
+        <AvatarImage src={photoURL} alt={displayName} />
         <AvatarFallback className="bg-orange-500 text-white text-[12px] font-semibold">
-          {(user?.displayName || user?.email || "U").slice(0, 1).toUpperCase()}
+          {(displayName || email || "U").slice(0, 1).toUpperCase()}
         </AvatarFallback>
       </Avatar>
     </button>
@@ -335,21 +340,16 @@ export function UserMenu({
             <SheetHeader className="text-left p-0 pb-4 border-b border-border/50">
               <div className="flex items-center gap-3">
                 <Avatar className="h-10 w-10">
-                  <AvatarImage
-                    src={user?.photoURL || undefined}
-                    alt={user?.displayName || undefined}
-                  />
+                  <AvatarImage src={photoURL} alt={displayName} />
                   <AvatarFallback className="bg-orange-500 text-white text-sm font-semibold">
-                    {(user?.displayName || user?.email || "U")
-                      .slice(0, 1)
-                      .toUpperCase()}
+                    {(displayName || email || "U").slice(0, 1).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 <div>
                   <SheetTitle className="text-base font-semibold">
-                    {user?.displayName || "ユーザー"}
+                    {displayName}
                   </SheetTitle>
-                  <p className="text-xs text-muted-foreground">{user?.email}</p>
+                  <p className="text-xs text-muted-foreground">{email}</p>
                 </div>
               </div>
             </SheetHeader>
@@ -560,10 +560,10 @@ export function UserMenu({
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-medium leading-none text-foreground">
-                  {user?.displayName || "ユーザー"}
+                  {displayName}
                 </p>
                 <p className="text-xs leading-none text-muted-foreground">
-                  {user?.email}
+                  {email}
                 </p>
               </div>
             </DropdownMenuLabel>

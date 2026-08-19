@@ -54,7 +54,7 @@ function RouteComponent() {
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="FAQを検索..."
             aria-label="FAQを検索"
-            className="h-11 w-full rounded-lg border border-border bg-background pl-10 pr-10 text-[14px] text-foreground placeholder:text-muted-foreground/70 focus:border-foreground/30 focus:outline-hidden focus:ring-2 focus:ring-ring/20 transition-colors shadow-xs"
+            className="h-11 w-full rounded-lg border border-border bg-background pl-10 pr-10 text-base md:text-[14px] text-foreground placeholder:text-muted-foreground/70 focus:border-foreground/30 focus:outline-hidden focus:ring-2 focus:ring-ring/20 transition-colors shadow-xs"
           />
         </div>
       </div>

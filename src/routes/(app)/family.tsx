@@ -11,6 +11,7 @@ import { usePasscode } from "@/components/PasscodeProvider";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { useAccount } from "@/hooks/useAccount";
 import { clearQueryCache } from "@/hooks/usePersistentQuery";
 import {
   deriveKeyFromPasscode,
@@ -81,17 +82,20 @@ function FamilyPending() {
 
 function FamilyComponent() {
   const { isAuthenticated } = useConvexAuth();
+  const { activeAccountId, activeAccount, accounts } = useAccount();
   const family = useQuery(
     api.families.getFamilyMembers,
-    isAuthenticated ? {} : "skip",
+    isAuthenticated ? { accountId: activeAccountId || undefined } : "skip",
   );
   const myJoinRequest = useQuery(
     api.families.getMyJoinRequest,
-    isAuthenticated ? {} : "skip",
+    isAuthenticated ? { accountId: activeAccountId || undefined } : "skip",
   );
   const pendingRequests = useQuery(
     api.families.getPendingRequests,
-    isAuthenticated && family ? {} : "skip",
+    isAuthenticated && family
+      ? { accountId: activeAccountId || undefined }
+      : "skip",
   );
   const search = Route.useSearch();
   const router = useRouter();
@@ -226,6 +230,7 @@ function FamilyComponent() {
       setIsLoading(true);
       try {
         await createJoinRequestMut({
+          accountId: activeAccountId || undefined,
           inviteCode: code as Id<"families">,
         });
         toast.success(
@@ -239,7 +244,7 @@ function FamilyComponent() {
         setIsLoading(false);
       }
     },
-    [createJoinRequestMut],
+    [createJoinRequestMut, activeAccountId],
   );
 
   // 家族移行（承認後に移行を完了する。家族未所属ユーザーにも対応）
@@ -267,6 +272,7 @@ function FamilyComponent() {
 
       // 2. prepare
       const { migrationId } = await prepareFamilyMigrationMut({
+        accountId: activeAccountId || undefined,
         action: "join",
         inviteCode: myJoinRequest.familyId,
       });
@@ -275,7 +281,10 @@ function FamilyComponent() {
       // 3. 移行先の家族情報を取得
       const existingFamily = await convex.query(
         api.families.getFamilyInfoByInviteCode,
-        { inviteCode: myJoinRequest.familyId as Id<"families"> },
+        {
+          accountId: activeAccountId || undefined,
+          inviteCode: myJoinRequest.familyId as Id<"families">,
+        },
       );
       if (
         !existingFamily.masterKeyEncrypted ||
@@ -371,6 +380,7 @@ function FamilyComponent() {
 
       // 5. commit
       await commitFamilyMigrationMut({
+        accountId: activeAccountId || undefined,
         migrationId,
         credentials: reEncryptedCredentials,
       });
@@ -382,7 +392,10 @@ function FamilyComponent() {
     } catch (error) {
       if (currentMigrationId) {
         try {
-          await abortFamilyMigrationMut({ migrationId: currentMigrationId });
+          await abortFamilyMigrationMut({
+            accountId: activeAccountId || undefined,
+            migrationId: currentMigrationId,
+          });
         } catch (abortError) {
           console.error("Failed to abort migration:", abortError);
         }
@@ -407,6 +420,7 @@ function FamilyComponent() {
     abortFamilyMigrationMut,
     queryClient,
     router,
+    activeAccountId,
   ]);
 
   const handleChangeFamily = async (
@@ -444,6 +458,7 @@ function FamilyComponent() {
 
         // 3. prepare
         const { migrationId } = await prepareFamilyMigrationMut({
+          accountId: activeAccountId || undefined,
           action: "create",
           name: createName,
           masterKeyEncrypted: wrapped.encrypted,
@@ -455,7 +470,10 @@ function FamilyComponent() {
         // 4. 所有するレコードの暗号化対象を取得
         const migrationData = await convex.query(
           api.families.getMigrationForEncryption,
-          { migrationId },
+          {
+            accountId: activeAccountId || undefined,
+            migrationId,
+          },
         );
         const reEncryptedCredentials: {
           recordId?: string;
@@ -510,6 +528,7 @@ function FamilyComponent() {
 
         // 5. commit
         await commitFamilyMigrationMut({
+          accountId: activeAccountId || undefined,
           migrationId,
           credentials: reEncryptedCredentials,
         });
@@ -521,7 +540,10 @@ function FamilyComponent() {
       } catch (error) {
         if (currentMigrationId) {
           try {
-            await abortFamilyMigrationMut({ migrationId: currentMigrationId });
+            await abortFamilyMigrationMut({
+              accountId: activeAccountId || undefined,
+              migrationId: currentMigrationId,
+            });
           } catch (abortError) {
             console.error("Failed to abort migration:", abortError);
           }
@@ -556,6 +578,7 @@ function FamilyComponent() {
       const wrapped = await wrapMasterKey(masterKey, passcodeKey);
 
       await createFamilyMut({
+        accountId: activeAccountId || undefined,
         name: createName,
         masterKeyEncrypted: wrapped.encrypted,
         masterKeyIv: wrapped.iv,
@@ -624,6 +647,7 @@ function FamilyComponent() {
                 setIsLoading(true);
                 try {
                   await cancelJoinRequestMut({
+                    accountId: activeAccountId || undefined,
                     requestId: myJoinRequest.id as Id<"joinRequests">,
                   });
                   toast.success("参加申請をキャンセルしました");
@@ -674,6 +698,7 @@ function FamilyComponent() {
                 setIsLoading(true);
                 try {
                   await dismissRejectedRequestMut({
+                    accountId: activeAccountId || undefined,
                     requestId: myJoinRequest.id as Id<"joinRequests">,
                   });
                 } catch {
@@ -700,12 +725,12 @@ function FamilyComponent() {
                   参加申請が承認されました！
                 </h2>
                 <p className="text-[13px] text-muted-foreground">
-                  家族「{myJoinRequest.familyName}」への参加を完了してください
+                  家族「{myJoinRequest.familyName}」への参加が承認されました
                 </p>
               </div>
             </div>
             <p className="text-[14px] text-muted-foreground leading-relaxed mb-6">
-              参加を完了するには、家族のパスコードを入力してください。
+              家族グループのパスコードを入力して、参加を完了してください。
             </p>
             <div className="space-y-4">
               <div>
@@ -713,12 +738,12 @@ function FamilyComponent() {
                   htmlFor="join-passcode-approved-input"
                   className="mb-1.5 block text-[14px] font-medium text-foreground"
                 >
-                  家族のパスコード <span className="text-red-500">*</span>
+                  家族パスコード <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <input
-                    type={showJoinPasscode ? "text" : "password"}
                     id="join-passcode-approved-input"
+                    type={showJoinPasscode ? "text" : "password"}
                     required
                     minLength={8}
                     value={joinPasscode}
@@ -949,7 +974,9 @@ function FamilyComponent() {
             </h3>
             <ul className="space-y-3">
               {family.users.map((u) => {
-                const isMe = auth?.currentUser?.uid === u.id;
+                const isCurrentAccount = activeAccountId === u.id;
+                const isMyOtherAccount =
+                  auth?.currentUser?.uid === u.userId && !isCurrentAccount;
                 return (
                   <li
                     key={u.id}
@@ -958,9 +985,14 @@ function FamilyComponent() {
                     <div className="flex flex-col">
                       <span className="text-[14px] font-medium text-foreground flex items-center gap-2">
                         {u.displayName || "名無し"}
-                        {isMe && (
-                          <span className="text-xs bg-muted px-2 py-0.5 rounded-md text-muted-foreground">
-                            あなた
+                        {isCurrentAccount && (
+                          <span className="text-xs bg-orange-500/10 text-orange-600 dark:text-orange-400 font-medium px-2 py-0.5 rounded-md">
+                            選択中のアカウント
+                          </span>
+                        )}
+                        {isMyOtherAccount && (
+                          <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-md">
+                            あなたの別アカウント
                           </span>
                         )}
                       </span>
@@ -1008,6 +1040,7 @@ function FamilyComponent() {
                           setIsLoading(true);
                           try {
                             await approveJoinRequestMut({
+                              accountId: activeAccountId || undefined,
                               requestId: req.id as Id<"joinRequests">,
                             });
                             toast.success(
@@ -1031,6 +1064,7 @@ function FamilyComponent() {
                           setIsLoading(true);
                           try {
                             await rejectJoinRequestMut({
+                              accountId: activeAccountId || undefined,
                               requestId: req.id as Id<"joinRequests">,
                             });
                             toast.success(
@@ -1070,16 +1104,41 @@ function FamilyComponent() {
       ) : (
         <div className="space-y-6">
           {!family ? (
-            <div className="rounded-lg bg-orange-500/10 p-4 border border-orange-500/20">
-              <h2 className="text-[16px] font-semibold text-orange-700 dark:text-orange-400 mb-2">
-                はじめに：家族グループの作成・参加
-              </h2>
-              <p className="text-[14px] text-orange-700/80 dark:text-orange-400/80 leading-relaxed">
-                PoohMaは家族間でのアカウント情報の共有を前提としています。
-                <br />
-                ダッシュボードやその他の機能を利用するには、まず家族グループを作成するか、既存の家族グループに参加してください。
-              </p>
-            </div>
+            <>
+              {search.inviteCode && (
+                <div className="rounded-lg bg-orange-500/10 p-4 border border-orange-500/30 flex flex-col gap-1.5">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-orange-600 dark:text-orange-400">
+                    招待リンクからのアクセス
+                  </span>
+                  <p className="text-sm font-medium text-foreground">
+                    招待コード「
+                    <code className="font-mono bg-background/80 px-1.5 py-0.5 rounded border">
+                      {search.inviteCode}
+                    </code>
+                    」が自動入力されています。
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    「
+                    <strong>
+                      {activeAccount?.displayName ||
+                        activeAccount?.name ||
+                        "アカウント"}
+                    </strong>
+                    」で参加申請します。別のアカウントで参加したい場合は、ヘッダーのアカウント切り替えメニューをご利用ください。
+                  </p>
+                </div>
+              )}
+              <div className="rounded-lg bg-orange-500/10 p-4 border border-orange-500/20">
+                <h2 className="text-[16px] font-semibold text-orange-700 dark:text-orange-400 mb-2">
+                  はじめに：家族グループの作成・参加
+                </h2>
+                <p className="text-[14px] text-orange-700/80 dark:text-orange-400/80 leading-relaxed">
+                  PoohMaは家族間でのアカウント情報の共有を前提としています。
+                  <br />
+                  ダッシュボードやその他の機能を利用するには、まず家族グループを作成するか、既存の家族グループに参加してください。
+                </p>
+              </div>
+            </>
           ) : (
             <div className="rounded-lg bg-red-500/10 p-4 border border-red-500/20 mb-6">
               <div className="flex justify-between items-start mb-2">
@@ -1102,6 +1161,25 @@ function FamilyComponent() {
               </p>
             </div>
           )}
+
+          {/* 操作対象アカウントの明示 */}
+          <div className="rounded-lg border border-border bg-card p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-muted-foreground shrink-0">
+                操作対象アカウント:
+              </span>
+              <span className="font-semibold text-foreground truncate">
+                {activeAccount?.displayName ||
+                  activeAccount?.name ||
+                  "アカウント"}
+              </span>
+            </div>
+            {accounts.length > 1 && (
+              <span className="text-muted-foreground text-[11px] shrink-0">
+                ※別のアカウントで操作する場合は、ヘッダーのアカウントメニューから切り替えてください
+              </span>
+            )}
+          </div>
 
           <div className="grid gap-6 md:grid-cols-2">
             {/* 家族を作成 */}

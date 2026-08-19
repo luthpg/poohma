@@ -7,6 +7,7 @@ import { api } from "@/../convex/_generated/api";
 import { usePasscode } from "@/components/PasscodeProvider";
 import { Spinner } from "@/components/ui/spinner";
 import { TagInput } from "@/components/ui/tag-input";
+import { useAccount } from "@/hooks/useAccount";
 
 export const Route = createFileRoute("/(app)/records/new")({
   component: NewRecordComponent,
@@ -18,8 +19,12 @@ function NewRecordComponent() {
   }, []);
 
   const { isAuthenticated } = useConvexAuth();
+  const { activeAccountId } = useAccount();
   const availableTags =
-    useQuery(api.records.getAvailableTags, isAuthenticated ? {} : "skip") || [];
+    useQuery(
+      api.records.getAvailableTags,
+      isAuthenticated ? { accountId: activeAccountId || undefined } : "skip",
+    ) || [];
   const navigate = useNavigate();
   const { encryptHint, masterKey, requireUnlock } = usePasscode();
   const [isLoading, setIsLoading] = useState(false);
@@ -218,6 +223,7 @@ function NewRecordComponent() {
       );
 
       await createRecord({
+        accountId: activeAccountId || undefined,
         title,
         titleReading: currentTitleReading || undefined,
         url: url || undefined,

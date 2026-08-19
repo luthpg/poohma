@@ -16,6 +16,7 @@ export default defineSchema({
     displayName: v.optional(v.string()),
     photoURL: v.optional(v.string()),
     familyId: v.optional(v.id("families")),
+    createdAt: v.optional(v.number()),
     updatedAt: v.number(),
   })
     .index("by_userId", ["userId"])
@@ -24,6 +25,7 @@ export default defineSchema({
 
   familyMigrations: defineTable({
     userId: v.string(), // Firebase UID
+    accountId: v.optional(v.id("users")), // 作成元 PoohMa アカウント ID
     sourceFamilyId: v.optional(v.id("families")),
     targetFamilyId: v.id("families"),
     serviceRecordIds: v.array(v.id("serviceRecords")),
@@ -37,11 +39,13 @@ export default defineSchema({
     expiresAt: v.number(),
   })
     .index("by_userId", ["userId"])
+    .index("by_accountId", ["accountId"])
     .index("by_status", ["status"]),
 
   joinRequests: defineTable({
     familyId: v.id("families"),
     userId: v.string(), // 申請者の Firebase UID
+    accountId: v.optional(v.id("users")), // 申請元 PoohMa Account ID
     status: v.union(
       v.literal("pending"),
       v.literal("approved"),
@@ -52,7 +56,9 @@ export default defineSchema({
   })
     .index("by_familyId_status", ["familyId", "status"])
     .index("by_userId_status", ["userId", "status"])
-    .index("by_familyId_userId", ["familyId", "userId"]),
+    .index("by_familyId_userId", ["familyId", "userId"])
+    .index("by_accountId_status", ["accountId", "status"])
+    .index("by_familyId_accountId", ["familyId", "accountId"]),
 
   serviceRecords: defineTable({
     title: v.string(),
@@ -63,6 +69,7 @@ export default defineSchema({
     memo: v.optional(v.string()),
     visibility: v.union(v.literal("PRIVATE"), v.literal("SHARED")),
     userId: v.string(), // 作成者の Firebase UID
+    accountId: v.id("users"), // 作成者の PoohMa アカウント ID（ownership境界）
     familyId: v.optional(v.id("families")),
 
     // 子エンティティ（アカウント情報）をドキュメント内に埋め込み
@@ -84,6 +91,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_userId", ["userId"])
+    .index("by_accountId", ["accountId"])
     .index("by_familyId", ["familyId"])
     .index("by_familyId_visibility", ["familyId", "visibility"])
     .index("by_updatedAt", ["updatedAt"]),
