@@ -70,7 +70,16 @@ export function AccountProvider({
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { isAuthenticated, isLoading: isAuthLoading } = useConvexFirebaseAuth();
+  const {
+    user,
+    isAuthenticated,
+    isLoading: isAuthLoading,
+  } = useConvexFirebaseAuth();
+  const currentUid = user?.id;
+
+  const getStorageKey = useCallback((uid?: string) => {
+    return uid ? `poohma_active_account_id_${uid}` : "poohma_active_account_id";
+  }, []);
 
   const fetchedAccounts = useQuery(
     api.users.getAccounts,
@@ -83,22 +92,17 @@ export function AccountProvider({
   const [activeAccountId, setActiveAccountId] = useState<Id<"users"> | null>(
     () => {
       if (typeof window !== "undefined") {
-        const stored = localStorage.getItem(STORAGE_KEY);
+        const key = currentUid
+          ? `poohma_active_account_id_${currentUid}`
+          : "poohma_active_account_id";
+        const stored =
+          localStorage.getItem(key) ||
+          localStorage.getItem("poohma_active_account_id");
         if (stored) return stored as Id<"users">;
       }
       return initialUser?.accountId || null;
     },
   );
-
-  // マウント後にlocalStorageからactiveAccountIdを復元
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setActiveAccountId(stored as Id<"users">);
-      }
-    }
-  }, []);
 
   const accounts: Account[] = useMemo(() => {
     if (fetchedAccounts) {
@@ -119,19 +123,41 @@ export function AccountProvider({
     return [];
   }, [fetchedAccounts, initialUser]);
 
+  // マウント時およびユーザー切り替え時にlocalStorageからactiveAccountIdを復元
+  useEffect(() => {
+    if (typeof window !== "undefined" && currentUid) {
+      const key = getStorageKey(currentUid);
+      const stored =
+        localStorage.getItem(key) ||
+        localStorage.getItem("poohma_active_account_id");
+      if (stored) {
+        setActiveAccountId(stored as Id<"users">);
+      }
+    }
+  }, [currentUid, getStorageKey]);
+
   // アカウントリストが取得できたら、activeAccountIdの有効性をチェックして必要なら初期化
   useEffect(() => {
     if (accounts.length > 0) {
       const exists = accounts.some((a) => a._id === activeAccountId);
       if (!exists || !activeAccountId) {
-        const fallbackId = accounts[0]._id;
-        setActiveAccountId(fallbackId);
+        // localStorage に有効な ID が保存されているか確認
+        let targetId = accounts[0]._id;
         if (typeof window !== "undefined") {
-          localStorage.setItem(STORAGE_KEY, fallbackId);
+          const key = getStorageKey(currentUid);
+          const stored =
+            localStorage.getItem(key) ||
+            localStorage.getItem("poohma_active_account_id");
+          if (stored && accounts.some((a) => a._id === stored)) {
+            targetId = stored as Id<"users">;
+          } else {
+            localStorage.setItem(key, targetId);
+          }
         }
+        setActiveAccountId(targetId);
       }
     }
-  }, [accounts, activeAccountId]);
+  }, [accounts, activeAccountId, currentUid, getStorageKey]);
 
   const activeAccount = useMemo(() => {
     if (!accounts || accounts.length === 0) return null;
@@ -150,13 +176,15 @@ export function AccountProvider({
       // 2. アクティブアカウントの切り替え
       setActiveAccountId(accountId);
       if (typeof window !== "undefined") {
-        localStorage.setItem(STORAGE_KEY, accountId);
+        localStorage.setItem(getStorageKey(currentUid), accountId);
+        // レガシーキーも更新
+        localStorage.setItem("poohma_active_account_id", accountId);
       }
 
       toast.success("アカウントを切り替えました");
       await router.invalidate();
     },
-    [activeAccountId, queryClient, router],
+    [activeAccountId, currentUid, getStorageKey, queryClient, router],
   );
 
   const createAccount = useCallback(
@@ -166,13 +194,14 @@ export function AccountProvider({
       await queryClient.invalidateQueries();
       setActiveAccountId(newAccountId);
       if (typeof window !== "undefined") {
-        localStorage.setItem(STORAGE_KEY, newAccountId);
+        localStorage.setItem(getStorageKey(currentUid), newAccountId);
+        localStorage.setItem("poohma_active_account_id", newAccountId);
       }
       toast.success("新しいアカウントを作成しました");
       await router.invalidate();
       return newAccountId;
     },
-    [createAccountMutation, queryClient, router],
+    [createAccountMutation, currentUid, getStorageKey, queryClient, router],
   );
 
   const deleteAccount = useCallback(
@@ -188,12 +217,14 @@ export function AccountProvider({
           const nextId = remaining[0]._id;
           setActiveAccountId(nextId);
           if (typeof window !== "undefined") {
-            localStorage.setItem(STORAGE_KEY, nextId);
+            localStorage.setItem(getStorageKey(currentUid), nextId);
+            localStorage.setItem("poohma_active_account_id", nextId);
           }
         } else {
           setActiveAccountId(null);
           if (typeof window !== "undefined") {
-            localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(getStorageKey(currentUid));
+            localStorage.removeItem("poohma_active_account_id");
           }
         }
       }
@@ -201,7 +232,15 @@ export function AccountProvider({
       toast.success("アカウントを削除しました");
       await router.invalidate();
     },
-    [accounts, activeAccountId, deleteAccountMutation, queryClient, router],
+    [
+      accounts,
+      activeAccountId,
+      currentUid,
+      deleteAccountMutation,
+      getStorageKey,
+      queryClient,
+      router,
+    ],
   );
 
   const isLoading =
