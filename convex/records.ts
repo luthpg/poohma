@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { z } from "zod";
 import { CredentialInputSchema, RecordInputSchema } from "../src/utils/schemas";
 import type { Doc } from "./_generated/dataModel";
+import type { QueryCtx } from "./_generated/server";
 import { authenticatedQuery, familyBoundMutation } from "./customBuilders";
 import { requireRecordAccess } from "./rls";
 
@@ -12,6 +13,36 @@ const ConvexCredentialInputSchema = CredentialInputSchema.extend({
 const ConvexRecordInputSchema = RecordInputSchema.extend({
   credentials: z.array(ConvexCredentialInputSchema),
 });
+
+/**
+ * ユーザーがアクセス可能な可視レコード（または所有レコード）を取得するヘルパー
+ */
+async function collectVisibleRecords(
+  ctx: { db: QueryCtx["db"] },
+  user: Doc<"users">,
+  ownedOnly = false,
+): Promise<Doc<"serviceRecords">[]> {
+  if (user.familyId) {
+    const q = ctx.db
+      .query("serviceRecords")
+      .withIndex("by_familyId", (i) => i.eq("familyId", user.familyId));
+    return ownedOnly
+      ? await q.filter((f) => f.eq(f.field("accountId"), user._id)).collect()
+      : await q
+          .filter((f) =>
+            f.or(
+              f.eq(f.field("accountId"), user._id),
+              f.eq(f.field("visibility"), "SHARED"),
+            ),
+          )
+          .collect();
+  }
+  return await ctx.db
+    .query("serviceRecords")
+    .withIndex("by_accountId", (i) => i.eq("accountId", user._id))
+    .filter((f) => f.eq(f.field("familyId"), undefined))
+    .collect();
+}
 
 // === Queries ===
 
@@ -24,27 +55,7 @@ export const getRecords = authenticatedQuery({
   handler: async (ctx, args) => {
     const { user } = ctx;
 
-    let records: Doc<"serviceRecords">[] = [];
-    if (user.familyId) {
-      // 家族所属時：その家族内の自分自身のレコード（PRIVATE含む）と家族共有(SHARED)のレコードを取得
-      records = await ctx.db
-        .query("serviceRecords")
-        .withIndex("by_familyId", (q) => q.eq("familyId", user.familyId))
-        .filter((q) =>
-          q.or(
-            q.eq(q.field("accountId"), user._id),
-            q.eq(q.field("visibility"), "SHARED"),
-          ),
-        )
-        .collect();
-    } else {
-      // 家族未所属時：自身が作成した家族未所属のレコードのみ
-      records = await ctx.db
-        .query("serviceRecords")
-        .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
-        .filter((q) => q.eq(q.field("familyId"), undefined))
-        .collect();
-    }
+    let records = await collectVisibleRecords(ctx, user);
 
     if (args.tag) {
       records = records.filter((r) => r.tags.includes(args.tag as string));
@@ -120,25 +131,7 @@ export const getAvailableTags = authenticatedQuery({
   handler: async (ctx) => {
     const { user } = ctx;
 
-    let visibleRecords: Doc<"serviceRecords">[] = [];
-    if (user.familyId) {
-      visibleRecords = await ctx.db
-        .query("serviceRecords")
-        .withIndex("by_familyId", (q) => q.eq("familyId", user.familyId))
-        .filter((q) =>
-          q.or(
-            q.eq(q.field("accountId"), user._id),
-            q.eq(q.field("visibility"), "SHARED"),
-          ),
-        )
-        .collect();
-    } else {
-      visibleRecords = await ctx.db
-        .query("serviceRecords")
-        .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
-        .filter((q) => q.eq(q.field("familyId"), undefined))
-        .collect();
-    }
+    const visibleRecords = await collectVisibleRecords(ctx, user);
 
     const tagsSet = new Set<string>();
     for (const r of visibleRecords) {
@@ -156,19 +149,7 @@ export const getOwnedRecords = authenticatedQuery({
   handler: async (ctx) => {
     const { user } = ctx;
 
-    if (user.familyId) {
-      return await ctx.db
-        .query("serviceRecords")
-        .withIndex("by_familyId", (q) => q.eq("familyId", user.familyId))
-        .filter((q) => q.eq(q.field("accountId"), user._id))
-        .collect();
-    }
-
-    return await ctx.db
-      .query("serviceRecords")
-      .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
-      .filter((q) => q.eq(q.field("familyId"), undefined))
-      .collect();
+    return await collectVisibleRecords(ctx, user, true);
   },
 });
 

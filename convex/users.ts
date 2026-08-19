@@ -224,9 +224,6 @@ export const updateProfile = authenticatedMutation({
 });
 
 /**
- * アカウントの削除
- */
-/**
  * Firebase UID に紐づく全 PoohMa アカウントを削除する（退会処理用）
  */
 export const deleteAllAccounts = identityVerifiedMutation({
