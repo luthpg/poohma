@@ -210,11 +210,27 @@ export const createAccount = identityVerifiedMutation({
 export const updateProfile = authenticatedMutation({
   args: {
     displayName: v.string(),
+    accountId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    const { user } = ctx;
+    const { user, identity } = ctx;
+    const uid = identity.subject;
 
-    await ctx.db.patch(user._id, {
+    // 更新対象アカウントの決定
+    let targetAccountId: Id<"users">;
+    if (args.accountId) {
+      // accountId が指定された場合、そのアカウントが現在の Firebase UID に属することを検証
+      const targetAccount = await ctx.db.get(args.accountId);
+      if (!targetAccount || targetAccount.userId !== uid) {
+        throw new Error("Access denied: Account does not belong to you");
+      }
+      targetAccountId = args.accountId;
+    } else {
+      // accountId が未指定の場合はデフォルトアカウント（ctx.user）を更新
+      targetAccountId = user._id;
+    }
+
+    await ctx.db.patch(targetAccountId, {
       displayName: args.displayName.trim(),
       updatedAt: Date.now(),
     });

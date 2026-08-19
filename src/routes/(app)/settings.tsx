@@ -7,6 +7,10 @@ import { useMutation } from "convex/react";
 import { AlertTriangle, Download } from "lucide-react";
 import { type SubmitEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
+import {
+  GoogleAuthProvider,
+  reauthenticateWithPopup,
+} from "firebase/auth";
 import { api } from "@/../convex/_generated/api";
 import { usePasscode } from "@/components/PasscodeProvider";
 import {
@@ -98,8 +102,10 @@ function SettingsComponent() {
 
     setIsSaving(true);
     try {
+      // activeAccount が存在する場合はそのアカウント ID を渡し、
+      // 存在しない場合は undefined（= デフォルトアカウントを更新）
       await updateProfile({
-        accountId: activeAccount?._id,
+        accountId: activeAccount?._id || undefined,
         displayName: displayName.trim(),
       });
       await queryClient.invalidateQueries({ queryKey: ["authUser"] });
@@ -135,13 +141,22 @@ function SettingsComponent() {
         throw new Error("認証情報が見つかりません。再ログインしてください。");
       }
 
-      // 1. Convexで全アカウント削除を先に実行
+      // 1. Firebase 再認証を最初に実行（セキュリティ確認）
+      try {
+        const provider = new GoogleAuthProvider();
+        await reauthenticateWithPopup(currentUser, provider);
+      } catch (reauthError) {
+        console.error("Re-authentication failed:", reauthError);
+        throw new Error("再認証に失敗しました。操作をキャンセルします。");
+      }
+
+      // 2. 再認証成功後、Convexで全アカウント削除を実行
       await deleteAllAccountsConvex({});
 
-      // 2. Convex削除成功後にFirebase Auth ユーザーの削除
+      // 3. Convex削除成功後にFirebase Auth ユーザーの削除
       await currentUser.delete();
 
-      // 3. キャッシュのクリア
+      // 4. キャッシュのクリア
       clearQueryCache();
 
       toast.success("退会処理が完了しました");
@@ -235,7 +250,7 @@ function SettingsComponent() {
           <div className="pt-4 flex justify-end">
             <button
               type="submit"
-              disabled={isSaving || displayName.trim() === user.displayName}
+              disabled={isSaving || displayName.trim() === currentAccount.displayName}
               className="flex items-center rounded-md bg-foreground px-6 py-2.5 text-[14px] font-medium text-background shadow-lg transition hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSaving ? (
