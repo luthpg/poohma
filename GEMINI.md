@@ -4,7 +4,8 @@
 
 - **OS / Shell**: Windows (PowerShell)
   - コマンド実行時のパス区切り文字やシェルコマンド（`;` の扱い、ファイル操作コマンド等）は PowerShell の構文に従うこと。
-  - スクリプトの先頭に `$ErrorActionPreference = "Stop"` と記述しておくと、`;` を使っていてもエラーが出た瞬間にスクリプト全体が強制終了します。
+  - Windows PowerShell 7未満 では `&&` 演算子が構文エラー（`トークン '&&' は、このバージョンでは有効なステートメント区切り記号ではありません`）となるため使用できません。
+  - コマンドを連続実行する際は、先頭に `$ErrorActionPreference = "Stop"` を記述して `;` で繋ぐ（例: `$ErrorActionPreference = "Stop"; コマンド1; コマンド2`）ことで、途中でエラーが出た瞬間にスクリプト全体を安全に強制終了させてください。
 - **Package Manager**: `pnpm`
   - パッケージの追加・削除・実行には必ず `pnpm` を使用すること（`npm`, `yarn` は使用禁止）。
 
@@ -17,7 +18,7 @@
 3. **Test**: `pnpm test`
 4. **Build Check**: `pnpm build`
 
-> **Note**: コマンドの連続実行時、PowerShell では `&&` や `$ErrorActionPreference = "Stop"`、または `pnpm` 側のスクリプトを活用すること。
+> **Note**: コマンドの連続実行時は、`$ErrorActionPreference = "Stop"; pnpm tsc; pnpm check; pnpm test; pnpm build` のように `$ErrorActionPreference = "Stop"` を付与して `;` で繋ぐか、`pnpm` 側のスクリプトを活用すること（`&&` は Windows PowerShell では構文エラーになります）。
 
 ## 3. Git Commit Message Guidelines
 
