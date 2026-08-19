@@ -4,13 +4,10 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
+import { GoogleAuthProvider, reauthenticateWithPopup } from "firebase/auth";
 import { AlertTriangle, Download } from "lucide-react";
 import { type SubmitEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
-import {
-  GoogleAuthProvider,
-  reauthenticateWithPopup,
-} from "firebase/auth";
 import { api } from "@/../convex/_generated/api";
 import { usePasscode } from "@/components/PasscodeProvider";
 import {
@@ -250,7 +247,9 @@ function SettingsComponent() {
           <div className="pt-4 flex justify-end">
             <button
               type="submit"
-              disabled={isSaving || displayName.trim() === currentAccount.displayName}
+              disabled={
+                isSaving || displayName.trim() === currentAccount.displayName
+              }
               className="flex items-center rounded-md bg-foreground px-6 py-2.5 text-[14px] font-medium text-background shadow-lg transition hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSaving ? (

@@ -291,7 +291,10 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
         await decryptPasscodeWithBiometrics(targetUserId);
 
       // 復号後、unlock 呼び出し前に世代とアカウントIDを再検証
-      if (accountGenerationRef.current !== startGen || targetUserId !== startTargetUserId) {
+      if (
+        accountGenerationRef.current !== startGen ||
+        targetUserId !== startTargetUserId
+      ) {
         // アカウントが切り替わっている場合は処理を中断
         return;
       }
