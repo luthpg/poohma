@@ -309,7 +309,12 @@ export const abortFamilyMigration = authenticatedMutation({
     const { user } = ctx;
 
     const migration = await ctx.db.get(args.migrationId);
-    if (!migration || migration.userId !== user.userId) {
+    const isOwner = migration
+      ? migration.accountId
+        ? migration.accountId === user._id
+        : migration.userId === user.userId
+      : false;
+    if (!migration || !isOwner) {
       throw new Error("Migration not found or access denied");
     }
 
@@ -357,7 +362,15 @@ export const prepareFamilyMigration = authenticatedMutation({
     const staleMigrations = await ctx.db
       .query("familyMigrations")
       .withIndex("by_userId", (q) => q.eq("userId", user.userId))
-      .filter((q) => q.eq(q.field("status"), "PREPARED"))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("status"), "PREPARED"),
+          q.or(
+            q.eq(q.field("accountId"), user._id),
+            q.eq(q.field("accountId"), undefined),
+          ),
+        ),
+      )
       .collect();
 
     for (const stale of staleMigrations) {
@@ -401,13 +414,26 @@ export const prepareFamilyMigration = authenticatedMutation({
       if (!family) throw new Error("Invalid invite code");
 
       // Verify approved join request
-      const approvedRequest = await ctx.db
-        .query("joinRequests")
-        .withIndex("by_familyId_userId", (q) =>
-          q.eq("familyId", family._id).eq("userId", user.userId),
-        )
-        .filter((q) => q.eq(q.field("status"), "approved"))
-        .unique();
+      const approvedRequest =
+        (await ctx.db
+          .query("joinRequests")
+          .withIndex("by_familyId_accountId", (q) =>
+            q.eq("familyId", family._id).eq("accountId", user._id),
+          )
+          .filter((q) => q.eq(q.field("status"), "approved"))
+          .first()) ||
+        (await ctx.db
+          .query("joinRequests")
+          .withIndex("by_familyId_userId", (q) =>
+            q.eq("familyId", family._id).eq("userId", user.userId),
+          )
+          .filter((q) =>
+            q.and(
+              q.eq(q.field("status"), "approved"),
+              q.eq(q.field("accountId"), undefined),
+            ),
+          )
+          .first());
 
       if (!approvedRequest) {
         throw new Error(
@@ -429,6 +455,7 @@ export const prepareFamilyMigration = authenticatedMutation({
 
     const migrationId = await ctx.db.insert("familyMigrations", {
       userId: user.userId,
+      accountId: user._id,
       sourceFamilyId: user.familyId,
       targetFamilyId,
       serviceRecordIds,
@@ -447,7 +474,12 @@ export const getMigrationForEncryption = authenticatedQuery({
     const { user } = ctx;
 
     const migration = await ctx.db.get(args.migrationId);
-    if (!migration || migration.userId !== user.userId) {
+    const isOwner = migration
+      ? migration.accountId
+        ? migration.accountId === user._id
+        : migration.userId === user.userId
+      : false;
+    if (!migration || !isOwner) {
       throw new Error("Migration not found or access denied");
     }
 
@@ -506,7 +538,12 @@ export const commitFamilyMigration = authenticatedMutation({
     const { user } = ctx;
 
     const migration = await ctx.db.get(args.migrationId);
-    if (!migration || migration.userId !== user.userId) {
+    const isOwner = migration
+      ? migration.accountId
+        ? migration.accountId === user._id
+        : migration.userId === user.userId
+      : false;
+    if (!migration || !isOwner) {
       throw new Error("Migration not found or access denied");
     }
 
@@ -765,6 +802,7 @@ export const changeFamily = authenticatedMutation({
 
     const migrationId = await ctx.db.insert("familyMigrations", {
       userId: user.userId,
+      accountId: user._id,
       sourceFamilyId: user.familyId,
       targetFamilyId,
       serviceRecordIds,

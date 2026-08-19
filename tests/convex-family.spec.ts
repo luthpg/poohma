@@ -1110,4 +1110,106 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
     // 元のDEKオブジェクト（鍵の生データ情報）が同一性を保っていることの検証
     expect(decryptedDek).toBeDefined();
   });
+
+  describe("2.1.5 家族移行（familyMigrations）のアカウント境界とアクセス制御", () => {
+    it("同一Firebase UID内の別アカウントが準備したmigrationIdは実行できず、作成元アカウントのみ実行できること", async () => {
+      const t = convexTest(schema, modules);
+
+      let account1Id!: Id<"users">;
+      let account2Id!: Id<"users">;
+
+      // 同一 Firebase UID (user_multi) で2つのアカウントを作成
+      await t.run(async (ctx) => {
+        account1Id = await ctx.db.insert("users", {
+          userId: "user_multi",
+          email: "multi@example.com",
+          displayName: "アカウント1",
+          updatedAt: Date.now(),
+        });
+        account2Id = await ctx.db.insert("users", {
+          userId: "user_multi",
+          email: "multi@example.com",
+          displayName: "アカウント2",
+          updatedAt: Date.now(),
+        });
+      });
+
+      const client1 = t.withIdentity({
+        subject: "user_multi",
+        email: "multi@example.com",
+      });
+
+      // アカウント1 で家族移行（新規家族作成）を prepare
+      const { migrationId } = await client1.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          accountId: account1Id,
+          action: "create",
+          name: "マルチ家族",
+          masterKeyEncrypted: "enc_key",
+          masterKeyIv: "iv_key",
+          masterKeySalt: "salt_key",
+        },
+      );
+
+      expect(migrationId).toBeDefined();
+
+      // DB内の migration に accountId が保存されていることを検証
+      const migrationDoc = await t.run(async (ctx) => {
+        return await ctx.db.get(migrationId);
+      });
+      expect(migrationDoc?.accountId).toBe(account1Id);
+
+      // アカウント2 で同じ migrationId の暗号化データ取得を試みると拒否される
+      await expect(
+        client1.query(api.families.getMigrationForEncryption, {
+          accountId: account2Id,
+          migrationId,
+        }),
+      ).rejects.toThrow("Migration not found or access denied");
+
+      // アカウント2 で同じ migrationId の commit を試みると拒否される
+      await expect(
+        client1.mutation(api.families.commitFamilyMigration, {
+          accountId: account2Id,
+          migrationId,
+          credentials: [],
+        }),
+      ).rejects.toThrow("Migration not found or access denied");
+
+      // アカウント2 で同じ migrationId の abort を試みると拒否される
+      await expect(
+        client1.mutation(api.families.abortFamilyMigration, {
+          accountId: account2Id,
+          migrationId,
+        }),
+      ).rejects.toThrow("Migration not found or access denied");
+
+      // アカウント1 であれば暗号化データを取得・コミットできる
+      const encryptionData = await client1.query(
+        api.families.getMigrationForEncryption,
+        {
+          accountId: account1Id,
+          migrationId,
+        },
+      );
+      expect(encryptionData.migrationId).toBe(migrationId);
+
+      const commitResult = await client1.mutation(
+        api.families.commitFamilyMigration,
+        {
+          accountId: account1Id,
+          migrationId,
+          credentials: [],
+        },
+      );
+      expect(commitResult.success).toBe(true);
+
+      // アカウント1の familyId が更新され、アカウント2は影響を受けないこと
+      const user1 = await t.run(async (ctx) => ctx.db.get(account1Id));
+      const user2 = await t.run(async (ctx) => ctx.db.get(account2Id));
+      expect(user1?.familyId).toBe(commitResult.familyId);
+      expect(user2?.familyId).toBeUndefined();
+    });
+  });
 });

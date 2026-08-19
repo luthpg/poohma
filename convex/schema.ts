@@ -25,6 +25,7 @@ export default defineSchema({
 
   familyMigrations: defineTable({
     userId: v.string(), // Firebase UID
+    accountId: v.optional(v.id("users")), // 作成元 PoohMa アカウント ID
     sourceFamilyId: v.optional(v.id("families")),
     targetFamilyId: v.id("families"),
     serviceRecordIds: v.array(v.id("serviceRecords")),
@@ -38,6 +39,7 @@ export default defineSchema({
     expiresAt: v.number(),
   })
     .index("by_userId", ["userId"])
+    .index("by_accountId", ["accountId"])
     .index("by_status", ["status"]),
 
   joinRequests: defineTable({
