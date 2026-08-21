@@ -363,6 +363,23 @@ ConvexReactClient / TanStack Query の Mutation実行を共通ラッパーでイ
 共通的に適用できるよう、Mutation呼び出しの共通フックとして実装する。
 ```
 
+### 5.6 ログアウトとセッション復元制御（FR-AUTH-04）
+
+```
+ログアウトフロー：
+  1. クライアント側（UserMenu / FamilyComponent 等）で sessionStorage にログアウトフラグ（LOGOUT_FLAG_KEY = "poohma_logout"）を設定
+  2. Firebase Auth の signOut(auth) を実行
+  3. サーバー関数 logout() を呼び出し：
+     - 現在のセッションCookieから uid を検証し、Firebase Admin SDK の revokeRefreshTokens(uid) でリフレッシュトークンを即時失効
+     - 発行時と同一属性（path, httpOnly, secure, sameSite）でセッションCookieを削除（deleteCookie および maxAge: 0）
+  4. クエリキャッシュ（clearQueryCache / queryClient）を全クリア
+
+サイレント再認証・セッション復元制御（useConvexFirebaseAuth）：
+  - 認証状態の監視において、未認証時にサーバー側セッションCookieを用いたサイレント再認証（getCustomTokenFromSession）を行う
+  - ただし sessionStorage に LOGOUT_FLAG_KEY が存在する場合はログアウト状態と判定し、サイレント再認証をスキップして即時未認証状態（isAuthenticated=false）に確定させる
+  - ユーザーが明示的に再ログインに成功した時点で LOGOUT_FLAG_KEY を削除する
+```
+
 ## 6. 暗号化設計（E2EE）
 
 ### 6.1 鍵階層
@@ -405,16 +422,24 @@ DEKは serviceRecords.credentials[].passwordHintDekEncrypted / passwordHintDekIv
 decryptHint/encryptHint 側でマスターキー直接暗号化にフォールバックする実装になっている
 （過去バージョンとの互換維持）。
 
-### 6.2 実装関数（src/lib/crypto.ts）
+### 6.2 実装関数（src/lib/crypto.ts, src/utils/passcode-strength.ts）
 
-| 関数                                    | 役割                          |
-| ------------------------------------- | --------------------------- |
-| deriveKeyFromPasscode(passcode, salt) | PBKDF2でパスコード導出鍵を生成          |
-| generateMasterKey() / generateDEK()   | AES-GCM鍵の新規生成               |
-| wrapMasterKey / unwrapMasterKey       | マスターキーのラップ／アンラップ            |
-| wrapDEK / unwrapDEK                   | DEKのラップ／アンラップ（マスターキーで）      |
-| encrypt / decrypt                     | AES-GCMによる汎用の暗号化／復号（IV自動生成） |
-| generateSalt                          | PBKDF2用ソルトの生成               |
+| 関数 / コンポーネント                               | 役割                                                                                  |
+| ------------------------------------------- | ----------------------------------------------------------------------------------- |
+| deriveKeyFromPasscode(passcode, salt)       | PBKDF2でパスコード導出鍵を生成                                                                    |
+| generateMasterKey() / generateDEK()         | AES-GCM鍵の新規生成                                                                         |
+| wrapMasterKey / unwrapMasterKey             | マスターキーのラップ／アンラップ                                                                    |
+| wrapDEK / unwrapDEK                         | DEKのラップ／アンラップ（マスターキーで）                                                                |
+| encrypt / decrypt                           | AES-GCMによる汎用の暗号化／復号（IV自動生成）                                                           |
+| generateSalt                                | PBKDF2用ソルトの生成                                                                         |
+| evaluatePasscodeStrength(passcode)          | `@zxcvbn-ts` を用いたパスコード強度判定（最低10文字、zxcvbnスコア2以上、推測耐性チェック）                           |
+| PasscodeStrengthMeter                       | パスコード入力時の強度メーターUI（プログレスバー・強度ラベル表示）                                                  |
+
+#### パスコード誤入力時の指数バックオフと一時ロックアウト（`PasscodeProvider.tsx`）
+
+- パスコード解除の誤入力を検知し、連続失敗回数（`failedAttempts`）をカウント。
+- 3回以上連続で失敗した場合は指数バックオフ（$2^{n-3}$ 秒、最大30秒）による遅延（`lockoutUntil`）を適用し、ロックアウト期間中は送信ボタンを非活性化してトースト通知を表示。
+- パスコード解除成功時に失敗カウントおよびロックアウト状態をリセット。
 
 ### 6.3 生体認証（WebAuthn PRF拡張, src/lib/biometric.ts）
 
@@ -539,39 +564,39 @@ decryptHint/encryptHint 側でマスターキー直接暗号化にフォール�
 
 ### 7.1 convex/users.ts
 
-| 関数                   | 種別            | 認可               | 概要                                    |
-| -------------------- | ------------- | ---------------- | ------------------------------------- |
-| syncUser             | Mutation      | identityVerified | ログイン時のユーザー情報同期（新規作成／UID引き継ぎ／プロフィール更新） |
-| updateProfile        | Mutation      | authenticated    | 表示名の更新                                |
-| deleteAccount        | Mutation      | authenticated    | 退会処理（所有レコード削除、家族最終メンバー時は家族も削除）        |
-| getUserByFirebaseUid | InternalQuery | 内部限定             | UIDからユーザー＋所属家族情報を取得（HTTP Action経由）    |
-| getUserById          | InternalQuery | 内部限定             | Convex内部IDからユーザー＋家族情報を取得              |
+| 関数                   | 種別            | 認可               | 概要                                                                                                    |
+| -------------------- | ------------- | ---------------- | ----------------------------------------------------------------------------------------------------- |
+| syncUser             | Mutation      | identityVerified | ログイン時のユーザー情報同期（新規作成／UID引き継ぎ／プロフィール更新）。別UID引き継ぎ時は `joinRequests` や `familyMigrations` も新UIDへ付け替えて孤児化を防止する |
+| updateProfile        | Mutation      | authenticated    | 表示名の更新                                                                                                |
+| deleteAccount        | Mutation      | authenticated    | 退会処理（所有レコード削除、家族最終メンバー時は家族も削除）                                                                          |
+| getUserByFirebaseUid | InternalQuery | 内部限定             | UIDからユーザー＋所属家族情報を取得（HTTP Action経由）                                                                    |
+| getUserById          | InternalQuery | 内部限定             | Convex内部IDからユーザー＋家族情報を取得                                                                                |
 
 ### 7.2 convex/families.ts
 
-| 関数                                     | 種別               | 認可            | 概要                                                           |
-| -------------------------------------- | ---------------- | ------------- | ------------------------------------------------------------ |
-| getFamilyMembers                       | Query            | authenticated | 自分の所属家族のメンバー一覧取得                                             |
-| createFamily                           | Mutation         | authenticated | 家族グループ新規作成＋通知メール送信                                           |
-| joinFamily                             | Mutation         | authenticated | 承認済み参加申請をもとに家族へ参加確定                                          |
-| getFamilyInfoByInviteCode              | Query            | authenticated | 招待コードから家族の暗号鍵情報を取得（メンバー or 承認済み申請者のみ）                        |
-| getFamilyPublicInfo                    | Query            | authenticated | 招待コードから家族名等の公開情報のみ取得                                         |
-| createJoinRequest                      | Mutation         | authenticated | 参加申請の送信＋既存メンバーへの通知メール                                        |
-| cancelJoinRequest                      | Mutation         | authenticated | 自分の保留中申請のキャンセル                                               |
-| getMyJoinRequest                       | Query            | authenticated | 自分の申請状況取得                                                    |
-| dismissRejectedRequest                 | Mutation         | authenticated | 却下された申請の削除（確認）                                               |
-| getPendingRequests                     | Query            | familyBound   | 自家族への保留中申請一覧                                                 |
-| approveJoinRequest / rejectJoinRequest | Mutation         | familyBound   | 申請の承認／却下＋通知メール                                               |
-| prepareFamilyMigration                 | Mutation         | authenticated | 家族移行の準備（PREPARED状態の作成）                                       |
-| getMigrationForEncryption              | Query            | authenticated | 移行対象データ（暗号化済みDEK等）の取得                                        |
-| commitFamilyMigration                  | Mutation         | authenticated | 移行の確定（再暗号化データの反映）                                            |
-| abortFamilyMigration                   | Mutation         | authenticated | 移行の中断                                                        |
-| changeFamily                           | Mutation         | authenticated | 準備・確定を一括で行う簡易版の家族変更                                          |
-| rotatePasscode                         | Mutation         | familyBound   | パスコードのみの変更（masterKeyEncrypted/Iv/Salt/kdfIterationsのみ更新、6.5） |
-| issueRecoveryKey                       | Mutation         | familyBound   | リカバリーキーの発行／再発行（masterKeyRecoveryEncrypted等を保存、6.6）           |
-| recoverWithRecoveryKey                 | Mutation         | authenticated | リカバリーキー経由でのマスターキー復元後、新パスコードでの再wrap結果を保存（6.6）                 |
-| getRecordsForReEncryption              | Query            | familyBound   | 再暗号化対象データ取得（家族所属前提）                                          |
-| cleanupExpiredMigrationsInternal       | InternalMutation | 内部限定（Cron）    | 期限切れ移行データの自動クリーンアップ                                          |
+| 関数                                     | 種別               | 認可            | 概要                                                                                                                    |
+| -------------------------------------- | ---------------- | ------------- | --------------------------------------------------------------------------------------------------------------------- |
+| getFamilyMembers                       | Query            | authenticated | 自分の所属家族のメンバー一覧取得                                                                                                      |
+| createFamily                           | Mutation         | authenticated | 家族グループ新規作成＋通知メール送信                                                                                                    |
+| joinFamily                             | Mutation         | authenticated | 承認済み参加申請をもとに家族へ参加確定                                                                                                   |
+| getFamilyInfoByInviteCode              | Query            | authenticated | 招待コードから家族の暗号鍵情報を取得（メンバー or 承認済み申請者のみ）                                                                                 |
+| getFamilyPublicInfo                    | Query            | authenticated | 招待コードから家族名等の公開情報のみ取得                                                                                                  |
+| createJoinRequest                      | Mutation         | authenticated | 参加申請の送信＋既存メンバーへの通知メール                                                                                                 |
+| cancelJoinRequest                      | Mutation         | authenticated | 自分の保留中申請のキャンセル                                                                                                        |
+| getMyJoinRequest                       | Query            | authenticated | 自分の申請状況取得                                                                                                             |
+| dismissRejectedRequest                 | Mutation         | authenticated | 却下された申請の削除（確認）                                                                                                        |
+| getPendingRequests                     | Query            | familyBound   | 自家族への保留中申請一覧                                                                                                          |
+| approveJoinRequest / rejectJoinRequest | Mutation         | familyBound   | 申請の承認／却下＋通知メール                                                                                                        |
+| prepareFamilyMigration                 | Mutation         | authenticated | 家族移行の準備（PREPARED状態の作成とレコード更新スナップショットの保持）                                                                               |
+| getMigrationForEncryption              | Query            | authenticated | 移行対象データ（暗号化済みDEK等）の取得                                                                                                 |
+| commitFamilyMigration                  | Mutation         | authenticated | 移行の確定（再暗号化データの反映）。prepare時点とcommit時点のレコード一覧を照合する楽観的ロック（競合検知）を適用                                                         |
+| abortFamilyMigration                   | Mutation         | authenticated | 移行の中断                                                                                                                 |
+| changeFamily                           | Mutation         | authenticated | 準備・確定を一括で行う簡易版の家族変更                                                                                                   |
+| rotatePasscode                         | Mutation         | familyBound   | パスコードのみの変更（masterKeyEncrypted/Iv/Salt/kdfIterationsのみ更新、6.5）                                                            |
+| issueRecoveryKey                       | Mutation         | familyBound   | リカバリーキーの発行／再発行（masterKeyRecoveryEncrypted等を保存、6.6）                                                                    |
+| recoverWithRecoveryKey                 | Mutation         | authenticated | リカバリーキー経由でのマスターキー復元後、新パスコードでの再wrap結果を保存（6.6）                                                                          |
+| getRecordsForReEncryption              | Query            | familyBound   | 再暗号化対象データ取得（家族所属前提）                                                                                                   |
+| cleanupExpiredMigrationsInternal       | InternalMutation | 内部限定（Cron）    | 期限切れ移行データの自動クリーンアップ                                                                                                   |
 
 ### 7.3 convex/records.ts
 
@@ -807,8 +832,8 @@ fetchSafeBuffer() (convex/actions.ts):
 | ------------------------- | --------------------------------------------------------------------------------------------------------- |
 | AeadDataSchema            | IV（16文字Base64）・暗号文（Base64、最小長22）の形式チェック共通部品                                                               |
 | CredentialInputSchema     | 認証情報の文字数上限、ヒント／IV／DEKの整合性チェック（片方のみ存在はエラー）                                                                 |
-| RecordInputSchema         | サービスレコード全体（タイトル必須255文字以内、URL形式、メモ10,000文字以内、 `credentials` 配列は `.max(10)` で上限を明示、 `tags` 配列にも運用上妥当な上限を設定） |
-| CreateFamilyInputSchema   | 家族名必須、マスターキー暗号化データ・ソルトの形式チェック、パスコード強度要件（最低文字数・複雑性、NFR-SEC-13）はクライアント側の入力時点でも検証する                          |
+| RecordInputSchema         | サービスレコード全体（タイトル必須255文字以内、URL形式、メモ10,000文字以内、 `credentials` 配列は `MAX_CREDENTIALS_PER_RECORD = 10` で上限を明示、 `tags` 配列にも運用上妥当な上限を設定） |
+| CreateFamilyInputSchema   | 家族名必須、マスターキー暗号化データ・ソルトの形式チェック、パスコード強度要件（最低文字数10文字・zxcvbnスコア2以上、NFR-SEC-13）はクライアント側の入力時点でも検証する                          |
 | ChangeFamilyInputSchema   | create/joinで分岐する必須項目チェック、認証情報配列の整合性チェック                                                                   |
 | RotatePasscodeInputSchema | 新パスコードの強度要件チェック、マスターキー再ラップデータの形式チェック（新設）                                                                  |
 
