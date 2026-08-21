@@ -8,6 +8,13 @@ import { getCustomTokenFromSession } from "@/services/auth.functions";
 import { auth } from "@/utils/firebase";
 import { isPwaFirstLaunch, markPwaAsInitialized } from "@/utils/pwa";
 
+/**
+ * ログアウト直後の SPA 遷移でセッション復元が発動するのを防ぐためのフラグキー。
+ * ログアウト処理側で sessionStorage にこのキーをセットし、
+ * 復元ロジック側でフラグが立っていればスキップする。
+ */
+export const LOGOUT_FLAG_KEY = "poohma_logout";
+
 export function useConvexFirebaseAuth() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -29,30 +36,55 @@ export function useConvexFirebaseAuth() {
       // Invalidate any ongoing recovery when auth state changes
       recoverySnapshot.current = null;
 
-      if (!user && !recoveryAttempted.current) {
-        recoveryAttempted.current = true;
-        // Capture auth state snapshot before starting async recovery
-        const snapshot = {
-          user: firebaseAuth.currentUser,
-          timestamp: Date.now(),
-        };
-        recoverySnapshot.current = snapshot;
-
+      if (user) {
+        // ログイン状態になったらログアウトフラグをクリア
         try {
-          const result = await getCustomTokenFromSession();
+          sessionStorage.removeItem(LOGOUT_FLAG_KEY);
+        } catch {
+          // ignore storage errors
+        }
+      }
 
-          // Only apply recovery if snapshot is still valid and effect not cleaned up
-          if (
-            !isCleanedUp &&
-            recoverySnapshot.current === snapshot &&
-            firebaseAuth.currentUser === snapshot.user &&
-            result?.customToken
-          ) {
-            await signInWithCustomToken(firebaseAuth, result.customToken);
-            return;
+      if (!user) {
+        // ログアウト状態中はセッション復元をスキップ
+        let isLoggedOut = false;
+        try {
+          isLoggedOut = !!sessionStorage.getItem(LOGOUT_FLAG_KEY);
+        } catch {
+          // ignore storage errors
+        }
+
+        if (isLoggedOut) {
+          setIsAuthenticated(false);
+          setIsLoading(false);
+          return;
+        }
+
+        if (!recoveryAttempted.current) {
+          recoveryAttempted.current = true;
+          // Capture auth state snapshot before starting async recovery
+          const snapshot = {
+            user: firebaseAuth.currentUser,
+            timestamp: Date.now(),
+          };
+          recoverySnapshot.current = snapshot;
+
+          try {
+            const result = await getCustomTokenFromSession();
+
+            // Only apply recovery if snapshot is still valid and effect not cleaned up
+            if (
+              !isCleanedUp &&
+              recoverySnapshot.current === snapshot &&
+              firebaseAuth.currentUser === snapshot.user &&
+              result?.customToken
+            ) {
+              await signInWithCustomToken(firebaseAuth, result.customToken);
+              return;
+            }
+          } catch (error) {
+            console.error("Silent re-auth failed:", error);
           }
-        } catch (error) {
-          console.error("Silent re-auth failed:", error);
         }
       }
       setIsAuthenticated(!!user);

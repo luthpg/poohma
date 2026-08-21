@@ -70,6 +70,6 @@ export const verifySessionCookie = async (sessionCookie: string) => {
   return adminAuth().verifySessionCookie(sessionCookie, true);
 };
 
-export const revokeSessionCookie = async (sessionCookie: string) => {
-  return adminAuth().revokeRefreshTokens(sessionCookie);
+export const revokeRefreshTokens = async (uid: string) => {
+  return adminAuth().revokeRefreshTokens(uid);
 };

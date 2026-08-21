@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 const verifySessionCookieMock = vi.fn();
+const revokeRefreshTokensMock = vi.fn();
 
 vi.mock("firebase-admin", () => {
   return {
@@ -9,6 +10,7 @@ vi.mock("firebase-admin", () => {
       app: () => ({
         auth: () => ({
           verifySessionCookie: verifySessionCookieMock,
+          revokeRefreshTokens: revokeRefreshTokensMock,
         }),
       }),
       initializeApp: vi.fn(),
@@ -45,5 +47,16 @@ describe("firebase-admin.server: verifySessionCookie", () => {
     await expect(verifySessionCookie("revoked-session-cookie")).rejects.toThrow(
       "revoked",
     );
+  });
+
+  it("revokeRefreshTokens が渡された uid で Firebase Admin SDK を呼び出すこと", async () => {
+    revokeRefreshTokensMock.mockResolvedValue(undefined);
+    const { revokeRefreshTokens } = await import(
+      "../src/services/firebase-admin.server"
+    );
+
+    await revokeRefreshTokens("user_uid_123");
+
+    expect(revokeRefreshTokensMock).toHaveBeenCalledWith("user_uid_123");
   });
 });
