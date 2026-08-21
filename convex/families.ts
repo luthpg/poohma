@@ -575,6 +575,18 @@ export const commitFamilyMigration = authenticatedMutation({
       .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
       .collect();
 
+    // migration.serviceRecordIds(prepare時点のスナップショット)との集合比較
+    const currentRecordIds = new Set(currentRecords.map((r) => r._id));
+    const preparedRecordIds = new Set(migration.serviceRecordIds);
+    if (
+      currentRecordIds.size !== preparedRecordIds.size ||
+      [...currentRecordIds].some((id) => !preparedRecordIds.has(id))
+    ) {
+      throw new Error(
+        "Conflict detected: Service records were modified during migration. Please retry migration.",
+      );
+    }
+
     // 再暗号化対象の全 credential に対して更新情報が存在するか事前に検証
     for (const record of currentRecords) {
       for (const cred of record.credentials) {

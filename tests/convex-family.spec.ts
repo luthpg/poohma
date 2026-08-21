@@ -862,10 +862,11 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
       });
     });
 
-    it("prepare 後に作成されたレコードも commit 時に移行対象に含まれること", async () => {
+    it("prepare 後に暗号化クレデンシャルを持つレコードが追加された場合、commitFamilyMigrationが競合エラーとなり何も書き換わらないこと", async () => {
       const t = convexTest(schema, modules);
       let oldFamilyId!: Id<"families">;
       let userMidId!: Id<"users">;
+      let recordBeforeId!: Id<"serviceRecords">;
 
       await t.run(async (ctx) => {
         oldFamilyId = await ctx.db.insert("families", {
@@ -881,7 +882,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         });
 
         // prepare 前に存在するレコード
-        await ctx.db.insert("serviceRecords", {
+        recordBeforeId = await ctx.db.insert("serviceRecords", {
           title: "テストレコード1",
           tags: [],
           userId: "user_mid",
@@ -937,42 +938,44 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         });
       });
 
-      // 3. commit (新レコードの credentials は Map にないが familyId は更新されるべき)
-      await userMid.mutation(api.families.commitFamilyMigration, {
-        migrationId: prepareRes.migrationId,
-        credentials: [
-          {
-            id: "cred_before",
-            passwordHint: "new_before_hint",
-            passwordHintIv: "new_before_iv",
-          },
-          {
-            id: "cred_after",
-            passwordHint: "new_after_hint",
-            passwordHintIv: "new_after_iv",
-          },
-        ],
-      });
+      // 3. commit (prepare後にレコードが追加されているため競合が検知され失敗すること)
+      await expect(
+        userMid.mutation(api.families.commitFamilyMigration, {
+          migrationId: prepareRes.migrationId,
+          credentials: [
+            {
+              id: "cred_before",
+              passwordHint: "new_before_hint",
+              passwordHintIv: "new_before_iv",
+            },
+            {
+              id: "cred_after",
+              passwordHint: "new_after_hint",
+              passwordHintIv: "new_after_iv",
+            },
+          ],
+        }),
+      ).rejects.toThrow("Conflict detected");
 
-      // 4. 検証: 両レコードとも新 Family に移行されていること
+      // 4. 検証: ロールバックされ、何も書き換わっていないこと
       await t.run(async (ctx) => {
-        const allRecords = await ctx.db
-          .query("serviceRecords")
-          .withIndex("by_userId", (q) => q.eq("userId", "user_mid"))
-          .collect();
+        const migration = await ctx.db.get(prepareRes.migrationId);
+        expect(migration?.status).toBe("PREPARED");
 
-        expect(allRecords.length).toBe(2);
-        for (const r of allRecords) {
-          expect(r.familyId).toBe(prepareRes.targetFamilyId);
-        }
+        const user = await ctx.db.get(userMidId);
+        expect(user?.familyId).toBe(oldFamilyId);
 
-        // 新レコードの credentials も更新されていること
+        const recordBefore = await ctx.db.get(recordBeforeId);
+        expect(recordBefore?.familyId).toBe(oldFamilyId);
+        expect(recordBefore?.credentials[0].passwordHint).toBe("before_hint");
+
         const newRecord = await ctx.db.get(newRecordId);
-        expect(newRecord?.credentials[0].passwordHint).toBe("new_after_hint");
+        expect(newRecord?.familyId).toBe(oldFamilyId);
+        expect(newRecord?.credentials[0].passwordHint).toBe("after_hint");
 
-        // 旧 Family はメンバーもレコードも0なので削除
+        // 旧Familyも残っていること
         const oldFamily = await ctx.db.get(oldFamilyId);
-        expect(oldFamily).toBeNull();
+        expect(oldFamily).not.toBeNull();
       });
     });
 
@@ -1016,6 +1019,98 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
         const targetFamily = await ctx.db.get(prepareRes.targetFamilyId);
         expect(targetFamily).toBeNull();
+      });
+    });
+
+    it("prepare後、commit前に暗号化クレデンシャルを持たない新規レコードが追加された場合、commitFamilyMigrationが競合エラーとなり何も書き換わらないこと", async () => {
+      const t = convexTest(schema, modules);
+      let oldFamilyId!: Id<"families">;
+      let userSoloId!: Id<"users">;
+      await t.run(async (ctx) => {
+        oldFamilyId = await ctx.db.insert("families", {
+          name: "旧田中家",
+          updatedAt: Date.now(),
+        });
+        userSoloId = await ctx.db.insert("users", {
+          userId: "user_solo2",
+          email: "solo2@example.com",
+          familyId: oldFamilyId,
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("serviceRecords", {
+          userId: "user_solo2",
+          accountId: userSoloId,
+          familyId: oldFamilyId,
+          title: "既存レコード",
+          visibility: "SHARED",
+          credentials: [
+            {
+              id: "cred_a",
+              passwordHint: "old_hint",
+              passwordHintIv: "old_iv",
+            },
+          ],
+          tags: [],
+          updatedAt: Date.now(),
+        });
+      });
+      const userSolo = t.withIdentity({
+        subject: "user_solo2",
+        email: "solo2@example.com",
+      });
+
+      const prepareRes = await userSolo.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "create",
+          name: "新田中家",
+          masterKeyEncrypted: "enc_key",
+          masterKeyIv: "key_iv",
+          masterKeySalt: "key_salt",
+        },
+      );
+
+      let newRecordId!: Id<"serviceRecords">;
+      await t.run(async (ctx) => {
+        newRecordId = await ctx.db.insert("serviceRecords", {
+          userId: "user_solo2",
+          accountId: userSoloId,
+          familyId: oldFamilyId,
+          title: "並行操作で追加されたレコード",
+          visibility: "PRIVATE",
+          credentials: [],
+          tags: [],
+          updatedAt: Date.now(),
+        });
+      });
+
+      await expect(
+        userSolo.mutation(api.families.commitFamilyMigration, {
+          migrationId: prepareRes.migrationId,
+          credentials: [
+            {
+              id: "cred_a",
+              passwordHint: "new_hint",
+              passwordHintIv: "new_iv",
+            },
+          ],
+        }),
+      ).rejects.toThrow("Conflict detected");
+
+      await t.run(async (ctx) => {
+        const migration = await ctx.db.get(prepareRes.migrationId);
+        expect(migration?.status).toBe("PREPARED");
+
+        const newRecord = await ctx.db.get(newRecordId);
+        expect(newRecord?.familyId).toBe(oldFamilyId);
+
+        const existingRecord = await ctx.db
+          .query("serviceRecords")
+          .withIndex("by_userId", (q) => q.eq("userId", "user_solo2"))
+          .filter((q) => q.eq(q.field("title"), "既存レコード"))
+          .unique();
+        expect(existingRecord?.familyId).toBe(oldFamilyId);
+        expect(existingRecord?.credentials[0].passwordHint).toBe("old_hint");
       });
     });
   });
