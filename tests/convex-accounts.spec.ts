@@ -1,6 +1,7 @@
 import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
 import { api } from "../convex/_generated/api";
+import type { Id } from "../convex/_generated/dataModel";
 import schema from "../convex/schema";
 
 const modules = import.meta.glob("../convex/**/*.ts");
@@ -248,5 +249,56 @@ describe("PoohMa Multi-Account & Authorization Tests", () => {
 
     allAccs = await user.query(api.users.getAccounts, {});
     expect(allAccs).toHaveLength(0);
+  });
+
+  it("同一メールで別UIDとしてsyncUserした場合、joinRequestsとfamilyMigrationsのuserIdも新UIDへ引き継がれること", async () => {
+    const t = convexTest(schema, modules);
+    let familyId!: Id<"families">;
+    let joinRequestId!: Id<"joinRequests">;
+    let migrationId!: Id<"familyMigrations">;
+
+    const oldUser = t.withIdentity({
+      subject: "old_uid",
+      email: "migrate@example.com",
+      emailVerified: true,
+    });
+    await oldUser.mutation(api.users.syncUser, { displayName: "旧アカウント" });
+
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        name: "Target Family",
+        updatedAt: Date.now(),
+      });
+      joinRequestId = await ctx.db.insert("joinRequests", {
+        familyId,
+        userId: "old_uid",
+        status: "pending",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      migrationId = await ctx.db.insert("familyMigrations", {
+        userId: "old_uid",
+        targetFamilyId: familyId,
+        serviceRecordIds: [],
+        status: "PREPARED",
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 1000 * 60 * 60,
+      });
+    });
+
+    const newUser = t.withIdentity({
+      subject: "new_uid",
+      email: "migrate@example.com",
+      emailVerified: true,
+    });
+    await newUser.mutation(api.users.syncUser, { displayName: "新アカウント" });
+
+    await t.run(async (ctx) => {
+      const joinRequest = await ctx.db.get(joinRequestId);
+      expect(joinRequest?.userId).toBe("new_uid");
+
+      const migration = await ctx.db.get(migrationId);
+      expect(migration?.userId).toBe("new_uid");
+    });
   });
 });
