@@ -8,6 +8,7 @@ import { usePasscode } from "@/components/PasscodeProvider";
 import { Spinner } from "@/components/ui/spinner";
 import { TagInput } from "@/components/ui/tag-input";
 import { useAccount } from "@/hooks/useAccount";
+import { MAX_CREDENTIALS_PER_RECORD } from "@/utils/schemas";
 
 export const Route = createFileRoute("/(app)/records/new")({
   component: NewRecordComponent,
@@ -143,6 +144,12 @@ function NewRecordComponent() {
   };
 
   const handleAddCredential = () => {
+    if (credentials.length >= MAX_CREDENTIALS_PER_RECORD) {
+      toast.error(
+        `アカウント情報は${MAX_CREDENTIALS_PER_RECORD}件まで登録できます`,
+      );
+      return;
+    }
     setCredentials([
       ...credentials,
       { label: "", loginId: "", passwordHint: "" },
@@ -381,6 +388,7 @@ function NewRecordComponent() {
             <button
               type="button"
               onClick={handleAddCredential}
+              disabled={credentials.length >= MAX_CREDENTIALS_PER_RECORD}
               className="text-[14px] font-medium text-orange-500 hover:text-orange-600 transition"
             >
               + 追加する

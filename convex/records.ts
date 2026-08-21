@@ -1,6 +1,10 @@
 import { v } from "convex/values";
 import { z } from "zod";
-import { CredentialInputSchema, RecordInputSchema } from "../src/utils/schemas";
+import {
+  CredentialInputSchema,
+  MAX_CREDENTIALS_PER_RECORD,
+  RecordInputSchema,
+} from "../src/utils/schemas";
 import type { Doc } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { authenticatedQuery, familyBoundMutation } from "./customBuilders";
@@ -11,7 +15,12 @@ const ConvexCredentialInputSchema = CredentialInputSchema.extend({
 });
 
 const ConvexRecordInputSchema = RecordInputSchema.extend({
-  credentials: z.array(ConvexCredentialInputSchema),
+  credentials: z
+    .array(ConvexCredentialInputSchema)
+    .max(
+      MAX_CREDENTIALS_PER_RECORD,
+      `アカウント情報は${MAX_CREDENTIALS_PER_RECORD}件まで登録できます`,
+    ),
 });
 
 /**

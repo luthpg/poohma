@@ -681,3 +681,71 @@ describe("Convexリプレース由来デグレ修正の追加テスト", () => {
     });
   });
 });
+
+describe("件数境界値テスト", () => {
+  it("createRecordで11件のcredentialsを送信するとバリデーションエラーになること", async () => {
+    const t = convexTest(schema, modules);
+    await t.run(async (ctx) => {
+      const familyId = await ctx.db.insert("families", {
+        name: "Test Family",
+        updatedAt: Date.now(),
+      });
+      await ctx.db.insert("users", {
+        userId: "user_cap",
+        email: "cap@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+    });
+
+    const user = t.withIdentity({
+      subject: "user_cap",
+      email: "cap@example.com",
+    });
+
+    await expect(
+      user.mutation(api.records.createRecord, {
+        title: "Too many credentials",
+        visibility: "PRIVATE",
+        credentials: Array.from({ length: 11 }, (_, i) => ({
+          id: `cred_${i}`,
+          label: `Cred${i}`,
+        })),
+        tags: [],
+      }),
+    ).rejects.toThrow("Validation failed");
+  });
+
+  it("createRecordで10件ちょうどのcredentialsは登録できること", async () => {
+    const t = convexTest(schema, modules);
+    await t.run(async (ctx) => {
+      const familyId = await ctx.db.insert("families", {
+        name: "Test Family",
+        updatedAt: Date.now(),
+      });
+      await ctx.db.insert("users", {
+        userId: "user_cap2",
+        email: "cap2@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+    });
+
+    const user = t.withIdentity({
+      subject: "user_cap2",
+      email: "cap2@example.com",
+    });
+
+    await expect(
+      user.mutation(api.records.createRecord, {
+        title: "Exactly 10 credentials",
+        visibility: "PRIVATE",
+        credentials: Array.from({ length: 10 }, (_, i) => ({
+          id: `cred_${i}`,
+          label: `Cred${i}`,
+        })),
+        tags: [],
+      }),
+    ).resolves.toBeDefined();
+  });
+});
