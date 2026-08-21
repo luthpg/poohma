@@ -443,4 +443,74 @@ describe("PasscodeProvider - 誤入力時の指数バックオフ・ロックア
       expect(screen.getByText("Unlocked")).toBeTruthy();
     });
   }, 10000);
+
+  it("キャンセル後も失敗回数が保持され、3回目の失敗でロックアウトが発動すること（回避攻撃の防止）", async () => {
+    (cryptoLib.deriveKeyFromPasscode as Mock).mockResolvedValue(
+      {} as CryptoKey,
+    );
+    (cryptoLib.unwrapMasterKey as Mock).mockRejectedValue(
+      new Error("bad passcode"),
+    );
+
+    let requireUnlockRef: (() => Promise<boolean>) | null = null;
+    const TestComponent = () => {
+      const { requireUnlock, isLocked } = usePasscode();
+      requireUnlockRef = requireUnlock;
+      return <div>{isLocked ? "Locked" : "Unlocked"}</div>;
+    };
+    render(
+      <PasscodeProvider>
+        <TestComponent />
+      </PasscodeProvider>,
+    );
+
+    // 1回目の失敗
+    // biome-ignore lint/style/noNonNullAssertion: requireUnlockRef はセットされることが保証されている
+    requireUnlockRef!();
+    await waitFor(() => {
+      expect(screen.getByText("家族パスコードの入力")).toBeTruthy();
+    });
+    const input = screen.getByPlaceholderText("パスコード");
+    const getSubmitButton = () =>
+      screen.getByRole("button", { name: "ロック解除" });
+    fireEvent.change(input, { target: { value: "wrong1" } });
+    await act(async () => {
+      fireEvent.click(getSubmitButton());
+    });
+
+    // 2回目の失敗
+    fireEvent.change(input, { target: { value: "wrong2" } });
+    await act(async () => {
+      fireEvent.click(getSubmitButton());
+    });
+
+    // ダイアログをキャンセル
+    const cancelButton = screen.getByRole("button", { name: "キャンセル" });
+    await act(async () => {
+      fireEvent.click(cancelButton);
+    });
+
+    // ダイアログが閉じることを確認
+    await waitFor(() => {
+      expect(screen.queryByText("家族パスコードの入力")).toBeNull();
+    });
+
+    // 再度ダイアログを開く
+    // biome-ignore lint/style/noNonNullAssertion: requireUnlockRef はセットされることが保証されている
+    requireUnlockRef!();
+    await waitFor(() => {
+      expect(screen.getByText("家族パスコードの入力")).toBeTruthy();
+    });
+
+    // 3回目の失敗 → ロックアウトが発動するはず
+    fireEvent.change(input, { target: { value: "wrong3" } });
+    await act(async () => {
+      fireEvent.click(getSubmitButton());
+    });
+
+    // 送信ボタンが非活性化されていることを確認（ロックアウトされている）
+    await waitFor(() => {
+      expect(getSubmitButton().hasAttribute("disabled")).toBe(true);
+    });
+  }, 10000);
 });

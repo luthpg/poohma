@@ -126,6 +126,10 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
 
   // アカウント変更世代カウンタ（非同期 unlock 処理中にアカウントが切り替わった場合の競合防止）
   const accountGenerationRef = useRef(0);
+  // 前回の familyId を追跡（familyId が実際に変わった場合のみ failed attempts をリセットするため）
+  const prevFamilyIdRef = useRef<string | null | undefined>(
+    currentAccount?.familyId,
+  );
 
   // 生体認証のサポート状況と有効状態をチェック
   useEffect(() => {
@@ -351,9 +355,6 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
     setIsPromptOpen(false);
     setPasscode("");
     setShouldRegisterBiometric(false);
-    setFailedAttempts(0);
-    setIsLockedOut(false);
-    if (lockoutTimerRef.current) clearTimeout(lockoutTimerRef.current);
     if (resolvePromiseRef.current) {
       resolvePromiseRef.current(false);
       resolvePromiseRef.current = null;
@@ -377,9 +378,15 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
     accountGenerationRef.current += 1;
     setMasterKey(null);
     masterKeyRef.current = null;
-    setFailedAttempts(0);
-    setIsLockedOut(false);
-    if (lockoutTimerRef.current) clearTimeout(lockoutTimerRef.current);
+
+    // familyId が実際に変わった場合のみ failed attempts と lockout 状態をリセット
+    const currentFamilyId = currentAccount?.familyId;
+    if (prevFamilyIdRef.current !== currentFamilyId) {
+      setFailedAttempts(0);
+      setIsLockedOut(false);
+      if (lockoutTimerRef.current) clearTimeout(lockoutTimerRef.current);
+      prevFamilyIdRef.current = currentFamilyId;
+    }
   }, [activeAccountId, currentAccount?.familyId]);
 
   return (
