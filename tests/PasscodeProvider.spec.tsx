@@ -337,3 +337,180 @@ describe("PasscodeProvider - decryptHint (Envelope Encryption Branching)", () =>
     expect(decrypted).toBe("legacy_decrypted_hint_text");
   });
 });
+
+describe("PasscodeProvider - 誤入力時の指数バックオフ・ロックアウト", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useRouteContext).mockReturnValue({
+      user: {
+        familyId: "family-1",
+        family: {
+          name: "Test Family",
+          masterKeyEncrypted: "encrypted-key",
+          masterKeyIv: "iv",
+          masterKeySalt: "salt",
+        },
+      },
+    });
+  });
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  const setup = async () => {
+    let requireUnlockRef: (() => Promise<boolean>) | null = null;
+    const TestComponent = () => {
+      const { requireUnlock, isLocked } = usePasscode();
+      requireUnlockRef = requireUnlock;
+      return <div>{isLocked ? "Locked" : "Unlocked"}</div>;
+    };
+    render(
+      <PasscodeProvider>
+        <TestComponent />
+      </PasscodeProvider>,
+    );
+    // biome-ignore lint/style/noNonNullAssertion: requireUnlockRef はセットされることが保証されている
+    requireUnlockRef!();
+    await waitFor(() => {
+      expect(screen.getByText("家族パスコードの入力")).toBeTruthy();
+    });
+    return {
+      input: screen.getByPlaceholderText("パスコード"),
+      submitButton: () => screen.getByRole("button", { name: "ロック解除" }),
+    };
+  };
+
+  it("3回連続で誤入力するとロックアウトされ、送信ボタンが非活性化されること", async () => {
+    (cryptoLib.deriveKeyFromPasscode as Mock).mockResolvedValue(
+      {} as CryptoKey,
+    );
+    (cryptoLib.unwrapMasterKey as Mock).mockRejectedValue(
+      new Error("bad passcode"),
+    );
+    const { input, submitButton } = await setup();
+
+    for (let i = 0; i < 2; i++) {
+      fireEvent.change(input, { target: { value: "wrong" } });
+      await act(async () => {
+        fireEvent.click(submitButton());
+      });
+    }
+    expect(submitButton().hasAttribute("disabled")).toBe(false);
+
+    fireEvent.change(input, { target: { value: "wrong" } });
+    await act(async () => {
+      fireEvent.click(submitButton());
+    });
+
+    expect(submitButton().hasAttribute("disabled")).toBe(true);
+  }, 10000);
+
+  it("ロックアウト解除後は再試行でき、成功時に失敗カウントがリセットされること", async () => {
+    (cryptoLib.deriveKeyFromPasscode as Mock).mockResolvedValue(
+      {} as CryptoKey,
+    );
+    (cryptoLib.unwrapMasterKey as Mock).mockRejectedValue(
+      new Error("bad passcode"),
+    );
+    const { input, submitButton } = await setup();
+
+    for (let i = 0; i < 3; i++) {
+      fireEvent.change(input, { target: { value: "wrong" } });
+      await act(async () => {
+        fireEvent.click(submitButton());
+      });
+    }
+    expect(submitButton().hasAttribute("disabled")).toBe(true);
+
+    // 3回目失敗時の遅延(1秒)を実時間で待つ
+    await waitFor(
+      () => {
+        expect(submitButton().hasAttribute("disabled")).toBe(false);
+      },
+      { timeout: 3000 },
+    );
+
+    (cryptoLib.unwrapMasterKey as Mock).mockResolvedValue({
+      type: "secret",
+    } as unknown as CryptoKey);
+    fireEvent.change(input, { target: { value: "correct-passcode" } });
+    await act(async () => {
+      fireEvent.click(submitButton());
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Unlocked")).toBeTruthy();
+    });
+  }, 10000);
+
+  it("キャンセル後も失敗回数が保持され、3回目の失敗でロックアウトが発動すること（回避攻撃の防止）", async () => {
+    (cryptoLib.deriveKeyFromPasscode as Mock).mockResolvedValue(
+      {} as CryptoKey,
+    );
+    (cryptoLib.unwrapMasterKey as Mock).mockRejectedValue(
+      new Error("bad passcode"),
+    );
+
+    let requireUnlockRef: (() => Promise<boolean>) | null = null;
+    const TestComponent = () => {
+      const { requireUnlock, isLocked } = usePasscode();
+      requireUnlockRef = requireUnlock;
+      return <div>{isLocked ? "Locked" : "Unlocked"}</div>;
+    };
+    render(
+      <PasscodeProvider>
+        <TestComponent />
+      </PasscodeProvider>,
+    );
+
+    // 1回目の失敗
+    // biome-ignore lint/style/noNonNullAssertion: requireUnlockRef はセットされることが保証されている
+    requireUnlockRef!();
+    await waitFor(() => {
+      expect(screen.getByText("家族パスコードの入力")).toBeTruthy();
+    });
+    const input = screen.getByPlaceholderText("パスコード");
+    const getSubmitButton = () =>
+      screen.getByRole("button", { name: "ロック解除" });
+    fireEvent.change(input, { target: { value: "wrong1" } });
+    await act(async () => {
+      fireEvent.click(getSubmitButton());
+    });
+
+    // 2回目の失敗
+    fireEvent.change(input, { target: { value: "wrong2" } });
+    await act(async () => {
+      fireEvent.click(getSubmitButton());
+    });
+
+    // ダイアログをキャンセル
+    const cancelButton = screen.getByRole("button", { name: "キャンセル" });
+    await act(async () => {
+      fireEvent.click(cancelButton);
+    });
+
+    // ダイアログが閉じることを確認
+    await waitFor(() => {
+      expect(screen.queryByText("家族パスコードの入力")).toBeNull();
+    });
+
+    // 再度ダイアログを開く
+    // biome-ignore lint/style/noNonNullAssertion: requireUnlockRef はセットされることが保証されている
+    requireUnlockRef!();
+    await waitFor(() => {
+      expect(screen.getByText("家族パスコードの入力")).toBeTruthy();
+    });
+
+    // 3回目の失敗 → ロックアウトが発動するはず
+    fireEvent.change(input, { target: { value: "wrong3" } });
+    await act(async () => {
+      fireEvent.click(getSubmitButton());
+    });
+
+    // 送信ボタンが非活性化されていることを確認（ロックアウトされている）
+    await waitFor(() => {
+      expect(getSubmitButton().hasAttribute("disabled")).toBe(true);
+    });
+  }, 10000);
+});
