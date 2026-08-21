@@ -76,7 +76,23 @@ export const syncUser = identityVerifiedMutation({
         await ctx.db.patch(record._id, { userId: uid });
       }
 
-      // 旧UIDを持つ全アカウントを更新（UIDとプロフィールを新しいものに差し替え）
+      // 旧UIDを持つ全アカウント・JoinRequests・FamilyMigrationsを更新（UIDとプロフィールを新しいものに差し替え）
+      const joinRequests = await ctx.db
+        .query("joinRequests")
+        .withIndex("by_userId_status", (q) => q.eq("userId", oldUid))
+        .collect();
+      for (const req of joinRequests) {
+        await ctx.db.patch(req._id, { userId: uid });
+      }
+
+      const migrations = await ctx.db
+        .query("familyMigrations")
+        .withIndex("by_userId", (q) => q.eq("userId", oldUid))
+        .collect();
+      for (const mig of migrations) {
+        await ctx.db.patch(mig._id, { userId: uid });
+      }
+
       const now = Date.now();
       for (const account of existingByEmail) {
         if (account.userId === oldUid) {
