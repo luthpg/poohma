@@ -67,7 +67,7 @@ export const getSessionCookie = async (idToken: string, expiresIn: number) => {
 };
 
 export const verifySessionCookie = async (sessionCookie: string) => {
-  return adminAuth().verifySessionCookie(sessionCookie);
+  return adminAuth().verifySessionCookie(sessionCookie, true);
 };
 
 export const revokeSessionCookie = async (sessionCookie: string) => {
