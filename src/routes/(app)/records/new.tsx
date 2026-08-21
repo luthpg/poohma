@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
@@ -389,7 +389,7 @@ function NewRecordComponent() {
               type="button"
               onClick={handleAddCredential}
               disabled={credentials.length >= MAX_CREDENTIALS_PER_RECORD}
-              className="text-[14px] font-medium text-orange-500 hover:text-orange-600 transition"
+              className="text-[14px] font-medium text-orange-500 hover:text-orange-600 disabled:opacity-40 disabled:cursor-not-allowed transition"
             >
               + 追加する
             </button>
@@ -406,10 +406,11 @@ function NewRecordComponent() {
                   <button
                     type="button"
                     onClick={() => handleRemoveCredential(index)}
-                    className="absolute right-3 top-3 text-muted-foreground hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                    className="absolute right-2.5 top-2.5 inline-flex items-center justify-center rounded-md p-1.5 text-muted-foreground transition-all hover:bg-red-500/10 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/30 opacity-80 hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"
                     title="このアカウント情報を削除"
+                    aria-label="このアカウント情報を削除"
                   >
-                    削除
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 )}
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
