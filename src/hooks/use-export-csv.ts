@@ -5,6 +5,7 @@ import { api } from "@/../convex/_generated/api";
 import { usePasscode } from "@/components/PasscodeProvider";
 import { useAccount } from "@/hooks/useAccount";
 import { sanitizeCsvValue } from "@/utils/csv-sanitize";
+import { MAX_CREDENTIALS_PER_RECORD } from "@/utils/schemas";
 
 export function useExportCsv() {
   const [isExporting, setIsExporting] = useState(false);
@@ -44,7 +45,7 @@ export function useExportCsv() {
       // Check if there are any encrypted hints
       let hasEncryptedHints = false;
       for (const row of data) {
-        for (let i = 1; i <= 10; i++) {
+        for (let i = 1; i <= MAX_CREDENTIALS_PER_RECORD; i++) {
           if (row[`PasswordHint${i}`] && row[`PasswordHintIv${i}`]) {
             hasEncryptedHints = true;
             break;
@@ -71,7 +72,7 @@ export function useExportCsv() {
             newRow[key] = sanitizeCsvValue(row[key]);
           }
 
-          for (let i = 1; i <= 10; i++) {
+          for (let i = 1; i <= MAX_CREDENTIALS_PER_RECORD; i++) {
             const hint = newRow[`PasswordHint${i}`];
             const iv = newRow[`PasswordHintIv${i}`];
             const dekEncrypted = newRow[`PasswordHintDekEncrypted${i}`];
@@ -101,7 +102,7 @@ export function useExportCsv() {
       );
 
       const columns = ["Title", "URL", "Memo", "Visibility", "Tags"];
-      for (let i = 1; i <= 10; i++) {
+      for (let i = 1; i <= MAX_CREDENTIALS_PER_RECORD; i++) {
         columns.push(`Label${i}`, `LoginID${i}`, `PasswordHint${i}`);
       }
 

@@ -230,6 +230,32 @@ describe("RecordInputSchema", () => {
       );
     }
   });
+
+  it("should accept exactly 10 credentials", () => {
+    const validData = {
+      title: "Test",
+      visibility: "PRIVATE",
+      credentials: Array.from({ length: 10 }, (_, i) => ({
+        label: `Cred${i}`,
+      })),
+      tags: [],
+    };
+    const result = RecordInputSchema.safeParse(validData);
+    expect(result.success).toBe(true);
+  });
+
+  it("should reject 11 credentials", () => {
+    const invalidData = {
+      title: "Test",
+      visibility: "PRIVATE",
+      credentials: Array.from({ length: 11 }, (_, i) => ({
+        label: `Cred${i}`,
+      })),
+      tags: [],
+    };
+    const result = RecordInputSchema.safeParse(invalidData);
+    expect(result.success).toBe(false);
+  });
 });
 
 import { CredentialInputSchema } from "@/utils/schemas";

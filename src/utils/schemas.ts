@@ -8,6 +8,9 @@ const BASE64_REGEX = /^[A-Za-z0-9+/]+={0,2}$/;
 /** IVは必ず12バイト。Base64でちょうど16文字かつパディングなし */
 const IV_REGEX = /^[A-Za-z0-9+/]{16}$/;
 
+/** 1レコードあたりの最大アカウント情報項目数 */
+export const MAX_CREDENTIALS_PER_RECORD = 10;
+
 /** AEAD (AES-GCM) データのスキーマ */
 export const AeadDataSchema = z.object({
   iv: z.string().regex(IV_REGEX, "IVは16文字のBase64形式である必要があります"),
@@ -137,7 +140,12 @@ export const RecordInputSchema = z.object({
     .max(10000, "メモは10,000文字以内で入力してください")
     .optional(),
   visibility: z.enum(Visibility),
-  credentials: z.array(CredentialInputSchema), // IDペアの配列
+  credentials: z
+    .array(CredentialInputSchema)
+    .max(
+      MAX_CREDENTIALS_PER_RECORD,
+      `アカウント情報は${MAX_CREDENTIALS_PER_RECORD}件まで登録できます`,
+    ), // IDペアの配列
   tags: z.array(z.string().max(50, "タグは50文字以内で入力してください")), // タグ文字列の配列
 });
 
