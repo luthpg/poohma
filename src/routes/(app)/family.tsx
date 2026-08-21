@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
 import { usePasscode } from "@/components/PasscodeProvider";
+import { PasscodeStrengthMeter } from "@/components/PasscodeStrengthMeter";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
@@ -27,6 +28,10 @@ import {
 } from "@/lib/crypto";
 import { logout } from "@/services/auth.functions";
 import { auth } from "@/utils/firebase";
+import {
+  evaluatePasscodeStrength,
+  MIN_PASSCODE_LENGTH,
+} from "@/utils/passcode-strength";
 
 export const Route = createFileRoute("/(app)/family")({
   validateSearch: (
@@ -435,8 +440,9 @@ function FamilyComponent() {
   ) => {
     e.preventDefault();
     if (action === "create") {
-      if (createPasscode.length < 8) {
-        toast.error("パスコードは8文字以上にしてください");
+      const strength = evaluatePasscodeStrength(createPasscode);
+      if (!strength.isValid) {
+        toast.error(strength.reasons[0]);
         return;
       }
       if (createPasscode !== createPasscodeConfirm) {
@@ -567,8 +573,9 @@ function FamilyComponent() {
 
   const handleCreate = async (e: React.SubmitEvent) => {
     e.preventDefault();
-    if (createPasscode.length < 8) {
-      toast.error("パスコードは8文字以上にしてください");
+    const strength = evaluatePasscodeStrength(createPasscode);
+    if (!strength.isValid) {
+      toast.error(strength.reasons[0]);
       return;
     }
     if (createPasscode !== createPasscodeConfirm) {
@@ -1230,10 +1237,10 @@ function FamilyComponent() {
                       type={showCreatePasscode ? "text" : "password"}
                       id="family-passcode-input"
                       required
-                      minLength={8}
+                      minLength={MIN_PASSCODE_LENGTH}
                       value={createPasscode}
                       onChange={(e) => setCreatePasscode(e.target.value)}
-                      placeholder="8文字以上"
+                      placeholder={`${MIN_PASSCODE_LENGTH}文字以上`}
                       className="w-full rounded-md bg-card p-2.5 text-base md:text-[14px] pr-10 shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
                     />
                     <button
@@ -1248,6 +1255,9 @@ function FamilyComponent() {
                       )}
                     </button>
                   </div>
+                  {createPasscode.length > 0 && (
+                    <PasscodeStrengthMeter passcode={createPasscode} />
+                  )}
                   <p className="mt-1.5 text-[12px] text-muted-foreground">
                     暗号化に使用します。忘れるとヒントを復元できません。
                   </p>

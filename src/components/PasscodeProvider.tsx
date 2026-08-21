@@ -80,6 +80,9 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
   const [isPromptOpen, setIsPromptOpen] = useState(false);
   const [showPasscode, setShowPasscode] = useState(false);
   const resolvePromiseRef = useRef<((value: boolean) => void) | null>(null);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [isLockedOut, setIsLockedOut] = useState(false);
+  const lockoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // オートロック設定
   const [lockTimeoutMinutes, setLockTimeoutMinutesState] = useState(
@@ -89,6 +92,11 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
   // マウント時に localStorage から読み込み
   useEffect(() => {
     setLockTimeoutMinutesState(getAutolockTimeoutMinutes());
+
+    // アンマウント時に指数バックオフ対策タイマーをクリア
+    return () => {
+      if (lockoutTimerRef.current) clearTimeout(lockoutTimerRef.current);
+    };
   }, []);
 
   const handleSetLockTimeoutMinutes = useCallback((minutes: number) => {
@@ -248,8 +256,12 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
 
   const handleUnlockSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
+    if (isLockedOut) return;
+
     const success = await unlock(passcode);
     if (success) {
+      setFailedAttempts(0);
+      setIsLockedOut(false);
       setIsPromptOpen(false);
 
       // パスコード認証成功後に生体認証登録を行う
@@ -275,6 +287,20 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
       if (resolvePromiseRef.current) {
         resolvePromiseRef.current(true);
         resolvePromiseRef.current = null;
+      }
+    } else {
+      const nextAttempts = failedAttempts + 1;
+      setFailedAttempts(nextAttempts);
+      if (nextAttempts >= 3) {
+        const delayMs = Math.min(2 ** (nextAttempts - 3) * 1000, 30000);
+        setIsLockedOut(true);
+        toast.error(
+          `試行制限中です。${Math.ceil(delayMs / 1000)}秒間再試行できません。`,
+        );
+        if (lockoutTimerRef.current) clearTimeout(lockoutTimerRef.current);
+        lockoutTimerRef.current = setTimeout(() => {
+          setIsLockedOut(false);
+        }, delayMs);
       }
     }
   };
@@ -322,11 +348,15 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
     setIsPromptOpen(false);
     setPasscode("");
     setShouldRegisterBiometric(false);
+    setFailedAttempts(0);
+    setIsLockedOut(false);
+    if (lockoutTimerRef.current) clearTimeout(lockoutTimerRef.current);
     if (resolvePromiseRef.current) {
       resolvePromiseRef.current(false);
       resolvePromiseRef.current = null;
     }
   };
+
   const getMasterKey = useCallback(() => {
     return masterKeyRef.current;
   }, []);
@@ -344,6 +374,9 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
     accountGenerationRef.current += 1;
     setMasterKey(null);
     masterKeyRef.current = null;
+    setFailedAttempts(0);
+    setIsLockedOut(false);
+    if (lockoutTimerRef.current) clearTimeout(lockoutTimerRef.current);
   }, [activeAccountId, currentAccount?.familyId]);
 
   return (
@@ -498,7 +531,12 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
               <button
                 type="submit"
                 className="flex-1 flex items-center justify-center rounded-lg bg-primary py-3 font-semibold text-primary-foreground shadow-lg transition-all hover:opacity-90 disabled:opacity-50"
-                disabled={isUnlocking || !passcode || isBiometricAuthenticating}
+                disabled={
+                  isUnlocking ||
+                  !passcode ||
+                  isBiometricAuthenticating ||
+                  isLockedOut
+                }
               >
                 {isUnlocking ? (
                   <>
