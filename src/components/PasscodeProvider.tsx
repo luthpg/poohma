@@ -329,6 +329,9 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
       if (success) {
         setIsPromptOpen(false);
         setPasscode("");
+        setFailedAttempts(0);
+        setIsLockedOut(false);
+        if (lockoutTimerRef.current) clearTimeout(lockoutTimerRef.current);
         if (resolvePromiseRef.current) {
           resolvePromiseRef.current(true);
           resolvePromiseRef.current = null;
