@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { useAccount } from "@/hooks/useAccount";
+import { LOGOUT_FLAG_KEY } from "@/hooks/useConvexFirebaseAuth";
 import { clearQueryCache } from "@/hooks/usePersistentQuery";
 import {
   deriveKeyFromPasscode,
@@ -103,6 +104,7 @@ function FamilyComponent() {
   const convex = useConvex();
   const handleLogout = async () => {
     try {
+      sessionStorage.setItem(LOGOUT_FLAG_KEY, "1");
       if (auth) await signOut(auth);
       await logout();
       clearQueryCache();

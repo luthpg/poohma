@@ -52,6 +52,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { useExportCsv } from "@/hooks/use-export-csv";
 import { useAccount } from "@/hooks/useAccount";
+import { LOGOUT_FLAG_KEY } from "@/hooks/useConvexFirebaseAuth";
 import { clearQueryCache } from "@/hooks/usePersistentQuery";
 import { logout } from "@/services/auth.functions";
 import { processInChunks } from "@/utils/chunk-processor";
@@ -85,6 +86,7 @@ export function UserMenu({
 
   const handleLogout = async () => {
     try {
+      sessionStorage.setItem(LOGOUT_FLAG_KEY, "1");
       if (auth) await signOut(auth);
       await logout();
       clearQueryCache();
