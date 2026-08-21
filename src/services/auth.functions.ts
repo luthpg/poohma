@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import {
+  deleteCookie,
   getCookie,
   setCookie,
   setResponseHeader,
@@ -11,6 +12,7 @@ import { env as serverEnv } from "@/env/server";
 import {
   adminAuth,
   getSessionCookie,
+  revokeRefreshTokens,
   verifySessionCookie,
 } from "@/services/firebase-admin.server";
 
@@ -74,15 +76,40 @@ export const syncUser = createServerFn({ method: "POST" })
   });
 
 /**
- * ログアウト処理（クッキーの削除）
+ * ログアウト処理（サーバー側のセッション失効とクッキーの削除）
  */
 export const logout = createServerFn({ method: "POST" }).handler(async () => {
+  const sessionCookie = getCookie("session");
+  if (sessionCookie) {
+    try {
+      // トークン失効状態にかかわらず uid を取得して Firebase 側のリフレッシュトークンを即時無効化
+      const decodedToken = await adminAuth().verifySessionCookie(
+        sessionCookie,
+        false,
+      );
+      if (decodedToken?.uid) {
+        await revokeRefreshTokens(decodedToken.uid);
+      }
+    } catch (e) {
+      console.error("logout: failed to revoke session token", e);
+    }
+  }
+
+  const isProduction = process.env.NODE_ENV === "production";
+
+  deleteCookie("session", {
+    path: "/",
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: "lax",
+  });
+
   setCookie("session", "", {
     httpOnly: true,
-    secure: true,
+    secure: isProduction,
     sameSite: "lax",
     path: "/",
-    maxAge: 0, // 即時無効化
+    maxAge: 0,
   });
 });
 

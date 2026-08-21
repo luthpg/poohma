@@ -104,7 +104,11 @@ function FamilyComponent() {
   const convex = useConvex();
   const handleLogout = async () => {
     try {
-      sessionStorage.setItem(LOGOUT_FLAG_KEY, "1");
+      try {
+        sessionStorage.setItem(LOGOUT_FLAG_KEY, "1");
+      } catch (e) {
+        console.warn("Failed to set logout flag in sessionStorage", e);
+      }
       if (auth) await signOut(auth);
       await logout();
       clearQueryCache();

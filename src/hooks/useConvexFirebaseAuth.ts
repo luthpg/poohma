@@ -36,40 +36,55 @@ export function useConvexFirebaseAuth() {
       // Invalidate any ongoing recovery when auth state changes
       recoverySnapshot.current = null;
 
-      if (!user && !recoveryAttempted.current) {
-        recoveryAttempted.current = true;
-
-        // ログアウト直後はセッション復元をスキップ
-        const logoutFlag = sessionStorage.getItem(LOGOUT_FLAG_KEY);
-        if (logoutFlag) {
+      if (user) {
+        // ログイン状態になったらログアウトフラグをクリア
+        try {
           sessionStorage.removeItem(LOGOUT_FLAG_KEY);
+        } catch {
+          // ignore storage errors
+        }
+      }
+
+      if (!user) {
+        // ログアウト状態中はセッション復元をスキップ
+        let isLoggedOut = false;
+        try {
+          isLoggedOut = !!sessionStorage.getItem(LOGOUT_FLAG_KEY);
+        } catch {
+          // ignore storage errors
+        }
+
+        if (isLoggedOut) {
           setIsAuthenticated(false);
           setIsLoading(false);
           return;
         }
 
-        // Capture auth state snapshot before starting async recovery
-        const snapshot = {
-          user: firebaseAuth.currentUser,
-          timestamp: Date.now(),
-        };
-        recoverySnapshot.current = snapshot;
+        if (!recoveryAttempted.current) {
+          recoveryAttempted.current = true;
+          // Capture auth state snapshot before starting async recovery
+          const snapshot = {
+            user: firebaseAuth.currentUser,
+            timestamp: Date.now(),
+          };
+          recoverySnapshot.current = snapshot;
 
-        try {
-          const result = await getCustomTokenFromSession();
+          try {
+            const result = await getCustomTokenFromSession();
 
-          // Only apply recovery if snapshot is still valid and effect not cleaned up
-          if (
-            !isCleanedUp &&
-            recoverySnapshot.current === snapshot &&
-            firebaseAuth.currentUser === snapshot.user &&
-            result?.customToken
-          ) {
-            await signInWithCustomToken(firebaseAuth, result.customToken);
-            return;
+            // Only apply recovery if snapshot is still valid and effect not cleaned up
+            if (
+              !isCleanedUp &&
+              recoverySnapshot.current === snapshot &&
+              firebaseAuth.currentUser === snapshot.user &&
+              result?.customToken
+            ) {
+              await signInWithCustomToken(firebaseAuth, result.customToken);
+              return;
+            }
+          } catch (error) {
+            console.error("Silent re-auth failed:", error);
           }
-        } catch (error) {
-          console.error("Silent re-auth failed:", error);
         }
       }
       setIsAuthenticated(!!user);
