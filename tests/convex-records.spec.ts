@@ -680,6 +680,126 @@ describe("Convexリプレース由来デグレ修正の追加テスト", () => {
       expect(updated?.titleReading).toBe("あまぞん");
     });
   });
+
+  it("他メンバー所有のSHAREDレコードに対し、非所有者がupdateRecordでvisibilityを変更しようとするとForbiddenになること", async () => {
+    const t = convexTest(schema, modules);
+    let family1Id!: Id<"families">;
+    let sharedRecordId!: Id<"serviceRecords">;
+    let userAId!: Id<"users">;
+    await t.run(async (ctx) => {
+      family1Id = await ctx.db.insert("families", {
+        name: "Family 1",
+        updatedAt: Date.now(),
+      });
+      userAId = await ctx.db.insert("users", {
+        userId: "user_a",
+        email: "a@example.com",
+        familyId: family1Id,
+        updatedAt: Date.now(),
+      });
+      await ctx.db.insert("users", {
+        userId: "user_b",
+        email: "b@example.com",
+        familyId: family1Id,
+        updatedAt: Date.now(),
+      });
+      sharedRecordId = await ctx.db.insert("serviceRecords", {
+        userId: "user_a",
+        accountId: userAId,
+        familyId: family1Id,
+        title: "Shared Record",
+        visibility: "SHARED",
+        credentials: [],
+        tags: [],
+        updatedAt: Date.now(),
+      });
+    });
+    const userB = t.withIdentity({ subject: "user_b", email: "b@example.com" });
+
+    await expect(
+      userB.mutation(api.records.updateRecord, {
+        id: sharedRecordId,
+        data: {
+          title: "Shared Record",
+          visibility: "PRIVATE",
+          credentials: [],
+          tags: [],
+        },
+      }),
+    ).rejects.toThrow("Forbidden");
+
+    await expect(
+      userB.mutation(api.records.updateRecord, {
+        id: sharedRecordId,
+        data: {
+          title: "Shared Record Renamed",
+          visibility: "SHARED",
+          credentials: [],
+          tags: [],
+        },
+      }),
+    ).resolves.not.toThrow();
+  });
+
+  it("bulkUpdateRecordsで他メンバー所有レコードを含むvisibility一括変更はForbiddenになり、全件ロールバックされること", async () => {
+    const t = convexTest(schema, modules);
+    let family1Id!: Id<"families">;
+    let ownRecordId!: Id<"serviceRecords">;
+    let othersSharedId!: Id<"serviceRecords">;
+    let userAId!: Id<"users">;
+    let userBId!: Id<"users">;
+    await t.run(async (ctx) => {
+      family1Id = await ctx.db.insert("families", {
+        name: "Family 1",
+        updatedAt: Date.now(),
+      });
+      userAId = await ctx.db.insert("users", {
+        userId: "user_a",
+        email: "a@example.com",
+        familyId: family1Id,
+        updatedAt: Date.now(),
+      });
+      userBId = await ctx.db.insert("users", {
+        userId: "user_b",
+        email: "b@example.com",
+        familyId: family1Id,
+        updatedAt: Date.now(),
+      });
+      ownRecordId = await ctx.db.insert("serviceRecords", {
+        userId: "user_b",
+        accountId: userBId,
+        familyId: family1Id,
+        title: "B own",
+        visibility: "PRIVATE",
+        credentials: [],
+        tags: [],
+        updatedAt: Date.now(),
+      });
+      othersSharedId = await ctx.db.insert("serviceRecords", {
+        userId: "user_a",
+        accountId: userAId,
+        familyId: family1Id,
+        title: "A shared",
+        visibility: "SHARED",
+        credentials: [],
+        tags: [],
+        updatedAt: Date.now(),
+      });
+    });
+    const userB = t.withIdentity({ subject: "user_b", email: "b@example.com" });
+
+    await expect(
+      userB.mutation(api.records.bulkUpdateRecords, {
+        ids: [ownRecordId, othersSharedId],
+        data: { visibility: "SHARED" },
+      }),
+    ).rejects.toThrow("Forbidden");
+
+    await t.run(async (ctx) => {
+      const own = await ctx.db.get(ownRecordId);
+      expect(own?.visibility).toBe("PRIVATE");
+    });
+  });
 });
 
 describe("件数境界値テスト", () => {
