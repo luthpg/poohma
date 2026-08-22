@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const Visibility = ["PRIVATE", "SHARED"] as const;
+export const OwnerType = ["user", "family"] as const;
 
 /** Base64形式の正規表現（標準Base64、空文字は不可） */
 const BASE64_REGEX = /^[A-Za-z0-9+/]+={0,2}$/;
@@ -58,7 +58,7 @@ export const CredentialInputSchema = z
       });
     }
 
-    // IV があるのに hint が空はあり得ない
+    // IV があるなら passwordHint も必須
     if (!hasHint && hasIv) {
       ctx.addIssue({
         code: "custom",
@@ -67,7 +67,7 @@ export const CredentialInputSchema = z
       });
     }
 
-    // 両方あるなら AEAD スキーマで検証
+    // AEAD (AES-GCM) データの検証
     if (hasHint && hasIv) {
       const result = AeadDataSchema.safeParse({
         iv: data.passwordHintIv,
@@ -76,35 +76,28 @@ export const CredentialInputSchema = z
       if (!result.success) {
         for (const issue of result.error.issues) {
           ctx.addIssue({
-            ...issue,
-            path:
-              issue.path[0] === "iv" ? ["passwordHintIv"] : ["passwordHint"],
+            code: "custom",
+            message: issue.message,
+            path: issue.path.includes("iv")
+              ? ["passwordHintIv"]
+              : ["passwordHint"],
           });
         }
       }
     }
 
-    const hasDekEncrypted = !!data.passwordHintDekEncrypted;
+    // DEK暗号データの検証（封筒暗号化）
+    const hasDek = !!data.passwordHintDekEncrypted;
     const hasDekIv = !!data.passwordHintDekIv;
-
-    if (hasDekEncrypted && !hasDekIv) {
+    if (hasDek !== hasDekIv) {
       ctx.addIssue({
         code: "custom",
-        message: "DEK暗号データが存在しますがDEK IVが不足しています",
-        path: ["passwordHintDekIv"],
-      });
-    }
-
-    if (!hasDekEncrypted && hasDekIv) {
-      ctx.addIssue({
-        code: "custom",
-        message: "DEK IVが存在しますがDEK暗号データが空です",
+        message:
+          "DEK暗号データとIVは両方指定するか、両方省略する必要があります",
         path: ["passwordHintDekEncrypted"],
       });
     }
-
-    // 両方あるなら AEAD スキーマで検証
-    if (hasDekEncrypted && hasDekIv) {
+    if (hasDek && hasDekIv) {
       const result = AeadDataSchema.safeParse({
         iv: data.passwordHintDekIv,
         ciphertext: data.passwordHintDekEncrypted,
@@ -112,11 +105,9 @@ export const CredentialInputSchema = z
       if (!result.success) {
         for (const issue of result.error.issues) {
           ctx.addIssue({
-            ...issue,
-            path:
-              issue.path[0] === "iv"
-                ? ["passwordHintDekIv"]
-                : ["passwordHintDekEncrypted"],
+            code: "custom",
+            message: issue.message,
+            path: ["passwordHintDekEncrypted"],
           });
         }
       }
@@ -139,7 +130,7 @@ export const RecordInputSchema = z.object({
     .string()
     .max(10000, "メモは10,000文字以内で入力してください")
     .optional(),
-  visibility: z.enum(Visibility),
+  ownerType: z.enum(OwnerType).optional(),
   credentials: z
     .array(CredentialInputSchema)
     .max(

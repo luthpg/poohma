@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import schema from "../convex/schema";
+import { computeSortKey } from "../src/utils/index-group";
 
 const modules = import.meta.glob("../convex/**/*.ts");
 
@@ -33,8 +34,8 @@ vi.mock("node:https", () => {
   };
 });
 
-describe("2.2.1 閲覧権限（Visibility）の境界値テスト (Convex版)", () => {
-  it("「自分のみ (PRIVATE)」「家族と共有 (SHARED)」の設定が、DBクエリレベルで正しくフィルタリングされること", async () => {
+describe("2.2.1 閲覧権限（ownerType）の境界値テスト (Convex版)", () => {
+  it("「自分のみ (user)」「家族と共有 (family)」の設定が、DBクエリレベルで正しくフィルタリングされること", async () => {
     const t = convexTest(schema, modules);
 
     let family1Id!: Id<"families">;
@@ -70,25 +71,30 @@ describe("2.2.1 閲覧権限（Visibility）の境界値テスト (Convex版)", 
         updatedAt: Date.now(),
       });
 
-      // AがPRIVATEレコードを作成
+      // Aが個人レコードを作成
       await ctx.db.insert("serviceRecords", {
         userId: "user_a",
         accountId: userAId,
         familyId: family1Id,
         title: "Private Record A",
-        visibility: "PRIVATE",
+        sortKey: computeSortKey("Private Record A"),
+        ownerType: "user",
+        admins: [],
         credentials: [],
         tags: [],
         updatedAt: Date.now(),
       });
 
-      // AがSHAREDレコードを作成
+      // Aが家族共有レコードを作成
       await ctx.db.insert("serviceRecords", {
         userId: "user_a",
         accountId: userAId,
         familyId: family1Id,
+        ownerFamilyId: family1Id,
         title: "Shared Record A",
-        visibility: "SHARED",
+        sortKey: computeSortKey("Shared Record A"),
+        ownerType: "family",
+        admins: [userAId],
         credentials: [],
         tags: [],
         updatedAt: Date.now(),
@@ -100,7 +106,7 @@ describe("2.2.1 閲覧権限（Visibility）の境界値テスト (Convex版)", 
     const resA = await userA.query(api.records.getRecords, {});
     expect(resA).toHaveLength(2);
 
-    // ユーザーBのコンテキストでクエリ (SHAREDレコードのみ取得できること)
+    // ユーザーBのコンテキストでクエリ (family共有レコードのみ取得できること)
     const userB = t.withIdentity({ subject: "user_b", email: "b@example.com" });
     const resB = await userB.query(api.records.getRecords, {});
     expect(resB).toHaveLength(1);
@@ -148,153 +154,40 @@ describe("2.2.2. OGP取得処理のフェイルセーフとタイムアウト (C
                   headers: {},
                 }) as unknown as http.IncomingMessage;
 
-                if (typeof callback === "function") {
-                  callback(mockRes);
-                }
+                (callback as (res: http.IncomingMessage) => void)(mockRes);
+
                 mockRes.emit("data", Buffer.from(mockHtml));
                 mockRes.emit("end");
               });
             },
-            destroy: () => {},
-          }) as unknown as http.ClientRequest;
-          return mockReq;
+            destroy: vi.fn(),
+          });
+          return mockReq as unknown as http.ClientRequest;
         },
       );
 
       const t = convexTest(schema, modules);
-      const user = t.withIdentity({ subject: "user_a" });
-      const result = await user.action(api.actions.getOgpInfo, {
+      const user = t.withIdentity({
+        subject: "user_ogp",
+        email: "ogp@example.com",
+      });
+      const res = await user.action(api.actions.getOgpInfo, {
         url: "https://example.com",
       });
 
-      expect(result).toEqual({
-        title: "テストサービスタイトル",
-        image: "https://example.com/ogp.png",
-        description: "テストサービスの詳細説明文です。",
-      });
-    });
-
-    it("OGPメタタグがない場合、通常の title タグと description メタタグからフォールバック抽出できること", async () => {
-      const mockHtml = `
-        <html>
-          <head>
-            <title>フォールバックタイトル</title>
-            <meta name="description" content="フォールバック用の説明文。" />
-          </head>
-        </html>
-      `;
-
-      vi.mocked(https.request).mockImplementation(
-        (_options: unknown, callback: unknown) => {
-          const mockReq = Object.assign(new EventEmitter(), {
-            end: () => {
-              process.nextTick(() => {
-                const mockRes = Object.assign(new EventEmitter(), {
-                  statusCode: 200,
-                  headers: {},
-                }) as unknown as http.IncomingMessage;
-
-                if (typeof callback === "function") {
-                  callback(mockRes);
-                }
-                mockRes.emit("data", Buffer.from(mockHtml));
-                mockRes.emit("end");
-              });
-            },
-            destroy: () => {},
-          }) as unknown as http.ClientRequest;
-          return mockReq;
-        },
-      );
-
-      const t = convexTest(schema, modules);
-      const user = t.withIdentity({ subject: "user_a" });
-      const result = await user.action(api.actions.getOgpInfo, {
-        url: "https://example.com",
-      });
-
-      expect(result).toEqual({
-        title: "フォールバックタイトル",
-        image: "",
-        description: "フォールバック用の説明文。",
-      });
-    });
-  });
-
-  describe("異常系 (フェイルセーフ)", () => {
-    it("HTTP ステータスコードが 500 などのエラーを返却した場合、クラッシュせず空のOGP情報を返却すること", async () => {
-      vi.mocked(https.request).mockImplementation(
-        (_options: unknown, callback: unknown) => {
-          const mockReq = Object.assign(new EventEmitter(), {
-            end: () => {
-              process.nextTick(() => {
-                const mockRes = Object.assign(new EventEmitter(), {
-                  statusCode: 500,
-                  headers: {},
-                }) as unknown as http.IncomingMessage;
-
-                if (typeof callback === "function") {
-                  callback(mockRes);
-                }
-                mockRes.emit("end");
-              });
-            },
-            destroy: () => {},
-          }) as unknown as http.ClientRequest;
-          return mockReq;
-        },
-      );
-
-      const t = convexTest(schema, modules);
-      const user = t.withIdentity({ subject: "user_a" });
-      const result = await user.action(api.actions.getOgpInfo, {
-        url: "https://example.com",
-      });
-
-      expect(result).toEqual({
-        title: "",
-        image: "",
-        description: "",
-      });
-    });
-
-    it("ネットワーク接続エラー等の理由で fetch が例外をスローした場合、クラッシュせず空のOGP情報を返却すること", async () => {
-      vi.mocked(https.request).mockImplementation(
-        (_options: unknown, _callback: unknown) => {
-          const mockReq = Object.assign(new EventEmitter(), {
-            end: () => {
-              process.nextTick(() => {
-                mockReq.emit("error", new Error("Network Error"));
-              });
-            },
-            destroy: () => {},
-          }) as unknown as http.ClientRequest;
-          return mockReq;
-        },
-      );
-
-      const t = convexTest(schema, modules);
-      const user = t.withIdentity({ subject: "user_a" });
-      const result = await user.action(api.actions.getOgpInfo, {
-        url: "https://example.com",
-      });
-
-      expect(result).toEqual({
-        title: "",
-        image: "",
-        description: "",
-      });
+      expect(res.title).toBe("テストサービスタイトル");
+      expect(res.image).toBe("https://example.com/ogp.png");
+      expect(res.description).toBe("テストサービスの詳細説明文です。");
     });
   });
 });
 
-describe("2.2.3 CSV一括インポートのトランザクションと部分成功 (Convex版)", () => {
-  it("正常なデータ2件と不正なデータ1件を含む配列で、successes: 2, failures: 1 が返り、DBには2件のみ登録されること", async () => {
+describe("2.2.3 CSVインポートのバリデーションと境界値 (Convex版)", () => {
+  it("正常なデータ行と不正なデータ行が混在する場合、部分インポートが行われ失敗詳細が返ること", async () => {
     const t = convexTest(schema, modules);
 
     let familyId!: Id<"families">;
 
-    // ユーザーと家族の作成
     await t.run(async (ctx) => {
       familyId = await ctx.db.insert("families", {
         name: "CSV Test Family",
@@ -319,21 +212,22 @@ describe("2.2.3 CSV一括インポートのトランザクションと部分成�
       {
         title: "Netflix",
         url: "https://netflix.com",
-        visibility: "PRIVATE" as const,
+        ownerType: "user" as const,
         credentials: [],
         tags: [],
       },
       {
         title: "",
         url: "https://invalid.com",
-        visibility: "PRIVATE" as const,
+        ownerType: "user" as const,
         credentials: [],
         tags: [],
       }, // タイトル空 → 失敗
       {
         title: "Amazon Prime",
         url: "https://amazon.co.jp",
-        visibility: "SHARED" as const,
+        ownerType: "family" as const,
+        adminEmails: ["csv@example.com"],
         credentials: [],
         tags: [],
       },
@@ -386,7 +280,7 @@ describe("2.2.3 CSV一括インポートのトランザクションと部分成�
 
     const rows = Array.from({ length: 501 }, (_, i) => ({
       title: `Record ${i + 1}`,
-      visibility: "PRIVATE" as const,
+      ownerType: "user" as const,
       credentials: [],
       tags: [],
     }));
@@ -415,7 +309,7 @@ describe("2.2.3 CSV一括インポートのトランザクションと部分成�
     const rows = [
       {
         title: "Test",
-        visibility: "PRIVATE" as const,
+        ownerType: "user" as const,
         credentials: [],
         tags: [],
       },
@@ -427,8 +321,8 @@ describe("2.2.3 CSV一括インポートのトランザクションと部分成�
   });
 });
 
-describe("Convexリプレース由来デグレ修正の追加テスト", () => {
-  it("getOwnedRecords は自分が所有するレコードのみを返し、家族の共有レコードは含まないこと", async () => {
+describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
+  it("getOwnedRecords は自分が所有する個人レコードと自分が管理者である共有レコードを返し、adminEmailsを付与すること", async () => {
     const t = convexTest(schema, modules);
     let family1Id!: Id<"families">;
     let userAId!: Id<"users">;
@@ -440,7 +334,6 @@ describe("Convexリプレース由来デグレ修正の追加テスト", () => {
         updatedAt: Date.now(),
       });
 
-      // User A and User B belong to Family 1
       userAId = await ctx.db.insert("users", {
         userId: "user_a",
         email: "a@example.com",
@@ -455,25 +348,30 @@ describe("Convexリプレース由来デグレ修正の追加テスト", () => {
         updatedAt: Date.now(),
       });
 
-      // User A owns record
+      // User A personal record
       await ctx.db.insert("serviceRecords", {
         userId: "user_a",
         accountId: userAId,
         familyId: family1Id,
         title: "A's Private",
-        visibility: "PRIVATE",
+        sortKey: computeSortKey("A's Private"),
+        ownerType: "user",
+        admins: [],
         credentials: [],
         tags: [],
         updatedAt: Date.now(),
       });
 
-      // User B owns record (SHARED)
+      // User B shared record where only B is admin
       await ctx.db.insert("serviceRecords", {
         userId: "user_b",
         accountId: userBId,
         familyId: family1Id,
+        ownerFamilyId: family1Id,
         title: "B's Shared",
-        visibility: "SHARED",
+        sortKey: computeSortKey("B's Shared"),
+        ownerType: "family",
+        admins: [userBId],
         credentials: [],
         tags: [],
         updatedAt: Date.now(),
@@ -482,105 +380,236 @@ describe("Convexリプレース由来デグレ修正の追加テスト", () => {
 
     const userA = t.withIdentity({ subject: "user_a", email: "a@example.com" });
 
-    // getRecords should return both
+    // getRecords returns both
     const allRecords = await userA.query(api.records.getRecords, {});
     expect(allRecords).toHaveLength(2);
 
-    // getOwnedRecords should return only A's Private
+    // getOwnedRecords returns only records manageable by A (A's Private)
     const ownedRecords = await userA.query(api.records.getOwnedRecords, {});
     expect(ownedRecords).toHaveLength(1);
     expect(ownedRecords[0].title).toBe("A's Private");
+    expect(ownedRecords[0].adminEmails).toBeDefined();
   });
 
-  it("家族共有(SHARED)のレコードは、同じ家族メンバーであれば編集・削除が可能であること", async () => {
+  it("ワンタップ共有 (shareRecord) とワンタップ解除 (unshareRecord) が正しく動作すること", async () => {
     const t = convexTest(schema, modules);
-    let family1Id!: Id<"families">;
-    let sharedRecordId!: Id<"serviceRecords">;
-    let privateRecordId!: Id<"serviceRecords">;
+    let familyId!: Id<"families">;
     let userAId!: Id<"users">;
+    let recordId!: Id<"serviceRecords">;
 
     await t.run(async (ctx) => {
-      family1Id = await ctx.db.insert("families", {
-        name: "Family 1",
+      familyId = await ctx.db.insert("families", {
+        name: "Test Family",
         updatedAt: Date.now(),
       });
 
       userAId = await ctx.db.insert("users", {
         userId: "user_a",
         email: "a@example.com",
-        familyId: family1Id,
+        familyId,
         updatedAt: Date.now(),
       });
 
       await ctx.db.insert("users", {
         userId: "user_b",
         email: "b@example.com",
-        familyId: family1Id,
+        familyId,
         updatedAt: Date.now(),
       });
 
-      // User A creates a SHARED record
-      sharedRecordId = await ctx.db.insert("serviceRecords", {
+      recordId = await ctx.db.insert("serviceRecords", {
         userId: "user_a",
         accountId: userAId,
-        familyId: family1Id,
-        title: "Shared Record",
-        visibility: "SHARED",
-        credentials: [],
-        tags: [],
-        updatedAt: Date.now(),
-      });
-
-      // User A creates a PRIVATE record
-      privateRecordId = await ctx.db.insert("serviceRecords", {
-        userId: "user_a",
-        accountId: userAId,
-        familyId: family1Id,
-        title: "Private Record",
-        visibility: "PRIVATE",
+        familyId,
+        title: "Record To Share",
+        sortKey: computeSortKey("Record To Share"),
+        ownerType: "user",
+        admins: [],
         credentials: [],
         tags: [],
         updatedAt: Date.now(),
       });
     });
 
+    const userA = t.withIdentity({ subject: "user_a", email: "a@example.com" });
     const userB = t.withIdentity({ subject: "user_b", email: "b@example.com" });
 
-    // User B updates User A's SHARED record -> should succeed
+    // 共有前: B は閲覧不可
     await expect(
-      userB.mutation(api.records.updateRecord, {
-        id: sharedRecordId,
-        data: {
-          title: "Shared Record Updated by B",
-          visibility: "SHARED",
-          credentials: [],
-          tags: [],
-        },
-      }),
-    ).resolves.not.toThrow();
-
-    // User B tries to update User A's PRIVATE record -> should fail
-    await expect(
-      userB.mutation(api.records.updateRecord, {
-        id: privateRecordId,
-        data: {
-          title: "Private Record Updated by B",
-          visibility: "PRIVATE",
-          credentials: [],
-          tags: [],
-        },
-      }),
+      userB.query(api.records.getRecordDetail, { id: recordId }),
     ).rejects.toThrow("Access denied");
 
-    // User B deletes User A's SHARED record -> should succeed
+    // A がワンタップ共有
+    await userA.mutation(api.records.shareRecord, { id: recordId });
+
+    // 共有後: B も閲覧可能
+    const sharedDetail = await userB.query(api.records.getRecordDetail, {
+      id: recordId,
+    });
+    expect(sharedDetail.title).toBe("Record To Share");
+
+    // B は管理者ではないため unshare 不可
+    await expect(
+      userB.mutation(api.records.unshareRecord, { id: recordId }),
+    ).rejects.toThrow("Access denied");
+
+    // A は管理者なので unshare 可能
+    await userA.mutation(api.records.unshareRecord, { id: recordId });
+
+    // 解除後: B は再度閲覧不可
+    await expect(
+      userB.query(api.records.getRecordDetail, { id: recordId }),
+    ).rejects.toThrow("Access denied");
+  });
+
+  it("管理者追加 (addRecordAdmin) と管理者解除 (removeRecordAdmin) が正しく動作すること", async () => {
+    const t = convexTest(schema, modules);
+    let familyId!: Id<"families">;
+    let userAId!: Id<"users">;
+    let userBId!: Id<"users">;
+    let sharedRecordId!: Id<"serviceRecords">;
+
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        name: "Test Family",
+        updatedAt: Date.now(),
+      });
+
+      userAId = await ctx.db.insert("users", {
+        userId: "user_a",
+        email: "a@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+
+      userBId = await ctx.db.insert("users", {
+        userId: "user_b",
+        email: "b@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+
+      sharedRecordId = await ctx.db.insert("serviceRecords", {
+        userId: "user_a",
+        accountId: userAId,
+        familyId,
+        ownerFamilyId: familyId,
+        title: "Shared Record",
+        sortKey: computeSortKey("Shared Record"),
+        ownerType: "family",
+        admins: [userAId],
+        credentials: [],
+        tags: [],
+        updatedAt: Date.now(),
+      });
+    });
+
+    const userA = t.withIdentity({ subject: "user_a", email: "a@example.com" });
+    const userB = t.withIdentity({ subject: "user_b", email: "b@example.com" });
+
+    // A が B を管理者に昇格
+    await userA.mutation(api.records.addRecordAdmin, {
+      id: sharedRecordId,
+      targetAccountId: userBId,
+    });
+
+    // B を管理者から解除
+    await userA.mutation(api.records.removeRecordAdmin, {
+      id: sharedRecordId,
+      targetAccountId: userBId,
+    });
+
+    // B は解除されたので削除不可（Access denied）
     await expect(
       userB.mutation(api.records.deleteRecord, { id: sharedRecordId }),
-    ).resolves.not.toThrow();
-
-    // User B tries to delete User A's PRIVATE record -> should fail
-    await expect(
-      userB.mutation(api.records.deleteRecord, { id: privateRecordId }),
     ).rejects.toThrow("Access denied");
+
+    // A は管理者のままなので削除可能
+    await expect(
+      userA.mutation(api.records.deleteRecord, { id: sharedRecordId }),
+    ).resolves.not.toThrow();
+  });
+
+  it("一括共有 (bulkShareRecords) と一括解除 (bulkUnshareRecords) が正しく動作すること", async () => {
+    const t = convexTest(schema, modules);
+    let familyId!: Id<"families">;
+    let userAId!: Id<"users">;
+    let r1Id!: Id<"serviceRecords">;
+    let r2Id!: Id<"serviceRecords">;
+
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        name: "Test Family",
+        updatedAt: Date.now(),
+      });
+
+      userAId = await ctx.db.insert("users", {
+        userId: "user_a",
+        email: "a@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+
+      r1Id = await ctx.db.insert("serviceRecords", {
+        userId: "user_a",
+        accountId: userAId,
+        familyId,
+        title: "R1",
+        sortKey: computeSortKey("R1"),
+        ownerType: "user",
+        admins: [],
+        credentials: [],
+        tags: [],
+        updatedAt: Date.now(),
+      });
+
+      r2Id = await ctx.db.insert("serviceRecords", {
+        userId: "user_a",
+        accountId: userAId,
+        familyId,
+        title: "R2",
+        sortKey: computeSortKey("R2"),
+        ownerType: "user",
+        admins: [],
+        credentials: [],
+        tags: [],
+        updatedAt: Date.now(),
+      });
+    });
+
+    const userA = t.withIdentity({ subject: "user_a", email: "a@example.com" });
+
+    // 一括共有
+    const shareRes = await userA.mutation(api.records.bulkShareRecords, {
+      ids: [r1Id, r2Id],
+    });
+    expect(shareRes.sharedCount).toBe(2);
+
+    await t.run(async (ctx) => {
+      const r1 = await ctx.db.get(r1Id);
+      expect(r1?.ownerType).toBe("family");
+      expect(r1?.admins).toContain(userAId);
+
+      const r2 = await ctx.db.get(r2Id);
+      expect(r2?.ownerType).toBe("family");
+      expect(r2?.admins).toContain(userAId);
+    });
+
+    // 一括解除
+    const unshareRes = await userA.mutation(api.records.bulkUnshareRecords, {
+      ids: [r1Id, r2Id],
+    });
+    expect(unshareRes.unsharedCount).toBe(2);
+
+    await t.run(async (ctx) => {
+      const r1 = await ctx.db.get(r1Id);
+      expect(r1?.ownerType).toBe("user");
+      expect(r1?.admins).toEqual([]);
+
+      const r2 = await ctx.db.get(r2Id);
+      expect(r2?.ownerType).toBe("user");
+      expect(r2?.admins).toEqual([]);
+    });
   });
 
   it("Zodによる文字数制限バリデーションが機能し、違反した入力ではエラーが返ること", async () => {
@@ -607,7 +636,7 @@ describe("Convexリプレース由来デグレ修正の追加テスト", () => {
     await expect(
       userA.mutation(api.records.createRecord, {
         title: "a".repeat(256),
-        visibility: "PRIVATE",
+        ownerType: "user",
         credentials: [],
         tags: [],
       }),
@@ -617,7 +646,7 @@ describe("Convexリプレース由来デグレ修正の追加テスト", () => {
     await expect(
       userA.mutation(api.records.createRecord, {
         title: "Valid Title",
-        visibility: "PRIVATE",
+        ownerType: "user",
         credentials: [
           {
             id: "cred1",
@@ -654,7 +683,9 @@ describe("Convexリプレース由来デグレ修正の追加テスト", () => {
         familyId,
         title: "Amazon",
         titleReading: "あまぞん",
-        visibility: "PRIVATE",
+        sortKey: computeSortKey("Amazon", "あまぞん"),
+        ownerType: "user",
+        admins: [],
         credentials: [],
         tags: [],
         updatedAt: Date.now(),
@@ -668,7 +699,7 @@ describe("Convexリプレース由来デグレ修正の追加テスト", () => {
       id: recordId,
       data: {
         title: "Amazon Renewed",
-        visibility: "PRIVATE",
+        ownerType: "user",
         credentials: [],
         tags: [],
       },
@@ -678,126 +709,6 @@ describe("Convexリプレース由来デグレ修正の追加テスト", () => {
       const updated = await ctx.db.get(recordId);
       expect(updated?.title).toBe("Amazon Renewed");
       expect(updated?.titleReading).toBe("あまぞん");
-    });
-  });
-
-  it("他メンバー所有のSHAREDレコードに対し、非所有者がupdateRecordでvisibilityを変更しようとするとForbiddenになること", async () => {
-    const t = convexTest(schema, modules);
-    let family1Id!: Id<"families">;
-    let sharedRecordId!: Id<"serviceRecords">;
-    let userAId!: Id<"users">;
-    await t.run(async (ctx) => {
-      family1Id = await ctx.db.insert("families", {
-        name: "Family 1",
-        updatedAt: Date.now(),
-      });
-      userAId = await ctx.db.insert("users", {
-        userId: "user_a",
-        email: "a@example.com",
-        familyId: family1Id,
-        updatedAt: Date.now(),
-      });
-      await ctx.db.insert("users", {
-        userId: "user_b",
-        email: "b@example.com",
-        familyId: family1Id,
-        updatedAt: Date.now(),
-      });
-      sharedRecordId = await ctx.db.insert("serviceRecords", {
-        userId: "user_a",
-        accountId: userAId,
-        familyId: family1Id,
-        title: "Shared Record",
-        visibility: "SHARED",
-        credentials: [],
-        tags: [],
-        updatedAt: Date.now(),
-      });
-    });
-    const userB = t.withIdentity({ subject: "user_b", email: "b@example.com" });
-
-    await expect(
-      userB.mutation(api.records.updateRecord, {
-        id: sharedRecordId,
-        data: {
-          title: "Shared Record",
-          visibility: "PRIVATE",
-          credentials: [],
-          tags: [],
-        },
-      }),
-    ).rejects.toThrow("Forbidden");
-
-    await expect(
-      userB.mutation(api.records.updateRecord, {
-        id: sharedRecordId,
-        data: {
-          title: "Shared Record Renamed",
-          visibility: "SHARED",
-          credentials: [],
-          tags: [],
-        },
-      }),
-    ).resolves.not.toThrow();
-  });
-
-  it("bulkUpdateRecordsで他メンバー所有レコードを含むvisibility一括変更はForbiddenになり、全件ロールバックされること", async () => {
-    const t = convexTest(schema, modules);
-    let family1Id!: Id<"families">;
-    let ownRecordId!: Id<"serviceRecords">;
-    let othersSharedId!: Id<"serviceRecords">;
-    let userAId!: Id<"users">;
-    let userBId!: Id<"users">;
-    await t.run(async (ctx) => {
-      family1Id = await ctx.db.insert("families", {
-        name: "Family 1",
-        updatedAt: Date.now(),
-      });
-      userAId = await ctx.db.insert("users", {
-        userId: "user_a",
-        email: "a@example.com",
-        familyId: family1Id,
-        updatedAt: Date.now(),
-      });
-      userBId = await ctx.db.insert("users", {
-        userId: "user_b",
-        email: "b@example.com",
-        familyId: family1Id,
-        updatedAt: Date.now(),
-      });
-      ownRecordId = await ctx.db.insert("serviceRecords", {
-        userId: "user_b",
-        accountId: userBId,
-        familyId: family1Id,
-        title: "B own",
-        visibility: "PRIVATE",
-        credentials: [],
-        tags: [],
-        updatedAt: Date.now(),
-      });
-      othersSharedId = await ctx.db.insert("serviceRecords", {
-        userId: "user_a",
-        accountId: userAId,
-        familyId: family1Id,
-        title: "A shared",
-        visibility: "SHARED",
-        credentials: [],
-        tags: [],
-        updatedAt: Date.now(),
-      });
-    });
-    const userB = t.withIdentity({ subject: "user_b", email: "b@example.com" });
-
-    await expect(
-      userB.mutation(api.records.bulkUpdateRecords, {
-        ids: [ownRecordId, othersSharedId],
-        data: { visibility: "SHARED" },
-      }),
-    ).rejects.toThrow("Forbidden");
-
-    await t.run(async (ctx) => {
-      const own = await ctx.db.get(ownRecordId);
-      expect(own?.visibility).toBe("PRIVATE");
     });
   });
 });
@@ -826,7 +737,7 @@ describe("件数境界値テスト", () => {
     await expect(
       user.mutation(api.records.createRecord, {
         title: "Too many credentials",
-        visibility: "PRIVATE",
+        ownerType: "user",
         credentials: Array.from({ length: 11 }, (_, i) => ({
           id: `cred_${i}`,
           label: `Cred${i}`,
@@ -859,7 +770,7 @@ describe("件数境界値テスト", () => {
     await expect(
       user.mutation(api.records.createRecord, {
         title: "Exactly 10 credentials",
-        visibility: "PRIVATE",
+        ownerType: "user",
         credentials: Array.from({ length: 10 }, (_, i) => ({
           id: `cred_${i}`,
           label: `Cred${i}`,

@@ -208,17 +208,19 @@ serviceRecords 1 ── * credentials(内包配列)
 | --------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | title                       | string                              | サービス名                                                                                                                                            |
 | titleReading                | string(optional)                    | 読み仮名（五十音インデックス用）                                                                                                                                 |
+| sortKey                     | string(optional)                    | 五十音順・アルファベット順ソートキー（グループ順位 2 桁ゼロ埋めプレフィックス + NFKC/ひらがな正規化文字列）。backfill 完了までは optional |
 | url                         | string(optional)                    | サービスURL                                                                                                                                          |
 | ogpImage / ogpDescription   | string(optional)                    | OGP自動取得結果                                                                                                                                        |
 | customIcon                  | string(optional)                    | ファビコン取得失敗時のフォールバック表示（絵文字＋カラーコード等、FR-REC-19）                                                                                                      |
 | memo                        | string(optional)                    | メモ（最大10,000文字）                                                                                                                                   |
-| visibility                  | "PRIVATE" \| "SHARED"               | 公開範囲                                                                                                                                             |
+| ownerType                   | ("user" \| "family")(optional)      | 所有者種別（"user": 個人所有, "family": 家族共有）。backfill 完了までは optional                                                                   |
+| ownerFamilyId               | Id<families>(optional)              | 共有レコードが属する家族ID（ownerType === "family" の場合）                                                                                        |
+| admins                      | Id<users>[](optional)               | レコード管理者（PoohMa accountId）配列。共有解除や削除、管理者変更権限を持つ。backfill 完了までは optional                                         |
 | userId                      | string                              | 作成者の Firebase UID                                                                                                                                |
-| accountId                   | Id<users>                           | 作成者の PoohMa Account ID（所有権・PRIVATE境界）                                                                                                          |
-| familyId                    | Id<families>(optional)              | 所属家族                                                                                                                                             |
+| accountId                   | Id<users>                           | 作成者の PoohMa Account ID（所有権・個人レコード境界）                                                                                                     |
+| familyId                    | Id<families>(optional)              | 暗号化スコープ・所属家族ID                                                                                                                          |
 | credentials                 | object\[]                           | 認証情報配列（下記、最大10件）                                                                                                                                 |
 | tags                        | string\[]                           | タグ                                                                                                                                               |
-| accessList                  | string\[]                           | アクセス制御用インデックスキー。 `owner:{userId}` を常に含み、visibility が SHARED の場合は `family:{familyId}` も含む。一覧・タグ集計クエリはこの配列に対する by\_access インデックスで絞り込む（NFR-PERF-03） |
 | isPinned                    | boolean                             | ピン留め状態（デフォルトfalse、FR-REC-18）                                                                                                                     |
 | isArchived                  | boolean                             | アーカイブ（非表示）状態（デフォルトfalse、FR-REC-23）                                                                                                               |
 | needsUpdate                 | boolean                             | 「要更新」フラグ（デフォルトfalse、FR-REC-17）                                                                                                                   |
@@ -227,7 +229,7 @@ serviceRecords 1 ── * credentials(内包配列)
 | lastViewedAt / lastViewedBy | number(optional) / string(optional) | 直近の閲覧日時・閲覧者（FR-REC-16、簡易サマリ用。詳細な履歴は recordAccessLog を参照）                                                                                         |
 | updatedAt                   | number                              | 更新日時                                                                                                                                             |
 
-インデックス: by\_userId, by\_accountId, by\_familyId, by\_familyId\_visibility, by\_updatedAt, **by\_access（accessList用、NFR-PERF-03で追加）**
+インデックス: by\_family\_sortKey, by\_ownerType\_accountId, by\_ownerType\_ownerFamilyId, by\_userId, by\_accountId
 
 credentials要素：
 
@@ -329,18 +331,27 @@ export const updateRecord = familyBoundMutation({
 ### 5.4 レコード単位アクセス制御（convex/rls.ts）
 
 ```
-requireRecordAccess(user, record):
+requireContentAccess(user, record):
   // 家族境界チェック（レコードが家族に属している場合、ユーザーも同一家族でなければならない）
   if record.familyId !== undefined && record.familyId !== user.familyId:
     Access denied エラーを送出
 
-  // 所有権または共有権限チェック
-  isOwner = record.accountId === user._id
-  isFamilyShared = record.visibility === "SHARED" && record.familyId === user.familyId
+  // 閲覧・編集権限チェック: 家族共有レコード、または本人の個人レコード
+  isOwner = record.ownerType === "user" && record.accountId === user._id
+  isFamilyShared = record.ownerType === "family" && record.ownerFamilyId === user.familyId
   isOwner または isFamilyShared でなければ Access denied エラーを送出
 
-サーバー側の getRecordDetail / updateRecord / deleteRecord / deleteRecords 等、
-すべてのレコード単体操作でこのチェックを必ず経由する。
+requireAdminAccess(user, record):
+  // 削除・共有解除・管理者変更権限チェック
+  if record.ownerType === "user":
+    if record.accountId !== user._id:
+      Access denied エラーを送出
+  else: // ownerType === "family"
+    if record.ownerFamilyId !== user.familyId || !(record.admins ?? []).includes(user._id):
+      Access denied エラーを送出
+
+サーバー側の getRecordDetail / updateRecord は requireContentAccess、
+deleteRecord / deleteRecords / unshareRecord / addRecordAdmin / removeRecordAdmin は requireAdminAccess を必ず経由する。
 ```
 
 ### 5.5 セッション失効時の入力保護（FR-AUTH-07）
@@ -602,17 +613,21 @@ decryptHint/encryptHint 側でマスターキー直接暗号化にフォール�
 
 | 関数                                                                | 種別           | 認可            | 概要                                                                                                                                                      |
 | ----------------------------------------------------------------- | ------------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| getRecords                                                        | Query        | authenticated | 一覧取得。accessList への by\_access インデックス検索＋ `paginate()` によるページネーションで取得し、検索・タグ・所有者フィルタ（すべて／自分／共有, FR-REC-20）・並び替えに対応する（NFR-PERF-03）。既定でisArchived=falseのみ返す |
+| getRecords                                                        | Query        | authenticated | 一覧取得。家族所属時は by\_family\_sortKey インデックスで同一家族レコードを取得し、非所属時は by\_ownerType\_accountId で個人レコードを取得。フルテーブルスキャンを完全排除（Issue #137）。検索・タグ・所有者フィルタ・並び替えに対応。既定でisArchived=falseのみ返す |
 | getArchivedRecords                                                | Query        | authenticated | アーカイブ済みレコードの一覧取得（FR-REC-23）                                                                                                                             |
-| getRecordDetail                                                   | Query        | authenticated | 詳細取得（rls.tsによるアクセス制御）。取得時にrecordAccessLogへVIEWEDを記録し、lastViewedAt/Byを更新                                                                                 |
-| getAvailableTags                                                  | Query        | authenticated | 閲覧可能レコードから使用中タグ一覧を抽出（by\_accessインデックス経由）                                                                                                                |
-| getOwnedRecords                                                   | Query        | authenticated | 自分が所有する全レコード取得（CSVエクスポート用。認証情報10件超のレコードがある場合はフラグを付けて返し、クライアント側で警告表示に用いる、FR-CSV-01）                                                                      |
+| getRecordDetail                                                   | Query        | authenticated | 詳細取得（rls.tsによるrequireContentAccess制御）。取得時にrecordAccessLogへVIEWEDを記録し、lastViewedAt/Byを更新                                                                     |
+| getAvailableTags                                                  | Query        | authenticated | 閲覧可能レコードから使用中タグ一覧を抽出（by\_family\_sortKey経由）                                                                                                    |
+| getOwnedRecords                                                   | Query        | authenticated | 自分が管理可能な全レコード取得（個人レコード＋自分が管理者の共有レコード、CSVエクスポート用）                                                                                       |
+| shareRecord                                                       | Mutation     | familyBound   | ワンタップで個人レコードを家族共有レコード（ownerType: "family", admins: [user._id]）に昇格                                                                                  |
+| unshareRecord                                                     | Mutation     | familyBound   | ワンタップで共有レコードを個人レコード（ownerType: "user", admins: []）に戻す（管理者限定）                                                                                 |
+| addRecordAdmin / removeRecordAdmin                                | Mutation     | familyBound   | 共有レコードの共同管理者の追加・解除（管理者限定）                                                                                                                           |
+| bulkShareRecords / bulkUnshareRecords                             | Mutation     | familyBound   | 選択した個人レコードの一括共有 / 共有レコードの一括共有解除                                                                                                                 |
 | previewCsvImport                                                  | Query/Action | familyBound   | インポート予定のCSV行と既存データ（URL＋タイトルで突合）を比較し、行ごとに新規／上書き／スキップを判定して返す（FR-CSV-07、9.7参照）                                                                             |
-| createRecord                                                      | Mutation     | familyBound   | レコード新規作成（zodによるサーバー再検証、accessList自動算出、credentials最大10件チェック）                                                                                             |
-| updateRecord                                                      | Mutation     | familyBound   | レコード更新（rls.tsチェック、visibility変更時はaccessListも再算出）                                                                                                         |
-| deleteRecord / deleteRecords                                      | Mutation     | familyBound   | 単体／一括削除                                                                                                                                                 |
-| importRecords                                                     | Mutation     | familyBound   | CSVインポート（最大500件、行ごとのバリデーション結果を返却）                                                                                                                       |
-| bulkUpdateRecords                                                 | Mutation     | familyBound   | 一括タグ付与／可視性変更（可視性変更はクライアント側で確認モーダルを経由してから呼び出す、FR-REC-12）                                                                                                 |
+| createRecord                                                      | Mutation     | familyBound   | レコード新規作成（zodによるサーバー再検証、sortKey自動算出、ownerType: "user" \| "family"、credentials最大10件チェック）                                                                   |
+| updateRecord                                                      | Mutation     | familyBound   | レコード更新（rls.tsチェック、sortKey再算出、共有解除時は管理者権限を要求）                                                                                                 |
+| deleteRecord / deleteRecords                                      | Mutation     | familyBound   | 単体／一括削除（requireAdminAccessチェック、非管理者の共有レコード削除を防止）                                                                                              |
+| importRecords                                                     | Mutation     | familyBound   | CSVインポート（最大500件、家族内メールアドレスの厳格突合、行ごとのバリデーション結果を返却）                                                                                |
+| bulkUpdateRecords                                                 | Mutation     | familyBound   | 一括タグ付与／所有設定変更（所有設定変更は確認モーダルを経由）                                                                                                              |
 | togglePin                                                         | Mutation     | familyBound   | isPinnedの切り替え（FR-REC-18）                                                                                                                                |
 | archiveRecord / unarchiveRecord                                   | Mutation     | familyBound   | isArchivedの切り替え（FR-REC-23）                                                                                                                              |
 | requestUpdate                                                     | Mutation     | familyBound   | needsUpdate等を設定し、オーナーへ通知メールを送信（FR-REC-17）                                                                                                               |

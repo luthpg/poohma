@@ -51,10 +51,45 @@ export type IndexGroupKey = (typeof ALL_INDEX_GROUPS)[number];
 /**
  * カタカナを全角ひらがなに変換する
  */
-function katakanaToHiragana(str: string): string {
+export function katakanaToHiragana(str: string): string {
   return str.replace(/[\u30a1-\u30f6]/g, (match) =>
     String.fromCharCode(match.charCodeAt(0) - 0x60),
   );
+}
+
+/**
+ * サービスレコードのソートキー（グループ順位 2 桁ゼロ埋めプレフィックス + 正規化文字列）を生成
+ */
+export function computeSortKey(
+  input: string | { titleReading?: string; title: string },
+  titleReading?: string,
+): string {
+  const record =
+    typeof input === "string" ? { title: input, titleReading } : input;
+  const rawText = (record.titleReading || record.title || "").trim();
+  if (!rawText) return "99_";
+
+  const groupKey = getIndexGroupKey(record);
+  let rank = 99;
+  const hIndex = HIRAGANA_GROUPS.indexOf(
+    groupKey as (typeof HIRAGANA_GROUPS)[number],
+  );
+  if (hIndex !== -1) {
+    rank = hIndex;
+  } else {
+    const aIndex = ALPHABET_GROUPS.indexOf(
+      groupKey as (typeof ALPHABET_GROUPS)[number],
+    );
+    if (aIndex !== -1) {
+      rank = 10 + aIndex;
+    }
+  }
+
+  const prefix = rank.toString().padStart(2, "0");
+  const normalized = katakanaToHiragana(
+    rawText.normalize("NFKC"),
+  ).toLowerCase();
+  return `${prefix}_${normalized}`;
 }
 
 /**

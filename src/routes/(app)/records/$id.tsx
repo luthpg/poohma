@@ -6,7 +6,7 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
-import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Share2, Trash2, Users } from "lucide-react";
 import { type SubmitEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
@@ -23,9 +23,18 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { TagInput } from "@/components/ui/tag-input";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAccount } from "@/hooks/useAccount";
 import { MAX_CREDENTIALS_PER_RECORD } from "@/utils/schemas";
 
@@ -91,6 +100,10 @@ function RecordDetailWrapper() {
     api.records.getRecordDetail,
     isAuthenticated ? { id, accountId: activeAccountId || undefined } : "skip",
   );
+  const familyMembers = useQuery(
+    api.families.getFamilyMembers,
+    isAuthenticated ? { accountId: activeAccountId || undefined } : "skip",
+  );
 
   if (record === undefined || availableTags === undefined) {
     return <RecordDetailPending />;
@@ -101,6 +114,7 @@ function RecordDetailWrapper() {
       record={record}
       availableTags={availableTags}
       activeAccountId={activeAccountId}
+      familyMembers={familyMembers?.users || []}
     />
   );
 }
@@ -109,22 +123,35 @@ function RecordDetailComponent({
   record,
   availableTags,
   activeAccountId,
+  familyMembers,
 }: {
   record: Doc<"serviceRecords"> & {
     user: {
       displayName?: string;
       email: string;
     } | null;
+    adminUsers?: { _id: Id<"users">; displayName?: string; email?: string }[];
   };
   availableTags: string[];
   activeAccountId?: Id<"users"> | null;
+  familyMembers: {
+    id: Id<"users">;
+    userId: string;
+    email?: string;
+    displayName?: string;
+  }[];
 }) {
-  const { user } = routeApi.useRouteContext();
-  const currentUserId = user?.id;
-  const isOwner = record.accountId
-    ? record.accountId === activeAccountId
-    : record.userId === currentUserId;
-  const isEditable = isOwner || record.visibility === "SHARED";
+  const effectiveAccountId = activeAccountId || record.accountId;
+  const isOwner =
+    (record.ownerType ?? "user") === "user" &&
+    record.accountId === effectiveAccountId;
+  const isShared = record.ownerType === "family";
+  const isAdmin =
+    isOwner ||
+    (isShared &&
+      (record.admins ?? []).includes(effectiveAccountId as Id<"users">));
+  const isEditable = isOwner || isShared;
+
   const navigate = useNavigate();
   const router = useRouter();
 
@@ -160,8 +187,8 @@ function RecordDetailComponent({
   );
   const [tags, setTags] = useState<string[]>(record.tags);
   const [memo, setMemo] = useState(record.memo || "");
-  const [visibility, setVisibility] = useState<"PRIVATE" | "SHARED">(
-    record.visibility,
+  const [ownerType, setOwnerType] = useState<"user" | "family">(
+    record.ownerType ?? "user",
   );
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingOgp, setIsFetchingOgp] = useState(false);
@@ -179,6 +206,7 @@ function RecordDetailComponent({
   const getFurigana = useAction(api.actions.getFurigana);
   const updateRecord = useMutation(api.records.updateRecord);
   const deleteRecord = useMutation(api.records.deleteRecord);
+  const shareRecord = useMutation(api.records.shareRecord);
 
   // ルビ取得リクエストを無効化
   const invalidateFuriganaRequest = () => {
@@ -270,19 +298,27 @@ function RecordDetailComponent({
       { label: "", loginId: "", passwordHint: "" },
     ]);
   };
-  const { encryptHint, decryptHint, masterKey, requireUnlock } = usePasscode();
+
+  const { decryptHint, encryptHint, requireUnlock, masterKey } = usePasscode();
 
   const handleEditStart = async () => {
     setTitle(record.title);
     setTitleReading(record.titleReading || "");
+    setShowAdvancedTitle(false);
+    setUrl(record.url || "");
+    setOgpImage(record.ogpImage || "");
+    setOgpDescription(record.ogpDescription || "");
+    setTags(record.tags);
+    setMemo(record.memo || "");
+    setOwnerType(record.ownerType ?? "user");
 
-    const hasEncrypted = record.credentials.some(
-      (c) => c.passwordHintIv && c.passwordHint,
+    const hasEncryptedHints = record.credentials.some(
+      (c) => c.passwordHint && c.passwordHintIv,
     );
 
-    if (hasEncrypted) {
+    if (hasEncryptedHints) {
       const unlocked = await requireUnlock();
-      if (!unlocked) return;
+      if (!unlocked) return; // user cancelled or failed
 
       const decryptedCreds = await Promise.all(
         record.credentials.map(async (c) => {
@@ -301,7 +337,7 @@ function RecordDetailComponent({
                 passwordHint: plain,
               };
             } catch (e) {
-              console.error("Decrypt failed during edit start", e);
+              console.error("Failed to decrypt on edit start", e);
               return {
                 id: c.id,
                 label: c.label || "",
@@ -416,7 +452,7 @@ function RecordDetailComponent({
           ogpImage: ogpImage || undefined,
           ogpDescription: ogpDescription || undefined,
           memo: memo || undefined,
-          visibility,
+          ownerType,
           credentials: encryptedCreds,
           tags,
         },
@@ -454,12 +490,12 @@ function RecordDetailComponent({
   if (isEditing) {
     return (
       <div className="mx-auto max-w-3xl p-6">
-        <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-6 bg-background/95 px-6 pb-4 pt-6 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center">
-          <h1 className="text-[24px] font-semibold tracking-geist-h2 text-foreground">
-            レコードを編集
-          </h1>
-        </div>
+        <h1 className="mb-8 text-[24px] font-semibold tracking-geist-h2 text-foreground">
+          サービス情報を編集
+        </h1>
+
         <form onSubmit={handleEditSubmit} className="space-y-8">
+          {/* URL・OGPセクション */}
           <section className="rounded-lg bg-card p-6 shadow-card transition-shadow">
             <div className="space-y-4">
               <div>
@@ -486,10 +522,8 @@ function RecordDetailComponent({
                     </div>
                   )}
                 </div>
-                <p className="mt-1.5 text-[12px] text-muted-foreground">
-                  入力後にフォーカスを外すと情報を自動取得します
-                </p>
               </div>
+
               <div>
                 <label
                   htmlFor="title-input"
@@ -577,6 +611,7 @@ function RecordDetailComponent({
             </div>
           </section>
 
+          {/* アカウント情報セクション */}
           <section className="rounded-lg bg-card p-6 shadow-card transition-shadow">
             <div className="mb-6 flex items-center justify-between border-b border-border pb-4">
               <h2 className="text-[18px] font-semibold text-foreground tracking-geist-ui">
@@ -591,6 +626,7 @@ function RecordDetailComponent({
                 + 追加する
               </button>
             </div>
+
             <div className="space-y-6">
               {credentials.map((cred, index) => (
                 <div
@@ -675,25 +711,50 @@ function RecordDetailComponent({
             </div>
           </section>
 
+          {/* 所有設定・タグ・メモ */}
           <section className="rounded-lg bg-card p-6 shadow-card transition-shadow space-y-6">
             <div>
-              <label
-                htmlFor="visibility-input"
-                className="block text-[14px] font-medium text-foreground mb-1"
+              <span
+                id="edit-owner-type-label"
+                className="block text-[14px] font-medium text-foreground mb-2"
               >
-                公開設定
-              </label>
-              <select
-                id="visibility-input"
-                value={visibility}
-                onChange={(e) =>
-                  setVisibility(e.target.value as "PRIVATE" | "SHARED")
-                }
-                className="w-full rounded-md bg-card p-2.5 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                所有設定
+              </span>
+              <ToggleGroup
+                aria-labelledby="edit-owner-type-label"
+                type="single"
+                value={ownerType}
+                disabled={!isAdmin}
+                onValueChange={(val) => {
+                  if (val === "user" || val === "family") {
+                    setOwnerType(val);
+                  }
+                }}
+                variant="outline"
+                className="w-full justify-start gap-2"
               >
-                <option value="PRIVATE">自分のみ (Private)</option>
-                <option value="SHARED">家族と共有 (Shared)</option>
-              </select>
+                <ToggleGroupItem
+                  value="user"
+                  disabled={!isAdmin}
+                  aria-label="自分のみ（個人用）"
+                  className="flex-1 py-2.5 px-4 text-sm font-medium border rounded-md data-[state=on]:bg-orange-500 data-[state=on]:text-white data-[state=on]:border-orange-500 transition-colors disabled:opacity-60"
+                >
+                  自分のみ（個人用）
+                </ToggleGroupItem>
+                <ToggleGroupItem
+                  value="family"
+                  disabled={!isAdmin}
+                  aria-label="家族と共有"
+                  className="flex-1 py-2.5 px-4 text-sm font-medium border rounded-md data-[state=on]:bg-blue-600 data-[state=on]:text-white data-[state=on]:border-blue-600 transition-colors disabled:opacity-60"
+                >
+                  家族と共有
+                </ToggleGroupItem>
+              </ToggleGroup>
+              {!isAdmin && (
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  ※ 共有設定の解除は管理者のみ可能です。
+                </p>
+              )}
             </div>
             <div>
               <label
@@ -812,7 +873,7 @@ function RecordDetailComponent({
                         ogpImage: ogp.image || undefined,
                         ogpDescription: ogp.description || undefined,
                         memo: record.memo || undefined,
-                        visibility: record.visibility,
+                        ownerType: record.ownerType,
                         credentials: record.credentials.map((c) => ({
                           id: c.id,
                           label: c.label || "",
@@ -855,31 +916,69 @@ function RecordDetailComponent({
 
         {/* 基本情報 */}
         <div className="p-6 md:p-8">
-          <div className="mb-6 flex items-start justify-between">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-[24px] font-semibold tracking-geist-h2 text-foreground">
               {record.title}
             </h1>
-            <span
-              className={`shrink-0 rounded-full px-3 py-1 text-[12px] font-medium tracking-wide uppercase ${
-                !isOwner
-                  ? "bg-purple-100/50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
-                  : record.visibility === "SHARED"
+            <div className="flex items-center gap-2">
+              <span
+                className={`shrink-0 rounded-full px-3 py-1 text-[12px] font-medium tracking-wide ${
+                  isShared
                     ? "bg-blue-100/50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
                     : "bg-secondary text-muted-foreground"
-              }`}
-            >
-              {!isOwner
-                ? "家族レコード"
-                : record.visibility === "SHARED"
-                  ? "共有中"
+                }`}
+              >
+                {isShared
+                  ? `共有中${record.admins && record.admins.length > 0 ? ` (${record.admins.length}名管理)` : ""}`
                   : "自分のみ"}
-            </span>
+              </span>
+
+              {/* ワンタップ共有ボタン (個人所有者の場合) */}
+              {isOwner && !isShared && (
+                <button
+                  type="button"
+                  disabled={isLoading}
+                  onClick={async () => {
+                    setIsLoading(true);
+                    try {
+                      await shareRecord({
+                        id: record._id,
+                        accountId: activeAccountId || undefined,
+                      });
+                      toast.success("家族と共有しました");
+                      await router.invalidate();
+                    } catch (e) {
+                      console.error(e);
+                      toast.error("共有に失敗しました");
+                    } finally {
+                      setIsLoading(false);
+                    }
+                  }}
+                  className="rounded-full bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 px-3 py-1 text-[12px] font-medium transition flex items-center gap-1 cursor-pointer"
+                >
+                  <Share2 className="h-3 w-3" />
+                  家族と共有する
+                </button>
+              )}
+
+              {/* 共有設定ボタン (共有レコードかつ管理者の場合) */}
+              {isShared && isAdmin && (
+                <ShareSettingsDialog
+                  record={record}
+                  familyMembers={familyMembers}
+                  activeAccountId={activeAccountId}
+                  onRecordUpdated={async () => {
+                    await router.invalidate();
+                  }}
+                />
+              )}
+            </div>
           </div>
 
           {/* オーナー情報 */}
           {record.user?.displayName && (
             <div className="mb-6 flex items-center gap-2 text-[13px] text-muted-foreground">
-              <span className="font-medium">オーナー:</span>
+              <span className="font-medium">作成者:</span>
               <span>
                 {record.user.displayName} ({record.user.email})
               </span>
@@ -935,35 +1034,37 @@ function RecordDetailComponent({
           {/* アクションボタン (編集権限がある場合のみ) */}
           {isEditable && (
             <div className="mt-10 flex justify-end gap-4 border-t border-border pt-6">
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <button
-                    type="button"
-                    className="rounded-md px-6 py-2 text-[14px] font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition"
-                  >
-                    削除する
-                  </button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>
-                      レコードを削除しますか？
-                    </AlertDialogTitle>
-                    <AlertDialogDescription>
-                      この操作は取り消せません。本当に削除してもよろしいですか？
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>キャンセル</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleDelete}
-                      className="bg-red-500 hover:bg-red-600 focus:ring-red-500"
+              {isAdmin && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <button
+                      type="button"
+                      className="rounded-md px-6 py-2 text-[14px] font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition"
                     >
                       削除する
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>
+                        レコードを削除しますか？
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        この操作は取り消せません。本当に削除してもよろしいですか？
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleDelete}
+                        className="bg-red-500 hover:bg-red-600 focus:ring-red-500"
+                      >
+                        削除する
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
               <button
                 type="button"
                 onClick={handleEditStart}
@@ -976,6 +1077,218 @@ function RecordDetailComponent({
         </div>
       </div>
     </div>
+  );
+}
+
+function ShareSettingsDialog({
+  record,
+  familyMembers,
+  activeAccountId,
+  onRecordUpdated,
+}: {
+  record: Doc<"serviceRecords"> & {
+    adminUsers?: { _id: Id<"users">; displayName?: string; email?: string }[];
+  };
+  familyMembers: {
+    id: Id<"users">;
+    userId: string;
+    email?: string;
+    displayName?: string;
+  }[];
+  activeAccountId?: Id<"users"> | null;
+  onRecordUpdated: () => Promise<void>;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedMemberId, setSelectedMemberId] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const addRecordAdmin = useMutation(api.records.addRecordAdmin);
+  const removeRecordAdmin = useMutation(api.records.removeRecordAdmin);
+  const unshareRecord = useMutation(api.records.unshareRecord);
+
+  const adminIds = record.admins ?? [];
+  const nonAdminMembers = familyMembers.filter((m) => !adminIds.includes(m.id));
+
+  const handleAddAdmin = async () => {
+    if (!selectedMemberId) return;
+    setIsSubmitting(true);
+    try {
+      await addRecordAdmin({
+        id: record._id,
+        targetAccountId: selectedMemberId as Id<"users">,
+        accountId: activeAccountId || undefined,
+      });
+      toast.success("管理者を設定しました");
+      setSelectedMemberId("");
+      await onRecordUpdated();
+    } catch (e) {
+      console.error(e);
+      toast.error("管理者の追加に失敗しました");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRemoveAdmin = async (targetId: Id<"users">) => {
+    setIsSubmitting(true);
+    try {
+      await removeRecordAdmin({
+        id: record._id,
+        targetAccountId: targetId,
+        accountId: activeAccountId || undefined,
+      });
+      toast.success("管理者を解除しました");
+      await onRecordUpdated();
+    } catch (e: unknown) {
+      console.error(e);
+      const raw = e instanceof Error ? e.message : "";
+      toast.error(
+        raw.includes("管理者が0人になるため削除できません")
+          ? "管理者が0人になるため削除できません"
+          : "管理者の解除に失敗しました",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUnshare = async () => {
+    setIsSubmitting(true);
+    try {
+      await unshareRecord({
+        id: record._id,
+        accountId: activeAccountId || undefined,
+      });
+      toast.success("共有を解除し、個人用レコードにしました");
+      setIsOpen(false);
+      await onRecordUpdated();
+    } catch (e) {
+      console.error(e);
+      toast.error("共有解除に失敗しました");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className="rounded-full bg-secondary hover:bg-accent text-foreground px-3 py-1 text-[12px] font-medium transition flex items-center gap-1 cursor-pointer"
+        >
+          <Users className="h-3 w-3" />
+          共有設定
+        </button>
+      </DialogTrigger>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>共有と管理者の設定</DialogTitle>
+          <DialogDescription>
+            家族共有レコードの管理者権限の追加・削除や共有の解除を行えます。
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-6 py-2">
+          {/* 管理者一覧 */}
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+              現在の管理者 ({adminIds.length}名)
+            </h3>
+            <div className="space-y-2 max-h-40 overflow-y-auto">
+              {(record.adminUsers && record.adminUsers.length > 0
+                ? record.adminUsers
+                : adminIds.map((id) => {
+                    const m = familyMembers.find((f) => f.id === id);
+                    return {
+                      _id: id,
+                      displayName: m?.displayName || "メンバー",
+                      email: m?.email || "",
+                    };
+                  })
+              ).map((admin) => (
+                <div
+                  key={admin._id}
+                  className="flex items-center justify-between p-2 rounded-md bg-muted/40 text-sm"
+                >
+                  <div>
+                    <div className="font-medium text-foreground">
+                      {admin.displayName || "メンバー"}
+                      {admin._id === activeAccountId && " (あなた)"}
+                    </div>
+                    {admin.email && (
+                      <div className="text-xs text-muted-foreground">
+                        {admin.email}
+                      </div>
+                    )}
+                  </div>
+                  {adminIds.length > 1 && (
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={() => handleRemoveAdmin(admin._id)}
+                      className="text-xs text-red-500 hover:text-red-600 disabled:opacity-50 p-1 cursor-pointer"
+                      title="管理者から外す"
+                    >
+                      解除
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 管理者を追加 */}
+          {nonAdminMembers.length > 0 && (
+            <div className="border-t border-border pt-4">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                管理者の追加
+              </h3>
+              <div className="flex gap-2">
+                <select
+                  aria-label="管理者に追加する家族メンバー"
+                  value={selectedMemberId}
+                  onChange={(e) => setSelectedMemberId(e.target.value)}
+                  className="flex-1 rounded-md bg-card p-2 text-xs shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                >
+                  <option value="">家族メンバーを選択...</option>
+                  {nonAdminMembers.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.displayName || "メンバー"} ({m.email})
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={!selectedMemberId || isSubmitting}
+                  onClick={handleAddAdmin}
+                  className="rounded-md bg-orange-500 px-3 py-2 text-xs font-medium text-white shadow-border hover:bg-orange-600 disabled:opacity-50 transition cursor-pointer"
+                >
+                  追加
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 共有解除 */}
+          <div className="border-t border-border pt-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+              共有の解除
+            </h3>
+            <p className="text-xs text-muted-foreground mb-3">
+              共有を解除すると、このレコードはあなたの個人用（自分のみ）になり、他の家族メンバーは閲覧できなくなります。
+            </p>
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={handleUnshare}
+              className="w-full rounded-md border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs font-medium text-red-600 hover:bg-red-500/20 disabled:opacity-50 transition cursor-pointer"
+            >
+              共有を解除して個人用にする
+            </button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -1049,70 +1362,60 @@ function CredentialCard({
       </div>
       <div>
         <div className="flex items-center justify-between mb-1">
-          <div className="text-xs text-gray-500 flex items-center gap-1.5">
-            パスワードのヒント
-            {isEncrypted && (
-              <span className="inline-flex items-center rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                🔒 暗号化
-              </span>
-            )}
-          </div>
+          <div className="text-xs text-muted-foreground">パスワードヒント</div>
           {displayedHint && (
-            <CopyButton text={displayedHint} label="パスワードのヒント" />
+            <CopyButton text={displayedHint} label="パスワードヒント" />
           )}
         </div>
-        {isEncrypted && decryptedHint == null ? (
-          <button
-            type="button"
-            onClick={handleReveal}
-            disabled={isDecrypting}
-            className="mt-1 inline-flex items-center gap-1.5 rounded-md bg-orange-50 px-3 py-1.5 text-[13px] font-medium text-orange-600 transition hover:bg-orange-100 disabled:opacity-50 dark:bg-orange-900/20 dark:text-orange-400 dark:hover:bg-orange-900/30"
-          >
-            {isDecrypting ? "復号中..." : "🔓 ヒントを見る"}
-          </button>
-        ) : (
-          <div className="text-sm font-medium text-foreground select-all">
-            {displayedHint || "-"}
-          </div>
-        )}
+        <div className="font-sans text-sm text-foreground whitespace-pre-wrap">
+          {displayedHint ? (
+            displayedHint
+          ) : isEncrypted ? (
+            <button
+              type="button"
+              onClick={handleReveal}
+              disabled={isDecrypting}
+              className="inline-flex items-center gap-1.5 rounded bg-orange-500/10 px-2.5 py-1 text-xs font-medium text-orange-600 hover:bg-orange-500/20 transition disabled:opacity-50"
+            >
+              {isDecrypting ? (
+                <>
+                  <Spinner className="h-3 w-3" />
+                  復号中...
+                </>
+              ) : (
+                "🔒 クリックして表示"
+              )}
+            </button>
+          ) : (
+            "-"
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-// アクセシビリティとモバイル操作性を考慮したコピーボタン
 function CopyButton({ text, label }: { text: string; label: string }) {
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), 2000);
-    return () => clearTimeout(timer);
-  }, [copied]);
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      toast.success(`${label}をコピーしました`);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("コピーに失敗しました");
+    }
   };
 
   return (
     <button
       type="button"
       onClick={handleCopy}
-      aria-label={`${label}をコピー`}
-      // モバイルでタップしやすいよう p-2 -m-2 で物理的なタッチエリアを拡大
-      className="p-2 -m-2 text-[11px] font-medium text-orange-500 hover:text-orange-700 transition flex items-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 rounded"
+      className="text-[11px] text-muted-foreground hover:text-foreground transition"
     >
-      {copied ? (
-        <>
-          <span aria-hidden="true" className="text-green-500">
-            ✓
-          </span>
-          <span className="text-green-600">コピー済</span>
-        </>
-      ) : (
-        <span>コピー</span>
-      )}
+      {copied ? "コピー完了" : "コピー"}
     </button>
   );
 }

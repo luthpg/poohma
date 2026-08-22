@@ -7,6 +7,7 @@ import { api } from "@/../convex/_generated/api";
 import { usePasscode } from "@/components/PasscodeProvider";
 import { Spinner } from "@/components/ui/spinner";
 import { TagInput } from "@/components/ui/tag-input";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAccount } from "@/hooks/useAccount";
 import { MAX_CREDENTIALS_PER_RECORD } from "@/utils/schemas";
 
@@ -42,7 +43,7 @@ function NewRecordComponent() {
   const [title, setTitle] = useState("");
   const [titleReading, setTitleReading] = useState("");
   const [memo, setMemo] = useState("");
-  const [visibility, setVisibility] = useState<"PRIVATE" | "SHARED">("PRIVATE");
+  const [ownerType, setOwnerType] = useState<"user" | "family">("user");
 
   // 非同期レース条件対策用
   const furiganaReqIdRef = useRef(0);
@@ -237,7 +238,7 @@ function NewRecordComponent() {
         ogpImage: ogpImage || undefined,
         ogpDescription: ogpDescription || undefined,
         memo: memo || undefined,
-        visibility,
+        ownerType,
         credentials: encryptedCredentials,
         tags,
       });
@@ -482,23 +483,39 @@ function NewRecordComponent() {
         {/* その他設定（公開設定・タグ・メモ） */}
         <section className="rounded-lg bg-card p-6 shadow-card transition-shadow space-y-6">
           <div>
-            <label
-              htmlFor="visibility-input"
-              className="block text-[14px] font-medium text-foreground mb-1"
+            <span
+              id="owner-type-label"
+              className="block text-[14px] font-medium text-foreground mb-2"
             >
-              公開設定
-            </label>
-            <select
-              id="visibility-input"
-              value={visibility}
-              onChange={(e) =>
-                setVisibility(e.target.value as "PRIVATE" | "SHARED")
-              }
-              className="w-full rounded-md bg-card p-2.5 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+              所有設定
+            </span>
+            <ToggleGroup
+              aria-labelledby="owner-type-label"
+              type="single"
+              value={ownerType}
+              onValueChange={(val) => {
+                if (val === "user" || val === "family") {
+                  setOwnerType(val);
+                }
+              }}
+              variant="outline"
+              className="w-full justify-start gap-2"
             >
-              <option value="PRIVATE">自分のみ (Private)</option>
-              <option value="SHARED">家族と共有 (Shared)</option>
-            </select>
+              <ToggleGroupItem
+                value="user"
+                aria-label="自分のみ（個人用）"
+                className="flex-1 py-2.5 px-4 text-sm font-medium border rounded-md data-[state=on]:bg-orange-500 data-[state=on]:text-white data-[state=on]:border-orange-500 transition-colors"
+              >
+                自分のみ（個人用）
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="family"
+                aria-label="家族と共有"
+                className="flex-1 py-2.5 px-4 text-sm font-medium border rounded-md data-[state=on]:bg-blue-600 data-[state=on]:text-white data-[state=on]:border-blue-600 transition-colors"
+              >
+                家族と共有
+              </ToggleGroupItem>
+            </ToggleGroup>
           </div>
 
           <div>

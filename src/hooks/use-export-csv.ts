@@ -26,7 +26,8 @@ export function useExportCsv() {
           Title: record.title,
           URL: record.url || "",
           Memo: record.memo || "",
-          Visibility: record.visibility,
+          OwnerType: record.ownerType ?? "user",
+          Admins: (record.adminEmails ?? []).join(", "),
           Tags: record.tags.join(","),
         };
         record.credentials.forEach((cred, i) => {
@@ -101,7 +102,7 @@ export function useExportCsv() {
         }),
       );
 
-      const columns = ["Title", "URL", "Memo", "Visibility", "Tags"];
+      const columns = ["Title", "URL", "Memo", "OwnerType", "Admins", "Tags"];
       for (let i = 1; i <= MAX_CREDENTIALS_PER_RECORD; i++) {
         columns.push(`Label${i}`, `LoginID${i}`, `PasswordHint${i}`);
       }

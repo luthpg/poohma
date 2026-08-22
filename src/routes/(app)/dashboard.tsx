@@ -219,6 +219,8 @@ function RouteComponent() {
 
   const deleteRecordsMut = useMutation(api.records.deleteRecords);
   const bulkUpdateRecordsMut = useMutation(api.records.bulkUpdateRecords);
+  const bulkShareMut = useMutation(api.records.bulkShareRecords);
+  const bulkUnshareMut = useMutation(api.records.bulkUnshareRecords);
 
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
@@ -262,27 +264,37 @@ function RouteComponent() {
     }
   };
 
-  const handleBulkVisibilityChange = async (
-    visibility: "PRIVATE" | "SHARED",
-  ) => {
+  const handleBulkShare = async () => {
     if (selectedIds.length === 0) return;
     try {
-      await bulkUpdateRecordsMut({
+      const result = await bulkShareMut({
         accountId: activeAccountId || undefined,
         ids: selectedIds as Id<"serviceRecords">[],
-        data: { visibility },
       });
-      toast.success(
-        `${selectedIds.length} 件のレコードを${
-          visibility === "SHARED" ? "共有中" : "自分のみ"
-        }に変更しました`,
-      );
+      toast.success(`${result.count} 件のレコードを家族と共有しました`);
       setSelectedIds([]);
       setIsSelectMode(false);
       setActiveModal(null);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(err);
-      toast.error("公開設定の変更に失敗しました");
+      toast.error("一括共有に失敗しました");
+    }
+  };
+
+  const handleBulkUnshare = async () => {
+    if (selectedIds.length === 0) return;
+    try {
+      const result = await bulkUnshareMut({
+        accountId: activeAccountId || undefined,
+        ids: selectedIds as Id<"serviceRecords">[],
+      });
+      toast.success(`${result.count} 件のレコードの共有を解除しました`);
+      setSelectedIds([]);
+      setIsSelectMode(false);
+      setActiveModal(null);
+    } catch (err: unknown) {
+      console.error(err);
+      toast.error("一括共有解除に失敗しました");
     }
   };
 
@@ -415,38 +427,38 @@ function RouteComponent() {
         />
       )}
 
-      {/* 公開設定モーダル */}
+      {/* 共有設定モーダル */}
       {activeModal === "visibility" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
           <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-lg animate-in fade-in duration-200">
             <h3 className="text-lg font-semibold mb-2">
-              選択したレコードの公開設定を変更
+              選択したレコードの共有設定
             </h3>
             <p className="text-sm text-muted-foreground mb-6">
               選択した {selectedIds.length}{" "}
-              件のレコードの公開設定を選択してください。
+              件のレコードの共有状態を一括で変更します。
             </p>
             <div className="grid grid-cols-2 gap-4 mb-6">
               <button
                 type="button"
-                onClick={() => handleBulkVisibilityChange("PRIVATE")}
+                onClick={handleBulkUnshare}
                 className="flex flex-col items-center gap-2 p-4 rounded-lg border border-border hover:border-orange-500 hover:bg-orange-500/5 transition text-center cursor-pointer"
               >
                 <Lock className="h-6 w-6 text-muted-foreground" />
                 <span className="font-semibold text-sm">自分のみ</span>
                 <span className="text-xs text-muted-foreground">
-                  家族には非公開
+                  共有を解除（個人用）
                 </span>
               </button>
               <button
                 type="button"
-                onClick={() => handleBulkVisibilityChange("SHARED")}
+                onClick={handleBulkShare}
                 className="flex flex-col items-center gap-2 p-4 rounded-lg border border-border hover:border-orange-500 hover:bg-orange-500/5 transition text-center cursor-pointer"
               >
                 <Globe className="h-6 w-6 text-blue-500" />
                 <span className="font-semibold text-sm">家族に共有</span>
                 <span className="text-xs text-muted-foreground">
-                  家族全員に公開
+                  家族全員で共有
                 </span>
               </button>
             </div>
@@ -580,7 +592,6 @@ function RecordListSection({
   onToggleSelect: (id: string) => void;
   onSelectAll: (ids: string[]) => void;
 }) {
-  const { user } = routeApi.useLoaderData();
   const { activeAccountId } = useAccount();
   const records = usePersistentQuery<Doc<"serviceRecords">[]>(
     api.records.getRecords,
@@ -731,8 +742,6 @@ function RecordListSection({
                       <ServiceCard
                         key={record._id}
                         record={record}
-                        currentUserId={user.id}
-                        currentAccountId={activeAccountId}
                         onTagClick={handleTagClick}
                         isSelectMode={isSelectMode}
                         isSelected={selectedIds.includes(record._id)}
@@ -742,8 +751,6 @@ function RecordListSection({
                       <ServiceListItem
                         key={record._id}
                         record={record}
-                        currentUserId={user.id}
-                        currentAccountId={activeAccountId}
                         onTagClick={handleTagClick}
                         isSelectMode={isSelectMode}
                         isSelected={selectedIds.includes(record._id)}
@@ -769,8 +776,6 @@ function RecordListSection({
               <ServiceCard
                 key={record._id}
                 record={record}
-                currentUserId={user.id}
-                currentAccountId={activeAccountId}
                 onTagClick={handleTagClick}
                 isSelectMode={isSelectMode}
                 isSelected={selectedIds.includes(record._id)}
@@ -780,8 +785,6 @@ function RecordListSection({
               <ServiceListItem
                 key={record._id}
                 record={record}
-                currentUserId={user.id}
-                currentAccountId={activeAccountId}
                 onTagClick={handleTagClick}
                 isSelectMode={isSelectMode}
                 isSelected={selectedIds.includes(record._id)}
@@ -800,24 +803,18 @@ type RecordType = Doc<"serviceRecords">;
 // リスト表示用コンポーネント
 function ServiceListItem({
   record,
-  currentUserId,
-  currentAccountId,
   onTagClick,
   isSelectMode,
   isSelected,
   onToggleSelect,
 }: {
   record: RecordType;
-  currentUserId: string;
-  currentAccountId?: Id<"users"> | null;
   onTagClick: (tag: string) => void;
   isSelectMode?: boolean;
   isSelected?: boolean;
   onToggleSelect?: () => void;
 }) {
-  const isOwner = record.accountId
-    ? record.accountId === currentAccountId
-    : record.userId === currentUserId;
+  const isShared = record.ownerType === "family";
   return (
     <Link
       to="/records/$id"
@@ -861,18 +858,12 @@ function ServiceListItem({
             </span>
             <span
               className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                !isOwner
-                  ? "bg-purple-100/50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
-                  : record.visibility === "SHARED"
-                    ? "bg-blue-100/50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
-                    : "bg-secondary text-muted-foreground"
+                isShared
+                  ? "bg-blue-100/50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                  : "bg-secondary text-muted-foreground"
               }`}
             >
-              {!isOwner
-                ? "家族レコード"
-                : record.visibility === "SHARED"
-                  ? "共有中"
-                  : "個人"}
+              {isShared ? "共有中" : "自分のみ"}
             </span>
           </div>
           {record.url && (
@@ -925,24 +916,17 @@ function ServiceListItem({
 // カードコンポーネント (UIパーツ)
 function ServiceCard({
   record,
-  currentUserId,
-  currentAccountId,
   onTagClick,
   isSelectMode,
   isSelected,
   onToggleSelect,
 }: {
   record: RecordType;
-  currentUserId: string;
-  currentAccountId?: Id<"users"> | null;
   onTagClick: (tag: string) => void;
   isSelectMode?: boolean;
   isSelected?: boolean;
   onToggleSelect?: () => void;
 }) {
-  const isOwner = record.accountId
-    ? record.accountId === currentAccountId
-    : record.userId === currentUserId;
   return (
     <Link
       to="/records/$id"
@@ -1001,21 +985,15 @@ function ServiceCard({
           <span className="text-[16px] md:text-[18px] font-semibold text-foreground line-clamp-2 md:line-clamp-1 tracking-geist-ui group-hover:text-orange-500 transition-colors">
             {record.title}
           </span>
-          {/* 公開設定バッジ */}
+          {/* 所有設定バッジ */}
           <span
             className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] md:text-xs font-medium ${
-              !isOwner
-                ? "bg-purple-100/50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
-                : record.visibility === "SHARED"
-                  ? "bg-blue-100/50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
-                  : "bg-secondary text-muted-foreground"
+              record.ownerType === "family"
+                ? "bg-blue-100/50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                : "bg-secondary text-muted-foreground"
             }`}
           >
-            {!isOwner
-              ? "家族レコード"
-              : record.visibility === "SHARED"
-                ? "共有中"
-                : "自分のみ"}
+            {record.ownerType === "family" ? "共有中" : "自分のみ"}
           </span>
         </div>
 
