@@ -759,6 +759,9 @@ function FamilyComponent() {
                     type={showJoinPasscode ? "text" : "password"}
                     required
                     minLength={8}
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck={false}
                     value={joinPasscode}
                     onChange={(e) => setJoinPasscode(e.target.value)}
                     placeholder="8文字以上"
@@ -851,6 +854,9 @@ function FamilyComponent() {
                   id="transfer-passcode-input"
                   required
                   minLength={8}
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={joinPasscode}
                   onChange={(e) => setJoinPasscode(e.target.value)}
                   placeholder="8文字以上"
@@ -1238,6 +1244,9 @@ function FamilyComponent() {
                       id="family-passcode-input"
                       required
                       minLength={MIN_PASSCODE_LENGTH}
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      spellCheck={false}
                       value={createPasscode}
                       onChange={(e) => setCreatePasscode(e.target.value)}
                       placeholder={`${MIN_PASSCODE_LENGTH}文字以上`}
@@ -1275,6 +1284,9 @@ function FamilyComponent() {
                       id="family-passcode-confirm-input"
                       required
                       minLength={8}
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      spellCheck={false}
                       value={createPasscodeConfirm}
                       onChange={(e) => setCreatePasscodeConfirm(e.target.value)}
                       placeholder="もう一度入力"

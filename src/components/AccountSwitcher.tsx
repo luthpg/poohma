@@ -34,6 +34,7 @@ export function AccountSwitcher({ className = "" }: AccountSwitcherProps) {
     activeAccountId,
     switchAccount,
     createAccount,
+    isLoading,
   } = useAccount();
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -61,9 +62,12 @@ export function AccountSwitcher({ className = "" }: AccountSwitcherProps) {
     }
   };
 
-  const currentDisplayName =
-    activeAccount?.displayName || activeAccount?.name || "アカウント";
-  const currentFamilyName = activeAccount?.family?.name || "ファミリー未所属";
+  const currentDisplayName = isLoading
+    ? "読み込み中..."
+    : activeAccount?.displayName || activeAccount?.name || "アカウント";
+  const currentFamilyName = isLoading
+    ? "読み込み中..."
+    : activeAccount?.family?.name || "ファミリー未所属";
 
   return (
     <>
@@ -72,7 +76,11 @@ export function AccountSwitcher({ className = "" }: AccountSwitcherProps) {
           className={`flex items-center gap-2 rounded-lg border border-border/60 bg-background/80 px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${className}`}
         >
           <div className="flex h-5 w-5 items-center justify-center rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 font-semibold text-[10px]">
-            {currentDisplayName.charAt(0).toUpperCase()}
+            {isLoading ? (
+              <Spinner className="h-3 w-3 animate-spin" />
+            ) : (
+              currentDisplayName.charAt(0).toUpperCase()
+            )}
           </div>
           <div className="flex flex-col items-start text-left max-w-[120px] sm:max-w-[160px]">
             <span className="truncate font-medium text-foreground text-xs leading-tight">

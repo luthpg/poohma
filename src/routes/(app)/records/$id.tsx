@@ -6,7 +6,14 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
-import { ChevronDown, ChevronUp, Share2, Trash2, Users } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Share2,
+  Trash2,
+  Users,
+} from "lucide-react";
 import { type SubmitEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
@@ -192,6 +199,45 @@ function RecordDetailComponent({
   );
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingOgp, setIsFetchingOgp] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [shareSuccess, setShareSuccess] = useState(false);
+
+  const handleWebShare = async () => {
+    if (typeof window === "undefined") return;
+
+    const shareData = {
+      title: record.title ? `${record.title} - PoohMa` : "PoohMa レコード",
+      text: record.title ? `「${record.title}」の共有` : "アカウント情報の共有",
+      url: window.location.href,
+    };
+
+    if (
+      typeof navigator !== "undefined" &&
+      navigator.share &&
+      navigator.canShare?.(shareData)
+    ) {
+      try {
+        await navigator.share(shareData);
+        setShareSuccess(true);
+        setTimeout(() => setShareSuccess(false), 2000);
+      } catch (err) {
+        if ((err as Error)?.name !== "AbortError") {
+          console.error("シェア処理に失敗しました:", err);
+          toast.error("共有に失敗しました");
+        }
+      }
+    } else if (typeof navigator !== "undefined" && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        setCopied(true);
+        toast.success("URLをクリップボードにコピーしました");
+        setTimeout(() => setCopied(false), 2000);
+      } catch (err) {
+        console.error("クリップボードコピーに失敗しました:", err);
+        toast.error("URLのコピーに失敗しました");
+      }
+    }
+  };
 
   // 非同期レース条件対策用
   const furiganaReqIdRef = useRef(0);
@@ -821,8 +867,8 @@ function RecordDetailComponent({
 
   return (
     <div className="mx-auto max-w-3xl p-6">
-      {/* 戻るボタン */}
-      <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-6 bg-background/95 px-6 pb-4 pt-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      {/* ヘッダーナビゲーション（戻るボタン & 共有ボタン） */}
+      <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-6 bg-background/95 px-6 pb-4 pt-6 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between gap-4">
         <button
           type="button"
           disabled={isNavigating}
@@ -834,10 +880,29 @@ function RecordDetailComponent({
               router.navigate({ to: "/dashboard" });
             }
           }}
-          className="text-[14px] font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none"
+          className="text-[14px] font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
         >
           <span className="text-[16px] leading-none mb-0.5">←</span>{" "}
           ダッシュボードに戻る
+        </button>
+
+        <button
+          type="button"
+          onClick={handleWebShare}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground shadow-sm cursor-pointer"
+        >
+          {shareSuccess || copied ? (
+            <Check className="h-3.5 w-3.5 text-green-500" />
+          ) : (
+            <Share2 className="h-3.5 w-3.5" />
+          )}
+          <span>
+            {copied
+              ? "URLをコピーしました"
+              : shareSuccess
+                ? "共有しました"
+                : "ページを共有"}
+          </span>
         </button>
       </div>
 
@@ -1375,7 +1440,7 @@ function CredentialCard({
               type="button"
               onClick={handleReveal}
               disabled={isDecrypting}
-              className="inline-flex items-center gap-1.5 rounded bg-orange-500/10 px-2.5 py-1 text-xs font-medium text-orange-600 hover:bg-orange-500/20 transition disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded bg-orange-300/10 px-2.5 py-1 text-xs font-medium text-orange-600 hover:bg-orange-500/20 transition disabled:opacity-50"
             >
               {isDecrypting ? (
                 <>
@@ -1415,7 +1480,16 @@ function CopyButton({ text, label }: { text: string; label: string }) {
       onClick={handleCopy}
       className="text-[11px] text-muted-foreground hover:text-foreground transition"
     >
-      {copied ? "コピー完了" : "コピー"}
+      {copied ? (
+        <>
+          <span aria-hidden="true" className="text-green-500">
+            ✓
+          </span>
+          <span className="ml-1 text-green-600">コピー済</span>
+        </>
+      ) : (
+        <span>コピー</span>
+      )}
     </button>
   );
 }
