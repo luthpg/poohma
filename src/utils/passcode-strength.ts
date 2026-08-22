@@ -26,10 +26,8 @@ export function evaluatePasscodeStrength(
   passcode: string,
 ): PasscodeStrengthResult {
   const reasons: string[] = [];
-  if (/[^\x20-\x7E]/.test(passcode)) {
-    reasons.push(
-      "半角英数字（大文字、小文字）、半角記号（半角スペースを含む）のみ使用できます",
-    );
+  if (/[^\x21-\x7E]/.test(passcode)) {
+    reasons.push("半角英数字（大文字、小文字）、半角記号のみ使用できます");
   }
   if (passcode.length < MIN_PASSCODE_LENGTH) {
     reasons.push(`パスコードは${MIN_PASSCODE_LENGTH}文字以上にしてください`);
