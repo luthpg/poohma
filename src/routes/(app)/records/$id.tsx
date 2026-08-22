@@ -207,7 +207,7 @@ function RecordDetailComponent({
 
     const shareData = {
       title: record.title ? `${record.title} - PoohMa` : "PoohMa レコード",
-      text: `${record.title || "アカウント情報"}の共有`,
+      text: record.title ? `「${record.title}」の共有` : "アカウント情報の共有",
       url: window.location.href,
     };
 
