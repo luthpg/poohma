@@ -1113,6 +1113,73 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         expect(existingRecord?.credentials[0].passwordHint).toBe("old_hint");
       });
     });
+
+    it("Family変更(移行)後、旧Familyの共有レコードへ本人がアクセスできなくなること", async () => {
+      const t = convexTest(schema, modules);
+      let oldFamilyId!: Id<"families">;
+      let stayingSharedRecordId!: Id<"serviceRecords">;
+      await t.run(async (ctx) => {
+        oldFamilyId = await ctx.db.insert("families", {
+          name: "旧ファミリー",
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("users", {
+          userId: "user_migrating",
+          email: "migrating@example.com",
+          familyId: oldFamilyId,
+          updatedAt: Date.now(),
+        });
+        const stayingId = await ctx.db.insert("users", {
+          userId: "user_staying2",
+          email: "staying2@example.com",
+          familyId: oldFamilyId,
+          updatedAt: Date.now(),
+        });
+        stayingSharedRecordId = await ctx.db.insert("serviceRecords", {
+          userId: "user_staying2",
+          accountId: stayingId,
+          familyId: oldFamilyId,
+          title: "旧ファミリーの共有レコード",
+          visibility: "SHARED",
+          credentials: [],
+          tags: [],
+          updatedAt: Date.now(),
+        });
+      });
+      const userMigrating = t.withIdentity({
+        subject: "user_migrating",
+        email: "migrating@example.com",
+      });
+
+      const beforeDetail = await userMigrating.query(
+        api.records.getRecordDetail,
+        {
+          id: stayingSharedRecordId,
+        },
+      );
+      expect(beforeDetail.title).toBe("旧ファミリーの共有レコード");
+
+      const prepareRes = await userMigrating.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "create",
+          name: "新ファミリー",
+          masterKeyEncrypted: "enc_key",
+          masterKeyIv: "key_iv",
+          masterKeySalt: "key_salt",
+        },
+      );
+      await userMigrating.mutation(api.families.commitFamilyMigration, {
+        migrationId: prepareRes.migrationId,
+        credentials: [],
+      });
+
+      await expect(
+        userMigrating.query(api.records.getRecordDetail, {
+          id: stayingSharedRecordId,
+        }),
+      ).rejects.toThrow("Access denied");
+    });
   });
 });
 

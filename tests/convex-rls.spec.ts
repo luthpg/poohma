@@ -53,6 +53,36 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
         }),
       ).rejects.toThrow("Unauthenticated");
     });
+
+    it("自分が所有するPRIVATEレコードは getRecordDetail で正常に取得できること", async () => {
+      const t = convexTest(schema, modules);
+      let recordId!: Id<"serviceRecords">;
+      let userAId!: Id<"users">;
+      await t.run(async (ctx) => {
+        userAId = await ctx.db.insert("users", {
+          userId: "user_owner",
+          email: "owner@example.com",
+          updatedAt: Date.now(),
+        });
+        recordId = await ctx.db.insert("serviceRecords", {
+          userId: "user_owner",
+          accountId: userAId,
+          title: "My Private Record",
+          visibility: "PRIVATE",
+          credentials: [],
+          tags: [],
+          updatedAt: Date.now(),
+        });
+      });
+      const owner = t.withIdentity({
+        subject: "user_owner",
+        email: "owner@example.com",
+      });
+      const detail = await owner.query(api.records.getRecordDetail, {
+        id: recordId,
+      });
+      expect(detail.title).toBe("My Private Record");
+    });
   });
 
   describe("4.2. クロスユーザー・クロスファミリー認可の検証 (RLS)", () => {
@@ -294,6 +324,163 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
       await expect(
         userF2.query(api.records.getRecordDetail, { id: recordAId }),
       ).rejects.toThrow("Access denied");
+    });
+
+    it("異なるFamilyのSHAREDレコード(暗号化データを含む)が getRecords の一覧結果に一切含まれないこと", async () => {
+      const t = convexTest(schema, modules);
+      await t.run(async (ctx) => {
+        const family1 = await ctx.db.insert("families", {
+          name: "Family 1",
+          updatedAt: Date.now(),
+        });
+        const family2 = await ctx.db.insert("families", {
+          name: "Family 2",
+          updatedAt: Date.now(),
+        });
+        const userF1Id = await ctx.db.insert("users", {
+          userId: "user_leak_f1",
+          email: "leakf1@example.com",
+          familyId: family1,
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("users", {
+          userId: "user_leak_f2",
+          email: "leakf2@example.com",
+          familyId: family2,
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("serviceRecords", {
+          userId: "user_leak_f1",
+          accountId: userF1Id,
+          familyId: family1,
+          title: "Family1の秘密レコード",
+          visibility: "SHARED",
+          credentials: [
+            {
+              id: "cred_secret",
+              label: "secret label",
+              passwordHint: "encrypted_hint_blob",
+              passwordHintIv: "encrypted_iv_blob",
+            },
+          ],
+          tags: [],
+          updatedAt: Date.now(),
+        });
+      });
+      const userF2 = t.withIdentity({
+        subject: "user_leak_f2",
+        email: "leakf2@example.com",
+      });
+      const records = await userF2.query(api.records.getRecords, {});
+      expect(records).toHaveLength(0);
+      expect(JSON.stringify(records)).not.toContain("encrypted_hint_blob");
+    });
+  });
+
+  describe("4.3 一括操作(bulk mutation)の認可検証", () => {
+    it("他人が所有するPRIVATEレコードを含むdeleteRecordsは、そのレコードでアクセス拒否され、何も削除されないこと", async () => {
+      const t = convexTest(schema, modules);
+      let family1Id!: Id<"families">;
+      let ownRecordId!: Id<"serviceRecords">;
+      let othersPrivateId!: Id<"serviceRecords">;
+      await t.run(async (ctx) => {
+        family1Id = await ctx.db.insert("families", {
+          name: "Family 1",
+          updatedAt: Date.now(),
+        });
+        const userAId = await ctx.db.insert("users", {
+          userId: "user_bulk_a",
+          email: "bulka@example.com",
+          familyId: family1Id,
+          updatedAt: Date.now(),
+        });
+        const userBId = await ctx.db.insert("users", {
+          userId: "user_bulk_b",
+          email: "bulkb@example.com",
+          familyId: family1Id,
+          updatedAt: Date.now(),
+        });
+        ownRecordId = await ctx.db.insert("serviceRecords", {
+          userId: "user_bulk_b",
+          accountId: userBId,
+          familyId: family1Id,
+          title: "Bの自分のレコード",
+          visibility: "PRIVATE",
+          credentials: [],
+          tags: [],
+          updatedAt: Date.now(),
+        });
+        othersPrivateId = await ctx.db.insert("serviceRecords", {
+          userId: "user_bulk_a",
+          accountId: userAId,
+          familyId: family1Id,
+          title: "AのPRIVATEレコード",
+          visibility: "PRIVATE",
+          credentials: [],
+          tags: [],
+          updatedAt: Date.now(),
+        });
+      });
+      const userB = t.withIdentity({
+        subject: "user_bulk_b",
+        email: "bulkb@example.com",
+      });
+
+      await expect(
+        userB.mutation(api.records.deleteRecords, {
+          ids: [ownRecordId, othersPrivateId],
+        }),
+      ).rejects.toThrow("Access denied");
+
+      await t.run(async (ctx) => {
+        expect(await ctx.db.get(ownRecordId)).not.toBeNull();
+        expect(await ctx.db.get(othersPrivateId)).not.toBeNull();
+      });
+    });
+
+    it("同一FamilyのSHAREDレコードは、所有者以外のメンバーでもdeleteRecordsで削除できること(仕様通りの許可系)", async () => {
+      const t = convexTest(schema, modules);
+      let sharedRecordId!: Id<"serviceRecords">;
+      await t.run(async (ctx) => {
+        const familyId = await ctx.db.insert("families", {
+          name: "Family Shared",
+          updatedAt: Date.now(),
+        });
+        const userAId = await ctx.db.insert("users", {
+          userId: "user_bulk_owner",
+          email: "bulkowner@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("users", {
+          userId: "user_bulk_member",
+          email: "bulkmember@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        sharedRecordId = await ctx.db.insert("serviceRecords", {
+          userId: "user_bulk_owner",
+          accountId: userAId,
+          familyId,
+          title: "共有レコード",
+          visibility: "SHARED",
+          credentials: [],
+          tags: [],
+          updatedAt: Date.now(),
+        });
+      });
+      const userMember = t.withIdentity({
+        subject: "user_bulk_member",
+        email: "bulkmember@example.com",
+      });
+
+      await userMember.mutation(api.records.deleteRecords, {
+        ids: [sharedRecordId],
+      });
+
+      await t.run(async (ctx) => {
+        expect(await ctx.db.get(sharedRecordId)).toBeNull();
+      });
     });
   });
 });

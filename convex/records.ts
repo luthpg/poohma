@@ -255,6 +255,13 @@ export const updateRecord = familyBoundMutation({
     // アクセス権のチェック（IDOR対策の確実な実行）
     requireRecordAccess(ctx.user, record);
 
+    if (
+      args.data.visibility !== record.visibility &&
+      record.accountId !== ctx.user._id
+    ) {
+      throw new Error("Forbidden: Only the owner can change record visibility");
+    }
+
     await ctx.db.patch(args.id, {
       ...args.data,
       titleReading: args.data.titleReading ?? record.titleReading,
@@ -388,6 +395,15 @@ export const bulkUpdateRecords = familyBoundMutation({
       // アクセス権のチェック（IDOR対策の確実な実行）
       requireRecordAccess(ctx.user, record);
 
+      if (
+        args.data.visibility !== undefined &&
+        record.accountId !== ctx.user._id
+      ) {
+        throw new Error(
+          "Forbidden: You cannot change visibility of records owned by other members",
+        );
+      }
+
       const patchData: {
         visibility?: "PRIVATE" | "SHARED";
         tags?: string[];
@@ -399,10 +415,9 @@ export const bulkUpdateRecords = familyBoundMutation({
       }
 
       if (args.data.tags !== undefined) {
-        const mergedTags = Array.from(
+        patchData.tags = Array.from(
           new Set([...record.tags, ...args.data.tags]),
         );
-        patchData.tags = mergedTags;
       }
 
       if (Object.keys(patchData).length > 0) {
