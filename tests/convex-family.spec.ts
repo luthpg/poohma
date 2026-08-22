@@ -1484,5 +1484,65 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         );
       });
     });
+
+    it("家族唯一のメンバーが移行して離脱した場合、孤立共有レコードおよび旧家族がクリーンアップされること", async () => {
+      const t = convexTest(schema, modules);
+      let familyOldId!: Id<"families">;
+      let userSoloId!: Id<"users">;
+      let sharedRecordId!: Id<"serviceRecords">;
+
+      await t.run(async (ctx) => {
+        familyOldId = await ctx.db.insert("families", {
+          name: "Old Solo Family",
+          updatedAt: Date.now(),
+        });
+        userSoloId = await ctx.db.insert("users", {
+          userId: "user_solo_leave",
+          email: "solo_leave@example.com",
+          familyId: familyOldId,
+          updatedAt: Date.now(),
+        });
+        sharedRecordId = await ctx.db.insert("serviceRecords", {
+          userId: "user_solo_leave",
+          accountId: userSoloId,
+          familyId: familyOldId,
+          ownerFamilyId: familyOldId,
+          title: "孤立する共有レコード",
+          sortKey: computeSortKey("孤立する共有レコード"),
+          ownerType: "family",
+          admins: [userSoloId],
+          credentials: [],
+          tags: [],
+          updatedAt: Date.now(),
+        });
+      });
+
+      const userSoloClient = t.withIdentity({
+        subject: "user_solo_leave",
+        email: "solo_leave@example.com",
+      });
+
+      const prep = await userSoloClient.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "create",
+          name: "New Family",
+          masterKeyEncrypted: "enc",
+          masterKeyIv: "iv",
+          masterKeySalt: "salt",
+        },
+      );
+
+      await userSoloClient.mutation(api.families.commitFamilyMigration, {
+        migrationId: prep.migrationId,
+        credentials: [],
+      });
+
+      // DB検証: 孤立した共有レコードおよびメンバー不在となった旧家族が削除されていること
+      await t.run(async (ctx) => {
+        expect(await ctx.db.get(sharedRecordId)).toBeNull();
+        expect(await ctx.db.get(familyOldId)).toBeNull();
+      });
+    });
   });
 });

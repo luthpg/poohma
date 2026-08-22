@@ -38,6 +38,14 @@ export async function reconcileAdminsOnLeave(
     .filter((u) => u._id !== leavingAccountId)
     .map((u) => u._id);
 
+  // 残存メンバーがいない場合、管理者不在・メンバー不在となった孤立共有レコードをクリーンアップ
+  if (remainingAccountIds.length === 0) {
+    for (const record of sharedRecords) {
+      await ctx.db.delete(record._id);
+    }
+    return;
+  }
+
   for (const record of sharedRecords) {
     const currentAdmins = record.admins ?? [];
     const validRemainingAdmins = currentAdmins.filter(
