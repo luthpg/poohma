@@ -114,6 +114,18 @@ describe("users.ts / 認証・認可・セキュリティ境界の検証", () =>
 
   it("getAccountsは呼び出し元のidentity.subjectに紐づくアカウントのみを返し、他ユーザー(他Family)のアカウントを含まないこと", async () => {
     const t = convexTest(schema, modules);
+    let familyIdX!: Id<"families">;
+    let familyIdY!: Id<"families">;
+    await t.run(async (ctx) => {
+      familyIdX = await ctx.db.insert("families", {
+        name: "Family X",
+        updatedAt: Date.now(),
+      });
+      familyIdY = await ctx.db.insert("families", {
+        name: "Family Y",
+        updatedAt: Date.now(),
+      });
+    });
     const userX = t.withIdentity({
       subject: "cross_user_x",
       email: "x@example.com",
@@ -126,6 +138,22 @@ describe("users.ts / 認証・認可・セキュリティ境界の検証", () =>
     });
     await userX.mutation(api.users.syncUser, { displayName: "User X" });
     await userY.mutation(api.users.syncUser, { displayName: "User Y" });
+    await t.run(async (ctx) => {
+      const accountX = await ctx.db
+        .query("users")
+        .withIndex("by_userId", (q) => q.eq("userId", "cross_user_x"))
+        .first();
+      const accountY = await ctx.db
+        .query("users")
+        .withIndex("by_userId", (q) => q.eq("userId", "cross_user_y"))
+        .first();
+      if (accountX) {
+        await ctx.db.patch(accountX._id, { familyId: familyIdX });
+      }
+      if (accountY) {
+        await ctx.db.patch(accountY._id, { familyId: familyIdY });
+      }
+    });
     await userX.mutation(api.users.createAccount, { name: "User X Sub" });
 
     const accountsX = await userX.query(api.users.getAccounts, {});
@@ -133,21 +161,25 @@ describe("users.ts / 認証・認可・セキュリティ境界の検証", () =>
 
     expect(accountsX).toHaveLength(2);
     expect(accountsX.every((a) => a.userId === "cross_user_x")).toBe(true);
+    expect(accountsX.every((a) => a.family?.name !== "Family Y")).toBe(true);
     expect(accountsY).toHaveLength(1);
     expect(accountsY[0].userId).toBe("cross_user_y");
+    expect(accountsY.every((a) => a.family?.name !== "Family X")).toBe(true);
   });
 
   it("Familyに他メンバーが残っている場合、deleteAccountは共有Familyや他メンバーの所有物を破壊しないこと", async () => {
     const t = convexTest(schema, modules);
     let familyId!: Id<"families">;
+    let userAAccountId!: Id<"users">;
     let userBAccountId!: Id<"users">;
-    let sharedRecordId!: Id<"serviceRecords">;
+    let sharedRecordByB!: Id<"serviceRecords">;
+    let sharedRecordByA!: Id<"serviceRecords">;
     await t.run(async (ctx) => {
       familyId = await ctx.db.insert("families", {
         name: "共有家族",
         updatedAt: Date.now(),
       });
-      await ctx.db.insert("users", {
+      userAAccountId = await ctx.db.insert("users", {
         userId: "leave_user_a",
         email: "leavea@example.com",
         familyId,
@@ -159,11 +191,21 @@ describe("users.ts / 認証・認可・セキュリティ境界の検証", () =>
         familyId,
         updatedAt: Date.now(),
       });
-      sharedRecordId = await ctx.db.insert("serviceRecords", {
+      sharedRecordByB = await ctx.db.insert("serviceRecords", {
         userId: "leave_user_b",
         accountId: userBAccountId,
         familyId,
         title: "Bの共有レコード",
+        visibility: "SHARED",
+        credentials: [],
+        tags: [],
+        updatedAt: Date.now(),
+      });
+      sharedRecordByA = await ctx.db.insert("serviceRecords", {
+        userId: "leave_user_a",
+        accountId: userAAccountId,
+        familyId,
+        title: "Aの共有レコード",
         visibility: "SHARED",
         credentials: [],
         tags: [],
@@ -180,7 +222,8 @@ describe("users.ts / 認証・認可・セキュリティ境界の検証", () =>
 
     await t.run(async (ctx) => {
       expect(await ctx.db.get(familyId)).not.toBeNull();
-      expect(await ctx.db.get(sharedRecordId)).not.toBeNull();
+      expect(await ctx.db.get(sharedRecordByB)).not.toBeNull();
+      expect(await ctx.db.get(sharedRecordByA)).not.toBeNull();
       expect(await ctx.db.get(userBAccountId)).not.toBeNull();
       const removedA = await ctx.db
         .query("users")

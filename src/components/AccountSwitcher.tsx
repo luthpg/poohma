@@ -62,10 +62,9 @@ export function AccountSwitcher({ className = "" }: AccountSwitcherProps) {
     }
   };
 
-  const currentDisplayName =
-    activeAccount?.displayName ||
-    activeAccount?.name ||
-    (isLoading ? "読み込み中..." : "アカウント");
+  const currentDisplayName = isLoading
+    ? "読み込み中..."
+    : activeAccount?.displayName || activeAccount?.name || "アカウント";
   const currentFamilyName = isLoading
     ? "読み込み中..."
     : activeAccount?.family?.name || "ファミリー未所属";
