@@ -609,6 +609,10 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
         });
         const legacyPrivateRecord = await ctx.db.get(legacyPrivateRecordId);
 
+        if (!user1 || !user2 || !legacySharedRecord || !legacyPrivateRecord) {
+          throw new Error("Fixture not found");
+        }
+
         const {
           requireContentAccess,
           requireAdminAccess,
@@ -618,29 +622,29 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
         } = await import("../convex/rls");
 
         // ヘルパー動作検証
-        expect(getEffectiveOwnerType(legacySharedRecord!)).toBe("family");
-        expect(getEffectiveOwnerFamilyId(legacySharedRecord!)).toBe(family1Id);
-        expect(getEffectiveAdmins(legacySharedRecord!)).toEqual([user1Id]);
+        expect(getEffectiveOwnerType(legacySharedRecord)).toBe("family");
+        expect(getEffectiveOwnerFamilyId(legacySharedRecord)).toBe(family1Id);
+        expect(getEffectiveAdmins(legacySharedRecord)).toEqual([user1Id]);
 
-        expect(getEffectiveOwnerType(legacyPrivateRecord!)).toBe("user");
-        expect(getEffectiveOwnerFamilyId(legacyPrivateRecord!)).toBeUndefined();
-        expect(getEffectiveAdmins(legacyPrivateRecord!)).toEqual([]);
+        expect(getEffectiveOwnerType(legacyPrivateRecord)).toBe("user");
+        expect(getEffectiveOwnerFamilyId(legacyPrivateRecord)).toBeUndefined();
+        expect(getEffectiveAdmins(legacyPrivateRecord)).toEqual([]);
 
         // requireContentAccess / requireAdminAccess 正常系
         expect(() =>
-          requireContentAccess(user1!, legacySharedRecord!),
+          requireContentAccess(user1, legacySharedRecord),
         ).not.toThrow();
         expect(() =>
-          requireAdminAccess(user1!, legacySharedRecord!),
+          requireAdminAccess(user1, legacySharedRecord),
         ).not.toThrow();
 
         // 家族境界チェック（他家族からのアクセス拒否）
-        expect(() =>
-          requireContentAccess(user2!, legacySharedRecord!),
-        ).toThrow("Access denied");
-        expect(() =>
-          requireAdminAccess(user2!, legacySharedRecord!),
-        ).toThrow("Access denied");
+        expect(() => requireContentAccess(user2, legacySharedRecord)).toThrow(
+          "Access denied",
+        );
+        expect(() => requireAdminAccess(user2, legacySharedRecord)).toThrow(
+          "Access denied",
+        );
       });
     });
   });
