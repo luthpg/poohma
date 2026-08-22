@@ -21,6 +21,24 @@ describe("evaluatePasscodeStrength", () => {
     expect(result.isValid).toBe(false);
   });
 
+  it("全角文字や非ASCII文字が含まれている場合は無効になること", () => {
+    const resultWithZenkaku = evaluatePasscodeStrength(
+      "Tanuki-Coffee-９２８４！",
+    );
+    expect(resultWithZenkaku.isValid).toBe(false);
+    expect(resultWithZenkaku.reasons.join()).toContain(
+      "半角英数字（大文字、小文字）、半角記号のみ使用できます",
+    );
+
+    const resultWithJapanese = evaluatePasscodeStrength(
+      "TanukiCoffeeパスコード99!",
+    );
+    expect(resultWithJapanese.isValid).toBe(false);
+    expect(resultWithJapanese.reasons.join()).toContain(
+      "半角英数字（大文字、小文字）、半角記号のみ使用できます",
+    );
+  });
+
   it("十分な長さとランダム性を持つパスコードは有効になること", () => {
     const result = evaluatePasscodeStrength("Tanuki-Coffee-9284!");
     expect(result.isValid).toBe(true);

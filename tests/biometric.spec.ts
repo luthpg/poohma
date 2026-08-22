@@ -126,6 +126,11 @@ describe("生体認証解除機能のテスト (PRF拡張対応版: src/lib/biom
       // PRF拡張がリクエストに含まれているか検証
       expect(createArgs.publicKey.extensions?.prf).toBeDefined();
 
+      // Safari/iOS対応の residentKey: "required" が設定されているか検証
+      expect(createArgs.publicKey.authenticatorSelection?.residentKey).toBe(
+        "required",
+      );
+
       // IndexedDB に保存されたデータの構造を検証
       // biome-ignore lint/suspicious/noExplicitAny: for tests
       const savedData = store.get(`poohma_biometric_${mockUserId}`) as any;

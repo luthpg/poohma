@@ -86,7 +86,7 @@ export async function registerBiometricUnlock(
     authenticatorSelection: {
       authenticatorAttachment: "platform", // 指紋やFaceID等のプラットフォーム認証に限定
       userVerification: "required",
-      residentKey: "preferred",
+      residentKey: "required",
     },
     timeout: 60000,
     attestation: "none",
