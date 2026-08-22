@@ -27,7 +27,23 @@ export const backfillOwnershipModel = mutation({
         if (oldVisibility === "SHARED") {
           updates.ownerType = "family";
           updates.ownerFamilyId = record.familyId;
-          updates.admins = [record.accountId];
+
+          // 作成者が現在も該当家族に所属しているか検証
+          const creator = await ctx.db.get(record.accountId);
+          if (creator && creator.familyId === record.familyId) {
+            updates.admins = [record.accountId];
+          } else if (record.familyId) {
+            // 離脱済みの場合はその家族の現存メンバーを管理者として割り当て
+            const famId = record.familyId;
+            const currentMembers = await ctx.db
+              .query("users")
+              .withIndex("by_familyId", (q) => q.eq("familyId", famId))
+              .collect();
+            updates.admins =
+              currentMembers.length > 0 ? [currentMembers[0]._id] : [];
+          } else {
+            updates.admins = [];
+          }
         } else {
           updates.ownerType = "user";
           updates.ownerFamilyId = undefined;

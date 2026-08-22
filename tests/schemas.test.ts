@@ -268,6 +268,16 @@ describe("RecordInputSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("should allow omitted ownerType", () => {
+    const validData = {
+      title: "No Owner Type",
+      credentials: [],
+      tags: [],
+    };
+    const result = RecordInputSchema.safeParse(validData);
+    expect(result.success).toBe(true);
+  });
+
   it("should reject invalid ownerType", () => {
     const invalidData = {
       title: "Invalid Record",

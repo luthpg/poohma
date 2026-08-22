@@ -264,9 +264,16 @@ export function UserMenu({
                 ? String(row.ogpDescription)
                 : undefined,
               memo: row.Memo ? String(row.Memo) : undefined,
-              visibility: (row.Visibility === "SHARED"
-                ? "SHARED"
-                : "PRIVATE") as "PRIVATE" | "SHARED",
+              ownerType: (row.OwnerType === "family" ||
+              row.Visibility === "SHARED"
+                ? "family"
+                : "user") as "user" | "family",
+              adminEmails:
+                typeof row.Admins === "string" && row.Admins.trim()
+                  ? row.Admins.split(",")
+                      .map((a: string) => a.trim())
+                      .filter(Boolean)
+                  : undefined,
               credentials,
               tags,
             };

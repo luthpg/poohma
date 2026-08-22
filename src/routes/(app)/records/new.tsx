@@ -483,14 +483,14 @@ function NewRecordComponent() {
         {/* その他設定（公開設定・タグ・メモ） */}
         <section className="rounded-lg bg-card p-6 shadow-card transition-shadow space-y-6">
           <div>
-            <label
-              htmlFor="owner-type-group"
+            <span
+              id="owner-type-label"
               className="block text-[14px] font-medium text-foreground mb-2"
             >
               所有設定
-            </label>
+            </span>
             <ToggleGroup
-              id="owner-type-group"
+              aria-labelledby="owner-type-label"
               type="single"
               value={ownerType}
               onValueChange={(val) => {

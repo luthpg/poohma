@@ -100,8 +100,6 @@ export default defineSchema({
     .index("by_userId", ["userId"])
     .index("by_accountId", ["accountId"])
     .index("by_family_sortKey", ["familyId", "sortKey"])
-    .index("by_family_url", ["familyId", "url"])
-    .index("by_family_updatedAt", ["familyId", "updatedAt"])
     .index("by_ownerType_accountId", ["ownerType", "accountId"])
     .index("by_ownerType_ownerFamilyId", ["ownerType", "ownerFamilyId"]),
 });

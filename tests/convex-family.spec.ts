@@ -1479,8 +1479,9 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         expect(record?.ownerFamilyId).toBe(familyOldId);
         expect(record?.ownerType).toBe("family");
         expect(record?.admins).not.toContain(userLeaveId);
-        expect(record?.admins).toContain(userRemain1Id);
-        expect(record?.admins).toContain(userRemain2Id);
+        expect([...(record?.admins ?? [])].sort()).toEqual(
+          [userRemain1Id, userRemain2Id].sort(),
+        );
       });
     });
   });

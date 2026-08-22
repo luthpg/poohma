@@ -208,14 +208,14 @@ serviceRecords 1 ── * credentials(内包配列)
 | --------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | title                       | string                              | サービス名                                                                                                                                            |
 | titleReading                | string(optional)                    | 読み仮名（五十音インデックス用）                                                                                                                                 |
-| sortKey                     | string                              | 五十音順・アルファベット順ソートキー（グループ順位 2 桁ゼロ埋めプレフィックス + NFKC/ひらがな正規化文字列）                                                              |
+| sortKey                     | string(optional)                    | 五十音順・アルファベット順ソートキー（グループ順位 2 桁ゼロ埋めプレフィックス + NFKC/ひらがな正規化文字列）。backfill 完了までは optional |
 | url                         | string(optional)                    | サービスURL                                                                                                                                          |
 | ogpImage / ogpDescription   | string(optional)                    | OGP自動取得結果                                                                                                                                        |
 | customIcon                  | string(optional)                    | ファビコン取得失敗時のフォールバック表示（絵文字＋カラーコード等、FR-REC-19）                                                                                                      |
 | memo                        | string(optional)                    | メモ（最大10,000文字）                                                                                                                                   |
-| ownerType                   | "user" \| "family"                  | 所有者種別（"user": 個人所有, "family": 家族共有）                                                                                                 |
+| ownerType                   | ("user" \| "family")(optional)      | 所有者種別（"user": 個人所有, "family": 家族共有）。backfill 完了までは optional                                                                   |
 | ownerFamilyId               | Id<families>(optional)              | 共有レコードが属する家族ID（ownerType === "family" の場合）                                                                                        |
-| admins                      | Id<users>[]                         | レコード管理者（PoohMa accountId）配列。共有解除や削除、管理者変更権限を持つ                                                                       |
+| admins                      | Id<users>[](optional)               | レコード管理者（PoohMa accountId）配列。共有解除や削除、管理者変更権限を持つ。backfill 完了までは optional                                         |
 | userId                      | string                              | 作成者の Firebase UID                                                                                                                                |
 | accountId                   | Id<users>                           | 作成者の PoohMa Account ID（所有権・個人レコード境界）                                                                                                     |
 | familyId                    | Id<families>(optional)              | 暗号化スコープ・所属家族ID                                                                                                                          |
@@ -229,7 +229,7 @@ serviceRecords 1 ── * credentials(内包配列)
 | lastViewedAt / lastViewedBy | number(optional) / string(optional) | 直近の閲覧日時・閲覧者（FR-REC-16、簡易サマリ用。詳細な履歴は recordAccessLog を参照）                                                                                         |
 | updatedAt                   | number                              | 更新日時                                                                                                                                             |
 
-インデックス: by\_family\_sortKey, by\_ownerType\_accountId, by\_ownerType\_ownerFamilyId, by\_userId, by\_accountId, by\_familyId, by\_updatedAt
+インデックス: by\_family\_sortKey, by\_ownerType\_accountId, by\_ownerType\_ownerFamilyId, by\_userId, by\_accountId
 
 credentials要素：
 
@@ -623,7 +623,7 @@ decryptHint/encryptHint 側でマスターキー直接暗号化にフォール�
 | addRecordAdmin / removeRecordAdmin                                | Mutation     | familyBound   | 共有レコードの共同管理者の追加・解除（管理者限定）                                                                                                                           |
 | bulkShareRecords / bulkUnshareRecords                             | Mutation     | familyBound   | 選択した個人レコードの一括共有 / 共有レコードの一括共有解除                                                                                                                 |
 | previewCsvImport                                                  | Query/Action | familyBound   | インポート予定のCSV行と既存データ（URL＋タイトルで突合）を比較し、行ごとに新規／上書き／スキップを判定して返す（FR-CSV-07、9.7参照）                                                                             |
-| createRecord                                                      | Mutation     | familyBound   | レコード新規作成（zodによるサーバー再検証、sortKey自動算出、ownerType: "user" | "family"、credentials最大10件チェック）                                                                   |
+| createRecord                                                      | Mutation     | familyBound   | レコード新規作成（zodによるサーバー再検証、sortKey自動算出、ownerType: "user" \| "family"、credentials最大10件チェック）                                                                   |
 | updateRecord                                                      | Mutation     | familyBound   | レコード更新（rls.tsチェック、sortKey再算出、共有解除時は管理者権限を要求）                                                                                                 |
 | deleteRecord / deleteRecords                                      | Mutation     | familyBound   | 単体／一括削除（requireAdminAccessチェック、非管理者の共有レコード削除を防止）                                                                                              |
 | importRecords                                                     | Mutation     | familyBound   | CSVインポート（最大500件、家族内メールアドレスの厳格突合、行ごとのバリデーション結果を返却）                                                                                |

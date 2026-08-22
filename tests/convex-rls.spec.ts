@@ -506,6 +506,10 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
           ids: [sharedRecordId],
         }),
       ).rejects.toThrow("Access denied");
+
+      await t.run(async (ctx) => {
+        expect(await ctx.db.get(sharedRecordId)).not.toBeNull();
+      });
     });
 
     it("共有レコードの管理者はdeleteRecordsで削除できること", async () => {
@@ -547,6 +551,96 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
 
       await t.run(async (ctx) => {
         expect(await ctx.db.get(sharedRecordId)).toBeNull();
+      });
+    });
+
+    it("移行互換ヘルパー（getEffectiveOwnerType等）および家族境界チェックが機能すること", async () => {
+      const t = convexTest(schema, modules);
+      await t.run(async (ctx) => {
+        const family1Id = await ctx.db.insert("families", {
+          name: "Family 1",
+          updatedAt: Date.now(),
+        });
+        const family2Id = await ctx.db.insert("families", {
+          name: "Family 2",
+          updatedAt: Date.now(),
+        });
+        const user1Id = await ctx.db.insert("users", {
+          userId: "u1",
+          email: "u1@example.com",
+          familyId: family1Id,
+          updatedAt: Date.now(),
+        });
+        const user2Id = await ctx.db.insert("users", {
+          userId: "u2",
+          email: "u2@example.com",
+          familyId: family2Id,
+          updatedAt: Date.now(),
+        });
+
+        const user1 = await ctx.db.get(user1Id);
+        const user2 = await ctx.db.get(user2Id);
+
+        // 未移行の旧SHAREDレコード
+        const legacySharedRecordId = await ctx.db.insert("serviceRecords", {
+          userId: "u1",
+          accountId: user1Id,
+          familyId: family1Id,
+          title: "Legacy Shared",
+          sortKey: computeSortKey("Legacy Shared"),
+          visibility: "SHARED",
+          credentials: [],
+          tags: [],
+          updatedAt: Date.now(),
+        });
+        const legacySharedRecord = await ctx.db.get(legacySharedRecordId);
+
+        // 未移行の旧PRIVATEレコード
+        const legacyPrivateRecordId = await ctx.db.insert("serviceRecords", {
+          userId: "u1",
+          accountId: user1Id,
+          familyId: family1Id,
+          title: "Legacy Private",
+          sortKey: computeSortKey("Legacy Private"),
+          visibility: "PRIVATE",
+          credentials: [],
+          tags: [],
+          updatedAt: Date.now(),
+        });
+        const legacyPrivateRecord = await ctx.db.get(legacyPrivateRecordId);
+
+        const {
+          requireContentAccess,
+          requireAdminAccess,
+          getEffectiveOwnerType,
+          getEffectiveOwnerFamilyId,
+          getEffectiveAdmins,
+        } = await import("../convex/rls");
+
+        // ヘルパー動作検証
+        expect(getEffectiveOwnerType(legacySharedRecord!)).toBe("family");
+        expect(getEffectiveOwnerFamilyId(legacySharedRecord!)).toBe(family1Id);
+        expect(getEffectiveAdmins(legacySharedRecord!)).toEqual([user1Id]);
+
+        expect(getEffectiveOwnerType(legacyPrivateRecord!)).toBe("user");
+        expect(getEffectiveOwnerFamilyId(legacyPrivateRecord!)).toBeUndefined();
+        expect(getEffectiveAdmins(legacyPrivateRecord!)).toEqual([]);
+
+        // requireContentAccess / requireAdminAccess 正常系
+        expect(() =>
+          requireContentAccess(user1!, legacySharedRecord!),
+        ).not.toThrow();
+        expect(() =>
+          requireAdminAccess(user1!, legacySharedRecord!),
+        ).not.toThrow();
+
+        // 家族境界チェック（他家族からのアクセス拒否）
+        expect(() =>
+          requireContentAccess(user2!, legacySharedRecord!),
+        ).toThrow("Access denied");
+        expect(() =>
+          requireAdminAccess(user2!, legacySharedRecord!),
+        ).toThrow("Access denied");
       });
     });
   });

@@ -267,11 +267,11 @@ function RouteComponent() {
   const handleBulkShare = async () => {
     if (selectedIds.length === 0) return;
     try {
-      await bulkShareMut({
+      const result = await bulkShareMut({
         accountId: activeAccountId || undefined,
         ids: selectedIds as Id<"serviceRecords">[],
       });
-      toast.success(`${selectedIds.length} 件のレコードを家族と共有しました`);
+      toast.success(`${result.count} 件のレコードを家族と共有しました`);
       setSelectedIds([]);
       setIsSelectMode(false);
       setActiveModal(null);
@@ -284,11 +284,11 @@ function RouteComponent() {
   const handleBulkUnshare = async () => {
     if (selectedIds.length === 0) return;
     try {
-      await bulkUnshareMut({
+      const result = await bulkUnshareMut({
         accountId: activeAccountId || undefined,
         ids: selectedIds as Id<"serviceRecords">[],
       });
-      toast.success(`${selectedIds.length} 件のレコードの共有を解除しました`);
+      toast.success(`${result.count} 件のレコードの共有を解除しました`);
       setSelectedIds([]);
       setIsSelectMode(false);
       setActiveModal(null);
@@ -863,7 +863,7 @@ function ServiceListItem({
                   : "bg-secondary text-muted-foreground"
               }`}
             >
-              {isShared ? "共有中" : "個人"}
+              {isShared ? "共有中" : "自分のみ"}
             </span>
           </div>
           {record.url && (

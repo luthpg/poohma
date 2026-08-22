@@ -305,12 +305,16 @@ export const deleteAllAccounts = identityVerifiedMutation({
           await ctx.db.delete(familyId);
         } else {
           // 他のメンバーがいる場合は、このアカウントの個人レコードのみ削除し、共有レコードの管理者を調停
-          const personalRecords = await ctx.db
+          const allUserRecords = await ctx.db
             .query("serviceRecords")
-            .withIndex("by_ownerType_accountId", (q) =>
-              q.eq("ownerType", "user").eq("accountId", account._id),
-            )
+            .withIndex("by_accountId", (q) => q.eq("accountId", account._id))
             .collect();
+          const personalRecords = allUserRecords.filter(
+            (r) =>
+              r.ownerType === "user" ||
+              (!r.ownerType &&
+                (r as Record<string, unknown>).visibility !== "SHARED"),
+          );
           for (const record of personalRecords) {
             await ctx.db.delete(record._id);
           }
@@ -378,12 +382,16 @@ export const deleteAccount = authenticatedMutation({
         await ctx.db.delete(familyId);
       } else {
         // 他のメンバーがいる場合は、このアカウントの個人レコードのみ削除し、共有レコードの管理者を調停
-        const personalRecords = await ctx.db
+        const allUserRecords = await ctx.db
           .query("serviceRecords")
-          .withIndex("by_ownerType_accountId", (q) =>
-            q.eq("ownerType", "user").eq("accountId", user._id),
-          )
+          .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
           .collect();
+        const personalRecords = allUserRecords.filter(
+          (r) =>
+            r.ownerType === "user" ||
+            (!r.ownerType &&
+              (r as Record<string, unknown>).visibility !== "SHARED"),
+        );
         for (const record of personalRecords) {
           await ctx.db.delete(record._id);
         }

@@ -388,6 +388,7 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
     const ownedRecords = await userA.query(api.records.getOwnedRecords, {});
     expect(ownedRecords).toHaveLength(1);
     expect(ownedRecords[0].title).toBe("A's Private");
+    expect(ownedRecords[0].adminEmails).toBeDefined();
   });
 
   it("ワンタップ共有 (shareRecord) とワンタップ解除 (unshareRecord) が正しく動作すること", async () => {
@@ -512,9 +513,20 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
       targetAccountId: userBId,
     });
 
-    // B は管理者になったので削除可能
+    // B を管理者から解除
+    await userA.mutation(api.records.removeRecordAdmin, {
+      id: sharedRecordId,
+      targetAccountId: userBId,
+    });
+
+    // B は解除されたので削除不可（Access denied）
     await expect(
       userB.mutation(api.records.deleteRecord, { id: sharedRecordId }),
+    ).rejects.toThrow("Access denied");
+
+    // A は管理者のままなので削除可能
+    await expect(
+      userA.mutation(api.records.deleteRecord, { id: sharedRecordId }),
     ).resolves.not.toThrow();
   });
 
@@ -577,6 +589,10 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
       const r1 = await ctx.db.get(r1Id);
       expect(r1?.ownerType).toBe("family");
       expect(r1?.admins).toContain(userAId);
+
+      const r2 = await ctx.db.get(r2Id);
+      expect(r2?.ownerType).toBe("family");
+      expect(r2?.admins).toContain(userAId);
     });
 
     // 一括解除
@@ -589,6 +605,10 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
       const r1 = await ctx.db.get(r1Id);
       expect(r1?.ownerType).toBe("user");
       expect(r1?.admins).toEqual([]);
+
+      const r2 = await ctx.db.get(r2Id);
+      expect(r2?.ownerType).toBe("user");
+      expect(r2?.admins).toEqual([]);
     });
   });
 

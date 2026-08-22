@@ -141,13 +141,15 @@ function RecordDetailComponent({
     displayName?: string;
   }[];
 }) {
+  const effectiveAccountId = activeAccountId || record.accountId;
   const isOwner =
-    record.ownerType === "user" && record.accountId === activeAccountId;
+    (record.ownerType ?? "user") === "user" &&
+    record.accountId === effectiveAccountId;
   const isShared = record.ownerType === "family";
   const isAdmin =
     isOwner ||
     (isShared &&
-      (record.admins ?? []).includes(activeAccountId as Id<"users">));
+      (record.admins ?? []).includes(effectiveAccountId as Id<"users">));
   const isEditable = isOwner || isShared;
 
   const navigate = useNavigate();
@@ -712,14 +714,14 @@ function RecordDetailComponent({
           {/* 所有設定・タグ・メモ */}
           <section className="rounded-lg bg-card p-6 shadow-card transition-shadow space-y-6">
             <div>
-              <label
-                htmlFor="owner-type-group"
+              <span
+                id="edit-owner-type-label"
                 className="block text-[14px] font-medium text-foreground mb-2"
               >
                 所有設定
-              </label>
+              </span>
               <ToggleGroup
-                id="owner-type-group"
+                aria-labelledby="edit-owner-type-label"
                 type="single"
                 value={ownerType}
                 disabled={!isAdmin}
@@ -1138,8 +1140,12 @@ function ShareSettingsDialog({
       await onRecordUpdated();
     } catch (e: unknown) {
       console.error(e);
-      const msg = e instanceof Error ? e.message : "管理者の解除に失敗しました";
-      toast.error(msg);
+      const raw = e instanceof Error ? e.message : "";
+      toast.error(
+        raw.includes("管理者が0人になるため削除できません")
+          ? "管理者が0人になるため削除できません"
+          : "管理者の解除に失敗しました",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -1239,6 +1245,7 @@ function ShareSettingsDialog({
               </h3>
               <div className="flex gap-2">
                 <select
+                  aria-label="管理者に追加する家族メンバー"
                   value={selectedMemberId}
                   onChange={(e) => setSelectedMemberId(e.target.value)}
                   className="flex-1 rounded-md bg-card p-2 text-xs shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"

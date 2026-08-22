@@ -40,21 +40,44 @@ export async function reconcileAdminsOnLeave(
 
   for (const record of sharedRecords) {
     const currentAdmins = record.admins ?? [];
-    if (currentAdmins.includes(leavingAccountId)) {
-      const newAdmins = currentAdmins.filter((id) => id !== leavingAccountId);
-      if (newAdmins.length === 0) {
-        await ctx.db.patch(record._id, {
-          admins: remainingAccountIds,
-          updatedAt: Date.now(),
-        });
-      } else {
-        await ctx.db.patch(record._id, {
-          admins: newAdmins,
-          updatedAt: Date.now(),
-        });
-      }
+    const validRemainingAdmins = currentAdmins.filter(
+      (id) => id !== leavingAccountId && remainingAccountIds.includes(id),
+    );
+
+    const newAdmins =
+      validRemainingAdmins.length === 0
+        ? remainingAccountIds
+        : validRemainingAdmins;
+
+    const hasChanged =
+      newAdmins.length !== currentAdmins.length ||
+      newAdmins.some((id, idx) => id !== currentAdmins[idx]);
+
+    if (hasChanged) {
+      await ctx.db.patch(record._id, {
+        admins: newAdmins,
+        updatedAt: Date.now(),
+      });
     }
   }
+}
+
+/**
+ * 移行前（ownerType未設定）データも考慮してユーザーの個人レコードを取得するヘルパー
+ */
+async function getPersonalRecordsForUser(
+  ctx: { db: MutationCtx["db"] | QueryCtx["db"] },
+  accountId: Id<"users">,
+) {
+  const records = await ctx.db
+    .query("serviceRecords")
+    .withIndex("by_accountId", (q) => q.eq("accountId", accountId))
+    .collect();
+  return records.filter(
+    (r) =>
+      r.ownerType === "user" ||
+      (!r.ownerType && (r as Record<string, unknown>).visibility !== "SHARED"),
+  );
 }
 
 export const getFamilyMembersByFamilyId = async (
@@ -490,12 +513,7 @@ export const prepareFamilyMigration = authenticatedMutation({
       targetFamilyId = family._id;
     }
 
-    const userRecords = await ctx.db
-      .query("serviceRecords")
-      .withIndex("by_ownerType_accountId", (q) =>
-        q.eq("ownerType", "user").eq("accountId", user._id),
-      )
-      .collect();
+    const userRecords = await getPersonalRecordsForUser(ctx, user._id);
 
     const serviceRecordIds = userRecords.map((r) => r._id);
     const now = Date.now();
@@ -540,12 +558,7 @@ export const getMigrationForEncryption = authenticatedQuery({
     }
 
     // prepare 後に作成されたレコードも含めるためリアルタイムで全件取得
-    const currentRecords = await ctx.db
-      .query("serviceRecords")
-      .withIndex("by_ownerType_accountId", (q) =>
-        q.eq("ownerType", "user").eq("accountId", user._id),
-      )
-      .collect();
+    const currentRecords = await getPersonalRecordsForUser(ctx, user._id);
 
     const records = currentRecords.map((record) => ({
       _id: record._id,
@@ -620,12 +633,7 @@ export const commitFamilyMigration = authenticatedMutation({
     }
 
     // prepare 後に作成されたレコードも含めるためリアルタイムで全件取得
-    const currentRecords = await ctx.db
-      .query("serviceRecords")
-      .withIndex("by_ownerType_accountId", (q) =>
-        q.eq("ownerType", "user").eq("accountId", user._id),
-      )
-      .collect();
+    const currentRecords = await getPersonalRecordsForUser(ctx, user._id);
 
     // migration.serviceRecordIds(prepare時点のスナップショット)との集合比較
     const currentRecordIds = new Set(currentRecords.map((r) => r._id));
@@ -761,12 +769,7 @@ export const getRecordsForReEncryption = familyBoundQuery({
   handler: async (ctx) => {
     const { user } = ctx;
 
-    const records = await ctx.db
-      .query("serviceRecords")
-      .withIndex("by_ownerType_accountId", (q) =>
-        q.eq("ownerType", "user").eq("accountId", user._id),
-      )
-      .collect();
+    const records = await getPersonalRecordsForUser(ctx, user._id);
 
     return records
       .map((record) => ({
@@ -860,12 +863,7 @@ export const changeFamily = authenticatedMutation({
       targetFamilyId = family._id;
     }
 
-    const userRecords = await ctx.db
-      .query("serviceRecords")
-      .withIndex("by_ownerType_accountId", (q) =>
-        q.eq("ownerType", "user").eq("accountId", user._id),
-      )
-      .collect();
+    const userRecords = await getPersonalRecordsForUser(ctx, user._id);
 
     const serviceRecordIds = userRecords.map((r) => r._id);
     const now = Date.now();

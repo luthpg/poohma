@@ -9,7 +9,13 @@ import {
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { authenticatedQuery, familyBoundMutation } from "./customBuilders";
-import { requireAdminAccess, requireContentAccess } from "./rls";
+import {
+  getEffectiveAdmins,
+  getEffectiveOwnerFamilyId,
+  getEffectiveOwnerType,
+  requireAdminAccess,
+  requireContentAccess,
+} from "./rls";
 
 const ConvexCredentialInputSchema = CredentialInputSchema.extend({
   id: z.string(),
@@ -40,25 +46,39 @@ async function collectVisibleRecords(
       .collect();
 
     if (ownedOnly) {
-      return familyRecords.filter(
-        (r) =>
-          (r.ownerType === "user" && r.accountId === user._id) ||
-          (r.ownerType === "family" && (r.admins ?? []).includes(user._id)),
-      );
+      return familyRecords.filter((r) => {
+        const ownerType = getEffectiveOwnerType(r);
+        const ownerFamilyId = getEffectiveOwnerFamilyId(r);
+        const admins = getEffectiveAdmins(r) ?? [];
+        return (
+          (ownerType === "user" && r.accountId === user._id) ||
+          (ownerType === "family" &&
+            ownerFamilyId === user.familyId &&
+            admins.includes(user._id))
+        );
+      });
     }
-    return familyRecords.filter(
-      (r) =>
-        r.ownerType === "family" ||
-        (r.ownerType === "user" && r.accountId === user._id),
-    );
+    return familyRecords.filter((r) => {
+      const ownerType = getEffectiveOwnerType(r);
+      const ownerFamilyId = getEffectiveOwnerFamilyId(r);
+      return (
+        (ownerType === "family" && ownerFamilyId === user.familyId) ||
+        (ownerType === "user" && r.accountId === user._id)
+      );
+    });
   }
 
-  return await ctx.db
+  // 家族未所属の場合
+  const personalRecords = await ctx.db
     .query("serviceRecords")
-    .withIndex("by_ownerType_accountId", (i) =>
-      i.eq("ownerType", "user").eq("accountId", user._id),
-    )
+    .withIndex("by_accountId", (i) => i.eq("accountId", user._id))
     .collect();
+
+  return personalRecords.filter(
+    (r) =>
+      getEffectiveOwnerType(r) === "user" ||
+      (!r.ownerType && (r as Record<string, unknown>).visibility !== "SHARED"),
+  );
 }
 
 // === Queries ===
@@ -92,28 +112,26 @@ export const getRecords = authenticatedQuery({
       );
     }
 
-    // ソート
-    if (args.sort) {
-      records.sort((a, b) => {
-        if (args.sort === "name-asc")
-          return (a.titleReading || a.title).localeCompare(
-            b.titleReading || b.title,
-          );
-        if (args.sort === "name-desc")
-          return (b.titleReading || b.title).localeCompare(
-            a.titleReading || a.title,
-          );
-        if (args.sort === "url-asc")
-          return (a.url || "").localeCompare(b.url || "");
-        if (args.sort === "url-desc")
-          return (b.url || "").localeCompare(a.url || "");
-        if (args.sort === "date-asc" || args.sort === "updatedAt-asc")
-          return a.updatedAt - b.updatedAt;
-        if (args.sort === "date-desc" || args.sort === "updatedAt-desc")
-          return b.updatedAt - a.updatedAt;
-        return (a.sortKey || a.title).localeCompare(b.sortKey || b.title);
-      });
-    }
+    // ソート（args.sort 未指定時も sortKey による既定ソートを適用）
+    records.sort((a, b) => {
+      if (args.sort === "name-asc")
+        return (a.titleReading || a.title).localeCompare(
+          b.titleReading || b.title,
+        );
+      if (args.sort === "name-desc")
+        return (b.titleReading || b.title).localeCompare(
+          a.titleReading || a.title,
+        );
+      if (args.sort === "url-asc")
+        return (a.url || "").localeCompare(b.url || "");
+      if (args.sort === "url-desc")
+        return (b.url || "").localeCompare(a.url || "");
+      if (args.sort === "date-asc" || args.sort === "updatedAt-asc")
+        return a.updatedAt - b.updatedAt;
+      if (args.sort === "date-desc" || args.sort === "updatedAt-desc")
+        return b.updatedAt - a.updatedAt;
+      return (a.sortKey || a.title).localeCompare(b.sortKey || b.title);
+    });
 
     return records;
   },
@@ -181,21 +199,24 @@ export const getOwnedRecords = authenticatedQuery({
     const { user } = ctx;
     const records = await collectVisibleRecords(ctx, user, true);
 
+    const members = user.familyId
+      ? await ctx.db
+          .query("users")
+          .withIndex("by_familyId", (q) => q.eq("familyId", user.familyId))
+          .collect()
+      : [user];
+    const emailById = new Map(members.map((m) => [m._id, m.email]));
+
     // 各レコードの管理者メールアドレスを付与
-    return await Promise.all(
-      records.map(async (r) => {
-        const adminDocs = await Promise.all(
-          (r.admins ?? []).map((adminId) => ctx.db.get(adminId)),
-        );
-        const adminEmails = adminDocs
-          .filter((u): u is Doc<"users"> => u != null && !!u.email)
-          .map((u) => u.email as string);
-        return {
-          ...r,
-          adminEmails,
-        };
-      }),
-    );
+    return records.map((r) => {
+      const admins = getEffectiveAdmins(r) ?? [];
+      return {
+        ...r,
+        adminEmails: admins
+          .map((id) => emailById.get(id))
+          .filter((email): email is string => !!email),
+      };
+    });
   },
 });
 
@@ -302,7 +323,10 @@ export const updateRecord = familyBoundMutation({
 
     const patchData: Partial<Doc<"serviceRecords">> = {
       title: args.data.title,
-      titleReading: args.data.titleReading ?? record.titleReading,
+      titleReading:
+        args.data.titleReading !== undefined
+          ? args.data.titleReading
+          : record.titleReading,
       url: args.data.url,
       ogpImage: args.data.ogpImage,
       ogpDescription: args.data.ogpDescription,
@@ -319,11 +343,12 @@ export const updateRecord = familyBoundMutation({
     });
 
     // ownerType の変更制御
+    const currentOwnerType = getEffectiveOwnerType(record);
     if (
       args.data.ownerType !== undefined &&
-      args.data.ownerType !== record.ownerType
+      args.data.ownerType !== currentOwnerType
     ) {
-      if (record.ownerType === "user" && args.data.ownerType === "family") {
+      if (currentOwnerType === "user" && args.data.ownerType === "family") {
         if (record.accountId !== ctx.user._id) {
           throw new Error("Forbidden: Only the owner can share this record");
         }
@@ -331,11 +356,12 @@ export const updateRecord = familyBoundMutation({
         patchData.ownerFamilyId = ctx.user.familyId;
         patchData.admins = [ctx.user._id];
       } else if (
-        record.ownerType === "family" &&
+        currentOwnerType === "family" &&
         args.data.ownerType === "user"
       ) {
         requireAdminAccess(ctx.user, record);
         patchData.ownerType = "user";
+        patchData.userId = ctx.user.userId;
         patchData.accountId = ctx.user._id;
         patchData.ownerFamilyId = undefined;
         patchData.admins = [];
@@ -409,6 +435,7 @@ export const unshareRecord = familyBoundMutation({
 
     await ctx.db.patch(args.id, {
       ownerType: "user",
+      userId: ctx.user.userId,
       accountId: ctx.user._id,
       ownerFamilyId: undefined,
       admins: [],
@@ -461,7 +488,10 @@ export const removeRecordAdmin = familyBoundMutation({
     requireAdminAccess(ctx.user, record);
 
     const admins = record.admins ?? [];
-    if (admins.length <= 1 && admins.includes(args.targetAccountId)) {
+    if (!admins.includes(args.targetAccountId)) {
+      throw new Error("Target user is not an administrator of this record");
+    }
+    if (admins.length <= 1) {
       throw new Error("管理者が0人になるため削除できません");
     }
 
@@ -515,6 +545,7 @@ export const bulkUnshareRecords = familyBoundMutation({
       ) {
         await ctx.db.patch(id, {
           ownerType: "user",
+          userId: ctx.user.userId,
           accountId: ctx.user._id,
           ownerFamilyId: undefined,
           admins: [],
@@ -611,8 +642,9 @@ export const importRecords = familyBoundMutation({
           // インポート実行者を必ず含める
           resolvedSet.add(user._id);
 
-          if (record.admins && record.admins.length > 0) {
-            for (const email of record.admins) {
+          const candidateEmails = record.adminEmails ?? record.admins ?? [];
+          if (candidateEmails.length > 0) {
+            for (const email of candidateEmails) {
               const matched = emailToAccountMap.get(email.toLowerCase());
               if (matched) {
                 for (const accId of matched) {
