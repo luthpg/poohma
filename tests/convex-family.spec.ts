@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { api, internal } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import schema from "../convex/schema";
+import { computeSortKey } from "../src/utils/index-group";
 
 const modules = import.meta.glob("../convex/**/*.ts");
 
@@ -89,7 +90,9 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           accountId: userAId,
           familyId: family1Id,
           title: "RA",
-          visibility: "PRIVATE",
+          sortKey: computeSortKey("RA"),
+          ownerType: "user",
+          admins: [],
           credentials: [
             {
               id: credAId,
@@ -109,7 +112,9 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           accountId: userBId,
           familyId: family1Id,
           title: "RB",
-          visibility: "PRIVATE",
+          sortKey: computeSortKey("RB"),
+          ownerType: "user",
+          admins: [],
           credentials: [
             {
               id: credBId,
@@ -409,7 +414,9 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           accountId: userSoloId,
           familyId: oldFamilyId,
           title: "Solo's Record",
-          visibility: "SHARED",
+          sortKey: computeSortKey("Solo's Record"),
+          ownerType: "user",
+          admins: [],
           credentials: [
             {
               id: "cred_solo",
@@ -530,11 +537,13 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         });
         await ctx.db.insert("serviceRecords", {
           title: "省略テストレコード",
+          sortKey: computeSortKey("省略テストレコード"),
           tags: [],
           userId: "user_omit",
           accountId: userOmitId,
           familyId: oldFamilyId,
-          visibility: "PRIVATE",
+          ownerType: "user",
+          admins: [],
           credentials: [
             {
               id: "cred_a",
@@ -693,8 +702,11 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         record1Id = await ctx.db.insert("serviceRecords", {
           userId: "user_dup_cred",
           accountId: userDupCredId,
+          familyId: undefined,
           title: "Service 1",
-          visibility: "PRIVATE",
+          sortKey: computeSortKey("Service 1"),
+          ownerType: "user",
+          admins: [],
           credentials: [
             {
               id: "same_cred_id",
@@ -709,8 +721,11 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         record2Id = await ctx.db.insert("serviceRecords", {
           userId: "user_dup_cred",
           accountId: userDupCredId,
+          familyId: undefined,
           title: "Service 2",
-          visibility: "PRIVATE",
+          sortKey: computeSortKey("Service 2"),
+          ownerType: "user",
+          admins: [],
           credentials: [
             {
               id: "same_cred_id",
@@ -884,11 +899,13 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         // prepare 前に存在するレコード
         recordBeforeId = await ctx.db.insert("serviceRecords", {
           title: "テストレコード1",
+          sortKey: computeSortKey("テストレコード1"),
           tags: [],
           userId: "user_mid",
           accountId: userMidId,
           familyId: oldFamilyId,
-          visibility: "PRIVATE",
+          ownerType: "user",
+          admins: [],
           credentials: [
             {
               id: "cred_before",
@@ -922,11 +939,13 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
       await t.run(async (ctx) => {
         newRecordId = await ctx.db.insert("serviceRecords", {
           title: "テストレコード2",
+          sortKey: computeSortKey("テストレコード2"),
           tags: [],
           userId: "user_mid",
           accountId: userMidId,
           familyId: oldFamilyId,
-          visibility: "PRIVATE",
+          ownerType: "user",
+          admins: [],
           credentials: [
             {
               id: "cred_after",
@@ -1042,7 +1061,9 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           accountId: userSoloId,
           familyId: oldFamilyId,
           title: "既存レコード",
-          visibility: "SHARED",
+          sortKey: computeSortKey("既存レコード"),
+          ownerType: "user",
+          admins: [],
           credentials: [
             {
               id: "cred_a",
@@ -1077,7 +1098,9 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           accountId: userSoloId,
           familyId: oldFamilyId,
           title: "並行操作で追加されたレコード",
-          visibility: "PRIVATE",
+          sortKey: computeSortKey("並行操作で追加されたレコード"),
+          ownerType: "user",
+          admins: [],
           credentials: [],
           tags: [],
           updatedAt: Date.now(),
@@ -1139,8 +1162,11 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           userId: "user_staying2",
           accountId: stayingId,
           familyId: oldFamilyId,
+          ownerFamilyId: oldFamilyId,
           title: "旧ファミリーの共有レコード",
-          visibility: "SHARED",
+          sortKey: computeSortKey("旧ファミリーの共有レコード"),
+          ownerType: "family",
+          admins: [stayingId],
           credentials: [],
           tags: [],
           updatedAt: Date.now(),
@@ -1372,6 +1398,90 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
       const user2 = await t.run(async (ctx) => ctx.db.get(account2Id));
       expect(user1?.familyId).toBe(commitResult.familyId);
       expect(user2?.familyId).toBeUndefined();
+    });
+
+    it("家族移行時、共有レコードは旧家族に残り、離脱者が唯一の管理者だった場合は残りの家族メンバー全員が自動昇格すること", async () => {
+      const t = convexTest(schema, modules);
+      let familyOldId!: Id<"families">;
+      let userLeaveId!: Id<"users">;
+      let userRemain1Id!: Id<"users">;
+      let userRemain2Id!: Id<"users">;
+      let sharedRecordId!: Id<"serviceRecords">;
+
+      await t.run(async (ctx) => {
+        familyOldId = await ctx.db.insert("families", {
+          name: "Old Family",
+          updatedAt: Date.now(),
+        });
+
+        userLeaveId = await ctx.db.insert("users", {
+          userId: "user_leave",
+          email: "leave@example.com",
+          familyId: familyOldId,
+          updatedAt: Date.now(),
+        });
+
+        userRemain1Id = await ctx.db.insert("users", {
+          userId: "user_remain1",
+          email: "remain1@example.com",
+          familyId: familyOldId,
+          updatedAt: Date.now(),
+        });
+
+        userRemain2Id = await ctx.db.insert("users", {
+          userId: "user_remain2",
+          email: "remain2@example.com",
+          familyId: familyOldId,
+          updatedAt: Date.now(),
+        });
+
+        sharedRecordId = await ctx.db.insert("serviceRecords", {
+          userId: "user_leave",
+          accountId: userLeaveId,
+          familyId: familyOldId,
+          ownerFamilyId: familyOldId,
+          title: "Shared Record",
+          sortKey: computeSortKey("Shared Record"),
+          ownerType: "family",
+          admins: [userLeaveId], // userLeave is the only admin
+          credentials: [],
+          tags: [],
+          updatedAt: Date.now(),
+        });
+      });
+
+      const userLeaveClient = t.withIdentity({
+        subject: "user_leave",
+        email: "leave@example.com",
+      });
+
+      // userLeave が新家族を作成して移行
+      const prep = await userLeaveClient.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "create",
+          name: "New Solo Family",
+          masterKeyEncrypted: "enc",
+          masterKeyIv: "iv",
+          masterKeySalt: "salt",
+        },
+      );
+
+      await userLeaveClient.mutation(api.families.commitFamilyMigration, {
+        migrationId: prep.migrationId,
+        credentials: [],
+      });
+
+      // DB検証: 共有レコードは旧家族に残り、admins が残った [userRemain1Id, userRemain2Id] に自動昇格されていること
+      await t.run(async (ctx) => {
+        const record = await ctx.db.get(sharedRecordId);
+        expect(record?.familyId).toBe(familyOldId);
+        expect(record?.ownerFamilyId).toBe(familyOldId);
+        expect(record?.ownerType).toBe("family");
+        expect(record?.admins).not.toContain(userLeaveId);
+        expect(record?.admins).toContain(userRemain1Id);
+        expect(record?.admins).toContain(userRemain2Id);
+      });
     });
   });
 });

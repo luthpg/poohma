@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RecordInputSchema } from "@/utils/schemas";
+import { CredentialInputSchema, RecordInputSchema } from "@/utils/schemas";
 
 describe("RecordInputSchema", () => {
   it("should validate a valid record with encrypted hint", () => {
@@ -9,7 +9,7 @@ describe("RecordInputSchema", () => {
       ogpImage: "https://example.com/image.png",
       ogpDescription: "Test Description",
       memo: "Test Memo",
-      visibility: "PRIVATE",
+      ownerType: "user" as const,
       credentials: [
         {
           label: "Admin",
@@ -28,7 +28,7 @@ describe("RecordInputSchema", () => {
   it("should validate a credential without passwordHint", () => {
     const validData = {
       title: "Test",
-      visibility: "PRIVATE",
+      ownerType: "user" as const,
       credentials: [
         {
           label: "Admin",
@@ -45,7 +45,7 @@ describe("RecordInputSchema", () => {
   it("should reject plaintext passwordHint (not Base64)", () => {
     const invalidData = {
       title: "Test",
-      visibility: "PRIVATE",
+      ownerType: "user" as const,
       credentials: [
         {
           label: "Admin",
@@ -63,7 +63,7 @@ describe("RecordInputSchema", () => {
   it("should reject passwordHint without IV", () => {
     const invalidData = {
       title: "Test",
-      visibility: "PRIVATE",
+      ownerType: "user" as const,
       credentials: [
         {
           label: "Admin",
@@ -87,7 +87,7 @@ describe("RecordInputSchema", () => {
   it("should reject IV without passwordHint", () => {
     const invalidData = {
       title: "Test",
-      visibility: "PRIVATE",
+      ownerType: "user" as const,
       credentials: [
         {
           label: "Admin",
@@ -111,7 +111,7 @@ describe("RecordInputSchema", () => {
   it("should fail if title is empty", () => {
     const invalidData = {
       title: "",
-      visibility: "PRIVATE",
+      ownerType: "user" as const,
       credentials: [],
       tags: [],
     };
@@ -127,7 +127,7 @@ describe("RecordInputSchema", () => {
     const invalidData = {
       title: "Test",
       url: "not-a-url",
-      visibility: "PRIVATE",
+      ownerType: "user" as const,
       credentials: [],
       tags: [],
     };
@@ -140,7 +140,7 @@ describe("RecordInputSchema", () => {
     const validData = {
       title: "Test",
       url: "",
-      visibility: "PRIVATE",
+      ownerType: "user" as const,
       credentials: [],
       tags: [],
     };
@@ -154,7 +154,7 @@ describe("RecordInputSchema", () => {
   it("should fail if title exceeds 255 characters", () => {
     const invalidData = {
       title: "a".repeat(256),
-      visibility: "PRIVATE",
+      ownerType: "user" as const,
       credentials: [],
       tags: [],
     };
@@ -171,7 +171,7 @@ describe("RecordInputSchema", () => {
   it("should allow title with exactly 255 characters", () => {
     const validData = {
       title: "a".repeat(255),
-      visibility: "PRIVATE",
+      ownerType: "user" as const,
       credentials: [],
       tags: [],
     };
@@ -183,7 +183,7 @@ describe("RecordInputSchema", () => {
   it("should fail if tag exceeds 50 characters", () => {
     const invalidData = {
       title: "Test",
-      visibility: "PRIVATE",
+      ownerType: "user" as const,
       credentials: [],
       tags: ["a".repeat(51)],
     };
@@ -200,7 +200,7 @@ describe("RecordInputSchema", () => {
   it("should fail if credential label exceeds 100 characters", () => {
     const invalidData = {
       title: "Test",
-      visibility: "PRIVATE",
+      ownerType: "user" as const,
       credentials: [{ label: "a".repeat(101) }],
       tags: [],
     };
@@ -217,7 +217,7 @@ describe("RecordInputSchema", () => {
   it("should fail if credential loginId exceeds 255 characters", () => {
     const invalidData = {
       title: "Test",
-      visibility: "PRIVATE",
+      ownerType: "user" as const,
       credentials: [{ loginId: "a".repeat(256) }],
       tags: [],
     };
@@ -234,7 +234,7 @@ describe("RecordInputSchema", () => {
   it("should accept exactly 10 credentials", () => {
     const validData = {
       title: "Test",
-      visibility: "PRIVATE",
+      ownerType: "user" as const,
       credentials: Array.from({ length: 10 }, (_, i) => ({
         label: `Cred${i}`,
       })),
@@ -247,7 +247,7 @@ describe("RecordInputSchema", () => {
   it("should reject 11 credentials", () => {
     const invalidData = {
       title: "Test",
-      visibility: "PRIVATE",
+      ownerType: "user" as const,
       credentials: Array.from({ length: 11 }, (_, i) => ({
         label: `Cred${i}`,
       })),
@@ -256,9 +256,29 @@ describe("RecordInputSchema", () => {
     const result = RecordInputSchema.safeParse(invalidData);
     expect(result.success).toBe(false);
   });
-});
 
-import { CredentialInputSchema } from "@/utils/schemas";
+  it("should validate ownerType: 'family'", () => {
+    const validData = {
+      title: "Family Record",
+      ownerType: "family" as const,
+      credentials: [],
+      tags: [],
+    };
+    const result = RecordInputSchema.safeParse(validData);
+    expect(result.success).toBe(true);
+  });
+
+  it("should reject invalid ownerType", () => {
+    const invalidData = {
+      title: "Invalid Record",
+      ownerType: "invalid_type",
+      credentials: [],
+      tags: [],
+    };
+    const result = RecordInputSchema.safeParse(invalidData);
+    expect(result.success).toBe(false);
+  });
+});
 
 describe("1.3 スキーマ・バリデーション (CredentialInputSchema)", () => {
   // 正常系のベースデータ

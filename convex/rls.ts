@@ -1,29 +1,47 @@
 import type { Doc } from "./_generated/dataModel";
 
 /**
- * レコードに対するアクセス権限を検証し、権限がなければ例外をスローする
+ * レコードのコンテンツ閲覧・編集権限（個人所有者または共有家族メンバー）を検証
  */
-export function requireRecordAccess(
+export function requireContentAccess(
   user: Doc<"users">,
   record: Doc<"serviceRecords">,
 ) {
-  // レコードがファミリーに属している場合、ユーザーも同一ファミリーに所属していなければならない
-  if (record.familyId !== undefined && record.familyId !== user.familyId) {
-    throw new Error(
-      "Access denied: You don't have permission to access this record",
-    );
-  }
+  const isPersonalOwner =
+    record.ownerType === "user" && record.accountId === user._id;
+  const isFamilyMember =
+    record.ownerType === "family" &&
+    record.ownerFamilyId !== undefined &&
+    record.ownerFamilyId === user.familyId;
 
-  // PRIVATE レコードの所有権はアカウントID単位で判定
-  const isOwner = record.accountId === user._id;
-  const isFamilyShared =
-    record.visibility === "SHARED" &&
-    record.familyId !== undefined &&
-    record.familyId === user.familyId;
-
-  if (!isOwner && !isFamilyShared) {
+  if (!isPersonalOwner && !isFamilyMember) {
     throw new Error(
       "Access denied: You don't have permission to access this record",
     );
   }
 }
+
+/**
+ * レコードの管理権限（共有解除・管理者変更・削除等）を検証
+ */
+export function requireAdminAccess(
+  user: Doc<"users">,
+  record: Doc<"serviceRecords">,
+) {
+  const isPersonalOwner =
+    record.ownerType === "user" && record.accountId === user._id;
+  const isFamilyAdmin =
+    record.ownerType === "family" &&
+    record.ownerFamilyId !== undefined &&
+    record.ownerFamilyId === user.familyId &&
+    (record.admins ?? []).includes(user._id);
+
+  if (!isPersonalOwner && !isFamilyAdmin) {
+    throw new Error(
+      "Access denied: admin rights required to manage sharing for this record",
+    );
+  }
+}
+
+/** 後方互換性エイリアス */
+export const requireRecordAccess = requireContentAccess;

@@ -105,7 +105,7 @@ describe("PoohMa Multi-Account & Authorization Tests", () => {
     await user.mutation(api.records.createRecord, {
       accountId: accountAId,
       title: "Record in Family A",
-      visibility: "PRIVATE",
+      ownerType: "user",
       credentials: [],
       tags: ["tagA"],
     });
@@ -128,7 +128,7 @@ describe("PoohMa Multi-Account & Authorization Tests", () => {
     await user.mutation(api.records.createRecord, {
       accountId: accountBId,
       title: "Record in Family B",
-      visibility: "SHARED",
+      ownerType: "family",
       credentials: [],
       tags: ["tagB"],
     });
@@ -216,7 +216,7 @@ describe("PoohMa Multi-Account & Authorization Tests", () => {
     await user.mutation(api.records.createRecord, {
       accountId: acc1Id,
       title: "Family Record",
-      visibility: "PRIVATE",
+      ownerType: "user",
       credentials: [],
       tags: [],
     });
@@ -234,7 +234,7 @@ describe("PoohMa Multi-Account & Authorization Tests", () => {
     await user.mutation(api.records.createRecord, {
       accountId: acc2Id,
       title: "Family 2 Record",
-      visibility: "PRIVATE",
+      ownerType: "user",
       credentials: [],
       tags: [],
     });

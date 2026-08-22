@@ -6,6 +6,7 @@ import {
   identityVerifiedMutation,
   identityVerifiedQuery,
 } from "./customBuilders";
+import { reconcileAdminsOnLeave } from "./families";
 
 /**
  * ユーザー同期（ログイン時に呼ばれる）
@@ -287,7 +288,7 @@ export const deleteAllAccounts = identityVerifiedMutation({
         if (otherMembers.length === 0) {
           const familyRecords = await ctx.db
             .query("serviceRecords")
-            .withIndex("by_familyId", (q) => q.eq("familyId", familyId))
+            .withIndex("by_family_sortKey", (q) => q.eq("familyId", familyId))
             .collect();
           for (const record of familyRecords) {
             await ctx.db.delete(record._id);
@@ -303,18 +304,18 @@ export const deleteAllAccounts = identityVerifiedMutation({
 
           await ctx.db.delete(familyId);
         } else {
-          // 他のメンバーがいる場合は、このアカウントが作成した非公開レコードのみ削除
-          const privateRecords = await ctx.db
+          // 他のメンバーがいる場合は、このアカウントの個人レコードのみ削除し、共有レコードの管理者を調停
+          const personalRecords = await ctx.db
             .query("serviceRecords")
-            .withIndex("by_familyId_visibility", (q) =>
-              q.eq("familyId", familyId).eq("visibility", "PRIVATE"),
+            .withIndex("by_ownerType_accountId", (q) =>
+              q.eq("ownerType", "user").eq("accountId", account._id),
             )
             .collect();
-          for (const record of privateRecords.filter(
-            (r) => r.accountId === account._id,
-          )) {
+          for (const record of personalRecords) {
             await ctx.db.delete(record._id);
           }
+
+          await reconcileAdminsOnLeave(ctx, familyId, account._id);
         }
       } else {
         // 家族未所属の場合、このアカウントが作成した全レコードを削除
@@ -360,7 +361,7 @@ export const deleteAccount = authenticatedMutation({
       if (otherMembers.length === 0) {
         const familyRecords = await ctx.db
           .query("serviceRecords")
-          .withIndex("by_familyId", (q) => q.eq("familyId", familyId))
+          .withIndex("by_family_sortKey", (q) => q.eq("familyId", familyId))
           .collect();
         for (const record of familyRecords) {
           await ctx.db.delete(record._id);
@@ -376,18 +377,18 @@ export const deleteAccount = authenticatedMutation({
 
         await ctx.db.delete(familyId);
       } else {
-        // 他のメンバーがいる場合は、このアカウントが作成した非公開レコードのみ削除
-        const privateRecords = await ctx.db
+        // 他のメンバーがいる場合は、このアカウントの個人レコードのみ削除し、共有レコードの管理者を調停
+        const personalRecords = await ctx.db
           .query("serviceRecords")
-          .withIndex("by_familyId_visibility", (q) =>
-            q.eq("familyId", familyId).eq("visibility", "PRIVATE"),
+          .withIndex("by_ownerType_accountId", (q) =>
+            q.eq("ownerType", "user").eq("accountId", user._id),
           )
           .collect();
-        for (const record of privateRecords.filter(
-          (r) => r.accountId === user._id,
-        )) {
+        for (const record of personalRecords) {
           await ctx.db.delete(record._id);
         }
+
+        await reconcileAdminsOnLeave(ctx, familyId, user._id);
       }
     } else {
       // 家族未所属の場合、このアカウントが作成した全レコードを削除

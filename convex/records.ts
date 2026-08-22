@@ -1,14 +1,15 @@
 import { v } from "convex/values";
 import { z } from "zod";
+import { computeSortKey } from "../src/utils/index-group";
 import {
   CredentialInputSchema,
   MAX_CREDENTIALS_PER_RECORD,
   RecordInputSchema,
 } from "../src/utils/schemas";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { authenticatedQuery, familyBoundMutation } from "./customBuilders";
-import { requireRecordAccess } from "./rls";
+import { requireAdminAccess, requireContentAccess } from "./rls";
 
 const ConvexCredentialInputSchema = CredentialInputSchema.extend({
   id: z.string(),
@@ -25,6 +26,7 @@ const ConvexRecordInputSchema = RecordInputSchema.extend({
 
 /**
  * ユーザーがアクセス可能な可視レコード（または所有レコード）を取得するヘルパー
+ * by_family_sortKey インデックスにより他家族のデータをスキャンせず高速取得
  */
 async function collectVisibleRecords(
   ctx: { db: QueryCtx["db"] },
@@ -32,24 +34,30 @@ async function collectVisibleRecords(
   ownedOnly = false,
 ): Promise<Doc<"serviceRecords">[]> {
   if (user.familyId) {
-    const q = ctx.db
+    const familyRecords = await ctx.db
       .query("serviceRecords")
-      .withIndex("by_familyId", (i) => i.eq("familyId", user.familyId));
-    return ownedOnly
-      ? await q.filter((f) => f.eq(f.field("accountId"), user._id)).collect()
-      : await q
-          .filter((f) =>
-            f.or(
-              f.eq(f.field("accountId"), user._id),
-              f.eq(f.field("visibility"), "SHARED"),
-            ),
-          )
-          .collect();
+      .withIndex("by_family_sortKey", (i) => i.eq("familyId", user.familyId))
+      .collect();
+
+    if (ownedOnly) {
+      return familyRecords.filter(
+        (r) =>
+          (r.ownerType === "user" && r.accountId === user._id) ||
+          (r.ownerType === "family" && (r.admins ?? []).includes(user._id)),
+      );
+    }
+    return familyRecords.filter(
+      (r) =>
+        r.ownerType === "family" ||
+        (r.ownerType === "user" && r.accountId === user._id),
+    );
   }
+
   return await ctx.db
     .query("serviceRecords")
-    .withIndex("by_accountId", (i) => i.eq("accountId", user._id))
-    .filter((f) => f.eq(f.field("familyId"), undefined))
+    .withIndex("by_ownerType_accountId", (i) =>
+      i.eq("ownerType", "user").eq("accountId", user._id),
+    )
     .collect();
 }
 
@@ -85,26 +93,27 @@ export const getRecords = authenticatedQuery({
     }
 
     // ソート
-    records.sort((a, b) => {
-      if (args.sort === "name-asc")
-        return (a.titleReading || a.title).localeCompare(
-          b.titleReading || b.title,
-        );
-      if (args.sort === "name-desc")
-        return (b.titleReading || b.title).localeCompare(
-          a.titleReading || a.title,
-        );
-      if (args.sort === "url-asc")
-        return (a.url || "").localeCompare(b.url || "");
-      if (args.sort === "url-desc")
-        return (b.url || "").localeCompare(a.url || "");
-      if (args.sort === "date-asc" || args.sort === "updatedAt-asc")
-        return a.updatedAt - b.updatedAt;
-      if (args.sort === "date-desc" || args.sort === "updatedAt-desc")
-        return b.updatedAt - a.updatedAt;
-      // default: name-asc
-      return a.title.localeCompare(b.title);
-    });
+    if (args.sort) {
+      records.sort((a, b) => {
+        if (args.sort === "name-asc")
+          return (a.titleReading || a.title).localeCompare(
+            b.titleReading || b.title,
+          );
+        if (args.sort === "name-desc")
+          return (b.titleReading || b.title).localeCompare(
+            a.titleReading || a.title,
+          );
+        if (args.sort === "url-asc")
+          return (a.url || "").localeCompare(b.url || "");
+        if (args.sort === "url-desc")
+          return (b.url || "").localeCompare(a.url || "");
+        if (args.sort === "date-asc" || args.sort === "updatedAt-asc")
+          return a.updatedAt - b.updatedAt;
+        if (args.sort === "date-desc" || args.sort === "updatedAt-desc")
+          return b.updatedAt - a.updatedAt;
+        return (a.sortKey || a.title).localeCompare(b.sortKey || b.title);
+      });
+    }
 
     return records;
   },
@@ -118,10 +127,22 @@ export const getRecordDetail = authenticatedQuery({
       throw new Error("Record not found");
     }
 
-    // アクセス権のチェック（IDOR対策の確実な実行）
-    requireRecordAccess(ctx.user, record);
+    // アクセス権のチェック（IDOR対策）
+    requireContentAccess(ctx.user, record);
 
     const recordOwner = await ctx.db.get(record.accountId);
+
+    // 管理者ユーザー一覧の情報を取得
+    const adminDocs = await Promise.all(
+      (record.admins ?? []).map((adminId) => ctx.db.get(adminId)),
+    );
+    const admins = adminDocs
+      .filter((u): u is Doc<"users"> => u != null)
+      .map((u) => ({
+        _id: u._id,
+        displayName: u.displayName,
+        email: u.email,
+      }));
 
     return {
       ...record,
@@ -131,6 +152,7 @@ export const getRecordDetail = authenticatedQuery({
             email: recordOwner.email,
           }
         : null,
+      adminUsers: admins,
     };
   },
 });
@@ -157,8 +179,23 @@ export const getOwnedRecords = authenticatedQuery({
   args: {},
   handler: async (ctx) => {
     const { user } = ctx;
+    const records = await collectVisibleRecords(ctx, user, true);
 
-    return await collectVisibleRecords(ctx, user, true);
+    // 各レコードの管理者メールアドレスを付与
+    return await Promise.all(
+      records.map(async (r) => {
+        const adminDocs = await Promise.all(
+          (r.admins ?? []).map((adminId) => ctx.db.get(adminId)),
+        );
+        const adminEmails = adminDocs
+          .filter((u): u is Doc<"users"> => u != null && !!u.email)
+          .map((u) => u.email as string);
+        return {
+          ...r,
+          adminEmails,
+        };
+      }),
+    );
   },
 });
 
@@ -172,7 +209,7 @@ export const createRecord = familyBoundMutation({
     ogpImage: v.optional(v.string()),
     ogpDescription: v.optional(v.string()),
     memo: v.optional(v.string()),
-    visibility: v.union(v.literal("PRIVATE"), v.literal("SHARED")),
+    ownerType: v.optional(v.union(v.literal("user"), v.literal("family"))),
     credentials: v.array(
       v.object({
         id: v.string(),
@@ -195,6 +232,11 @@ export const createRecord = familyBoundMutation({
     }
 
     const { user } = ctx;
+    const isFamily = args.ownerType === "family";
+    const sortKey = computeSortKey({
+      titleReading: args.titleReading,
+      title: args.title,
+    });
 
     const recordId = await ctx.db.insert("serviceRecords", {
       title: args.title,
@@ -203,10 +245,13 @@ export const createRecord = familyBoundMutation({
       ogpImage: args.ogpImage,
       ogpDescription: args.ogpDescription,
       memo: args.memo,
-      visibility: args.visibility,
       userId: user.userId,
       accountId: user._id,
       familyId: user.familyId,
+      sortKey,
+      ownerType: isFamily ? "family" : "user",
+      ownerFamilyId: isFamily ? user.familyId : undefined,
+      admins: isFamily ? [user._id] : [],
       credentials: args.credentials,
       tags: args.tags,
       updatedAt: Date.now(),
@@ -226,7 +271,7 @@ export const updateRecord = familyBoundMutation({
       ogpImage: v.optional(v.string()),
       ogpDescription: v.optional(v.string()),
       memo: v.optional(v.string()),
-      visibility: v.union(v.literal("PRIVATE"), v.literal("SHARED")),
+      ownerType: v.optional(v.union(v.literal("user"), v.literal("family"))),
       credentials: v.array(
         v.object({
           id: v.string(),
@@ -252,21 +297,52 @@ export const updateRecord = familyBoundMutation({
     const record = await ctx.db.get(args.id);
     if (!record) throw new Error("Record not found");
 
-    // アクセス権のチェック（IDOR対策の確実な実行）
-    requireRecordAccess(ctx.user, record);
+    // コンテンツ編集権限の確認
+    requireContentAccess(ctx.user, record);
 
+    const patchData: Partial<Doc<"serviceRecords">> = {
+      title: args.data.title,
+      titleReading: args.data.titleReading ?? record.titleReading,
+      url: args.data.url,
+      ogpImage: args.data.ogpImage,
+      ogpDescription: args.data.ogpDescription,
+      memo: args.data.memo,
+      credentials: args.data.credentials,
+      tags: args.data.tags,
+      updatedAt: Date.now(),
+    };
+
+    // ソートキーの更新
+    patchData.sortKey = computeSortKey({
+      titleReading: patchData.titleReading,
+      title: patchData.title ?? record.title,
+    });
+
+    // ownerType の変更制御
     if (
-      args.data.visibility !== record.visibility &&
-      record.accountId !== ctx.user._id
+      args.data.ownerType !== undefined &&
+      args.data.ownerType !== record.ownerType
     ) {
-      throw new Error("Forbidden: Only the owner can change record visibility");
+      if (record.ownerType === "user" && args.data.ownerType === "family") {
+        if (record.accountId !== ctx.user._id) {
+          throw new Error("Forbidden: Only the owner can share this record");
+        }
+        patchData.ownerType = "family";
+        patchData.ownerFamilyId = ctx.user.familyId;
+        patchData.admins = [ctx.user._id];
+      } else if (
+        record.ownerType === "family" &&
+        args.data.ownerType === "user"
+      ) {
+        requireAdminAccess(ctx.user, record);
+        patchData.ownerType = "user";
+        patchData.accountId = ctx.user._id;
+        patchData.ownerFamilyId = undefined;
+        patchData.admins = [];
+      }
     }
 
-    await ctx.db.patch(args.id, {
-      ...args.data,
-      titleReading: args.data.titleReading ?? record.titleReading,
-      updatedAt: Date.now(),
-    });
+    await ctx.db.patch(args.id, patchData);
   },
 });
 
@@ -276,8 +352,8 @@ export const deleteRecord = familyBoundMutation({
     const record = await ctx.db.get(args.id);
     if (!record) throw new Error("Record not found");
 
-    // アクセス権のチェック（IDOR対策の確実な実行）
-    requireRecordAccess(ctx.user, record);
+    // 個人所有者または家族管理者のみ削除可能
+    requireAdminAccess(ctx.user, record);
 
     await ctx.db.delete(args.id);
   },
@@ -290,11 +366,164 @@ export const deleteRecords = familyBoundMutation({
       const record = await ctx.db.get(id);
       if (!record) continue;
 
-      // アクセス権のチェック（IDOR対策の確実な実行）
-      requireRecordAccess(ctx.user, record);
-
+      requireAdminAccess(ctx.user, record);
       await ctx.db.delete(id);
     }
+  },
+});
+
+/**
+ * 個人レコードをワンタップで家族共有へ移行
+ */
+export const shareRecord = familyBoundMutation({
+  args: { id: v.id("serviceRecords") },
+  handler: async (ctx, args) => {
+    const record = await ctx.db.get(args.id);
+    if (!record) throw new Error("Record not found");
+
+    if (record.ownerType !== "user" || record.accountId !== ctx.user._id) {
+      throw new Error(
+        "Forbidden: Only the personal owner can share this record",
+      );
+    }
+
+    await ctx.db.patch(args.id, {
+      ownerType: "family",
+      ownerFamilyId: ctx.user.familyId,
+      admins: [ctx.user._id],
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+/**
+ * 共有レコードをワンタップで共有解除（実行者が新個人所有者）
+ */
+export const unshareRecord = familyBoundMutation({
+  args: { id: v.id("serviceRecords") },
+  handler: async (ctx, args) => {
+    const record = await ctx.db.get(args.id);
+    if (!record) throw new Error("Record not found");
+
+    requireAdminAccess(ctx.user, record);
+
+    await ctx.db.patch(args.id, {
+      ownerType: "user",
+      accountId: ctx.user._id,
+      ownerFamilyId: undefined,
+      admins: [],
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+/**
+ * 共有レコードの管理者を同一家族内メンバーから追加
+ */
+export const addRecordAdmin = familyBoundMutation({
+  args: {
+    id: v.id("serviceRecords"),
+    targetAccountId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const record = await ctx.db.get(args.id);
+    if (!record) throw new Error("Record not found");
+
+    requireAdminAccess(ctx.user, record);
+
+    const targetUser = await ctx.db.get(args.targetAccountId);
+    if (!targetUser || targetUser.familyId !== ctx.user.familyId) {
+      throw new Error("Target user is not a member of this family");
+    }
+
+    const admins = record.admins ?? [];
+    if (!admins.includes(args.targetAccountId)) {
+      await ctx.db.patch(args.id, {
+        admins: [...admins, args.targetAccountId],
+        updatedAt: Date.now(),
+      });
+    }
+  },
+});
+
+/**
+ * 共有レコードの管理者を降格（最後の1人の削除は拒否）
+ */
+export const removeRecordAdmin = familyBoundMutation({
+  args: {
+    id: v.id("serviceRecords"),
+    targetAccountId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const record = await ctx.db.get(args.id);
+    if (!record) throw new Error("Record not found");
+
+    requireAdminAccess(ctx.user, record);
+
+    const admins = record.admins ?? [];
+    if (admins.length <= 1 && admins.includes(args.targetAccountId)) {
+      throw new Error("管理者が0人になるため削除できません");
+    }
+
+    await ctx.db.patch(args.id, {
+      admins: admins.filter((id) => id !== args.targetAccountId),
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+/**
+ * 個人所有レコードを一括共有
+ */
+export const bulkShareRecords = familyBoundMutation({
+  args: { ids: v.array(v.id("serviceRecords")) },
+  handler: async (ctx, args) => {
+    let count = 0;
+    for (const id of args.ids) {
+      const record = await ctx.db.get(id);
+      if (
+        record &&
+        record.ownerType === "user" &&
+        record.accountId === ctx.user._id
+      ) {
+        await ctx.db.patch(id, {
+          ownerType: "family",
+          ownerFamilyId: ctx.user.familyId,
+          admins: [ctx.user._id],
+          updatedAt: Date.now(),
+        });
+        count++;
+      }
+    }
+    return { success: true, count, sharedCount: count };
+  },
+});
+
+/**
+ * 共有レコードを一括共有解除
+ */
+export const bulkUnshareRecords = familyBoundMutation({
+  args: { ids: v.array(v.id("serviceRecords")) },
+  handler: async (ctx, args) => {
+    let count = 0;
+    for (const id of args.ids) {
+      const record = await ctx.db.get(id);
+      if (
+        record &&
+        record.ownerType === "family" &&
+        (record.admins ?? []).includes(ctx.user._id)
+      ) {
+        await ctx.db.patch(id, {
+          ownerType: "user",
+          accountId: ctx.user._id,
+          ownerFamilyId: undefined,
+          admins: [],
+          updatedAt: Date.now(),
+        });
+        count++;
+      }
+    }
+    return { success: true, count, unsharedCount: count };
   },
 });
 
@@ -308,7 +537,9 @@ export const importRecords = familyBoundMutation({
         ogpImage: v.optional(v.string()),
         ogpDescription: v.optional(v.string()),
         memo: v.optional(v.string()),
-        visibility: v.union(v.literal("PRIVATE"), v.literal("SHARED")),
+        ownerType: v.optional(v.union(v.literal("user"), v.literal("family"))),
+        admins: v.optional(v.array(v.string())),
+        adminEmails: v.optional(v.array(v.string())),
         credentials: v.array(
           v.object({
             id: v.string(),
@@ -333,6 +564,24 @@ export const importRecords = familyBoundMutation({
       );
     }
 
+    // 家族内メンバーを事前に取得してメールアドレスからPoohMa IDを逆引き可能にする
+    const familyMembers = user.familyId
+      ? await ctx.db
+          .query("users")
+          .withIndex("by_familyId", (q) => q.eq("familyId", user.familyId))
+          .collect()
+      : [];
+
+    const emailToAccountMap = new Map<string, Id<"users">[]>();
+    for (const m of familyMembers) {
+      if (m.email) {
+        const lower = m.email.toLowerCase();
+        const existing = emailToAccountMap.get(lower) || [];
+        existing.push(m._id);
+        emailToAccountMap.set(lower, existing);
+      }
+    }
+
     const failures: { row: number; reason: string }[] = [];
     let successes = 0;
 
@@ -349,6 +598,32 @@ export const importRecords = familyBoundMutation({
           });
           continue;
         }
+
+        const isFamily = record.ownerType === "family";
+        const sortKey = computeSortKey({
+          titleReading: record.titleReading,
+          title: record.title,
+        });
+
+        let resolvedAdmins: Id<"users">[] = [];
+        if (isFamily) {
+          const resolvedSet = new Set<Id<"users">>();
+          // インポート実行者を必ず含める
+          resolvedSet.add(user._id);
+
+          if (record.admins && record.admins.length > 0) {
+            for (const email of record.admins) {
+              const matched = emailToAccountMap.get(email.toLowerCase());
+              if (matched) {
+                for (const accId of matched) {
+                  resolvedSet.add(accId);
+                }
+              }
+            }
+          }
+          resolvedAdmins = Array.from(resolvedSet);
+        }
+
         await ctx.db.insert("serviceRecords", {
           title: record.title,
           titleReading: record.titleReading,
@@ -356,10 +631,13 @@ export const importRecords = familyBoundMutation({
           ogpImage: record.ogpImage,
           ogpDescription: record.ogpDescription,
           memo: record.memo,
-          visibility: record.visibility,
           userId: user.userId,
           accountId: user._id,
           familyId: user.familyId,
+          sortKey,
+          ownerType: isFamily ? "family" : "user",
+          ownerFamilyId: isFamily ? user.familyId : undefined,
+          admins: resolvedAdmins,
           credentials: record.credentials,
           tags: record.tags,
           updatedAt: Date.now(),
@@ -381,9 +659,6 @@ export const bulkUpdateRecords = familyBoundMutation({
   args: {
     ids: v.array(v.id("serviceRecords")),
     data: v.object({
-      visibility: v.optional(
-        v.union(v.literal("PRIVATE"), v.literal("SHARED")),
-      ),
       tags: v.optional(v.array(v.string())),
     }),
   },
@@ -392,37 +667,16 @@ export const bulkUpdateRecords = familyBoundMutation({
       const record = await ctx.db.get(id);
       if (!record) continue;
 
-      // アクセス権のチェック（IDOR対策の確実な実行）
-      requireRecordAccess(ctx.user, record);
-
-      if (
-        args.data.visibility !== undefined &&
-        record.accountId !== ctx.user._id
-      ) {
-        throw new Error(
-          "Forbidden: You cannot change visibility of records owned by other members",
-        );
-      }
-
-      const patchData: {
-        visibility?: "PRIVATE" | "SHARED";
-        tags?: string[];
-        updatedAt?: number;
-      } = {};
-
-      if (args.data.visibility !== undefined) {
-        patchData.visibility = args.data.visibility;
-      }
+      requireContentAccess(ctx.user, record);
 
       if (args.data.tags !== undefined) {
-        patchData.tags = Array.from(
+        const newTags = Array.from(
           new Set([...record.tags, ...args.data.tags]),
         );
-      }
-
-      if (Object.keys(patchData).length > 0) {
-        patchData.updatedAt = Date.now();
-        await ctx.db.patch(id, patchData);
+        await ctx.db.patch(id, {
+          tags: newTags,
+          updatedAt: Date.now(),
+        });
       }
     }
   },

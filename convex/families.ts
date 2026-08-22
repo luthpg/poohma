@@ -4,6 +4,7 @@ import type { Id } from "./_generated/dataModel";
 import {
   internalMutation,
   internalQuery,
+  type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
 import {
@@ -12,6 +13,49 @@ import {
   familyBoundMutation,
   familyBoundQuery,
 } from "./customBuilders";
+
+/**
+ * メンバーが家族を離脱または削除された際、共有レコードの管理者リストを調停
+ * 管理者が0人になる場合は残りの家族メンバー全員を自動昇格
+ */
+export async function reconcileAdminsOnLeave(
+  ctx: { db: MutationCtx["db"] },
+  familyId: Id<"families">,
+  leavingAccountId: Id<"users">,
+) {
+  const sharedRecords = await ctx.db
+    .query("serviceRecords")
+    .withIndex("by_ownerType_ownerFamilyId", (q) =>
+      q.eq("ownerType", "family").eq("ownerFamilyId", familyId),
+    )
+    .collect();
+
+  const remainingFamilyMembers = await ctx.db
+    .query("users")
+    .withIndex("by_familyId", (q) => q.eq("familyId", familyId))
+    .collect();
+  const remainingAccountIds = remainingFamilyMembers
+    .filter((u) => u._id !== leavingAccountId)
+    .map((u) => u._id);
+
+  for (const record of sharedRecords) {
+    const currentAdmins = record.admins ?? [];
+    if (currentAdmins.includes(leavingAccountId)) {
+      const newAdmins = currentAdmins.filter((id) => id !== leavingAccountId);
+      if (newAdmins.length === 0) {
+        await ctx.db.patch(record._id, {
+          admins: remainingAccountIds,
+          updatedAt: Date.now(),
+        });
+      } else {
+        await ctx.db.patch(record._id, {
+          admins: newAdmins,
+          updatedAt: Date.now(),
+        });
+      }
+    }
+  }
+}
 
 export const getFamilyMembersByFamilyId = async (
   ctx: QueryCtx,
@@ -291,7 +335,7 @@ export const cleanupExpiredMigrationsInternal = internalMutation({
 
       const remainingRecord = await ctx.db
         .query("serviceRecords")
-        .withIndex("by_familyId", (q) =>
+        .withIndex("by_family_sortKey", (q) =>
           q.eq("familyId", migration.targetFamilyId),
         )
         .first();
@@ -333,7 +377,7 @@ export const abortFamilyMigration = authenticatedMutation({
 
     const remainingRecord = await ctx.db
       .query("serviceRecords")
-      .withIndex("by_familyId", (q) =>
+      .withIndex("by_family_sortKey", (q) =>
         q.eq("familyId", migration.targetFamilyId),
       )
       .first();
@@ -382,7 +426,9 @@ export const prepareFamilyMigration = authenticatedMutation({
 
       const remainingRecord = await ctx.db
         .query("serviceRecords")
-        .withIndex("by_familyId", (q) => q.eq("familyId", stale.targetFamilyId))
+        .withIndex("by_family_sortKey", (q) =>
+          q.eq("familyId", stale.targetFamilyId),
+        )
         .first();
 
       if (members.length === 0 && !remainingRecord) {
@@ -446,7 +492,9 @@ export const prepareFamilyMigration = authenticatedMutation({
 
     const userRecords = await ctx.db
       .query("serviceRecords")
-      .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
+      .withIndex("by_ownerType_accountId", (q) =>
+        q.eq("ownerType", "user").eq("accountId", user._id),
+      )
       .collect();
 
     const serviceRecordIds = userRecords.map((r) => r._id);
@@ -494,7 +542,9 @@ export const getMigrationForEncryption = authenticatedQuery({
     // prepare 後に作成されたレコードも含めるためリアルタイムで全件取得
     const currentRecords = await ctx.db
       .query("serviceRecords")
-      .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
+      .withIndex("by_ownerType_accountId", (q) =>
+        q.eq("ownerType", "user").eq("accountId", user._id),
+      )
       .collect();
 
     const records = currentRecords.map((record) => ({
@@ -572,7 +622,9 @@ export const commitFamilyMigration = authenticatedMutation({
     // prepare 後に作成されたレコードも含めるためリアルタイムで全件取得
     const currentRecords = await ctx.db
       .query("serviceRecords")
-      .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
+      .withIndex("by_ownerType_accountId", (q) =>
+        q.eq("ownerType", "user").eq("accountId", user._id),
+      )
       .collect();
 
     // migration.serviceRecordIds(prepare時点のスナップショット)との集合比較
@@ -658,6 +710,8 @@ export const commitFamilyMigration = authenticatedMutation({
       migration.sourceFamilyId &&
       migration.sourceFamilyId !== migration.targetFamilyId
     ) {
+      await reconcileAdminsOnLeave(ctx, migration.sourceFamilyId, user._id);
+
       const remainingUsers = await ctx.db
         .query("users")
         .withIndex("by_familyId", (q) =>
@@ -668,7 +722,7 @@ export const commitFamilyMigration = authenticatedMutation({
       // serviceRecords が旧 Family に残っていないことも確認
       const remainingRecord = await ctx.db
         .query("serviceRecords")
-        .withIndex("by_familyId", (q) =>
+        .withIndex("by_family_sortKey", (q) =>
           q.eq("familyId", migration.sourceFamilyId),
         )
         .first();
@@ -709,7 +763,9 @@ export const getRecordsForReEncryption = familyBoundQuery({
 
     const records = await ctx.db
       .query("serviceRecords")
-      .withIndex("by_userId", (q) => q.eq("userId", user.userId))
+      .withIndex("by_ownerType_accountId", (q) =>
+        q.eq("ownerType", "user").eq("accountId", user._id),
+      )
       .collect();
 
     return records
@@ -806,7 +862,9 @@ export const changeFamily = authenticatedMutation({
 
     const userRecords = await ctx.db
       .query("serviceRecords")
-      .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
+      .withIndex("by_ownerType_accountId", (q) =>
+        q.eq("ownerType", "user").eq("accountId", user._id),
+      )
       .collect();
 
     const serviceRecordIds = userRecords.map((r) => r._id);
@@ -888,6 +946,8 @@ export const changeFamily = authenticatedMutation({
     }
 
     if (user.familyId && user.familyId !== targetFamilyId) {
+      await reconcileAdminsOnLeave(ctx, user.familyId, user._id);
+
       const remainingUsers = await ctx.db
         .query("users")
         .withIndex("by_familyId", (q) => q.eq("familyId", user.familyId))
@@ -896,7 +956,7 @@ export const changeFamily = authenticatedMutation({
       // serviceRecords が旧 Family に残っていないことも確認
       const remainingRecord = await ctx.db
         .query("serviceRecords")
-        .withIndex("by_familyId", (q) => q.eq("familyId", user.familyId))
+        .withIndex("by_family_sortKey", (q) => q.eq("familyId", user.familyId))
         .first();
 
       if (remainingUsers.length === 0 && !remainingRecord) {

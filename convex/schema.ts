@@ -67,10 +67,17 @@ export default defineSchema({
     ogpImage: v.optional(v.string()),
     ogpDescription: v.optional(v.string()),
     memo: v.optional(v.string()),
-    visibility: v.union(v.literal("PRIVATE"), v.literal("SHARED")),
-    userId: v.string(), // 作成者の Firebase UID
-    accountId: v.id("users"), // 作成者の PoohMa アカウント ID（ownership境界）
-    familyId: v.optional(v.id("families")),
+    userId: v.string(), // 作成者の Firebase UID (監査・表示用)
+    accountId: v.id("users"), // 作成元 / 個人オーナーの PoohMa アカウント ID (主識別子)
+    familyId: v.optional(v.id("families")), // 暗号化スコープ / 所属家族 ID
+
+    // 移行互換用（旧データ読み取りおよび backfill 完了までの安全策）
+    visibility: v.optional(v.union(v.literal("PRIVATE"), v.literal("SHARED"))),
+
+    sortKey: v.optional(v.string()), // 五十音・アルファベット順位プレフィックス付きソートキー
+    ownerType: v.optional(v.union(v.literal("user"), v.literal("family"))),
+    ownerFamilyId: v.optional(v.id("families")), // ownerType === "family" のとき
+    admins: v.optional(v.array(v.id("users"))), // ownerType === "family" のときの管理者 PoohMa アカウント ID 配列
 
     // 子エンティティ（アカウント情報）をドキュメント内に埋め込み
     credentials: v.array(
@@ -92,7 +99,9 @@ export default defineSchema({
   })
     .index("by_userId", ["userId"])
     .index("by_accountId", ["accountId"])
-    .index("by_familyId", ["familyId"])
-    .index("by_familyId_visibility", ["familyId", "visibility"])
-    .index("by_updatedAt", ["updatedAt"]),
+    .index("by_family_sortKey", ["familyId", "sortKey"])
+    .index("by_family_url", ["familyId", "url"])
+    .index("by_family_updatedAt", ["familyId", "updatedAt"])
+    .index("by_ownerType_accountId", ["ownerType", "accountId"])
+    .index("by_ownerType_ownerFamilyId", ["ownerType", "ownerFamilyId"]),
 });

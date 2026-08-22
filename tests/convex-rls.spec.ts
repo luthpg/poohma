@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { api } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import schema from "../convex/schema";
+import { computeSortKey } from "../src/utils/index-group";
 
 const modules = import.meta.glob("../convex/**/*.ts");
 
@@ -30,7 +31,9 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
           userId: "some_user",
           accountId: someUserId,
           title: "Dummy",
-          visibility: "PRIVATE",
+          sortKey: computeSortKey("Dummy"),
+          ownerType: "user",
+          admins: [],
           credentials: [],
           tags: [],
           updatedAt: Date.now(),
@@ -47,14 +50,14 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
       await expect(
         t.mutation(api.records.createRecord, {
           title: "Test",
-          visibility: "PRIVATE" as const,
+          ownerType: "user" as const,
           credentials: [],
           tags: [],
         }),
       ).rejects.toThrow("Unauthenticated");
     });
 
-    it("自分が所有するPRIVATEレコードは getRecordDetail で正常に取得できること", async () => {
+    it("自分が所有する個人レコードは getRecordDetail で正常に取得できること", async () => {
       const t = convexTest(schema, modules);
       let recordId!: Id<"serviceRecords">;
       let userAId!: Id<"users">;
@@ -68,7 +71,9 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
           userId: "user_owner",
           accountId: userAId,
           title: "My Private Record",
-          visibility: "PRIVATE",
+          sortKey: computeSortKey("My Private Record"),
+          ownerType: "user",
+          admins: [],
           credentials: [],
           tags: [],
           updatedAt: Date.now(),
@@ -86,7 +91,7 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
   });
 
   describe("4.2. クロスユーザー・クロスファミリー認可の検証 (RLS)", () => {
-    it("他ユーザー of PRIVATE レコードに対して getRecordDetail を実行した場合、アクセス拒否されること", async () => {
+    it("他ユーザーの個人レコードに対して getRecordDetail を実行した場合、アクセス拒否されること", async () => {
       const t = convexTest(schema, modules);
 
       let recordAId!: Id<"serviceRecords">;
@@ -105,19 +110,21 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
           updatedAt: Date.now(),
         });
 
-        // ユーザーAの PRIVATE レコード
+        // ユーザーAの個人レコード
         recordAId = await ctx.db.insert("serviceRecords", {
           userId: "user_a",
           accountId: userAId,
           title: "User A Private",
-          visibility: "PRIVATE",
+          sortKey: computeSortKey("User A Private"),
+          ownerType: "user",
+          admins: [],
           credentials: [],
           tags: [],
           updatedAt: Date.now(),
         });
       });
 
-      // ユーザーBがユーザーAのPRIVATEレコードにアクセスを試みる
+      // ユーザーBがユーザーAの個人レコードにアクセスを試みる
       const userB = t.withIdentity({
         subject: "user_b",
         email: "b@example.com",
@@ -128,7 +135,7 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
       ).rejects.toThrow("Access denied");
     });
 
-    it("他人のレコードを updateRecord で更新しようとした場合、例外がスローされること", async () => {
+    it("他人の個人レコードを updateRecord で更新しようとした場合、例外がスローされること", async () => {
       const t = convexTest(schema, modules);
 
       let recordAId!: Id<"serviceRecords">;
@@ -157,7 +164,9 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
           accountId: userAId,
           familyId,
           title: "User A Record",
-          visibility: "PRIVATE",
+          sortKey: computeSortKey("User A Record"),
+          ownerType: "user",
+          admins: [],
           credentials: [],
           tags: [],
           updatedAt: Date.now(),
@@ -175,7 +184,7 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
           id: recordAId,
           data: {
             title: "Hacked!",
-            visibility: "PRIVATE" as const,
+            ownerType: "user" as const,
             credentials: [],
             tags: [],
           },
@@ -183,7 +192,7 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
       ).rejects.toThrow("Access denied");
     });
 
-    it("他人のレコードを deleteRecord で削除しようとした場合、例外がスローされること", async () => {
+    it("他人の個人レコードを deleteRecord で削除しようとした場合、例外がスローされること", async () => {
       const t = convexTest(schema, modules);
 
       let recordAId!: Id<"serviceRecords">;
@@ -212,7 +221,9 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
           accountId: userAId,
           familyId,
           title: "User A Record",
-          visibility: "PRIVATE",
+          sortKey: computeSortKey("User A Record"),
+          ownerType: "user",
+          admins: [],
           credentials: [],
           tags: [],
           updatedAt: Date.now(),
@@ -230,7 +241,7 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
       ).rejects.toThrow("Access denied");
     });
 
-    it("同一ファミリー内のSHAREDレコードは他のメンバーからも取得できること", async () => {
+    it("同一ファミリー内の共有レコードは他のメンバーからも取得できること", async () => {
       const t = convexTest(schema, modules);
       let recordAId!: Id<"serviceRecords">;
       let userAId!: Id<"users">;
@@ -257,8 +268,11 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
           userId: "user_a",
           accountId: userAId,
           familyId,
+          ownerFamilyId: familyId,
           title: "Shared Record",
-          visibility: "SHARED",
+          sortKey: computeSortKey("Shared Record"),
+          ownerType: "family",
+          admins: [userAId],
           credentials: [],
           tags: [],
           updatedAt: Date.now(),
@@ -308,8 +322,11 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
           userId: "user_f1",
           accountId: userF1Id,
           familyId: family1,
+          ownerFamilyId: family1,
           title: "Family 1 Secret",
-          visibility: "SHARED",
+          sortKey: computeSortKey("Family 1 Secret"),
+          ownerType: "family",
+          admins: [userF1Id],
           credentials: [],
           tags: [],
           updatedAt: Date.now(),
@@ -326,7 +343,7 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
       ).rejects.toThrow("Access denied");
     });
 
-    it("異なるFamilyのSHAREDレコード(暗号化データを含む)が getRecords の一覧結果に一切含まれないこと", async () => {
+    it("異なるFamilyの共有レコード(暗号化データを含む)が getRecords の一覧結果に一切含まれないこと", async () => {
       const t = convexTest(schema, modules);
       await t.run(async (ctx) => {
         const family1 = await ctx.db.insert("families", {
@@ -353,8 +370,11 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
           userId: "user_leak_f1",
           accountId: userF1Id,
           familyId: family1,
+          ownerFamilyId: family1,
           title: "Family1の秘密レコード",
-          visibility: "SHARED",
+          sortKey: computeSortKey("Family1の秘密レコード"),
+          ownerType: "family",
+          admins: [userF1Id],
           credentials: [
             {
               id: "cred_secret",
@@ -378,7 +398,7 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
   });
 
   describe("4.3 一括操作(bulk mutation)の認可検証", () => {
-    it("他人が所有するPRIVATEレコードを含むdeleteRecordsは、そのレコードでアクセス拒否され、何も削除されないこと", async () => {
+    it("他人が所有する個人レコードを含むdeleteRecordsは、そのレコードでアクセス拒否され、何も削除されないこと", async () => {
       const t = convexTest(schema, modules);
       let family1Id!: Id<"families">;
       let ownRecordId!: Id<"serviceRecords">;
@@ -405,7 +425,9 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
           accountId: userBId,
           familyId: family1Id,
           title: "Bの自分のレコード",
-          visibility: "PRIVATE",
+          sortKey: computeSortKey("Bの自分のレコード"),
+          ownerType: "user",
+          admins: [],
           credentials: [],
           tags: [],
           updatedAt: Date.now(),
@@ -414,8 +436,10 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
           userId: "user_bulk_a",
           accountId: userAId,
           familyId: family1Id,
-          title: "AのPRIVATEレコード",
-          visibility: "PRIVATE",
+          title: "Aの個人レコード",
+          sortKey: computeSortKey("Aの個人レコード"),
+          ownerType: "user",
+          admins: [],
           credentials: [],
           tags: [],
           updatedAt: Date.now(),
@@ -438,7 +462,7 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
       });
     });
 
-    it("同一FamilyのSHAREDレコードは、所有者以外のメンバーでもdeleteRecordsで削除できること(仕様通りの許可系)", async () => {
+    it("共有レコードの非管理者メンバーによるdeleteRecordsは拒否されること", async () => {
       const t = convexTest(schema, modules);
       let sharedRecordId!: Id<"serviceRecords">;
       await t.run(async (ctx) => {
@@ -462,8 +486,11 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
           userId: "user_bulk_owner",
           accountId: userAId,
           familyId,
+          ownerFamilyId: familyId,
           title: "共有レコード",
-          visibility: "SHARED",
+          sortKey: computeSortKey("共有レコード"),
+          ownerType: "family",
+          admins: [userAId],
           credentials: [],
           tags: [],
           updatedAt: Date.now(),
@@ -474,7 +501,47 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
         email: "bulkmember@example.com",
       });
 
-      await userMember.mutation(api.records.deleteRecords, {
+      await expect(
+        userMember.mutation(api.records.deleteRecords, {
+          ids: [sharedRecordId],
+        }),
+      ).rejects.toThrow("Access denied");
+    });
+
+    it("共有レコードの管理者はdeleteRecordsで削除できること", async () => {
+      const t = convexTest(schema, modules);
+      let sharedRecordId!: Id<"serviceRecords">;
+      await t.run(async (ctx) => {
+        const familyId = await ctx.db.insert("families", {
+          name: "Family Shared",
+          updatedAt: Date.now(),
+        });
+        const userAId = await ctx.db.insert("users", {
+          userId: "user_bulk_owner",
+          email: "bulkowner@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        sharedRecordId = await ctx.db.insert("serviceRecords", {
+          userId: "user_bulk_owner",
+          accountId: userAId,
+          familyId,
+          ownerFamilyId: familyId,
+          title: "共有レコード",
+          sortKey: computeSortKey("共有レコード"),
+          ownerType: "family",
+          admins: [userAId],
+          credentials: [],
+          tags: [],
+          updatedAt: Date.now(),
+        });
+      });
+      const userOwner = t.withIdentity({
+        subject: "user_bulk_owner",
+        email: "bulkowner@example.com",
+      });
+
+      await userOwner.mutation(api.records.deleteRecords, {
         ids: [sharedRecordId],
       });
 
