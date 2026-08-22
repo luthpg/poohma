@@ -186,7 +186,7 @@ function RecordDetailComponent({
   const [tags, setTags] = useState<string[]>(record.tags);
   const [memo, setMemo] = useState(record.memo || "");
   const [ownerType, setOwnerType] = useState<"user" | "family">(
-    record.ownerType,
+    record.ownerType ?? "user",
   );
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingOgp, setIsFetchingOgp] = useState(false);
@@ -308,7 +308,7 @@ function RecordDetailComponent({
     setOgpDescription(record.ogpDescription || "");
     setTags(record.tags);
     setMemo(record.memo || "");
-    setOwnerType(record.ownerType);
+    setOwnerType(record.ownerType ?? "user");
 
     const hasEncryptedHints = record.credentials.some(
       (c) => c.passwordHint && c.passwordHintIv,

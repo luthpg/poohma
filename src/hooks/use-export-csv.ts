@@ -26,7 +26,7 @@ export function useExportCsv() {
           Title: record.title,
           URL: record.url || "",
           Memo: record.memo || "",
-          OwnerType: record.ownerType,
+          OwnerType: record.ownerType ?? "user",
           Admins: (record.adminEmails ?? []).join(", "),
           Tags: record.tags.join(","),
         };
