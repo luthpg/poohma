@@ -662,14 +662,23 @@ export const recordLogin = identityVerifiedMutation({
 export const cleanupOldLoginEventsInternal = internalMutation({
   args: {},
   handler: async (ctx) => {
+    const BATCH_SIZE = 100;
     const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
     const oldEvents = await ctx.db
       .query("loginEvents")
       .withIndex("by_loginAt", (q) => q.lt("loginAt", ninetyDaysAgo))
-      .collect();
+      .take(BATCH_SIZE);
 
     for (const event of oldEvents) {
       await ctx.db.delete(event._id);
+    }
+
+    // Schedule another cleanup if we deleted a full batch (more may remain)
+    if (oldEvents.length === BATCH_SIZE) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.users.cleanupOldLoginEventsInternal,
+      );
     }
 
     return { deletedCount: oldEvents.length };
