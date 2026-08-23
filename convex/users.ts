@@ -1,6 +1,7 @@
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { internalQuery } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import {
   authenticatedMutation,
   identityVerifiedMutation,
@@ -273,6 +274,9 @@ export const deleteAllAccounts = identityVerifiedMutation({
 
     // 各アカウントについて deleteAccount と同じ処理を実行
     for (const account of allAccounts) {
+      const email = account.email;
+      const displayName = account.displayName || "ユーザー";
+
       // 1. 家族に関する処理
       if (account.familyId) {
         const familyId = account.familyId;
@@ -336,6 +340,24 @@ export const deleteAllAccounts = identityVerifiedMutation({
 
       // 2. アカウント自身の削除
       await ctx.db.delete(account._id);
+
+      // 3. アカウント削除通知メール送信
+      const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
+      await ctx.scheduler.runAfter(
+        0,
+        internal.actions.sendTemplatedEmailInternal,
+        {
+          email,
+          payload: {
+            template: "accountDeleted",
+            props: {
+              displayName,
+              deletedAt: Date.now(),
+              ctaUrl: `${appUrl}/`,
+            },
+          },
+        },
+      );
     }
 
     return { success: true, deletedCount: allAccounts.length };
@@ -349,6 +371,8 @@ export const deleteAccount = authenticatedMutation({
   args: {},
   handler: async (ctx) => {
     const { user } = ctx;
+    const email = user.email;
+    const displayName = user.displayName || "ユーザー";
 
     // 1. 家族に関する処理
     if (user.familyId) {
@@ -413,6 +437,24 @@ export const deleteAccount = authenticatedMutation({
 
     // 2. ユーザーアカウント自身の削除
     await ctx.db.delete(user._id);
+
+    // 3. アカウント削除通知メール送信
+    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
+    await ctx.scheduler.runAfter(
+      0,
+      internal.actions.sendTemplatedEmailInternal,
+      {
+        email,
+        payload: {
+          template: "accountDeleted",
+          props: {
+            displayName,
+            deletedAt: Date.now(),
+            ctaUrl: `${appUrl}/`,
+          },
+        },
+      },
+    );
 
     return { success: true };
   },
@@ -522,5 +564,179 @@ export const getUserById = internalQuery({
       familyId: user.familyId,
       family,
     };
+  },
+});
+
+/**
+ * ログイン履歴の記録と新端末検知通知
+ */
+export const recordLogin = identityVerifiedMutation({
+  args: {
+    deviceId: v.string(),
+    deviceName: v.optional(v.string()),
+    browser: v.optional(v.string()),
+    os: v.optional(v.string()),
+    ipAddress: v.optional(v.string()),
+    location: v.optional(v.string()),
+    accountId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const { identity } = ctx;
+    const uid = identity.subject;
+
+    let targetAccount = null;
+    if (args.accountId) {
+      targetAccount = await ctx.db.get(args.accountId);
+      if (targetAccount && targetAccount.userId !== uid) {
+        targetAccount = null;
+      }
+    }
+
+    if (!targetAccount) {
+      targetAccount = await ctx.db
+        .query("users")
+        .withIndex("by_userId", (q) => q.eq("userId", uid))
+        .first();
+    }
+
+    if (!targetAccount) {
+      return { success: false, reason: "Account not found" };
+    }
+
+    // 過去に同じ accountId × deviceId のログインがあるか確認
+    const existingEvents = await ctx.db
+      .query("loginEvents")
+      .withIndex("by_accountId_deviceId", (q) =>
+        q.eq("accountId", targetAccount._id).eq("deviceId", args.deviceId),
+      )
+      .collect();
+
+    const isNewDevice = existingEvents.length === 0;
+    const now = Date.now();
+
+    await ctx.db.insert("loginEvents", {
+      accountId: targetAccount._id,
+      userId: uid,
+      deviceId: args.deviceId,
+      deviceName: args.deviceName,
+      browser: args.browser,
+      os: args.os,
+      ipAddress: args.ipAddress,
+      location: args.location,
+      isNewDevice,
+      loginAt: now,
+    });
+
+    // 新端末と判定された場合のみ警告通知メールを送信
+    if (isNewDevice) {
+      const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
+      await ctx.scheduler.runAfter(
+        0,
+        internal.actions.sendTemplatedEmailInternal,
+        {
+          email: targetAccount.email,
+          payload: {
+            template: "newDeviceLogin",
+            props: {
+              displayName: targetAccount.displayName || "ユーザー",
+              loginAt: now,
+              deviceName: args.deviceName,
+              browser: args.browser,
+              os: args.os,
+              ipAddress: args.ipAddress,
+              location: args.location,
+              ctaUrl: `${appUrl}/dashboard`,
+            },
+          },
+        },
+      );
+    }
+
+    return { success: true, isNewDevice };
+  },
+});
+
+/**
+ * 90日以上前の古いログイン履歴を削除する定期バッチジョブ
+ */
+export const cleanupOldLoginEventsInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
+    const oldEvents = await ctx.db
+      .query("loginEvents")
+      .withIndex("by_loginAt", (q) => q.lt("loginAt", ninetyDaysAgo))
+      .collect();
+
+    for (const event of oldEvents) {
+      await ctx.db.delete(event._id);
+    }
+
+    return { deletedCount: oldEvents.length };
+  },
+});
+
+/**
+ * 生体認証の登録・解除通知
+ */
+export const notifyBiometricEvent = authenticatedMutation({
+  args: {
+    event: v.union(v.literal("registered"), v.literal("removed")),
+    deviceName: v.optional(v.string()),
+    browser: v.optional(v.string()),
+    os: v.optional(v.string()),
+    ipAddress: v.optional(v.string()),
+    location: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { user } = ctx;
+    const now = Date.now();
+    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
+
+    if (args.event === "registered") {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.actions.sendTemplatedEmailInternal,
+        {
+          email: user.email,
+          payload: {
+            template: "biometricRegistered",
+            props: {
+              displayName: user.displayName || "ユーザー",
+              registeredAt: now,
+              deviceName: args.deviceName,
+              browser: args.browser,
+              os: args.os,
+              ipAddress: args.ipAddress,
+              location: args.location,
+              ctaUrl: `${appUrl}/settings`,
+            },
+          },
+        },
+      );
+    } else {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.actions.sendTemplatedEmailInternal,
+        {
+          email: user.email,
+          payload: {
+            template: "biometricRemoved",
+            props: {
+              displayName: user.displayName || "ユーザー",
+              removedAt: now,
+              deviceName: args.deviceName,
+              browser: args.browser,
+              os: args.os,
+              ipAddress: args.ipAddress,
+              location: args.location,
+              ctaUrl: `${appUrl}/settings`,
+            },
+          },
+        },
+      );
+    }
+
+    return { success: true };
   },
 });

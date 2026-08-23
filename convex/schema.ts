@@ -7,8 +7,27 @@ export default defineSchema({
     masterKeyEncrypted: v.optional(v.string()),
     masterKeyIv: v.optional(v.string()),
     masterKeySalt: v.optional(v.string()),
+    masterKeyRecoveryEncrypted: v.optional(v.string()),
+    masterKeyRecoveryIv: v.optional(v.string()),
+    recoveryKeyIssuedAt: v.optional(v.number()),
     updatedAt: v.number(),
   }),
+
+  loginEvents: defineTable({
+    accountId: v.id("users"),
+    userId: v.string(),
+    deviceId: v.string(),
+    deviceName: v.optional(v.string()),
+    browser: v.optional(v.string()),
+    os: v.optional(v.string()),
+    ipAddress: v.optional(v.string()),
+    location: v.optional(v.string()),
+    isNewDevice: v.boolean(),
+    loginAt: v.number(),
+  })
+    .index("by_accountId", ["accountId"])
+    .index("by_accountId_deviceId", ["accountId", "deviceId"])
+    .index("by_loginAt", ["loginAt"]),
 
   users: defineTable({
     userId: v.string(), // Firebase UID

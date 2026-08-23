@@ -9,4 +9,10 @@ crons.interval(
   internal.families.cleanupExpiredMigrationsInternal,
 );
 
+crons.interval(
+  "cleanup old login events",
+  { hours: 24 },
+  internal.users.cleanupOldLoginEventsInternal,
+);
+
 export default crons;

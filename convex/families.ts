@@ -1406,3 +1406,194 @@ export const rejectJoinRequest = familyBoundMutation({
     return { success: true };
   },
 });
+
+/**
+ * 家族パスコード変更（マスターキー再暗号化結果を保存しメンバー全員に通知）
+ */
+export const rotatePasscode = familyBoundMutation({
+  args: {
+    masterKeyEncrypted: v.string(),
+    masterKeyIv: v.string(),
+    masterKeySalt: v.string(),
+    deviceName: v.optional(v.string()),
+    browser: v.optional(v.string()),
+    os: v.optional(v.string()),
+    ipAddress: v.optional(v.string()),
+    location: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { familyId, user } = ctx;
+    const now = Date.now();
+
+    await ctx.db.patch(familyId, {
+      masterKeyEncrypted: args.masterKeyEncrypted,
+      masterKeyIv: args.masterKeyIv,
+      masterKeySalt: args.masterKeySalt,
+      updatedAt: now,
+    });
+
+    const family = await ctx.db.get(familyId);
+    const familyName = family?.name ?? "家族";
+    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
+
+    // 家族メンバー全員を取得して通知
+    const members = await ctx.db
+      .query("users")
+      .withIndex("by_familyId", (q) => q.eq("familyId", familyId))
+      .collect();
+
+    for (const member of members) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.actions.sendTemplatedEmailInternal,
+        {
+          email: member.email,
+          payload: {
+            template: "familyPasscodeChanged",
+            props: {
+              displayName: member.displayName || "メンバー",
+              familyName,
+              changedByDisplayName: user.displayName || "メンバー",
+              isSelf: member._id === user._id,
+              changedAt: now,
+              deviceName: args.deviceName,
+              browser: args.browser,
+              os: args.os,
+              ipAddress: args.ipAddress,
+              location: args.location,
+              ctaUrl: `${appUrl}/dashboard`,
+            },
+          },
+        },
+      );
+    }
+
+    return { success: true };
+  },
+});
+
+/**
+ * リカバリーキー発行・再発行（リカバリーキー由来鍵で再wrapしたマスターキーを保存）
+ */
+export const issueRecoveryKey = familyBoundMutation({
+  args: {
+    masterKeyRecoveryEncrypted: v.string(),
+    masterKeyRecoveryIv: v.string(),
+    deviceName: v.optional(v.string()),
+    browser: v.optional(v.string()),
+    os: v.optional(v.string()),
+    ipAddress: v.optional(v.string()),
+    location: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { familyId, user } = ctx;
+    const now = Date.now();
+
+    await ctx.db.patch(familyId, {
+      masterKeyRecoveryEncrypted: args.masterKeyRecoveryEncrypted,
+      masterKeyRecoveryIv: args.masterKeyRecoveryIv,
+      recoveryKeyIssuedAt: now,
+      updatedAt: now,
+    });
+
+    const family = await ctx.db.get(familyId);
+    const familyName = family?.name ?? "家族";
+    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
+
+    await ctx.scheduler.runAfter(
+      0,
+      internal.actions.sendTemplatedEmailInternal,
+      {
+        email: user.email,
+        payload: {
+          template: "recoveryKitReissued",
+          props: {
+            displayName: user.displayName || "メンバー",
+            familyName,
+            issuedAt: now,
+            deviceName: args.deviceName,
+            browser: args.browser,
+            os: args.os,
+            ipAddress: args.ipAddress,
+            location: args.location,
+            ctaUrl: `${appUrl}/family`,
+          },
+        },
+      },
+    );
+
+    return { success: true, issuedAt: now };
+  },
+});
+
+/**
+ * リカバリーキーを使用したパスコード再設定・復旧
+ */
+export const recoverWithRecoveryKey = authenticatedMutation({
+  args: {
+    familyId: v.id("families"),
+    masterKeyEncrypted: v.string(),
+    masterKeyIv: v.string(),
+    masterKeySalt: v.string(),
+    deviceName: v.optional(v.string()),
+    browser: v.optional(v.string()),
+    os: v.optional(v.string()),
+    ipAddress: v.optional(v.string()),
+    location: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { user } = ctx;
+    const family = await ctx.db.get(args.familyId);
+    if (!family) throw new Error("Family not found");
+
+    if (user.familyId && user.familyId !== args.familyId) {
+      throw new Error("User does not belong to this family");
+    }
+
+    const now = Date.now();
+
+    // パスコード再設定を反映し、古いリカバリーキーを無効化
+    await ctx.db.patch(args.familyId, {
+      masterKeyEncrypted: args.masterKeyEncrypted,
+      masterKeyIv: args.masterKeyIv,
+      masterKeySalt: args.masterKeySalt,
+      masterKeyRecoveryEncrypted: undefined,
+      masterKeyRecoveryIv: undefined,
+      recoveryKeyIssuedAt: undefined,
+      updatedAt: now,
+    });
+
+    // ユーザーが家族未紐付けなら紐付ける
+    if (!user.familyId) {
+      await ctx.db.patch(user._id, { familyId: args.familyId });
+    }
+
+    const familyName = family.name;
+    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
+
+    // 実行者へ通知
+    await ctx.scheduler.runAfter(
+      0,
+      internal.actions.sendTemplatedEmailInternal,
+      {
+        email: user.email,
+        payload: {
+          template: "recoveryRedeemed",
+          props: {
+            displayName: user.displayName || "メンバー",
+            familyName,
+            recoveredAt: now,
+            deviceName: args.deviceName,
+            browser: args.browser,
+            os: args.os,
+            ipAddress: args.ipAddress,
+            location: args.location,
+            ctaUrl: `${appUrl}/family`,
+          },
+        },
+      },
+    );
+
+    return { success: true };
+  },
+});

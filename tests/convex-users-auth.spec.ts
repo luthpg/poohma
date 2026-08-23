@@ -240,4 +240,88 @@ describe("users.ts / 認証・認可・セキュリティ境界の検証", () =>
     expect(hasGetUserByFirebaseUid).toBe(false);
     expect(hasGetUserById).toBe(false);
   });
+
+  describe("ログイン通知と生体認証通知 (Issue #196)", () => {
+    it("recordLogin: 初回端末ログイン時は isNewDevice: true と判定され、2回目以降は false と判定されること", async () => {
+      const t = convexTest(schema, modules);
+
+      let accountId!: Id<"users">;
+      await t.run(async (ctx) => {
+        accountId = await ctx.db.insert("users", {
+          userId: "user_device_test",
+          email: "device@example.com",
+          displayName: "デバイス太郎",
+          updatedAt: Date.now(),
+        });
+      });
+
+      const userClient = t.withIdentity({
+        subject: "user_device_test",
+        email: "device@example.com",
+      });
+
+      // 1回目のログイン (新端末)
+      const res1 = await userClient.mutation(api.users.recordLogin, {
+        deviceId: "device_abc_123",
+        accountId,
+        deviceName: "Pixel 8",
+        browser: "Chrome",
+        ipAddress: "203.0.113.1",
+      });
+      expect(res1.success).toBe(true);
+      expect(res1.isNewDevice).toBe(true);
+
+      // 2回目のログイン (同一端末)
+      const res2 = await userClient.mutation(api.users.recordLogin, {
+        deviceId: "device_abc_123",
+        accountId,
+        deviceName: "Pixel 8",
+        browser: "Chrome",
+        ipAddress: "203.0.113.1",
+      });
+      expect(res2.success).toBe(true);
+      expect(res2.isNewDevice).toBe(false);
+
+      // 3回目のログイン (別端末)
+      const res3 = await userClient.mutation(api.users.recordLogin, {
+        deviceId: "device_xyz_999",
+        accountId,
+        deviceName: "MacBook Pro",
+        browser: "Safari",
+        ipAddress: "203.0.113.2",
+      });
+      expect(res3.success).toBe(true);
+      expect(res3.isNewDevice).toBe(true);
+    });
+
+    it("notifyBiometricEvent: 生体認証登録・解除通知 mutation が正常に完了すること", async () => {
+      const t = convexTest(schema, modules);
+
+      await t.run(async (ctx) => {
+        await ctx.db.insert("users", {
+          userId: "user_bio_test",
+          email: "bio@example.com",
+          displayName: "生体太郎",
+          updatedAt: Date.now(),
+        });
+      });
+
+      const userClient = t.withIdentity({
+        subject: "user_bio_test",
+        email: "bio@example.com",
+      });
+
+      const resReg = await userClient.mutation(api.users.notifyBiometricEvent, {
+        event: "registered",
+        deviceName: "iPhone 15",
+      });
+      expect(resReg.success).toBe(true);
+
+      const resRem = await userClient.mutation(api.users.notifyBiometricEvent, {
+        event: "removed",
+        deviceName: "iPhone 15",
+      });
+      expect(resRem.success).toBe(true);
+    });
+  });
 });

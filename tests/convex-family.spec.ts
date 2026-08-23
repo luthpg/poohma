@@ -1545,4 +1545,138 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
       });
     });
   });
+
+  describe("2.1.8 パスコード変更およびリカバリーキー機能 (Issue #196)", () => {
+    it("rotatePasscode: パスコード変更時に暗号化情報が更新されること", async () => {
+      const t = convexTest(schema, modules);
+
+      const familyId = await t.run(async (ctx) => {
+        const fId = await ctx.db.insert("families", {
+          name: "田中家",
+          masterKeyEncrypted: "old_enc",
+          masterKeyIv: "old_iv",
+          masterKeySalt: "old_salt",
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("users", {
+          userId: "user_rotate",
+          email: "rotate@example.com",
+          displayName: "田中 太郎",
+          familyId: fId,
+          updatedAt: Date.now(),
+        });
+        return fId;
+      });
+
+      const userClient = t.withIdentity({
+        subject: "user_rotate",
+        email: "rotate@example.com",
+      });
+
+      await userClient.mutation(api.families.rotatePasscode, {
+        masterKeyEncrypted: "new_enc",
+        masterKeyIv: "new_iv",
+        masterKeySalt: "new_salt",
+        deviceName: "MacBook Pro",
+        ipAddress: "203.0.113.1",
+      });
+
+      await t.run(async (ctx) => {
+        const family = await ctx.db.get(familyId);
+        expect(family?.masterKeyEncrypted).toBe("new_enc");
+        expect(family?.masterKeyIv).toBe("new_iv");
+        expect(family?.masterKeySalt).toBe("new_salt");
+      });
+    });
+
+    it("issueRecoveryKey: リカバリーキー発行時に暗号化情報が保存されること", async () => {
+      const t = convexTest(schema, modules);
+
+      const familyId = await t.run(async (ctx) => {
+        const fId = await ctx.db.insert("families", {
+          name: "佐藤家",
+          masterKeyEncrypted: "enc",
+          masterKeyIv: "iv",
+          masterKeySalt: "salt",
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("users", {
+          userId: "user_recovery",
+          email: "recovery@example.com",
+          displayName: "佐藤 一郎",
+          familyId: fId,
+          updatedAt: Date.now(),
+        });
+        return fId;
+      });
+
+      const userClient = t.withIdentity({
+        subject: "user_recovery",
+        email: "recovery@example.com",
+      });
+
+      const res = await userClient.mutation(api.families.issueRecoveryKey, {
+        masterKeyRecoveryEncrypted: "recovery_enc",
+        masterKeyRecoveryIv: "recovery_iv",
+        deviceName: "iPhone 15",
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.issuedAt).toBeDefined();
+
+      await t.run(async (ctx) => {
+        const family = await ctx.db.get(familyId);
+        expect(family?.masterKeyRecoveryEncrypted).toBe("recovery_enc");
+        expect(family?.masterKeyRecoveryIv).toBe("recovery_iv");
+        expect(family?.recoveryKeyIssuedAt).toBe(res.issuedAt);
+      });
+    });
+
+    it("recoverWithRecoveryKey: リカバリーキー使用でパスコードが復旧され古いリカバリーキーが無効化されること", async () => {
+      const t = convexTest(schema, modules);
+
+      const familyId = await t.run(async (ctx) => {
+        const fId = await ctx.db.insert("families", {
+          name: "鈴木家",
+          masterKeyEncrypted: "old_enc",
+          masterKeyIv: "old_iv",
+          masterKeySalt: "old_salt",
+          masterKeyRecoveryEncrypted: "old_rec_enc",
+          masterKeyRecoveryIv: "old_rec_iv",
+          recoveryKeyIssuedAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("users", {
+          userId: "user_redeem",
+          email: "redeem@example.com",
+          displayName: "鈴木 次郎",
+          familyId: fId,
+          updatedAt: Date.now(),
+        });
+        return fId;
+      });
+
+      const userClient = t.withIdentity({
+        subject: "user_redeem",
+        email: "redeem@example.com",
+      });
+
+      await userClient.mutation(api.families.recoverWithRecoveryKey, {
+        familyId,
+        masterKeyEncrypted: "recovered_enc",
+        masterKeyIv: "recovered_iv",
+        masterKeySalt: "recovered_salt",
+      });
+
+      await t.run(async (ctx) => {
+        const family = await ctx.db.get(familyId);
+        expect(family?.masterKeyEncrypted).toBe("recovered_enc");
+        expect(family?.masterKeyIv).toBe("recovered_iv");
+        expect(family?.masterKeySalt).toBe("recovered_salt");
+        expect(family?.masterKeyRecoveryEncrypted).toBeUndefined();
+        expect(family?.masterKeyRecoveryIv).toBeUndefined();
+        expect(family?.recoveryKeyIssuedAt).toBeUndefined();
+      });
+    });
+  });
 });
