@@ -12,10 +12,7 @@ import { newMemberJoinedEmail } from "./templates/family/NewMemberJoinedEmail";
 import { biometricRegisteredEmail } from "./templates/security/BiometricRegisteredEmail";
 import { biometricRemovedEmail } from "./templates/security/BiometricRemovedEmail";
 import { csvExportedEmail } from "./templates/security/CsvExportedEmail";
-import { familyPasscodeChangedEmail } from "./templates/security/FamilyPasscodeChangedEmail";
 import { newDeviceLoginEmail } from "./templates/security/LoginNotificationEmail";
-import { recoveryKitReissuedEmail } from "./templates/security/RecoveryKitReissuedEmail";
-import { recoveryRedeemedEmail } from "./templates/security/RecoveryRedeemedEmail";
 
 function resolve<Props>(
   definition: {
@@ -50,12 +47,6 @@ export function resolveEmail(payload: EmailPayload) {
       return resolve(recordAdminChangedEmail, payload.props);
     case "accountDeleted":
       return resolve(accountDeletedEmail, payload.props);
-    case "recoveryRedeemed":
-      return resolve(recoveryRedeemedEmail, payload.props);
-    case "recoveryKitReissued":
-      return resolve(recoveryKitReissuedEmail, payload.props);
-    case "familyPasscodeChanged":
-      return resolve(familyPasscodeChangedEmail, payload.props);
     case "newDeviceLogin":
       return resolve(newDeviceLoginEmail, payload.props);
     case "csvExported":

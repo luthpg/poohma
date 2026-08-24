@@ -11,10 +11,7 @@ import { newMemberJoinedEmail } from "./templates/family/NewMemberJoinedEmail";
 import { biometricRegisteredEmail } from "./templates/security/BiometricRegisteredEmail";
 import { biometricRemovedEmail } from "./templates/security/BiometricRemovedEmail";
 import { csvExportedEmail } from "./templates/security/CsvExportedEmail";
-import { familyPasscodeChangedEmail } from "./templates/security/FamilyPasscodeChangedEmail";
 import { newDeviceLoginEmail } from "./templates/security/LoginNotificationEmail";
-import { recoveryKitReissuedEmail } from "./templates/security/RecoveryKitReissuedEmail";
-import { recoveryRedeemedEmail } from "./templates/security/RecoveryRedeemedEmail";
 
 export const emailTemplates = [
   familyWelcomeEmail,
@@ -26,9 +23,6 @@ export const emailTemplates = [
   shareSettingChangedEmail,
   recordAdminChangedEmail,
   accountDeletedEmail,
-  recoveryRedeemedEmail,
-  recoveryKitReissuedEmail,
-  familyPasscodeChangedEmail,
   newDeviceLoginEmail,
   csvExportedEmail,
   biometricRegisteredEmail,
@@ -71,18 +65,6 @@ export const emailPayload = v.union(
   v.object({
     template: v.literal(accountDeletedEmail.key),
     props: accountDeletedEmail.props,
-  }),
-  v.object({
-    template: v.literal(recoveryRedeemedEmail.key),
-    props: recoveryRedeemedEmail.props,
-  }),
-  v.object({
-    template: v.literal(recoveryKitReissuedEmail.key),
-    props: recoveryKitReissuedEmail.props,
-  }),
-  v.object({
-    template: v.literal(familyPasscodeChangedEmail.key),
-    props: familyPasscodeChangedEmail.props,
   }),
   v.object({
     template: v.literal(newDeviceLoginEmail.key),

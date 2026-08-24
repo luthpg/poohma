@@ -98,53 +98,6 @@ function samplePayloadFor(key: string): EmailPayload {
           ctaUrl: "https://poohma.ciderlabs.link/",
         },
       };
-    case "recoveryRedeemed":
-      return {
-        template: "recoveryRedeemed",
-        props: {
-          displayName: "山田 太郎",
-          familyName: "山田家",
-          recoveredAt: Date.now(),
-          deviceName: "iPhone 15 Pro",
-          browser: "Mobile Safari",
-          os: "iOS",
-          ipAddress: "203.0.113.1",
-          location: "東京都, 日本",
-          ctaUrl: "https://poohma.ciderlabs.link/family",
-        },
-      };
-    case "recoveryKitReissued":
-      return {
-        template: "recoveryKitReissued",
-        props: {
-          displayName: "山田 太郎",
-          familyName: "山田家",
-          issuedAt: Date.now(),
-          deviceName: "MacBook Pro",
-          browser: "Chrome",
-          os: "macOS",
-          ipAddress: "203.0.113.1",
-          location: "東京都, 日本",
-          ctaUrl: "https://poohma.ciderlabs.link/family",
-        },
-      };
-    case "familyPasscodeChanged":
-      return {
-        template: "familyPasscodeChanged",
-        props: {
-          displayName: "山田 太郎",
-          familyName: "山田家",
-          changedByDisplayName: "山田 太郎",
-          isSelf: true,
-          changedAt: Date.now(),
-          deviceName: "Pixel 8 Pro",
-          browser: "Chrome Mobile",
-          os: "Android",
-          ipAddress: "203.0.113.1",
-          location: "東京都, 日本",
-          ctaUrl: "https://poohma.ciderlabs.link/dashboard",
-        },
-      };
     case "newDeviceLogin":
       return {
         template: "newDeviceLogin",

@@ -7,9 +7,6 @@ export default defineSchema({
     masterKeyEncrypted: v.optional(v.string()),
     masterKeyIv: v.optional(v.string()),
     masterKeySalt: v.optional(v.string()),
-    masterKeyRecoveryEncrypted: v.optional(v.string()),
-    masterKeyRecoveryIv: v.optional(v.string()),
-    recoveryKeyIssuedAt: v.optional(v.number()),
     updatedAt: v.number(),
   }),
 
