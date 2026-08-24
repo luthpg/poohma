@@ -12,7 +12,7 @@ import {
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
-import { useConvexFirebaseAuth } from "@/hooks/useConvexFirebaseAuth";
+import { useAuth } from "@/components/AuthProvider";
 import { clearQueryCache } from "@/hooks/usePersistentQuery";
 import { auth } from "@/utils/firebase";
 
@@ -69,7 +69,7 @@ export function AccountProvider({
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { isAuthenticated, isLoading: isAuthLoading } = useConvexFirebaseAuth();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const currentUid =
     auth?.currentUser?.uid || initialUser?.accounts?.[0]?.userId;
 

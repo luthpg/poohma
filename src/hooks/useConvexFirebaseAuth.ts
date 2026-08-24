@@ -3,7 +3,7 @@ import {
   onIdTokenChanged,
   signInWithCustomToken,
 } from "firebase/auth";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCustomTokenFromSession } from "@/services/auth.functions";
 import { auth } from "@/utils/firebase";
 import { isPwaFirstLaunch, markPwaAsInitialized } from "@/utils/pwa";
@@ -18,11 +18,35 @@ export const LOGOUT_FLAG_KEY = "poohma_logout";
 export function useConvexFirebaseAuth() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const recoveryAttempted = useRef(false);
-  const recoverySnapshot = useRef<{
-    user: FirebaseUser | null;
-    timestamp: number;
-  } | null>(null);
+  const recoveryPromiseRef = useRef<Promise<boolean> | null>(null);
+
+  const recoverSession = useCallback(
+    async (firebaseAuth: NonNullable<typeof auth>): Promise<boolean> => {
+      if (recoveryPromiseRef.current) {
+        return recoveryPromiseRef.current;
+      }
+
+      const promise = (async () => {
+        try {
+          const result = await getCustomTokenFromSession();
+          if (!result?.customToken) {
+            return false;
+          }
+          await signInWithCustomToken(firebaseAuth, result.customToken);
+          return true;
+        } catch (error) {
+          console.error("Silent re-auth failed:", error);
+          return false;
+        } finally {
+          recoveryPromiseRef.current = null;
+        }
+      })();
+
+      recoveryPromiseRef.current = promise;
+      return promise;
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!auth) {
@@ -32,20 +56,21 @@ export function useConvexFirebaseAuth() {
     const firebaseAuth = auth;
     let isCleanedUp = false;
 
-    const unsubscribe = onIdTokenChanged(firebaseAuth, async (user) => {
-      // Invalidate any ongoing recovery when auth state changes
-      recoverySnapshot.current = null;
-
-      if (user) {
-        // ログイン状態になったらログアウトフラグをクリア
-        try {
-          sessionStorage.removeItem(LOGOUT_FLAG_KEY);
-        } catch {
-          // ignore storage errors
+    const unsubscribe = onIdTokenChanged(
+      firebaseAuth,
+      async (user: FirebaseUser | null) => {
+        if (user) {
+          // ログイン状態になったらログアウトフラグをクリア
+          try {
+            sessionStorage.removeItem(LOGOUT_FLAG_KEY);
+          } catch {
+            // ignore storage errors
+          }
+          setIsAuthenticated(true);
+          setIsLoading(false);
+          return;
         }
-      }
 
-      if (!user) {
         // ログアウト状態中はセッション復元をスキップ
         let isLoggedOut = false;
         try {
@@ -60,43 +85,22 @@ export function useConvexFirebaseAuth() {
           return;
         }
 
-        if (!recoveryAttempted.current) {
-          recoveryAttempted.current = true;
-          // Capture auth state snapshot before starting async recovery
-          const snapshot = {
-            user: firebaseAuth.currentUser,
-            timestamp: Date.now(),
-          };
-          recoverySnapshot.current = snapshot;
+        const recovered = await recoverSession(firebaseAuth);
+        if (isCleanedUp) return;
 
-          try {
-            const result = await getCustomTokenFromSession();
-
-            // Only apply recovery if snapshot is still valid and effect not cleaned up
-            if (
-              !isCleanedUp &&
-              recoverySnapshot.current === snapshot &&
-              firebaseAuth.currentUser === snapshot.user &&
-              result?.customToken
-            ) {
-              await signInWithCustomToken(firebaseAuth, result.customToken);
-              return;
-            }
-          } catch (error) {
-            console.error("Silent re-auth failed:", error);
-          }
+        if (!recovered) {
+          // 再認証に失敗した場合のみ未認証を確定する
+          setIsAuthenticated(false);
         }
-      }
-      setIsAuthenticated(!!user);
-      setIsLoading(false);
-    });
+        setIsLoading(false);
+      },
+    );
 
     return () => {
       isCleanedUp = true;
-      recoverySnapshot.current = null;
       unsubscribe();
     };
-  }, []);
+  }, [recoverSession]);
 
   return useMemo(
     () => ({

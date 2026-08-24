@@ -11,8 +11,8 @@ import {
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react";
+import { AuthProvider, useAuth } from "@/components/AuthProvider";
 import { env } from "@/env/client";
-import { useConvexFirebaseAuth } from "@/hooks/useConvexFirebaseAuth";
 import { getAuthUser } from "@/services/auth.functions";
 import "@fontsource/geist-sans/400.css";
 import "@fontsource/geist-sans/500.css";
@@ -177,6 +177,21 @@ export const Route = createRootRouteWithContext<RouterContext>()({
   shellComponent: RootDocument,
 });
 
+function ConvexAuthBridge({
+  client,
+  children,
+}: {
+  client: ConvexReactClient;
+  children: React.ReactNode;
+}) {
+  const auth = useAuth();
+  return (
+    <ConvexProviderWithAuth client={client} useAuth={() => auth}>
+      {children}
+    </ConvexProviderWithAuth>
+  );
+}
+
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ja" suppressHydrationWarning>
@@ -184,33 +199,35 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <ConvexProviderWithAuth client={convex} useAuth={useConvexFirebaseAuth}>
-          <QueryClientProvider client={Route.useRouteContext().queryClient}>
-            <ThemeProvider defaultTheme="system" storageKey="theme">
-              <AccountProvider initialUser={Route.useRouteContext().user}>
-                <PasscodeProvider>
-                  <div className="min-h-screen bg-background text-foreground">
-                    {children}
-                    <Analytics />
-                    <SpeedInsights />
-                    <TanStackDevtools
-                      config={{
-                        position: "bottom-right",
-                      }}
-                      plugins={[
-                        {
-                          name: "Tanstack Router",
-                          render: <TanStackRouterDevtoolsPanel />,
-                        },
-                      ]}
-                    />
-                    <Toaster />
-                  </div>
-                </PasscodeProvider>
-              </AccountProvider>
-            </ThemeProvider>
-          </QueryClientProvider>
-        </ConvexProviderWithAuth>
+        <AuthProvider>
+          <ConvexAuthBridge client={convex}>
+            <QueryClientProvider client={Route.useRouteContext().queryClient}>
+              <ThemeProvider defaultTheme="system" storageKey="theme">
+                <AccountProvider initialUser={Route.useRouteContext().user}>
+                  <PasscodeProvider>
+                    <div className="min-h-screen bg-background text-foreground">
+                      {children}
+                      <Analytics />
+                      <SpeedInsights />
+                      <TanStackDevtools
+                        config={{
+                          position: "bottom-right",
+                        }}
+                        plugins={[
+                          {
+                            name: "Tanstack Router",
+                            render: <TanStackRouterDevtoolsPanel />,
+                          },
+                        ]}
+                      />
+                      <Toaster />
+                    </div>
+                  </PasscodeProvider>
+                </AccountProvider>
+              </ThemeProvider>
+            </QueryClientProvider>
+          </ConvexAuthBridge>
+        </AuthProvider>
         <Scripts />
       </body>
     </html>
