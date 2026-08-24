@@ -63,6 +63,98 @@ function samplePayloadFor(key: string): EmailPayload {
           ctaUrl: "https://poohma.ciderlabs.link/",
         },
       };
+    case "shareSettingChanged":
+      return {
+        template: "shareSettingChanged",
+        props: {
+          displayName: "山田 太郎",
+          familyName: "山田家",
+          changedByDisplayName: "山田 太郎",
+          changedAt: Date.now(),
+          changeSummary: "「Amazon」が家族共有に設定されました",
+          ctaUrl: "https://poohma.ciderlabs.link/records",
+        },
+      };
+    case "recordAdminChanged":
+      return {
+        template: "recordAdminChanged",
+        props: {
+          displayName: "山田 太郎",
+          familyName: "山田家",
+          accountName: "Netflix",
+          event: "added",
+          changedAccountDisplayName: "山田 花子",
+          changedByDisplayName: "山田 太郎",
+          changedAt: Date.now(),
+          ctaUrl: "https://poohma.ciderlabs.link/records",
+        },
+      };
+    case "accountDeleted":
+      return {
+        template: "accountDeleted",
+        props: {
+          displayName: "山田 太郎",
+          deletedAt: Date.now(),
+          ctaUrl: "https://poohma.ciderlabs.link/",
+        },
+      };
+    case "newDeviceLogin":
+      return {
+        template: "newDeviceLogin",
+        props: {
+          displayName: "山田 太郎",
+          loginAt: Date.now(),
+          deviceName: "Windows PC",
+          browser: "Chrome",
+          os: "Windows",
+          ipAddress: "203.0.113.1",
+          location: "東京都, 日本",
+          ctaUrl: "https://poohma.ciderlabs.link/dashboard",
+        },
+      };
+    case "csvExported":
+      return {
+        template: "csvExported",
+        props: {
+          displayName: "山田 太郎",
+          exportedAt: Date.now(),
+          recordCount: 10,
+          deviceName: "MacBook Air",
+          browser: "Safari",
+          os: "macOS",
+          ipAddress: "203.0.113.1",
+          location: "東京都, 日本",
+          ctaUrl: "https://poohma.ciderlabs.link/settings",
+        },
+      };
+    case "biometricRegistered":
+      return {
+        template: "biometricRegistered",
+        props: {
+          displayName: "山田 太郎",
+          registeredAt: Date.now(),
+          deviceName: "iPhone 15 Pro",
+          browser: "Mobile Safari",
+          os: "iOS",
+          ipAddress: "203.0.113.1",
+          location: "東京都, 日本",
+          ctaUrl: "https://poohma.ciderlabs.link/settings",
+        },
+      };
+    case "biometricRemoved":
+      return {
+        template: "biometricRemoved",
+        props: {
+          displayName: "山田 太郎",
+          removedAt: Date.now(),
+          deviceName: "iPhone 15 Pro",
+          browser: "Mobile Safari",
+          os: "iOS",
+          ipAddress: "203.0.113.1",
+          location: "東京都, 日本",
+          ctaUrl: "https://poohma.ciderlabs.link/settings",
+        },
+      };
     default:
       throw new Error(`Unknown template key: ${key}`);
   }

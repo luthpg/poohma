@@ -9,6 +9,7 @@ export const env = createEnv({
     CONVEX_INTERNAL_SECRET: z.string().min(1),
     VERCEL_ENV: z.enum(["production", "preview", "development"]).optional(),
     CSP_MODE: z.enum(["report-only", "enforce"]).optional(),
+    ABSTRACT_IP_GEOLOCATION_API_KEY: z.string().optional(),
   },
 
   /**

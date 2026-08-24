@@ -41,6 +41,7 @@ import {
   unwrapMasterKey,
   wrapDEK,
 } from "@/lib/crypto";
+import { notifyBiometricEventServerFn } from "@/services/security.functions";
 
 interface PasscodeContextType {
   masterKey: CryptoKey | null;
@@ -256,7 +257,15 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
     // ロック解除した状態をリセット
     setMasterKey(null);
     masterKeyRef.current = null;
-  }, [targetUserId]);
+
+    // 解除通知メール送信（バックグラウンド）
+    notifyBiometricEventServerFn({
+      data: {
+        event: "removed",
+        accountId: currentAccount?._id,
+      },
+    }).catch((e) => console.warn("Failed to send biometric removed email:", e));
+  }, [targetUserId, currentAccount]);
 
   const handleUnlockSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
@@ -278,6 +287,16 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
           );
           setBiometricEnabled(true);
           toast.success("指紋/FaceIDでのロック解除を有効にしました。");
+
+          // 登録通知メール送信（バックグラウンド）
+          notifyBiometricEventServerFn({
+            data: {
+              event: "registered",
+              accountId: currentAccount._id,
+            },
+          }).catch((e) =>
+            console.warn("Failed to send biometric registered email:", e),
+          );
         } catch (error) {
           console.error("Biometric registration failed:", error);
           if (error instanceof Error && error.name !== "NotAllowedError") {

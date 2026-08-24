@@ -6,9 +6,14 @@ import {
   MAX_CREDENTIALS_PER_RECORD,
   RecordInputSchema,
 } from "../src/utils/schemas";
+import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
-import { authenticatedQuery, familyBoundMutation } from "./customBuilders";
+import {
+  authenticatedMutation,
+  authenticatedQuery,
+  familyBoundMutation,
+} from "./customBuilders";
 import {
   getEffectiveAdmins,
   getEffectiveOwnerFamilyId,
@@ -419,6 +424,29 @@ export const shareRecord = familyBoundMutation({
       admins: [ctx.user._id],
       updatedAt: Date.now(),
     });
+
+    const family = await ctx.db.get(ctx.familyId);
+    const familyName = family?.name ?? "家族";
+    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
+
+    await ctx.scheduler.runAfter(
+      0,
+      internal.actions.sendTemplatedEmailInternal,
+      {
+        email: ctx.user.email,
+        payload: {
+          template: "shareSettingChanged",
+          props: {
+            displayName: ctx.user.displayName || "メンバー",
+            familyName,
+            changedByDisplayName: ctx.user.displayName || "メンバー",
+            changedAt: Date.now(),
+            changeSummary: `「${record.title}」が家族共有に設定されました`,
+            ctaUrl: `${appUrl}/records`,
+          },
+        },
+      },
+    );
   },
 });
 
@@ -441,6 +469,29 @@ export const unshareRecord = familyBoundMutation({
       admins: [],
       updatedAt: Date.now(),
     });
+
+    const family = await ctx.db.get(ctx.familyId);
+    const familyName = family?.name ?? "家族";
+    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
+
+    await ctx.scheduler.runAfter(
+      0,
+      internal.actions.sendTemplatedEmailInternal,
+      {
+        email: ctx.user.email,
+        payload: {
+          template: "shareSettingChanged",
+          props: {
+            displayName: ctx.user.displayName || "メンバー",
+            familyName,
+            changedByDisplayName: ctx.user.displayName || "メンバー",
+            changedAt: Date.now(),
+            changeSummary: `「${record.title}」の共有が解除され、個人所有に変更されました`,
+            ctaUrl: `${appUrl}/records`,
+          },
+        },
+      },
+    );
   },
 });
 
@@ -465,10 +516,44 @@ export const addRecordAdmin = familyBoundMutation({
 
     const admins = record.admins ?? [];
     if (!admins.includes(args.targetAccountId)) {
+      const newAdmins = [...admins, args.targetAccountId];
       await ctx.db.patch(args.id, {
-        admins: [...admins, args.targetAccountId],
+        admins: newAdmins,
         updatedAt: Date.now(),
       });
+
+      const family = await ctx.db.get(ctx.familyId);
+      const familyName = family?.name ?? "家族";
+      const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
+      const now = Date.now();
+
+      // 新管理者一覧の全メンバーに通知
+      for (const adminId of newAdmins) {
+        const adminDoc = await ctx.db.get(adminId);
+        if (adminDoc) {
+          await ctx.scheduler.runAfter(
+            0,
+            internal.actions.sendTemplatedEmailInternal,
+            {
+              email: adminDoc.email,
+              payload: {
+                template: "recordAdminChanged",
+                props: {
+                  displayName: adminDoc.displayName || "メンバー",
+                  familyName,
+                  accountName: record.title,
+                  event: "added",
+                  changedAccountDisplayName:
+                    targetUser.displayName || "メンバー",
+                  changedByDisplayName: ctx.user.displayName || "メンバー",
+                  changedAt: now,
+                  ctaUrl: `${appUrl}/records`,
+                },
+              },
+            },
+          );
+        }
+      }
     }
   },
 });
@@ -487,6 +572,11 @@ export const removeRecordAdmin = familyBoundMutation({
 
     requireAdminAccess(ctx.user, record);
 
+    const targetUser = await ctx.db.get(args.targetAccountId);
+    if (!targetUser) {
+      throw new Error("Target user not found");
+    }
+
     const admins = record.admins ?? [];
     if (!admins.includes(args.targetAccountId)) {
       throw new Error("Target user is not an administrator of this record");
@@ -495,10 +585,46 @@ export const removeRecordAdmin = familyBoundMutation({
       throw new Error("管理者が0人になるため削除できません");
     }
 
+    const newAdmins = admins.filter((id) => id !== args.targetAccountId);
     await ctx.db.patch(args.id, {
-      admins: admins.filter((id) => id !== args.targetAccountId),
+      admins: newAdmins,
       updatedAt: Date.now(),
     });
+
+    const family = await ctx.db.get(ctx.familyId);
+    const familyName = family?.name ?? "家族";
+    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
+    const now = Date.now();
+
+    // 削除された本人を含む関係者に通知
+    const notifyUserIds = Array.from(
+      new Set([...newAdmins, args.targetAccountId]),
+    );
+    for (const userId of notifyUserIds) {
+      const userDoc = await ctx.db.get(userId);
+      if (userDoc) {
+        await ctx.scheduler.runAfter(
+          0,
+          internal.actions.sendTemplatedEmailInternal,
+          {
+            email: userDoc.email,
+            payload: {
+              template: "recordAdminChanged",
+              props: {
+                displayName: userDoc.displayName || "メンバー",
+                familyName,
+                accountName: record.title,
+                event: "removed",
+                changedAccountDisplayName: targetUser.displayName || "メンバー",
+                changedByDisplayName: ctx.user.displayName || "メンバー",
+                changedAt: now,
+                ctaUrl: `${appUrl}/records`,
+              },
+            },
+          },
+        );
+      }
+    }
   },
 });
 
@@ -525,6 +651,32 @@ export const bulkShareRecords = familyBoundMutation({
         count++;
       }
     }
+
+    if (count > 0) {
+      const family = await ctx.db.get(ctx.familyId);
+      const familyName = family?.name ?? "家族";
+      const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
+
+      await ctx.scheduler.runAfter(
+        0,
+        internal.actions.sendTemplatedEmailInternal,
+        {
+          email: ctx.user.email,
+          payload: {
+            template: "shareSettingChanged",
+            props: {
+              displayName: ctx.user.displayName || "メンバー",
+              familyName,
+              changedByDisplayName: ctx.user.displayName || "メンバー",
+              changedAt: Date.now(),
+              changeSummary: `${count}件のアカウント情報が家族共有に設定されました`,
+              ctaUrl: `${appUrl}/records`,
+            },
+          },
+        },
+      );
+    }
+
     return { success: true, count, sharedCount: count };
   },
 });
@@ -554,7 +706,93 @@ export const bulkUnshareRecords = familyBoundMutation({
         count++;
       }
     }
+
+    if (count > 0) {
+      const family = await ctx.db.get(ctx.familyId);
+      const familyName = family?.name ?? "家族";
+      const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
+
+      await ctx.scheduler.runAfter(
+        0,
+        internal.actions.sendTemplatedEmailInternal,
+        {
+          email: ctx.user.email,
+          payload: {
+            template: "shareSettingChanged",
+            props: {
+              displayName: ctx.user.displayName || "メンバー",
+              familyName,
+              changedByDisplayName: ctx.user.displayName || "メンバー",
+              changedAt: Date.now(),
+              changeSummary: `${count}件のアカウント情報の家族共有が解除されました`,
+              ctaUrl: `${appUrl}/records`,
+            },
+          },
+        },
+      );
+    }
+
     return { success: true, count, unsharedCount: count };
+  },
+});
+
+/**
+ * CSVエクスポート用レコード取得（サーバー側で取得と同時に通知をスケジュール・スキップ防止）
+ */
+export const fetchRecordsForExport = authenticatedMutation({
+  args: {
+    deviceName: v.optional(v.string()),
+    browser: v.optional(v.string()),
+    os: v.optional(v.string()),
+    ipAddress: v.optional(v.string()),
+    location: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { user } = ctx;
+    const records = await collectVisibleRecords(ctx, user, true);
+
+    const members = user.familyId
+      ? await ctx.db
+          .query("users")
+          .withIndex("by_familyId", (q) => q.eq("familyId", user.familyId))
+          .collect()
+      : [user];
+    const emailById = new Map(members.map((m) => [m._id, m.email]));
+
+    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
+
+    // エクスポート実行通知メールをスケジュール（サーバー側確実発火）
+    await ctx.scheduler.runAfter(
+      0,
+      internal.actions.sendTemplatedEmailInternal,
+      {
+        email: user.email,
+        payload: {
+          template: "csvExported",
+          props: {
+            displayName: user.displayName || "メンバー",
+            exportedAt: Date.now(),
+            recordCount: records.length,
+            deviceName: args.deviceName,
+            browser: args.browser,
+            os: args.os,
+            ipAddress: args.ipAddress,
+            location: args.location,
+            ctaUrl: `${appUrl}/settings`,
+          },
+        },
+      },
+    );
+
+    return records.map((r) => {
+      const admins = getEffectiveAdmins(r) ?? [];
+      return {
+        ...r,
+        adminEmails: admins
+          .map((id) => emailById.get(id))
+          .filter((email): email is string => !!email),
+      };
+    });
   },
 });
 

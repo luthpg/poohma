@@ -15,12 +15,14 @@ import {
   revokeRefreshTokens,
   verifySessionCookie,
 } from "@/services/firebase-admin.server";
+import { getRequestContext } from "@/utils/request-context.server";
 
 /**
  * 14日間の秒数とミリ秒数
  */
 const SESSION_EXPIRES_IN_SECONDS = 60 * 60 * 24 * 14;
 const SESSION_EXPIRES_IN_MS = SESSION_EXPIRES_IN_SECONDS * 1000;
+const DEVICE_ID_EXPIRES_IN_SECONDS = 60 * 60 * 24 * 365; // 1年間
 
 /**
  * リクエストごとに生成する
@@ -51,6 +53,34 @@ export const syncUser = createServerFn({ method: "POST" })
         photoURL: picture,
       });
 
+      // デバイス識別用クッキーの取得または新規発行
+      let deviceId = getCookie("poohma_device_id");
+      const isProduction = process.env.NODE_ENV === "production";
+
+      if (!deviceId) {
+        deviceId = crypto.randomUUID();
+        setCookie("poohma_device_id", deviceId, {
+          httpOnly: true,
+          secure: isProduction,
+          sameSite: "lax",
+          path: "/",
+          maxAge: DEVICE_ID_EXPIRES_IN_SECONDS,
+        });
+      }
+
+      // ログイン履歴の記録と新端末検知通知
+      try {
+        const context = await getRequestContext();
+        await convexClient.mutation(api.users.recordLogin, {
+          deviceId,
+          accountId:
+            userId as unknown as import("@/../convex/_generated/dataModel").Id<"users">,
+          ...context,
+        });
+      } catch (logErr) {
+        console.warn("Failed to record login event:", logErr);
+      }
+
       // セッションクッキーの作成 (expiresIn はミリ秒)
       const sessionCookie = await getSessionCookie(
         idToken,
@@ -58,8 +88,6 @@ export const syncUser = createServerFn({ method: "POST" })
       );
 
       // クッキーの設定 (maxAge は秒)
-      const isProduction = process.env.NODE_ENV === "production";
-
       setCookie("session", sessionCookie, {
         httpOnly: true,
         secure: isProduction,
