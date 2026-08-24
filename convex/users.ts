@@ -604,14 +604,14 @@ export const recordLogin = identityVerifiedMutation({
     }
 
     // 過去に同じ accountId × deviceId のログインがあるか確認
-    const existingEvents = await ctx.db
+    const existingEvent = await ctx.db
       .query("loginEvents")
       .withIndex("by_accountId_deviceId", (q) =>
         q.eq("accountId", targetAccount._id).eq("deviceId", args.deviceId),
       )
-      .collect();
+      .first();
 
-    const isNewDevice = existingEvents.length === 0;
+    const isNewDevice = existingEvent === null;
     const now = Date.now();
 
     await ctx.db.insert("loginEvents", {
