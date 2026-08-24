@@ -1678,5 +1678,98 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         expect(family?.recoveryKeyIssuedAt).toBeUndefined();
       });
     });
+
+    it("recoverWithRecoveryKey: 未所属ユーザーは他家族を復旧できないこと", async () => {
+      const t = convexTest(schema, modules);
+
+      const { familyId, userId } = await t.run(async (ctx) => {
+        const fId = await ctx.db.insert("families", {
+          name: "高橋家",
+          masterKeyEncrypted: "original_enc",
+          masterKeyIv: "original_iv",
+          masterKeySalt: "original_salt",
+          masterKeyRecoveryEncrypted: "recovery_enc",
+          masterKeyRecoveryIv: "recovery_iv",
+          recoveryKeyIssuedAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+        const uId = await ctx.db.insert("users", {
+          userId: "user_without_family",
+          email: "without-family@example.com",
+          displayName: "未所属ユーザー",
+          updatedAt: Date.now(),
+        });
+        return { familyId: fId, userId: uId };
+      });
+
+      const userClient = t.withIdentity({
+        subject: "user_without_family",
+        email: "without-family@example.com",
+      });
+
+      await expect(
+        userClient.mutation(api.families.recoverWithRecoveryKey, {
+          familyId,
+          masterKeyEncrypted: "attacker_enc",
+          masterKeyIv: "attacker_iv",
+          masterKeySalt: "attacker_salt",
+        }),
+      ).rejects.toThrow("User does not belong to this family");
+
+      await t.run(async (ctx) => {
+        const family = await ctx.db.get(familyId);
+        const user = await ctx.db.get(userId);
+        expect(family?.masterKeyEncrypted).toBe("original_enc");
+        expect(family?.masterKeyIv).toBe("original_iv");
+        expect(family?.masterKeySalt).toBe("original_salt");
+        expect(user?.familyId).toBeUndefined();
+      });
+    });
+
+    it("recoverWithRecoveryKey: リカバリーキー未発行の家族は復旧できないこと", async () => {
+      const t = convexTest(schema, modules);
+
+      const familyId = await t.run(async (ctx) => {
+        const fId = await ctx.db.insert("families", {
+          name: "伊藤家",
+          masterKeyEncrypted: "original_enc",
+          masterKeyIv: "original_iv",
+          masterKeySalt: "original_salt",
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("users", {
+          userId: "user_without_recovery_key",
+          email: "without-recovery-key@example.com",
+          displayName: "伊藤 太郎",
+          familyId: fId,
+          updatedAt: Date.now(),
+        });
+        return fId;
+      });
+
+      const userClient = t.withIdentity({
+        subject: "user_without_recovery_key",
+        email: "without-recovery-key@example.com",
+      });
+
+      await expect(
+        userClient.mutation(api.families.recoverWithRecoveryKey, {
+          familyId,
+          masterKeyEncrypted: "recovered_enc",
+          masterKeyIv: "recovered_iv",
+          masterKeySalt: "recovered_salt",
+        }),
+      ).rejects.toThrow("Recovery key has not been issued");
+
+      await t.run(async (ctx) => {
+        const family = await ctx.db.get(familyId);
+        expect(family?.masterKeyEncrypted).toBe("original_enc");
+        expect(family?.masterKeyIv).toBe("original_iv");
+        expect(family?.masterKeySalt).toBe("original_salt");
+        expect(family?.masterKeyRecoveryEncrypted).toBeUndefined();
+        expect(family?.masterKeyRecoveryIv).toBeUndefined();
+        expect(family?.recoveryKeyIssuedAt).toBeUndefined();
+      });
+    });
   });
 });

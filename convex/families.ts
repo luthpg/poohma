@@ -1546,8 +1546,16 @@ export const recoverWithRecoveryKey = authenticatedMutation({
     const family = await ctx.db.get(args.familyId);
     if (!family) throw new Error("Family not found");
 
-    if (user.familyId && user.familyId !== args.familyId) {
+    if (user.familyId !== args.familyId) {
       throw new Error("User does not belong to this family");
+    }
+
+    if (
+      family.masterKeyRecoveryEncrypted === undefined ||
+      family.masterKeyRecoveryIv === undefined ||
+      family.recoveryKeyIssuedAt === undefined
+    ) {
+      throw new Error("Recovery key has not been issued");
     }
 
     const now = Date.now();
@@ -1562,11 +1570,6 @@ export const recoverWithRecoveryKey = authenticatedMutation({
       recoveryKeyIssuedAt: undefined,
       updatedAt: now,
     });
-
-    // ユーザーが家族未紐付けなら紐付ける
-    if (!user.familyId) {
-      await ctx.db.patch(user._id, { familyId: args.familyId });
-    }
 
     const familyName = family.name;
     const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
