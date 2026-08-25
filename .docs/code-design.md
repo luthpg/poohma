@@ -83,8 +83,8 @@ Service Worker (Workbox等):
 | バックエンド／DB      | Convex（サーバーレス関数＋リアクティブDB）                                                                                                    |
 | 認証             | Firebase Authentication（Google OAuth）＋ firebase-admin（サーバー側検証）＋ httpOnlyセッションCookie                                          |
 | CMS            | microCMS（microcms-js-sdk）                                                                                                    |
-| メール送信          | Resend                                                                                                                       |
-| 外部API          | Yahoo!テキスト解析API（ふりがな）、任意サイトのOGPスクレイピング（cheerio）                                                                              |
+| メール送信・テンプレート | Resend, React Email（`@react-email/components`）                                                                                |
+| 外部API          | Yahoo!テキスト解析API（ふりがな）、任意サイトのOGPスクレイピング（cheerio）、Abstract IP Geolocation API（位置情報取得）                                 |
 | CSV処理          | papaparse                                                                                                                    |
 | QRコード          | qrcode.react                                                                                                                 |
 | PWA            | Web App Manifest、iOS standalone判定ロジック（自前実装）、Service Worker（Workbox等）＋IndexedDB（オフラインキャッシュ、FR-PWA-03）                         |
@@ -115,6 +115,11 @@ convex/
 
 src/
   components/            … 共通UIコンポーネント (AppHeader, PasscodeProvider 等)
+  emails/                … メールテンプレート定義・配信レジストリ (React Email / Resend)
+    _components/         … メール共通コンポーネント (EmailLayout, EmailButton 等)
+    templates/           … 用途別テンプレート (account/, family/, security/)
+    dispatch.ts          … メール送信ディスパッチャ
+    registry.ts          … テンプレートレジストリ・Convex Payloadスキーマ
   env/                    … クライアント/サーバー環境変数スキーマ (t3-env)
   hooks/                  … usePersistentQuery, useConvexFirebaseAuth, use-export-csv 等
   lib/                    … crypto.ts (E2EE), biometric.ts (WebAuthn), cms.server.ts
@@ -123,8 +128,10 @@ src/
     (public)/              … 公開ルート群 (LP, usage, faq, login, 規約等)
     __root.tsx              … 全体レイアウト・グローバルProvider
   services/                … サーバー関数 (auth.functions.ts, cms.functions.ts, prefs.functions.ts,
-                                firebase-admin.server.ts)
-  utils/                    … schemas.ts (zod), url-safety.ts (SSRF対策), csv-sanitize.ts,
+                                security.functions.ts, firebase-admin.server.ts)
+  utils/                    … schemas.ts (zod), geo-ip.server.ts (位置情報取得),
+                                request-context.server.ts (リクエストメタデータ解析),
+                                url-safety.ts (SSRF対策), csv-sanitize.ts,
                                 index-group.ts (五十音インデックス), chunk-processor.ts
 ```
 
@@ -577,9 +584,10 @@ decryptHint/encryptHint 側でマスターキー直接暗号化にフォール�
 
 | 関数                   | 種別            | 認可               | 概要                                                                                                    |
 | -------------------- | ------------- | ---------------- | ----------------------------------------------------------------------------------------------------- |
-| syncUser             | Mutation      | identityVerified | ログイン時のユーザー情報同期（新規作成／UID引き継ぎ／プロフィール更新）。別UID引き継ぎ時は `joinRequests` や `familyMigrations` も新UIDへ付け替えて孤児化を防止する |
+| syncUser             | Mutation      | identityVerified | ログイン時のユーザー情報同期（新規作成／UID引き継ぎ／プロフィール更新）。別UID引き継ぎ時は `joinRequests` や `familyMigrations` も新UIDへ付け替えて孤児化を防止する。新規ログイン時はIP・位置情報等をもとにログイン通知メールをスケジュール送信 |
 | updateProfile        | Mutation      | authenticated    | 表示名の更新                                                                                                |
-| deleteAccount        | Mutation      | authenticated    | 退会処理（所有レコード削除、家族最終メンバー時は家族も削除）                                                                          |
+| notifyBiometricEvent | Mutation      | authenticated    | 生体認証の登録・解除イベントを検知し、セキュリティ通知メールをスケジュール送信                                              |
+| deleteAccount        | Mutation      | authenticated    | 退会処理（所有レコード削除、家族最終メンバー時は家族も削除）。退会完了通知メールを送信                                      |
 | getUserByFirebaseUid | InternalQuery | 内部限定             | UIDからユーザー＋所属家族情報を取得（HTTP Action経由）                                                                    |
 | getUserById          | InternalQuery | 内部限定             | Convex内部IDからユーザー＋家族情報を取得                                                                                |
 
@@ -618,9 +626,10 @@ decryptHint/encryptHint 側でマスターキー直接暗号化にフォール�
 | getRecordDetail                                                   | Query        | authenticated | 詳細取得（rls.tsによるrequireContentAccess制御）。取得時にrecordAccessLogへVIEWEDを記録し、lastViewedAt/Byを更新                                                                     |
 | getAvailableTags                                                  | Query        | authenticated | 閲覧可能レコードから使用中タグ一覧を抽出（by\_family\_sortKey経由）                                                                                                    |
 | getOwnedRecords                                                   | Query        | authenticated | 自分が管理可能な全レコード取得（個人レコード＋自分が管理者の共有レコード、CSVエクスポート用）                                                                                       |
-| shareRecord                                                       | Mutation     | familyBound   | ワンタップで個人レコードを家族共有レコード（ownerType: "family", admins: [user._id]）に昇格                                                                                  |
-| unshareRecord                                                     | Mutation     | familyBound   | ワンタップで共有レコードを個人レコード（ownerType: "user", admins: []）に戻す（管理者限定）                                                                                 |
-| addRecordAdmin / removeRecordAdmin                                | Mutation     | familyBound   | 共有レコードの共同管理者の追加・解除（管理者限定）                                                                                                                           |
+| fetchRecordsForExport                                             | Mutation     | authenticated | CSVエクスポート用レコード一括取得（サーバー側でCSVエクスポート通知メールもスケジュール送信）                                                                             |
+| shareRecord                                                       | Mutation     | familyBound   | ワンタップで個人レコードを家族共有レコード（ownerType: "family", admins: [user._id]）に昇格（共有変更通知メール送信）                                                        |
+| unshareRecord                                                     | Mutation     | familyBound   | ワンタップで共有レコードを個人レコード（ownerType: "user", admins: []）に戻す（管理者限定・共有変更通知メール送信）                                                         |
+| addRecordAdmin / removeRecordAdmin                                | Mutation     | familyBound   | 共有レコードの共同管理者の追加・解除（管理者限定・管理者変更通知メール送信）                                                                                                 |
 | bulkShareRecords / bulkUnshareRecords                             | Mutation     | familyBound   | 選択した個人レコードの一括共有 / 共有レコードの一括共有解除                                                                                                                 |
 | previewCsvImport                                                  | Query/Action | familyBound   | インポート予定のCSV行と既存データ（URL＋タイトルで突合）を比較し、行ごとに新規／上書き／スキップを判定して返す（FR-CSV-07、9.7参照）                                                                             |
 | createRecord                                                      | Mutation     | familyBound   | レコード新規作成（zodによるサーバー再検証、sortKey自動算出、ownerType: "user" \| "family"、credentials最大10件チェック）                                                                   |
@@ -643,13 +652,26 @@ decryptHint/encryptHint 側でマスターキー直接暗号化にフォール�
 | -------------------------------- | ---------------- | -------------------- | -------------------------------------- |
 | getOgpInfo                       | Action           | 要ログイン（内部でidentity検証） | 指定URLのOGP情報取得（SSRF対策済みfetch＋cheerio解析） |
 | getFurigana                      | Action           | 要ログイン                | Yahoo!テキスト解析APIによるふりがな取得               |
-| sendEmailReq / sendEmailInternal | (Internal)Action | 内部限定                 | Resend経由のメール送信                         |
+| sendEmailReq / sendEmailInternal | (Internal)Action | 内部限定                 | Resend経由のメール送信（React EmailテンプレートのHTML化・配信） |
 
 ### 7.5 convex/http.ts
 
 | エンドポイント               | メソッド | 認証                                               | 概要                                     |
 | --------------------- | ---- | ------------------------------------------------ | -------------------------------------- |
 | /getUserByFirebaseUid | POST | x-internal-secret ヘッダー（CONVEX\_INTERNAL\_SECRET） | サーバーサイド (getAuthUser) からのユーザー情報取得専用API |
+
+### 7.6 Server Functions (src/services/)
+
+| 関数                           | ファイル                  | メソッド | 認可・検証                     | 概要                                                      |
+| ---------------------------- | --------------------- | ---- | ------------------------- | ------------------------------------------------------- |
+| syncUser                     | auth.functions.ts     | POST | Firebase IDトークン検証      | ログイン時のユーザー同期・セッションCookie発行・ログイン通知送信トリガー |
+| getAuthUser                  | auth.functions.ts     | GET  | セッションCookie検証            | 現在ログイン中のユーザーおよび所属家族情報取得          |
+| getCustomTokenFromSession    | auth.functions.ts     | POST | セッションCookie検証            | セッションCookieからFirebaseカスタムトークンを再発行（セッション復旧用） |
+| logout                       | auth.functions.ts     | POST | セッションCookie失効            | ログアウト処理（Cookie削除＋トークン失効）              |
+| fetchRecordsForExportServerFn | security.functions.ts | POST | セッションCookie検証            | CSVエクスポート用レコード取得＋監査通知メール送信トリガー |
+| notifyBiometricEventServerFn | security.functions.ts | POST | セッションCookie検証            | 生体認証登録／解除イベントの監査通知メール送信トリガー  |
+| getClientRequestContext      | security.functions.ts | GET  | なし                      | 接続元のIPアドレス・User-Agent・GeoIP位置情報の取得     |
+
 
 ## 8. 画面設計・ルーティング設計
 
@@ -895,12 +917,13 @@ cleanupExpiredMigrationsInternal:
 
 ### サーバー（src/env/server.ts）
 
-| 変数名                       | 必須 | 説明                                 |
-| ------------------------- | -- | ---------------------------------- |
-| SERVER\_URL               | 任意 | サーバーURL                            |
-| MICROCMS\_SERVICE\_DOMAIN | 必須 | microCMSサービスドメイン                   |
-| MICROCMS\_API\_KEY        | 必須 | microCMS APIキー                     |
-| CONVEX\_INTERNAL\_SECRET  | 必須 | Convex HTTP Action（内部API）保護用シークレット |
+| 変数名                            | 必須 | 説明                                              |
+| --------------------------------- | -- | ------------------------------------------------- |
+| SERVER\_URL                       | 任意 | サーバーURL                                         |
+| MICROCMS\_SERVICE\_DOMAIN         | 必須 | microCMSサービスドメイン                                |
+| MICROCMS\_API\_KEY                | 必須 | microCMS APIキー                                  |
+| CONVEX\_INTERNAL\_SECRET          | 必須 | Convex HTTP Action（内部API）保護用シークレット      |
+| ABSTRACT\_IP\_GEOLOCATION\_API\_KEY | 任意 | Abstract API GeoIP（ログイン・監査メール位置情報取得用） |
 
 ### その他（Convex実行環境）
 
