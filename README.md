@@ -111,12 +111,13 @@ pnpm install
 
 サーバー（TanStack Startのサーバー関数用）：
 
-| 変数名                       | 必須 | 説明                                        |
-| ------------------------- | -- | ----------------------------------------- |
-| SERVER\_URL               | 任意 | サーバーURL                                   |
-| MICROCMS\_SERVICE\_DOMAIN | 必須 | microCMSサービスドメイン                          |
-| MICROCMS\_API\_KEY        | 必須 | microCMS APIキー                            |
-| CONVEX\_INTERNAL\_SECRET  | 必須 | Convex内部API保護用シークレット（下記Convex環境変数と同じ値を設定） |
+| 変数名                            | 必須 | 説明                                              |
+| --------------------------------- | -- | ------------------------------------------------- |
+| SERVER\_URL                       | 任意 | サーバーURL                                         |
+| MICROCMS\_SERVICE\_DOMAIN         | 必須 | microCMSサービスドメイン                                |
+| MICROCMS\_API\_KEY                | 必須 | microCMS APIキー                                  |
+| CONVEX\_INTERNAL\_SECRET          | 必須 | Convex内部API保護用シークレット（下記Convex環境変数と同じ値を設定） |
+| ABSTRACT\_IP\_GEOLOCATION\_API\_KEY | 任意 | Abstract API GeoIP（ログイン・監査メール位置情報取得用） |
 
 Convex実行環境（ `npx convex env set` 等でConvex側に設定）：
 
