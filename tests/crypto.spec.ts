@@ -1,15 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  CURRENT_KDF_ITERATIONS,
+  CURRENT_KDF_VERSION,
   decrypt,
   deriveKeyFromPasscode,
   encrypt,
   generateDEK,
   generateMasterKey,
+  LEGACY_PBKDF2_ITERATIONS,
   unwrapDEK,
   unwrapMasterKey,
   wrapDEK,
   wrapMasterKey,
-} from "@/lib/crypto"; // 各自のパスエイリアスに合わせて調整してください
+} from "@/lib/crypto";
 
 describe("1.1 暗号化コアロジックの単体テスト (src/lib/crypto.ts)", () => {
   // テスト共通のダミーデータ定義
@@ -288,6 +291,97 @@ describe("1.1 暗号化コアロジックの単体テスト (src/lib/crypto.ts)"
       const { encrypted, iv } = await encrypt(SECRET_DATA, unwrappedDEKNew);
       const decrypted = await decrypt(encrypted, iv, unwrappedDEKNew);
       expect(decrypted).toBe(SECRET_DATA);
+    });
+  });
+
+  describe("1.3 KDFバージョン管理とイテレーション数の可変化", () => {
+    it("iterations/version を省略した場合、レガシー値にフォールバックすること", async () => {
+      const keyDefault = await deriveKeyFromPasscode(
+        DUMMY_PASSCODE,
+        DUMMY_SALT,
+      );
+      const keyExplicit = await deriveKeyFromPasscode(
+        DUMMY_PASSCODE,
+        DUMMY_SALT,
+        LEGACY_PBKDF2_ITERATIONS,
+      );
+      const { encrypted, iv } = await encrypt(SECRET_HINT_DATA, keyDefault);
+      const decrypted = await decrypt(encrypted, iv, keyExplicit);
+      expect(decrypted).toBe(SECRET_HINT_DATA);
+    });
+
+    it("保存されているイテレーション数が異なると、導出される鍵も異なること", async () => {
+      const keyLow = await deriveKeyFromPasscode(
+        DUMMY_PASSCODE,
+        DUMMY_SALT,
+        100_000,
+      );
+      const keyHigh = await deriveKeyFromPasscode(
+        DUMMY_PASSCODE,
+        DUMMY_SALT,
+        300_000,
+      );
+      const { encrypted, iv } = await encrypt(SECRET_HINT_DATA, keyLow);
+      await expect(decrypt(encrypted, iv, keyHigh)).rejects.toThrow();
+    });
+
+    it("CURRENT_KDF_ITERATIONS を将来引き上げても、保存済みの旧イテレーション数でマスターキーを復号できること", async () => {
+      const legacyIterations = 300_000;
+      const wrappingKeyAtCreation = await deriveKeyFromPasscode(
+        DUMMY_PASSCODE,
+        DUMMY_SALT,
+        legacyIterations,
+      );
+      const masterKey = await generateMasterKey();
+      const wrapped = await wrapMasterKey(masterKey, wrappingKeyAtCreation);
+
+      // 将来イテレーション数が引き上げられた状況をシミュレート
+      const futureIterations = 600_000;
+      const wrappingKeyWithFutureParams = await deriveKeyFromPasscode(
+        DUMMY_PASSCODE,
+        DUMMY_SALT,
+        futureIterations,
+      );
+
+      // 将来値では復号できない（=別の鍵になっている）
+      await expect(
+        unwrapMasterKey(
+          wrapped.encrypted,
+          wrapped.iv,
+          wrappingKeyWithFutureParams,
+        ),
+      ).rejects.toThrow();
+
+      // DBに保存されているはずの legacyIterations を使えば引き続き復号できる
+      const unwrapped = await unwrapMasterKey(
+        wrapped.encrypted,
+        wrapped.iv,
+        wrappingKeyAtCreation,
+      );
+      expect(unwrapped.algorithm.name).toBe("AES-GCM");
+    });
+
+    it("未対応の cryptoVersion を指定した場合はエラーになること", async () => {
+      await expect(
+        deriveKeyFromPasscode(DUMMY_PASSCODE, DUMMY_SALT, 300_000, 99 as never),
+      ).rejects.toThrow("Unsupported KDF version");
+    });
+
+    it("CURRENT_KDF_ITERATIONS / CURRENT_KDF_VERSION を用いた新規作成フローが従来どおり成立すること", async () => {
+      const wrappingKey = await deriveKeyFromPasscode(
+        DUMMY_PASSCODE,
+        DUMMY_SALT,
+        CURRENT_KDF_ITERATIONS,
+        CURRENT_KDF_VERSION,
+      );
+      const masterKey = await generateMasterKey();
+      const wrapped = await wrapMasterKey(masterKey, wrappingKey);
+      const unwrapped = await unwrapMasterKey(
+        wrapped.encrypted,
+        wrapped.iv,
+        wrappingKey,
+      );
+      expect(unwrapped.algorithm.name).toBe("AES-GCM");
     });
   });
 });

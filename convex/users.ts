@@ -157,6 +157,8 @@ export const getAccounts = identityVerifiedQuery({
           masterKeyEncrypted?: string;
           masterKeyIv?: string;
           masterKeySalt?: string;
+          kdfIterations?: number;
+          cryptoVersion?: number;
         } | null = null;
 
         if (acc.familyId) {
@@ -168,6 +170,8 @@ export const getAccounts = identityVerifiedQuery({
               masterKeyEncrypted: familyDoc.masterKeyEncrypted,
               masterKeyIv: familyDoc.masterKeyIv,
               masterKeySalt: familyDoc.masterKeySalt,
+              kdfIterations: familyDoc.kdfIterations,
+              cryptoVersion: familyDoc.cryptoVersion,
             };
           }
         }
@@ -493,6 +497,8 @@ export const getUserByFirebaseUid = internalQuery({
           masterKeyEncrypted: familyDoc.masterKeyEncrypted,
           masterKeyIv: familyDoc.masterKeyIv,
           masterKeySalt: familyDoc.masterKeySalt,
+          kdfIterations: familyDoc.kdfIterations,
+          cryptoVersion: familyDoc.cryptoVersion,
         };
       }
     }
@@ -539,6 +545,8 @@ export const getUserById = internalQuery({
       masterKeyEncrypted: string | undefined;
       masterKeyIv: string | undefined;
       masterKeySalt: string | undefined;
+      kdfIterations: number | undefined;
+      cryptoVersion: number | undefined;
     } | null = null;
     if (user.familyId) {
       const familyDoc = await ctx.db.get(user.familyId);
@@ -549,6 +557,8 @@ export const getUserById = internalQuery({
           masterKeyEncrypted: familyDoc.masterKeyEncrypted,
           masterKeyIv: familyDoc.masterKeyIv,
           masterKeySalt: familyDoc.masterKeySalt,
+          kdfIterations: familyDoc.kdfIterations,
+          cryptoVersion: familyDoc.cryptoVersion,
         };
       }
     }

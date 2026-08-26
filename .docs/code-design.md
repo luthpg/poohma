@@ -159,7 +159,8 @@ serviceRecords 1 ── * credentials(内包配列)
 | masterKeyEncrypted         | string(optional) | パスコード由来鍵でラップされたマスターキー（Base64）                                                     |
 | masterKeyIv                | string(optional) | 上記ラップ処理のIV（Base64）                                                                |
 | masterKeySalt              | string(optional) | パスコードからの鍵導出（PBKDF2）に使うソルト（Base64）                                                 |
-| kdfIterations              | number           | パスコード鍵導出（PBKDF2）の反復回数。作成・パスコード変更時点の値を記録し、復号時はこの値を動的に適用する（NFR-SEC-14）。デフォルト300,000 |
+| kdfIterations              | number(optional) | パスコード鍵導出（PBKDF2）の反復回数。作成・パスコード変更時点の値を記録し、復号時はこの値を動的に適用する（NFR-SEC-14）。未設定時はレガシー値300,000 |
+| cryptoVersion              | number(optional) | KDF・暗号化スキームのバージョン番号。未設定時はレガシー値1                                                                |
 | masterKeyRecoveryEncrypted | string(optional) | リカバリーキー由来鍵でラップされたマスターキー（Base64、FR-CRYPT-06）                                       |
 | masterKeyRecoveryIv        | string(optional) | 上記ラップ処理のIV（Base64）                                                                |
 | recoveryKeyIssuedAt        | number(optional) | リカバリーキー発行・再発行日時                                                                   |
