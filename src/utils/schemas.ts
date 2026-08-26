@@ -149,6 +149,8 @@ export const CreateFamilyInputSchema = z
     masterKeyEncrypted: z.string(),
     masterKeyIv: z.string(),
     masterKeySalt: z.string(),
+    kdfIterations: z.number().int().min(100_000).max(2_000_000).optional(),
+    cryptoVersion: z.number().int().min(1).optional(),
   })
   .superRefine((data, ctx) => {
     const result = AeadDataSchema.safeParse({
@@ -181,6 +183,8 @@ export const ChangeFamilyInputSchema = z
     masterKeyEncrypted: z.string().optional(),
     masterKeyIv: z.string().optional(),
     masterKeySalt: z.string().optional(),
+    kdfIterations: z.number().int().min(100_000).max(2_000_000).optional(),
+    cryptoVersion: z.number().int().min(1).optional(),
     // join用
     inviteCode: z.string().optional(),
 

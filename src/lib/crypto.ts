@@ -4,7 +4,23 @@
 
 const ALGORITHM = "AES-GCM";
 const KEY_LENGTH = 256;
-const PBKDF2_ITERATIONS = 300000;
+// KDFパラメータのバージョン管理テーブル。
+// 値は追記のみ行い、既存バージョンのエントリは変更しないこと（過去データの復号を壊すため）。
+export const KDF_VERSIONS = {
+  1: { hash: "SHA-256" as const, defaultIterations: 300_000 },
+} as const;
+
+export type KdfVersion = keyof typeof KDF_VERSIONS;
+
+// 新規に鍵をラップする際に使用する「現在の」KDFパラメータ。
+export const CURRENT_KDF_VERSION: KdfVersion = 1;
+export const CURRENT_KDF_ITERATIONS =
+  KDF_VERSIONS[CURRENT_KDF_VERSION].defaultIterations;
+
+// kdfIterations / cryptoVersion が未設定の（=このフィールド導入前の）
+// families レコードを復号する際のフォールバック値。
+export const LEGACY_PBKDF2_ITERATIONS = 300_000;
+export const LEGACY_KDF_VERSION: KdfVersion = 1;
 
 /**
  * 文字列を Uint8Array に変換
@@ -45,7 +61,14 @@ export function base64ToBuffer(base64: string): ArrayBuffer {
 export async function deriveKeyFromPasscode(
   passcode: string,
   salt: string,
+  iterations: number = LEGACY_PBKDF2_ITERATIONS,
+  kdfVersion: KdfVersion = LEGACY_KDF_VERSION,
 ): Promise<CryptoKey> {
+  const params = KDF_VERSIONS[kdfVersion];
+  if (!params) {
+    throw new Error(`Unsupported KDF version: ${kdfVersion}`);
+  }
+
   const passwordKey = await crypto.subtle.importKey(
     "raw",
     textToBuffer(passcode),
@@ -58,8 +81,8 @@ export async function deriveKeyFromPasscode(
     {
       name: "PBKDF2",
       salt: textToBuffer(salt),
-      iterations: PBKDF2_ITERATIONS,
-      hash: "SHA-256",
+      iterations,
+      hash: params.hash,
     },
     passwordKey,
     { name: ALGORITHM, length: KEY_LENGTH },

@@ -7,6 +7,8 @@ export default defineSchema({
     masterKeyEncrypted: v.optional(v.string()),
     masterKeyIv: v.optional(v.string()),
     masterKeySalt: v.optional(v.string()),
+    kdfIterations: v.optional(v.number()),
+    cryptoVersion: v.optional(v.number()),
     updatedAt: v.number(),
   }),
 

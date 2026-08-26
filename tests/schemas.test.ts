@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { CredentialInputSchema, RecordInputSchema } from "@/utils/schemas";
+import {
+  ChangeFamilyInputSchema,
+  CreateFamilyInputSchema,
+  CredentialInputSchema,
+  RecordInputSchema,
+} from "@/utils/schemas";
 
 describe("RecordInputSchema", () => {
   it("should validate a valid record with encrypted hint", () => {
@@ -404,5 +409,65 @@ describe("1.3 スキーマ・バリデーション (CredentialInputSchema)", () 
         );
       }
     });
+  });
+});
+
+describe("CreateFamilyInputSchema & ChangeFamilyInputSchema KDF Metadata Validation", () => {
+  const validFamilyData = {
+    name: "山田家",
+    masterKeyEncrypted: "SGVsbG8gV29ybGQgYXV0aGVudGljYXRlZCBhZWFk",
+    masterKeyIv: "dGVzdGl2MTIzNDU2",
+    masterKeySalt: "dGVzdHNhbHQxMjM0NTY=",
+  };
+
+  it("kdfIterations / cryptoVersion を指定した場合、検証を通過すること", () => {
+    const result = CreateFamilyInputSchema.safeParse({
+      ...validFamilyData,
+      kdfIterations: 300_000,
+      cryptoVersion: 1,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("kdfIterations / cryptoVersion を省略した場合も検証を通過すること", () => {
+    const result = CreateFamilyInputSchema.safeParse(validFamilyData);
+    expect(result.success).toBe(true);
+  });
+
+  it("kdfIterations が範囲外（100,000未満または2,000,000超）の場合は拒否されること", () => {
+    const lowResult = CreateFamilyInputSchema.safeParse({
+      ...validFamilyData,
+      kdfIterations: 50_000,
+    });
+    expect(lowResult.success).toBe(false);
+
+    const highResult = CreateFamilyInputSchema.safeParse({
+      ...validFamilyData,
+      kdfIterations: 3_000_000,
+    });
+    expect(highResult.success).toBe(false);
+  });
+
+  it("cryptoVersion が1未満の場合は拒否されること", () => {
+    const result = CreateFamilyInputSchema.safeParse({
+      ...validFamilyData,
+      cryptoVersion: 0,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("ChangeFamilyInputSchema の create アクションで kdfIterations / cryptoVersion が正しく検証されること", () => {
+    const validChangeData = {
+      action: "create" as const,
+      name: "山田家",
+      masterKeyEncrypted: "SGVsbG8gV29ybGQgYXV0aGVudGljYXRlZCBhZWFk",
+      masterKeyIv: "dGVzdGl2MTIzNDU2",
+      masterKeySalt: "dGVzdHNhbHQxMjM0NTY=",
+      kdfIterations: 400_000,
+      cryptoVersion: 1,
+      credentials: [],
+    };
+    const result = ChangeFamilyInputSchema.safeParse(validChangeData);
+    expect(result.success).toBe(true);
   });
 });

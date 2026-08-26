@@ -37,6 +37,9 @@ import {
   deriveKeyFromPasscode,
   encrypt,
   generateDEK,
+  type KdfVersion,
+  LEGACY_KDF_VERSION,
+  LEGACY_PBKDF2_ITERATIONS,
   unwrapDEK,
   unwrapMasterKey,
   wrapDEK,
@@ -170,13 +173,19 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
 
       try {
         setIsUnlocking(true);
+        const family = currentAccount.family as typeof currentAccount.family & {
+          kdfIterations?: number;
+          cryptoVersion?: number;
+        };
         const wrappingKey = await deriveKeyFromPasscode(
           code,
-          currentAccount.family.masterKeySalt,
+          family.masterKeySalt,
+          family.kdfIterations ?? LEGACY_PBKDF2_ITERATIONS,
+          (family.cryptoVersion ?? LEGACY_KDF_VERSION) as KdfVersion,
         );
         const key = await unwrapMasterKey(
-          currentAccount.family.masterKeyEncrypted,
-          currentAccount.family.masterKeyIv,
+          family.masterKeyEncrypted,
+          family.masterKeyIv,
           wrappingKey,
         );
 

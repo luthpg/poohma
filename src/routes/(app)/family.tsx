@@ -16,11 +16,16 @@ import { useAccount } from "@/hooks/useAccount";
 import { LOGOUT_FLAG_KEY } from "@/hooks/useConvexFirebaseAuth";
 import { clearQueryCache } from "@/hooks/usePersistentQuery";
 import {
+  CURRENT_KDF_ITERATIONS,
+  CURRENT_KDF_VERSION,
   deriveKeyFromPasscode,
   encrypt,
   generateDEK,
   generateMasterKey,
   generateSalt,
+  type KdfVersion,
+  LEGACY_KDF_VERSION,
+  LEGACY_PBKDF2_ITERATIONS,
   unwrapDEK,
   unwrapMasterKey,
   wrapDEK,
@@ -307,6 +312,8 @@ function FamilyComponent() {
       const wrappingKey = await deriveKeyFromPasscode(
         joinPasscode,
         existingFamily.masterKeySalt,
+        existingFamily.kdfIterations ?? LEGACY_PBKDF2_ITERATIONS,
+        (existingFamily.cryptoVersion ?? LEGACY_KDF_VERSION) as KdfVersion,
       );
       const newMasterKey = await unwrapMasterKey(
         existingFamily.masterKeyEncrypted,
@@ -464,7 +471,12 @@ function FamilyComponent() {
 
         // 2. 新しいマスターキーの準備
         const salt = generateSalt();
-        const passcodeKey = await deriveKeyFromPasscode(createPasscode, salt);
+        const passcodeKey = await deriveKeyFromPasscode(
+          createPasscode,
+          salt,
+          CURRENT_KDF_ITERATIONS,
+          CURRENT_KDF_VERSION,
+        );
         const newMasterKey = await generateMasterKey();
         const wrapped = await wrapMasterKey(newMasterKey, passcodeKey);
 
@@ -476,6 +488,8 @@ function FamilyComponent() {
           masterKeyEncrypted: wrapped.encrypted,
           masterKeyIv: wrapped.iv,
           masterKeySalt: salt,
+          kdfIterations: CURRENT_KDF_ITERATIONS,
+          cryptoVersion: CURRENT_KDF_VERSION,
         });
         currentMigrationId = migrationId;
 
@@ -586,7 +600,12 @@ function FamilyComponent() {
     try {
       // E2EE: マスターキーの生成とラップ
       const salt = generateSalt();
-      const passcodeKey = await deriveKeyFromPasscode(createPasscode, salt);
+      const passcodeKey = await deriveKeyFromPasscode(
+        createPasscode,
+        salt,
+        CURRENT_KDF_ITERATIONS,
+        CURRENT_KDF_VERSION,
+      );
       const masterKey = await generateMasterKey();
       const wrapped = await wrapMasterKey(masterKey, passcodeKey);
 
@@ -596,6 +615,8 @@ function FamilyComponent() {
         masterKeyEncrypted: wrapped.encrypted,
         masterKeyIv: wrapped.iv,
         masterKeySalt: salt,
+        kdfIterations: CURRENT_KDF_ITERATIONS,
+        cryptoVersion: CURRENT_KDF_VERSION,
       });
       await queryClient.invalidateQueries({ queryKey: ["authUser"] });
       toast.success("家族グループを作成しました。");

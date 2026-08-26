@@ -25,8 +25,10 @@ vi.mock("@tanstack/react-router", () => ({
   useRouteContext: vi.fn(),
 }));
 
-vi.mock("@/lib/crypto", () => {
+vi.mock("@/lib/crypto", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/crypto")>();
   return {
+    ...actual,
     deriveKeyFromPasscode: vi.fn(),
     unwrapMasterKey: vi.fn(),
     exportKeyToBase64: vi.fn(),
@@ -114,6 +116,8 @@ describe("PasscodeProvider E2EE State Management", () => {
       expect(cryptoLib.deriveKeyFromPasscode).toHaveBeenCalledWith(
         "my-passcode",
         "salt",
+        300_000,
+        1,
       );
       expect(cryptoLib.unwrapMasterKey).toHaveBeenCalledWith(
         "encrypted-key",
@@ -130,6 +134,63 @@ describe("PasscodeProvider E2EE State Management", () => {
 
     // Verify it was NOT saved to sessionStorage
     expect(sessionStorage.getItem("poohma_master_key_family-1")).toBeNull();
+  });
+
+  it("family に kdfIterations / cryptoVersion が設定されている場合、その値で deriveKeyFromPasscode が呼ばれること", async () => {
+    (useRouteContext as Mock).mockReturnValue({
+      user: {
+        familyId: "family-1",
+        family: {
+          name: "Test Family",
+          masterKeyEncrypted: "encrypted-key",
+          masterKeyIv: "iv",
+          masterKeySalt: "salt",
+          kdfIterations: 500_000,
+          cryptoVersion: 1,
+        },
+      },
+    });
+
+    const mockDerivedKey = {} as CryptoKey;
+    const mockUnwrappedKey = { type: "secret" } as unknown as CryptoKey;
+
+    (cryptoLib.deriveKeyFromPasscode as Mock).mockResolvedValue(mockDerivedKey);
+    (cryptoLib.unwrapMasterKey as Mock).mockResolvedValue(mockUnwrappedKey);
+
+    let requireUnlockRef: (() => Promise<boolean>) | null = null;
+
+    const TestComponent = () => {
+      const { requireUnlock } = usePasscode();
+      requireUnlockRef = requireUnlock;
+      return <div>Test</div>;
+    };
+
+    render(
+      <PasscodeProvider>
+        <TestComponent />
+      </PasscodeProvider>,
+    );
+
+    // biome-ignore lint/style/noNonNullAssertion: use non-null assertion for testing
+    requireUnlockRef!();
+
+    await waitFor(() => {
+      expect(screen.getByText("家族パスコードの入力")).toBeTruthy();
+    });
+
+    const input = screen.getByPlaceholderText("パスコード");
+    fireEvent.change(input, { target: { value: "my-passcode" } });
+    const submitButton = screen.getByRole("button", { name: "ロック解除" });
+    fireEvent.click(submitButton);
+
+    await waitFor(() => {
+      expect(cryptoLib.deriveKeyFromPasscode).toHaveBeenCalledWith(
+        "my-passcode",
+        "salt",
+        500_000,
+        1,
+      );
+    });
   });
 
   it("should remain Locked on mount even if sessionStorage has data, and clear master key when user logs out", async () => {

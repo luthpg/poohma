@@ -153,21 +153,54 @@ export const getFamilyMembers = authenticatedQuery({
   },
 });
 
+const MIN_KDF_ITERATIONS = 100_000;
+const MAX_KDF_ITERATIONS = 2_000_000;
+const SUPPORTED_KDF_VERSIONS = new Set([1]);
+const LEGACY_PBKDF2_ITERATIONS = 300_000;
+
+function resolveKdfParams(iterations?: number, version?: number) {
+  const resolvedVersion = version ?? 1;
+  if (!SUPPORTED_KDF_VERSIONS.has(resolvedVersion)) {
+    throw new Error(`Unsupported cryptoVersion: ${resolvedVersion}`);
+  }
+  const resolvedIterations = iterations ?? LEGACY_PBKDF2_ITERATIONS;
+  if (!Number.isSafeInteger(resolvedIterations)) {
+    throw new Error("kdfIterations must be a safe integer");
+  }
+  if (
+    resolvedIterations < MIN_KDF_ITERATIONS ||
+    resolvedIterations > MAX_KDF_ITERATIONS
+  ) {
+    throw new Error(
+      `kdfIterations is out of the allowed range (${MIN_KDF_ITERATIONS}-${MAX_KDF_ITERATIONS})`,
+    );
+  }
+  return { kdfIterations: resolvedIterations, cryptoVersion: resolvedVersion };
+}
+
 export const createFamily = authenticatedMutation({
   args: {
     name: v.string(),
     masterKeyEncrypted: v.optional(v.string()),
     masterKeyIv: v.optional(v.string()),
     masterKeySalt: v.optional(v.string()),
+    kdfIterations: v.optional(v.number()),
+    cryptoVersion: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const { user } = ctx;
+    const { kdfIterations, cryptoVersion } = resolveKdfParams(
+      args.kdfIterations,
+      args.cryptoVersion,
+    );
 
     const familyId = await ctx.db.insert("families", {
       name: args.name,
       masterKeyEncrypted: args.masterKeyEncrypted,
       masterKeyIv: args.masterKeyIv,
       masterKeySalt: args.masterKeySalt,
+      kdfIterations,
+      cryptoVersion,
       updatedAt: Date.now(),
     });
 
@@ -341,6 +374,8 @@ export const getFamilyInfoByInviteCode = authenticatedQuery({
       masterKeyEncrypted: family.masterKeyEncrypted,
       masterKeyIv: family.masterKeyIv,
       masterKeySalt: family.masterKeySalt,
+      kdfIterations: family.kdfIterations,
+      cryptoVersion: family.cryptoVersion,
     };
   },
 });
@@ -394,7 +429,7 @@ export const abortFamilyMigration = authenticatedMutation({
     }
 
     if (migration.status !== "PREPARED") {
-      return { success: false };
+      return { success: true };
     }
 
     await ctx.db.patch(migration._id, { status: "ABORTED" });
@@ -428,6 +463,8 @@ export const prepareFamilyMigration = authenticatedMutation({
     masterKeyEncrypted: v.optional(v.string()),
     masterKeyIv: v.optional(v.string()),
     masterKeySalt: v.optional(v.string()),
+    kdfIterations: v.optional(v.number()),
+    cryptoVersion: v.optional(v.number()),
     inviteCode: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -478,11 +515,17 @@ export const prepareFamilyMigration = authenticatedMutation({
       ) {
         throw new Error("Missing fields for create");
       }
+      const { kdfIterations, cryptoVersion } = resolveKdfParams(
+        args.kdfIterations,
+        args.cryptoVersion,
+      );
       targetFamilyId = await ctx.db.insert("families", {
         name: args.name,
         masterKeyEncrypted: args.masterKeyEncrypted,
         masterKeyIv: args.masterKeyIv,
         masterKeySalt: args.masterKeySalt,
+        kdfIterations,
+        cryptoVersion,
         updatedAt: Date.now(),
       });
     } else {
@@ -804,6 +847,8 @@ export const changeFamily = authenticatedMutation({
     masterKeyEncrypted: v.optional(v.string()),
     masterKeyIv: v.optional(v.string()),
     masterKeySalt: v.optional(v.string()),
+    kdfIterations: v.optional(v.number()),
+    cryptoVersion: v.optional(v.number()),
     inviteCode: v.optional(v.string()),
     credentials: v.array(
       v.object({
@@ -829,11 +874,17 @@ export const changeFamily = authenticatedMutation({
       ) {
         throw new Error("Missing fields for create");
       }
+      const { kdfIterations, cryptoVersion } = resolveKdfParams(
+        args.kdfIterations,
+        args.cryptoVersion,
+      );
       targetFamilyId = await ctx.db.insert("families", {
         name: args.name,
         masterKeyEncrypted: args.masterKeyEncrypted,
         masterKeyIv: args.masterKeyIv,
         masterKeySalt: args.masterKeySalt,
+        kdfIterations,
+        cryptoVersion,
         updatedAt: Date.now(),
       });
     } else {
@@ -1404,5 +1455,26 @@ export const rejectJoinRequest = familyBoundMutation({
     }
 
     return { success: true };
+  },
+});
+
+export const backfillKdfMetadataInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const allFamilies = await ctx.db.query("families").collect();
+    let patched = 0;
+    for (const family of allFamilies) {
+      if (
+        family.kdfIterations === undefined ||
+        family.cryptoVersion === undefined
+      ) {
+        await ctx.db.patch(family._id, {
+          kdfIterations: family.kdfIterations ?? LEGACY_PBKDF2_ITERATIONS,
+          cryptoVersion: family.cryptoVersion ?? 1,
+        });
+        patched++;
+      }
+    }
+    return { patched, total: allFamilies.length };
   },
 });
