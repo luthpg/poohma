@@ -1650,6 +1650,81 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         }),
       ).rejects.toThrow("Unsupported cryptoVersion");
     });
+
+    it("NaN を kdfIterations として指定した場合は作成が拒否されること", async () => {
+      const t = convexTest(schema, modules);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("users", {
+          userId: "user_kdf_nan",
+          email: "kdfnan@example.com",
+          updatedAt: Date.now(),
+        });
+      });
+      const user = t.withIdentity({
+        subject: "user_kdf_nan",
+        email: "kdfnan@example.com",
+      });
+      await expect(
+        user.mutation(api.families.createFamily, {
+          name: "NaNテスト家族",
+          masterKeyEncrypted: "enc",
+          masterKeyIv: "iv",
+          masterKeySalt: "salt",
+          kdfIterations: NaN,
+          cryptoVersion: 1,
+        }),
+      ).rejects.toThrow("must be a safe integer");
+    });
+
+    it("Infinity を kdfIterations として指定した場合は作成が拒否されること", async () => {
+      const t = convexTest(schema, modules);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("users", {
+          userId: "user_kdf_inf",
+          email: "kdfinf@example.com",
+          updatedAt: Date.now(),
+        });
+      });
+      const user = t.withIdentity({
+        subject: "user_kdf_inf",
+        email: "kdfinf@example.com",
+      });
+      await expect(
+        user.mutation(api.families.createFamily, {
+          name: "Infinityテスト家族",
+          masterKeyEncrypted: "enc",
+          masterKeyIv: "iv",
+          masterKeySalt: "salt",
+          kdfIterations: Infinity,
+          cryptoVersion: 1,
+        }),
+      ).rejects.toThrow("must be a safe integer");
+    });
+
+    it("小数 を kdfIterations として指定した場合は作成が拒否されること", async () => {
+      const t = convexTest(schema, modules);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("users", {
+          userId: "user_kdf_frac",
+          email: "kdffrac@example.com",
+          updatedAt: Date.now(),
+        });
+      });
+      const user = t.withIdentity({
+        subject: "user_kdf_frac",
+        email: "kdffrac@example.com",
+      });
+      await expect(
+        user.mutation(api.families.createFamily, {
+          name: "小数テスト家族",
+          masterKeyEncrypted: "enc",
+          masterKeyIv: "iv",
+          masterKeySalt: "salt",
+          kdfIterations: 300000.5,
+          cryptoVersion: 1,
+        }),
+      ).rejects.toThrow("must be a safe integer");
+    });
   });
 
   describe("2.1.6 既存データへのKDFメタデータ マイグレーション", () => {

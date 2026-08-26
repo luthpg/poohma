@@ -164,6 +164,9 @@ function resolveKdfParams(iterations?: number, version?: number) {
     throw new Error(`Unsupported cryptoVersion: ${resolvedVersion}`);
   }
   const resolvedIterations = iterations ?? LEGACY_PBKDF2_ITERATIONS;
+  if (!Number.isSafeInteger(resolvedIterations)) {
+    throw new Error("kdfIterations must be a safe integer");
+  }
   if (
     resolvedIterations < MIN_KDF_ITERATIONS ||
     resolvedIterations > MAX_KDF_ITERATIONS
