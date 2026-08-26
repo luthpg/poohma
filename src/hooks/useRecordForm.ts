@@ -187,13 +187,13 @@ export function useRecordForm(initialValues?: Partial<RecordFormValues>) {
     const promise = (async () => {
       try {
         const ogp = await getOgpInfo({ url: values.url });
-        let shouldFetchFuriganaFor: string | null = null;
+        const shouldFetchFuriganaFor =
+          ogp.title && !values.title ? ogp.title : null;
 
         setValues((prev) => {
           const next = { ...prev };
           if (ogp.title && !prev.title) {
             next.title = ogp.title;
-            shouldFetchFuriganaFor = ogp.title;
           }
           if (ogp.image) next.ogpImage = ogp.image;
           if (ogp.description) next.ogpDescription = ogp.description;
@@ -214,7 +214,7 @@ export function useRecordForm(initialValues?: Partial<RecordFormValues>) {
 
     ogpPromiseRef.current = promise;
     return promise;
-  }, [values.url, getOgpInfo, fetchFuriganaForTitle]);
+  }, [values.url, values.title, getOgpInfo, fetchFuriganaForTitle]);
 
   const setMemo = useCallback((memo: string) => {
     setValues((prev) => ({ ...prev, memo }));

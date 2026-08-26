@@ -62,6 +62,7 @@ export function TagInput({
 
   return (
     <Command
+      label="タグ"
       onKeyDown={handleKeyDown}
       className="overflow-visible bg-transparent"
     >
