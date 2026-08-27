@@ -4,6 +4,7 @@ import {
   CreateFamilyInputSchema,
   CredentialInputSchema,
   RecordInputSchema,
+  RotatePasscodeInputSchema,
 } from "@/utils/schemas";
 
 describe("RecordInputSchema", () => {
@@ -469,5 +470,60 @@ describe("CreateFamilyInputSchema & ChangeFamilyInputSchema KDF Metadata Validat
     };
     const result = ChangeFamilyInputSchema.safeParse(validChangeData);
     expect(result.success).toBe(true);
+  });
+});
+
+describe("RotatePasscodeInputSchema", () => {
+  const validRotateData = {
+    previousMasterKeyEncrypted: "b2xkTWFzdGVyS2V5RW5jcnlwdGVkRGF0YQ==",
+    masterKeyEncrypted: "SGVsbG8gV29ybGQgYXV0aGVudGljYXRlZCBhZWFk",
+    masterKeyIv: "dGVzdGl2MTIzNDU2",
+    masterKeySalt: "dGVzdHNhbHQxMjM0NTY=",
+  };
+
+  it("正しい鍵材料で検証を通過すること", () => {
+    const result = RotatePasscodeInputSchema.safeParse(validRotateData);
+    expect(result.success).toBe(true);
+  });
+
+  it("kdfIterations / cryptoVersion を指定した場合も検証を通過すること", () => {
+    const result = RotatePasscodeInputSchema.safeParse({
+      ...validRotateData,
+      kdfIterations: 300_000,
+      cryptoVersion: 1,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("IVが不正な形式（16文字Base64以外）の場合はエラーになること", () => {
+    const result = RotatePasscodeInputSchema.safeParse({
+      ...validRotateData,
+      masterKeyIv: "invalid-iv",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("masterKeyEncryptedが短すぎる（タグ不足）の場合はエラーになること", () => {
+    const result = RotatePasscodeInputSchema.safeParse({
+      ...validRotateData,
+      masterKeyEncrypted: "dG9vU2hvcnQ=",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("masterKeySaltがBase64でない場合はエラーになること", () => {
+    const result = RotatePasscodeInputSchema.safeParse({
+      ...validRotateData,
+      masterKeySalt: "not a base64 salt!",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("kdfIterations が範囲外の場合はエラーになること", () => {
+    const result = RotatePasscodeInputSchema.safeParse({
+      ...validRotateData,
+      kdfIterations: 50_000,
+    });
+    expect(result.success).toBe(false);
   });
 });

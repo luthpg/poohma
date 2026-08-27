@@ -8,6 +8,7 @@ import { joinApprovedEmail } from "./templates/family/JoinApprovedEmail";
 import { joinRequestReceivedEmail } from "./templates/family/JoinRequestReceivedEmail";
 import { joinRequestRejectedEmail } from "./templates/family/JoinRequestRejectedEmail";
 import { newMemberJoinedEmail } from "./templates/family/NewMemberJoinedEmail";
+import { passcodeRotatedEmail } from "./templates/family/PasscodeRotatedEmail";
 import { biometricRegisteredEmail } from "./templates/security/BiometricRegisteredEmail";
 import { biometricRemovedEmail } from "./templates/security/BiometricRemovedEmail";
 import { csvExportedEmail } from "./templates/security/CsvExportedEmail";
@@ -20,6 +21,7 @@ export const emailTemplates = [
   joinApprovedEmail,
   joinRequestRejectedEmail,
   familyMigrationCompletedEmail,
+  passcodeRotatedEmail,
   shareSettingChangedEmail,
   recordAdminChangedEmail,
   accountDeletedEmail,
@@ -53,6 +55,10 @@ export const emailPayload = v.union(
   v.object({
     template: v.literal(familyMigrationCompletedEmail.key),
     props: familyMigrationCompletedEmail.props,
+  }),
+  v.object({
+    template: v.literal(passcodeRotatedEmail.key),
+    props: passcodeRotatedEmail.props,
   }),
   v.object({
     template: v.literal(shareSettingChangedEmail.key),

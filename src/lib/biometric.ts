@@ -223,6 +223,61 @@ export async function decryptPasscodeWithBiometrics(
 }
 
 /**
+ * ユーザーIDに紐づく生体認証データ内の暗号化パスコードを更新する（WebAuthnクレデンシャル再作成不要）
+ */
+export async function updateBiometricPasscode(
+  userId: string,
+  newPasscode: string,
+): Promise<void> {
+  const data = await get<BiometricCredentials>(getBiometricKey(userId));
+  if (data == null) {
+    return;
+  }
+  const credentialIdBuf = base64ToArrayBuffer(data.credentialId);
+  const prfSaltBuf = base64ToArrayBuffer(data.prfSalt);
+  const challenge = crypto.getRandomValues(new Uint8Array(32));
+  const assertion = (await navigator.credentials.get({
+    publicKey: {
+      challenge,
+      rpId: window.location.hostname,
+      allowCredentials: [{ type: "public-key", id: credentialIdBuf }],
+      userVerification: "required",
+      timeout: 60000,
+      extensions: {
+        prf: { eval: { first: new Uint8Array(prfSaltBuf) } },
+      },
+    },
+  })) as PublicKeyCredential;
+  if (assertion == null) {
+    throw new Error("生体認証の検証に失敗しました。");
+  }
+  const extensionResults = assertion.getClientExtensionResults();
+  const prfSeed = extensionResults.prf?.results?.first;
+  if (!prfSeed) {
+    throw new Error("生体認証器から暗号鍵を取得できませんでした。");
+  }
+  const encKey = await crypto.subtle.importKey(
+    "raw",
+    prfSeed,
+    { name: "AES-GCM" },
+    false,
+    ["encrypt"],
+  );
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    encKey,
+    new TextEncoder().encode(newPasscode),
+  );
+  const updated: BiometricCredentials = {
+    ...data,
+    encryptedPasscode: bufferToBase64(encrypted),
+    iv: bufferToBase64(iv.buffer as ArrayBuffer),
+  };
+  await set(getBiometricKey(userId), updated);
+}
+
+/**
  * ユーザーIDに紐づく生体認証によるロック解除を無効化（IndexedDB から削除）
  */
 export async function disableBiometricUnlock(userId: string): Promise<void> {

@@ -538,15 +538,15 @@ decryptHint/encryptHint 側でマスターキー直接暗号化にフォール�
 3. 展開済みの現在のマスターキー（アンロック済み前提。未展開の場合は旧パスコードでの
    アンロックを先に要求する）を、新しい導出鍵で再wrap
 4. Mutation families.rotatePasscode を呼び出し、以下のみを更新する：
-   masterKeyEncrypted / masterKeyIv / masterKeySalt / kdfIterations
+   masterKeyEncrypted / masterKeyIv / masterKeySalt / kdfIterations / cryptoVersion
    （各レコードのcredentials・DEK・passwordHintは一切変更しない。
    DEKはマスターキーでラップされており、マスターキー自体は不変であるため、
-   パスコード由来鍵の変更はDEKに影響しない。O(1)で完了する軽量な操作）
-5. リカバリーキーが発行済みの場合、masterKeyRecoveryEncrypted 等は
+   パスコード由来鍵の変更はDEKに影響しない。O(1)で完了する軽量な操作。
+   Compare-And-Swapにより他端末・他メンバーとの同時更新時の競合を防止する）
+5. 実行端末で生体認証が有効な場合は既存PRFシードを用いてローカル暗号化パスコードを更新。
+   他の家族メンバーや別端末には通知メールを送信し、次回新パスコードでの解錠と生体認証の再登録を促す
+6. リカバリーキーが発行済みの場合、masterKeyRecoveryEncrypted 等は
    同一マスターキーへの別経路のラップであるため、本操作による影響を受けず有効なまま残る
-
-注記：現行実装では rotatePasscode Mutation は未実装であり、パスコード変更は
-家族移行フロー（6.4）経由で新家族（同一家族ID）を作成する形で代替している。
 ```
 
 ### 6.6 リカバリーキー（復元コード, FR-CRYPT-06）

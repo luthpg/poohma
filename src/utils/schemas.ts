@@ -175,6 +175,38 @@ export const CreateFamilyInputSchema = z
     }
   });
 
+export const RotatePasscodeInputSchema = z
+  .object({
+    previousMasterKeyEncrypted: z.string(),
+    masterKeyEncrypted: z.string(),
+    masterKeyIv: z.string(),
+    masterKeySalt: z.string(),
+    kdfIterations: z.number().int().min(100_000).max(2_000_000).optional(),
+    cryptoVersion: z.number().int().min(1).optional(),
+  })
+  .superRefine((data, ctx) => {
+    const result = AeadDataSchema.safeParse({
+      iv: data.masterKeyIv,
+      ciphertext: data.masterKeyEncrypted,
+    });
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        ctx.addIssue({
+          ...issue,
+          path:
+            issue.path[0] === "iv" ? ["masterKeyIv"] : ["masterKeyEncrypted"],
+        });
+      }
+    }
+    if (!BASE64_REGEX.test(data.masterKeySalt)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "ソルトはBase64形式である必要があります",
+        path: ["masterKeySalt"],
+      });
+    }
+  });
+
 export const ChangeFamilyInputSchema = z
   .object({
     action: z.enum(["create", "join"]),

@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { RotatePasscodeInputSchema } from "../src/utils/schemas";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -1042,6 +1043,91 @@ export const changeFamily = authenticatedMutation({
     );
 
     return { success: true, familyId: targetFamilyId };
+  },
+});
+
+export const rotatePasscode = familyBoundMutation({
+  args: {
+    previousMasterKeyEncrypted: v.string(),
+    masterKeyEncrypted: v.string(),
+    masterKeyIv: v.string(),
+    masterKeySalt: v.string(),
+    kdfIterations: v.optional(v.number()),
+    cryptoVersion: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const { familyId } = ctx;
+
+    const parsed = RotatePasscodeInputSchema.safeParse({
+      previousMasterKeyEncrypted: args.previousMasterKeyEncrypted,
+      masterKeyEncrypted: args.masterKeyEncrypted,
+      masterKeyIv: args.masterKeyIv,
+      masterKeySalt: args.masterKeySalt,
+      kdfIterations: args.kdfIterations,
+      cryptoVersion: args.cryptoVersion,
+    });
+    if (!parsed.success) {
+      throw new Error(
+        `Invalid key material: ${parsed.error.issues.map((i) => i.message).join(", ")}`,
+      );
+    }
+
+    const family = await ctx.db.get(familyId);
+    if (!family) throw new Error("Family not found");
+
+    if (
+      !family.masterKeyEncrypted ||
+      !family.masterKeyIv ||
+      !family.masterKeySalt
+    ) {
+      throw new Error("Family encryption is not initialized yet");
+    }
+
+    if (family.masterKeyEncrypted !== args.previousMasterKeyEncrypted) {
+      throw new Error(
+        "CONFLICT: 家族の暗号鍵情報が他の操作により更新されています。最新の状態を取得してやり直してください。",
+      );
+    }
+
+    const { kdfIterations, cryptoVersion } = resolveKdfParams(
+      args.kdfIterations ?? family.kdfIterations,
+      args.cryptoVersion ?? family.cryptoVersion,
+    );
+
+    await ctx.db.patch(familyId, {
+      masterKeyEncrypted: args.masterKeyEncrypted,
+      masterKeyIv: args.masterKeyIv,
+      masterKeySalt: args.masterKeySalt,
+      kdfIterations,
+      cryptoVersion,
+      updatedAt: Date.now(),
+    });
+
+    const members = await ctx.db
+      .query("users")
+      .withIndex("by_familyId", (q) => q.eq("familyId", familyId))
+      .collect();
+    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
+    for (const member of members) {
+      if (member._id === ctx.user._id) continue;
+      await ctx.scheduler.runAfter(
+        0,
+        internal.actions.sendTemplatedEmailInternal,
+        {
+          email: member.email,
+          payload: {
+            template: "passcodeRotated",
+            props: {
+              displayName: member.displayName || "メンバー",
+              familyName: family.name,
+              ctaUrl: `${appUrl}/settings`,
+            },
+          },
+        },
+      );
+    }
+
+    return { success: true };
   },
 });
 

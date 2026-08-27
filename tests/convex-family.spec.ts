@@ -1769,4 +1769,190 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
       });
     });
   });
+
+  describe("2.1.7 パスコードローテーション (rotatePasscode)", () => {
+    it("masterKey情報のみが更新され、users/serviceRecordsは変化しないこと", async () => {
+      const t = convexTest(schema, modules);
+      let familyId!: Id<"families">;
+      let userAId!: Id<"users">;
+      let userBId!: Id<"users">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          name: "F1",
+          masterKeyEncrypted: "b2xkRW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
+          masterKeyIv: "dGVzdGl2MTIzNDU2",
+          masterKeySalt: "dGVzdHNhbHQxMjM0NTY=",
+          kdfIterations: 300_000,
+          cryptoVersion: 1,
+          updatedAt: 1000,
+        });
+
+        userAId = await ctx.db.insert("users", {
+          userId: "ua",
+          email: "a@a.com",
+          familyId,
+          updatedAt: 1000,
+        });
+
+        userBId = await ctx.db.insert("users", {
+          userId: "ub",
+          email: "b@b.com",
+          familyId,
+          updatedAt: 1000,
+        });
+
+        await ctx.db.insert("serviceRecords", {
+          userId: "ua",
+          accountId: userAId,
+          familyId,
+          title: "R1",
+          sortKey: computeSortKey("R1"),
+          ownerType: "user",
+          admins: [],
+          credentials: [
+            {
+              id: "c1",
+              passwordHint: "SGVsbG8gV29ybGQgYXV0aGVudGljYXRlZCBhZWFk",
+              passwordHintIv: "dGVzdGl2MTIzNDU2",
+              passwordHintDekEncrypted: "ZGVrRGF0YUF1dGhlbnRpY2F0ZWQ=",
+              passwordHintDekIv: "ZGVraXZkZWtpdjEyMzQ=",
+            },
+          ],
+          tags: [],
+          updatedAt: 2000,
+        });
+      });
+
+      const userA = t.withIdentity({ subject: "ua", email: "a@a.com" });
+      const result = await userA.mutation(api.families.rotatePasscode, {
+        previousMasterKeyEncrypted: "b2xkRW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
+        masterKeyEncrypted: "bmV3RW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
+        masterKeyIv: "bmV3SXZuZXdJdjEy",
+        masterKeySalt: "bmV3U2FsdE5ld1NhbHQ=",
+        kdfIterations: 400_000,
+        cryptoVersion: 1,
+      });
+
+      expect(result.success).toBe(true);
+
+      const family = await t.run((ctx) => ctx.db.get(familyId));
+      expect(family?.masterKeyEncrypted).toBe(
+        "bmV3RW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
+      );
+      expect(family?.masterKeyIv).toBe("bmV3SXZuZXdJdjEy");
+      expect(family?.masterKeySalt).toBe("bmV3U2FsdE5ld1NhbHQ=");
+      expect(family?.kdfIterations).toBe(400_000);
+      expect(family?.cryptoVersion).toBe(1);
+
+      // users や serviceRecords に変更がないことを確認
+      const record = await t.run(async (ctx) =>
+        ctx.db
+          .query("serviceRecords")
+          .withIndex("by_accountId", (q) => q.eq("accountId", userAId))
+          .first(),
+      );
+      expect(record?.updatedAt).toBe(2000);
+      expect(record?.credentials[0]?.passwordHintDekEncrypted).toBe(
+        "ZGVrRGF0YUF1dGhlbnRpY2F0ZWQ=",
+      );
+
+      const userAAfter = await t.run((ctx) => ctx.db.get(userAId));
+      expect(userAAfter?.updatedAt).toBe(1000);
+      expect(userAAfter?.familyId).toBe(familyId);
+
+      const userBAfter = await t.run((ctx) => ctx.db.get(userBId));
+      expect(userBAfter?.updatedAt).toBe(1000);
+      expect(userBAfter?.familyId).toBe(familyId);
+    });
+
+    it("他メンバーや他端末での更新によりpreviousMasterKeyEncryptedがDB現在値と不一致の場合はCONFLICTとなること", async () => {
+      const t = convexTest(schema, modules);
+      let familyId!: Id<"families">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          name: "F1",
+          masterKeyEncrypted: "Y3VycmVudEVuY3J5cHRlZERhdGFBdXRoZW50aWNhdGVk",
+          masterKeyIv: "dGVzdGl2MTIzNDU2",
+          masterKeySalt: "dGVzdHNhbHQxMjM0NTY=",
+          updatedAt: 1000,
+        });
+
+        await ctx.db.insert("users", {
+          userId: "ua",
+          email: "a@a.com",
+          familyId,
+          updatedAt: 1000,
+        });
+      });
+
+      const userA = t.withIdentity({ subject: "ua", email: "a@a.com" });
+      await expect(
+        userA.mutation(api.families.rotatePasscode, {
+          previousMasterKeyEncrypted:
+            "c3RhbGVFbmNyeXB0ZWREYXRhQXV0aGVudGljYXRlZA==", // 古い値
+          masterKeyEncrypted: "bmV3RW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
+          masterKeyIv: "bmV3SXZuZXdJdjEy",
+          masterKeySalt: "bmV3U2FsdE5ld1NhbHQ=",
+        }),
+      ).rejects.toThrow("CONFLICT");
+    });
+
+    it("家族暗号化情報が未初期化の場合は拒否されること", async () => {
+      const t = convexTest(schema, modules);
+
+      await t.run(async (ctx) => {
+        const familyId = await ctx.db.insert("families", {
+          name: "未初期化家族",
+          updatedAt: 1000,
+        });
+
+        await ctx.db.insert("users", {
+          userId: "ua",
+          email: "a@a.com",
+          familyId,
+          updatedAt: 1000,
+        });
+      });
+
+      const userA = t.withIdentity({ subject: "ua", email: "a@a.com" });
+      await expect(
+        userA.mutation(api.families.rotatePasscode, {
+          previousMasterKeyEncrypted:
+            "YW55RW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
+          masterKeyEncrypted: "bmV3RW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
+          masterKeyIv: "bmV3SXZuZXdJdjEy",
+          masterKeySalt: "bmV3U2FsdE5ld1NhbHQ=",
+        }),
+      ).rejects.toThrow("Family encryption is not initialized yet");
+    });
+
+    it("家族に所属していないユーザーからの呼び出しは拒否されること", async () => {
+      const t = convexTest(schema, modules);
+
+      await t.run(async (ctx) => {
+        await ctx.db.insert("users", {
+          userId: "no_family_user",
+          email: "nofam@a.com",
+          updatedAt: 1000,
+        });
+      });
+
+      const noFamUser = t.withIdentity({
+        subject: "no_family_user",
+        email: "nofam@a.com",
+      });
+
+      await expect(
+        noFamUser.mutation(api.families.rotatePasscode, {
+          previousMasterKeyEncrypted:
+            "YW55RW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
+          masterKeyEncrypted: "bmV3RW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
+          masterKeyIv: "bmV3SXZuZXdJdjEy",
+          masterKeySalt: "bmV3U2FsdE5ld1NhbHQ=",
+        }),
+      ).rejects.toThrow("User does not belong to a family");
+    });
+  });
 });

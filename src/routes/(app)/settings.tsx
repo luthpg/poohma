@@ -10,6 +10,7 @@ import { type SubmitEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import { usePasscode } from "@/components/PasscodeProvider";
+import { PasscodeStrengthMeter } from "@/components/PasscodeStrengthMeter";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,8 +26,23 @@ import { Spinner } from "@/components/ui/spinner";
 import { useExportCsv } from "@/hooks/use-export-csv";
 import { useAccount } from "@/hooks/useAccount";
 import { clearQueryCache } from "@/hooks/usePersistentQuery";
-import { isBiometricEnabledForUser } from "@/lib/biometric";
+import {
+  isBiometricEnabledForUser,
+  updateBiometricPasscode,
+} from "@/lib/biometric";
+import {
+  CURRENT_KDF_ITERATIONS,
+  CURRENT_KDF_VERSION,
+  deriveKeyFromPasscode,
+  generateSalt,
+  unwrapMasterKey,
+  wrapMasterKey,
+} from "@/lib/crypto";
 import { auth } from "@/utils/firebase";
+import {
+  evaluatePasscodeStrength,
+  MIN_PASSCODE_LENGTH,
+} from "@/utils/passcode-strength";
 
 export const Route = createFileRoute("/(app)/settings")({
   loader: ({ context }) => {
@@ -48,8 +64,18 @@ function SettingsComponent() {
     activeAccountId,
     deleteAccount: deletePoohMaAccount,
   } = useAccount();
-  const { disableBiometric, lockTimeoutMinutes, setLockTimeoutMinutes } =
-    usePasscode();
+  const {
+    disableBiometric,
+    lockTimeoutMinutes,
+    setLockTimeoutMinutes,
+    unlock,
+    getMasterKey,
+  } = usePasscode();
+  const rotatePasscodeMut = useMutation(api.families.rotatePasscode);
+  const [isChangingPasscode, setIsChangingPasscode] = useState(false);
+  const [currentPasscode, setCurrentPasscode] = useState("");
+  const [newPasscode, setNewPasscode] = useState("");
+  const [newPasscodeConfirm, setNewPasscodeConfirm] = useState("");
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -170,6 +196,105 @@ function SettingsComponent() {
         toast.error(err?.message || "退会処理に失敗しました");
       }
       setIsDeleting(false);
+    }
+  };
+
+  const handleChangePasscode = async (e: SubmitEvent) => {
+    e.preventDefault();
+    const strength = evaluatePasscodeStrength(newPasscode);
+    if (!strength.isValid) {
+      toast.error(strength.reasons[0]);
+      return;
+    }
+    if (newPasscode !== newPasscodeConfirm) {
+      toast.error("新しいパスコードが一致しません");
+      return;
+    }
+    if (newPasscode === currentPasscode) {
+      toast.error("現在のパスコードと異なるものを設定してください");
+      return;
+    }
+    const family = currentAccount.family;
+    if (
+      !family?.masterKeyEncrypted ||
+      !family.masterKeyIv ||
+      !family.masterKeySalt
+    ) {
+      toast.error("家族の暗号化情報が初期化されていません");
+      return;
+    }
+
+    setIsChangingPasscode(true);
+    try {
+      const unlocked = await unlock(currentPasscode);
+      if (!unlocked) {
+        // unlock内で「パスコードが正しくないか、エラーが発生しました」のトーストが表示済み
+        return;
+      }
+      const masterKey = getMasterKey();
+      if (!masterKey) {
+        toast.error("マスターキーの取得に失敗しました");
+        return;
+      }
+
+      const previousMasterKeyEncrypted = family.masterKeyEncrypted;
+      const newSalt = generateSalt();
+      const newWrappingKey = await deriveKeyFromPasscode(
+        newPasscode,
+        newSalt,
+        CURRENT_KDF_ITERATIONS,
+        CURRENT_KDF_VERSION,
+      );
+      const wrapped = await wrapMasterKey(masterKey, newWrappingKey);
+
+      try {
+        await unwrapMasterKey(wrapped.encrypted, wrapped.iv, newWrappingKey);
+      } catch (error) {
+        console.error("Self-check failed:", error);
+        toast.error("鍵の再暗号化に失敗しました。もう一度お試しください");
+        return;
+      }
+
+      await rotatePasscodeMut({
+        accountId: activeAccountId || undefined,
+        previousMasterKeyEncrypted,
+        masterKeyEncrypted: wrapped.encrypted,
+        masterKeyIv: wrapped.iv,
+        masterKeySalt: newSalt,
+        kdfIterations: CURRENT_KDF_ITERATIONS,
+        cryptoVersion: CURRENT_KDF_VERSION,
+      });
+
+      if (hasBiometric) {
+        const targetId = activeAccount?.id || user.id;
+        try {
+          await updateBiometricPasscode(targetId, newPasscode);
+        } catch (error) {
+          console.error("Biometric passcode update failed:", error);
+          toast.error(
+            "生体認証のロック解除情報の更新に失敗しました。設定画面から再設定してください。",
+          );
+        }
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["authUser"] });
+      await router.invalidate();
+      toast.success("パスコードを変更しました");
+      setCurrentPasscode("");
+      setNewPasscode("");
+      setNewPasscodeConfirm("");
+    } catch (error) {
+      console.error(error);
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes("CONFLICT")) {
+        toast.error(
+          "他の操作と競合しました。ページを再読み込みしてやり直してください",
+        );
+      } else {
+        toast.error("パスコードの変更に失敗しました");
+      }
+    } finally {
+      setIsChangingPasscode(false);
     }
   };
 
@@ -325,6 +450,78 @@ function SettingsComponent() {
               >
                 設定を削除
               </button>
+            </div>
+          )}
+
+          {currentAccount?.familyId && (
+            <div className="flex flex-col gap-4 pt-6 border-t border-border/40">
+              <div>
+                <p className="text-[14px] font-medium text-foreground">
+                  家族パスコードの変更
+                </p>
+                <p className="text-[12px] text-muted-foreground mt-1">
+                  家族グループやメンバー構成は変更せず、パスコードのみを変更します。
+                  パスコード変更後、
+                  <strong>
+                    他の家族メンバーおよび別端末では次回新パスコードでのロック解除が必要
+                  </strong>
+                  となり、生体認証をご利用の場合は再登録が必要になります。
+                  <br />※
+                  すでにマスターキー等の漏洩が疑われる場合はこの操作だけでは不十分です。家族グループの作り直しをご検討ください。
+                </p>
+              </div>
+              <form onSubmit={handleChangePasscode} className="space-y-3">
+                <input
+                  type="password"
+                  placeholder="現在のパスコード"
+                  value={currentPasscode}
+                  onChange={(e) => setCurrentPasscode(e.target.value)}
+                  disabled={isChangingPasscode}
+                  className="w-full rounded-md bg-card p-2.5 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                />
+                <div>
+                  <input
+                    type="password"
+                    placeholder={`新しいパスコード（${MIN_PASSCODE_LENGTH}文字以上）`}
+                    minLength={MIN_PASSCODE_LENGTH}
+                    value={newPasscode}
+                    onChange={(e) => setNewPasscode(e.target.value)}
+                    disabled={isChangingPasscode}
+                    className="w-full rounded-md bg-card p-2.5 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                  />
+                  {newPasscode && (
+                    <PasscodeStrengthMeter passcode={newPasscode} />
+                  )}
+                </div>
+                <input
+                  type="password"
+                  placeholder="新しいパスコード（確認）"
+                  minLength={MIN_PASSCODE_LENGTH}
+                  value={newPasscodeConfirm}
+                  onChange={(e) => setNewPasscodeConfirm(e.target.value)}
+                  disabled={isChangingPasscode}
+                  className="w-full rounded-md bg-card p-2.5 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                />
+                <button
+                  type="submit"
+                  disabled={
+                    isChangingPasscode ||
+                    !currentPasscode ||
+                    !newPasscode ||
+                    !newPasscodeConfirm
+                  }
+                  className="flex items-center rounded-md bg-foreground px-6 py-2.5 text-[14px] font-medium text-background shadow-lg transition hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isChangingPasscode ? (
+                    <>
+                      <Spinner className="mr-2 h-4 w-4" />
+                      変更中...
+                    </>
+                  ) : (
+                    "パスコードを変更する"
+                  )}
+                </button>
+              </form>
             </div>
           )}
         </div>
