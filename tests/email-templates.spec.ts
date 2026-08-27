@@ -63,6 +63,15 @@ function samplePayloadFor(key: string): EmailPayload {
           ctaUrl: "https://poohma.ciderlabs.link/",
         },
       };
+    case "passcodeRotated":
+      return {
+        template: "passcodeRotated",
+        props: {
+          displayName: "山田 太郎",
+          familyName: "山田家",
+          ctaUrl: "https://poohma.ciderlabs.link/family",
+        },
+      };
     case "shareSettingChanged":
       return {
         template: "shareSettingChanged",

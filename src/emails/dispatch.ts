@@ -9,6 +9,7 @@ import { joinApprovedEmail } from "./templates/family/JoinApprovedEmail";
 import { joinRequestReceivedEmail } from "./templates/family/JoinRequestReceivedEmail";
 import { joinRequestRejectedEmail } from "./templates/family/JoinRequestRejectedEmail";
 import { newMemberJoinedEmail } from "./templates/family/NewMemberJoinedEmail";
+import { passcodeRotatedEmail } from "./templates/family/PasscodeRotatedEmail";
 import { biometricRegisteredEmail } from "./templates/security/BiometricRegisteredEmail";
 import { biometricRemovedEmail } from "./templates/security/BiometricRemovedEmail";
 import { csvExportedEmail } from "./templates/security/CsvExportedEmail";
@@ -41,6 +42,8 @@ export function resolveEmail(payload: EmailPayload) {
       return resolve(joinRequestRejectedEmail, payload.props);
     case "familyMigrationCompleted":
       return resolve(familyMigrationCompletedEmail, payload.props);
+    case "passcodeRotated":
+      return resolve(passcodeRotatedEmail, payload.props);
     case "shareSettingChanged":
       return resolve(shareSettingChangedEmail, payload.props);
     case "recordAdminChanged":

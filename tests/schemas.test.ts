@@ -4,6 +4,7 @@ import {
   CreateFamilyInputSchema,
   CredentialInputSchema,
   RecordInputSchema,
+  RotatePasscodeInputSchema,
 } from "@/utils/schemas";
 
 describe("RecordInputSchema", () => {
@@ -468,6 +469,161 @@ describe("CreateFamilyInputSchema & ChangeFamilyInputSchema KDF Metadata Validat
       credentials: [],
     };
     const result = ChangeFamilyInputSchema.safeParse(validChangeData);
+    expect(result.success).toBe(true);
+  });
+});
+
+describe("RotatePasscodeInputSchema", () => {
+  const validRotateData = {
+    previousMasterKeyEncrypted: "b2xkTWFzdGVyS2V5RW5jcnlwdGVkRGF0YQ==",
+    masterKeyEncrypted: "SGVsbG8gV29ybGQgYXV0aGVudGljYXRlZCBhZWFk",
+    masterKeyIv: "dGVzdGl2MTIzNDU2",
+    masterKeySalt: "dGVzdHNhbHQxMjM0NTY=",
+  };
+
+  it("正しい鍵材料で検証を通過すること", () => {
+    const result = RotatePasscodeInputSchema.safeParse(validRotateData);
+    expect(result.success).toBe(true);
+  });
+
+  it("kdfIterations / cryptoVersion を指定した場合も検証を通過すること", () => {
+    const result = RotatePasscodeInputSchema.safeParse({
+      ...validRotateData,
+      kdfIterations: 300_000,
+      cryptoVersion: 1,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("IVが不正な形式（16文字Base64以外）の場合はエラーになること", () => {
+    const result = RotatePasscodeInputSchema.safeParse({
+      ...validRotateData,
+      masterKeyIv: "invalid-iv",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("masterKeyEncryptedが短すぎる（タグ不足）の場合はエラーになること", () => {
+    const result = RotatePasscodeInputSchema.safeParse({
+      ...validRotateData,
+      masterKeyEncrypted: "dG9vU2hvcnQ=",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("masterKeySaltがBase64でない場合はエラーになること", () => {
+    const result = RotatePasscodeInputSchema.safeParse({
+      ...validRotateData,
+      masterKeySalt: "not a base64 salt!",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("kdfIterations が範囲外の場合はエラーになること", () => {
+    const result = RotatePasscodeInputSchema.safeParse({
+      ...validRotateData,
+      kdfIterations: 50_000,
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("BASE64_REGEX strict validation", () => {
+  const validRotateDataBase = {
+    previousMasterKeyEncrypted: "b2xkTWFzdGVyS2V5RW5jcnlwdGVkRGF0YQ==",
+    masterKeyEncrypted: "SGVsbG8gV29ybGQgYXV0aGVudGljYXRlZCBhZWFk",
+    masterKeyIv: "dGVzdGl2MTIzNDU2",
+  };
+
+  it("should reject empty string", () => {
+    const result = RotatePasscodeInputSchema.safeParse({
+      ...validRotateDataBase,
+      masterKeySalt: "",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const saltIssue = result.error.issues.find((issue) =>
+        issue.path.includes("masterKeySalt"),
+      );
+      expect(saltIssue).toBeDefined();
+      expect(saltIssue?.message).toBe("ソルトはBase64形式である必要があります");
+    }
+  });
+
+  it("should reject single-character base64-like string (e.g. 'A')", () => {
+    const result = RotatePasscodeInputSchema.safeParse({
+      ...validRotateDataBase,
+      masterKeySalt: "A",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const saltIssue = result.error.issues.find((issue) =>
+        issue.path.includes("masterKeySalt"),
+      );
+      expect(saltIssue).toBeDefined();
+      expect(saltIssue?.message).toBe("ソルトはBase64形式である必要があります");
+    }
+  });
+
+  it("should reject base64-like string with incorrect length/padding (23 chars)", () => {
+    const result = RotatePasscodeInputSchema.safeParse({
+      ...validRotateDataBase,
+      masterKeySalt: "dGVzdHNhbHQxMjM0NTY", // 23 chars - not multiple of 4
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const saltIssue = result.error.issues.find((issue) =>
+        issue.path.includes("masterKeySalt"),
+      );
+      expect(saltIssue).toBeDefined();
+      expect(saltIssue?.message).toBe("ソルトはBase64形式である必要があります");
+    }
+  });
+
+  it("should reject base64-like string with incorrect padding placement", () => {
+    const result = RotatePasscodeInputSchema.safeParse({
+      ...validRotateDataBase,
+      masterKeySalt: "ABC=DEFG", // padding in the middle
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const saltIssue = result.error.issues.find((issue) =>
+        issue.path.includes("masterKeySalt"),
+      );
+      expect(saltIssue).toBeDefined();
+      expect(saltIssue?.message).toBe("ソルトはBase64形式である必要があります");
+    }
+  });
+
+  it("should accept valid base64 string with no padding (multiple of 4)", () => {
+    const result = RotatePasscodeInputSchema.safeParse({
+      ...validRotateDataBase,
+      masterKeySalt: "dGVzdHNhbHQ=", // valid 12 chars
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("should accept valid base64 string with single padding (=)", () => {
+    const result = RotatePasscodeInputSchema.safeParse({
+      ...validRotateDataBase,
+      masterKeySalt: "dGVzdA==", // valid 8 chars with == padding
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("should accept valid base64 string with double padding (==)", () => {
+    const result = RotatePasscodeInputSchema.safeParse({
+      ...validRotateDataBase,
+      masterKeySalt: "dGVzdHNhbHQxMjM0NTY=", // valid 24 chars with = padding
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("should accept valid base64 string without padding (exact multiple of 4)", () => {
+    const result = RotatePasscodeInputSchema.safeParse({
+      ...validRotateDataBase,
+      masterKeySalt: "dGVzdHNhbHQxMjM0", // valid 16 chars, no padding
+    });
     expect(result.success).toBe(true);
   });
 });

@@ -3,7 +3,8 @@ import { z } from "zod";
 export const OwnerType = ["user", "family"] as const;
 
 /** Base64形式の正規表現（標準Base64、空文字は不可） */
-const BASE64_REGEX = /^[A-Za-z0-9+/]+={0,2}$/;
+const BASE64_REGEX =
+  /^(?:[A-Za-z0-9+/]{4})+(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$|^(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)$/;
 
 /** IVは必ず12バイト。Base64でちょうど16文字かつパディングなし */
 const IV_REGEX = /^[A-Za-z0-9+/]{16}$/;
@@ -146,6 +147,38 @@ export const CreateFamilyInputSchema = z
       .string()
       .min(1, "家族名は必須です")
       .max(100, "家族名は100文字以内で入力してください"),
+    masterKeyEncrypted: z.string(),
+    masterKeyIv: z.string(),
+    masterKeySalt: z.string(),
+    kdfIterations: z.number().int().min(100_000).max(2_000_000).optional(),
+    cryptoVersion: z.number().int().min(1).optional(),
+  })
+  .superRefine((data, ctx) => {
+    const result = AeadDataSchema.safeParse({
+      iv: data.masterKeyIv,
+      ciphertext: data.masterKeyEncrypted,
+    });
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        ctx.addIssue({
+          ...issue,
+          path:
+            issue.path[0] === "iv" ? ["masterKeyIv"] : ["masterKeyEncrypted"],
+        });
+      }
+    }
+    if (!BASE64_REGEX.test(data.masterKeySalt)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "ソルトはBase64形式である必要があります",
+        path: ["masterKeySalt"],
+      });
+    }
+  });
+
+export const RotatePasscodeInputSchema = z
+  .object({
+    previousMasterKeyEncrypted: z.string(),
     masterKeyEncrypted: z.string(),
     masterKeyIv: z.string(),
     masterKeySalt: z.string(),

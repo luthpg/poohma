@@ -178,7 +178,7 @@ export async function unwrapMasterKey(
     unwrappingKey,
     { name: ALGORITHM, iv },
     { name: ALGORITHM, length: KEY_LENGTH },
-    false,
+    true, // エクスポート可能 (再ラップ・ローテーション等のため)
     ["encrypt", "decrypt", "wrapKey", "unwrapKey"],
   );
 }

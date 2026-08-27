@@ -384,4 +384,70 @@ describe("1.1 暗号化コアロジックの単体テスト (src/lib/crypto.ts)"
       expect(unwrapped.algorithm.name).toBe("AES-GCM");
     });
   });
+
+  /**
+   * 1.1.8 パスコードローテーションの鍵再ラップサイクル
+   */
+  describe("1.1.8 パスコードローテーション（マスターキーの再ラップ）", () => {
+    it("旧パスコードでラップされたマスターキーを新パスコードで再ラップし、新鍵でアンラップでき旧鍵では失敗すること", async () => {
+      const oldPasscode = "OldSecretPasscode123!";
+      const oldSalt = "OldSaltBase64String1=";
+      const newPasscode = "NewSecretPasscode456!";
+      const newSalt = "NewSaltBase64String2=";
+
+      // 1. マスターキーを生成し、旧パスコードでラップ
+      const masterKey = await generateMasterKey();
+      const oldWrappingKey = await deriveKeyFromPasscode(
+        oldPasscode,
+        oldSalt,
+        CURRENT_KDF_ITERATIONS,
+        CURRENT_KDF_VERSION,
+      );
+      const oldWrapped = await wrapMasterKey(masterKey, oldWrappingKey);
+
+      // 2. 旧パスコードでアンラップ（現在のアンロック動作）
+      const unlockedMasterKey = await unwrapMasterKey(
+        oldWrapped.encrypted,
+        oldWrapped.iv,
+        oldWrappingKey,
+      );
+
+      // 3. 新パスコード・新ソルトで再ラップ
+      const newWrappingKey = await deriveKeyFromPasscode(
+        newPasscode,
+        newSalt,
+        CURRENT_KDF_ITERATIONS,
+        CURRENT_KDF_VERSION,
+      );
+      const newWrapped = await wrapMasterKey(unlockedMasterKey, newWrappingKey);
+
+      // 4. 新パスコードでは正常にアンラップできる
+      const restoredMasterKey = await unwrapMasterKey(
+        newWrapped.encrypted,
+        newWrapped.iv,
+        newWrappingKey,
+      );
+
+      // 5. 新マスターキーでDEKやヒントを復号・検証
+      const dek = await generateDEK();
+      const wrappedDek = await wrapDEK(dek, masterKey);
+      const unwrappedDek = await unwrapDEK(
+        wrappedDek.encrypted,
+        wrappedDek.iv,
+        restoredMasterKey,
+      );
+      const encryptedHint = await encrypt(SECRET_HINT_DATA, dek);
+      const decryptedHint = await decrypt(
+        encryptedHint.encrypted,
+        encryptedHint.iv,
+        unwrappedDek,
+      );
+      expect(decryptedHint).toBe(SECRET_HINT_DATA);
+
+      // 6. 旧パスコードでは新ラップデータをアンラップできない（認証タグエラー）
+      await expect(
+        unwrapMasterKey(newWrapped.encrypted, newWrapped.iv, oldWrappingKey),
+      ).rejects.toThrow();
+    });
+  });
 });
