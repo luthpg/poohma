@@ -1120,7 +1120,7 @@ export const rotatePasscode = familyBoundMutation({
             props: {
               displayName: member.displayName || "メンバー",
               familyName: family.name,
-              ctaUrl: `${appUrl}/settings`,
+              ctaUrl: `${appUrl}/family`,
             },
           },
         },

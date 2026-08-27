@@ -74,7 +74,7 @@ export const passcodeRotatedEmail = defineEmailTemplate({
 PasscodeRotatedEmail.PreviewProps = {
   displayName: "たろう",
   familyName: "鈴木家",
-  ctaUrl: "https://poohma.ciderlabs.link/settings",
+  ctaUrl: "https://poohma.ciderlabs.link/family",
 };
 
 export default PasscodeRotatedEmail;

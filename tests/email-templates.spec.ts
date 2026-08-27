@@ -69,7 +69,7 @@ function samplePayloadFor(key: string): EmailPayload {
         props: {
           displayName: "山田 太郎",
           familyName: "山田家",
-          ctaUrl: "https://poohma.ciderlabs.link/settings",
+          ctaUrl: "https://poohma.ciderlabs.link/family",
         },
       };
     case "shareSettingChanged":
