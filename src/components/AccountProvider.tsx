@@ -31,6 +31,8 @@ export interface Account {
     masterKeyEncrypted?: string;
     masterKeyIv?: string;
     masterKeySalt?: string;
+    kdfIterations?: number;
+    cryptoVersion?: number;
   } | null;
   createdAt?: number;
   updatedAt: number;

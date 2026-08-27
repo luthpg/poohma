@@ -164,10 +164,11 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
 
   const unlock = useCallback(
     async (code: string, options?: { silent?: boolean }) => {
+      const family = currentAccount?.family;
       if (
-        !currentAccount?.family?.masterKeyEncrypted ||
-        !currentAccount?.family?.masterKeyIv ||
-        !currentAccount?.family?.masterKeySalt
+        !family?.masterKeyEncrypted ||
+        !family?.masterKeyIv ||
+        !family?.masterKeySalt
       ) {
         return false;
       }
@@ -176,10 +177,6 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
 
       try {
         setIsUnlocking(true);
-        const family = currentAccount.family as typeof currentAccount.family & {
-          kdfIterations?: number;
-          cryptoVersion?: number;
-        };
         const wrappingKey = await deriveKeyFromPasscode(
           code,
           family.masterKeySalt,

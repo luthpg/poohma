@@ -19,7 +19,9 @@
       "**/vite.config.ts",
       "!**/src/routeTree.gen.ts",
       "!**/src/styles.css",
-      "!**/coverage/**/*"
+      "!**/coverage/**/*",
+      "./workers/**/*",
+      "!**/cloudflare-env.d.ts"
     ]
   },
   "formatter": {

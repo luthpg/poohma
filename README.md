@@ -52,6 +52,7 @@ PoohMaは、実際のパスワードではなく「パスワードのヒント�
 | テスト         | Vitest, @testing-library/react, convex-test, Playwright        |
 | Lint／フォーマット | Biome                                                          |
 | デプロイ        | Vercel（フロントエンド）, Convex Cloud（バックエンド）                          |
+| バックアップ     | Cloudflare Workers（定時自動実行）, Cloudflare R2（ZIP保存・90日保持）         |
 
 技術的な詳細（DBスキーマ、API一覧、暗号鍵の階層構造など）は [設計書](#関連ドキュメント) を参照してください。
 
@@ -165,6 +166,8 @@ pnpm dev
 
 ```
 convex/       … Convexのスキーマ・Query/Mutation/Action定義
+workers/
+  backup/     … 定期自動バックアップ用Cloudflare Worker（Convex -> R2）
 src/
   components/ … 共通UIコンポーネント
   routes/      … TanStack Routerのファイルベースルーティング
@@ -188,6 +191,7 @@ src/
 
 - フロントエンドはVercelにデプロイされます。
 - バックエンド（Convex）はConvex Cloudにデプロイされます。
+- 自動バックアップ（Worker）はCloudflare Workersにデプロイされます（日次Cron実行、R2に90日間保持）。
 - Firebase Authのリダイレクト処理は、Firebase Hostingへのリライト設定を経由します。
 
 本番デプロイ前に、環境変数がすべて本番用の値に設定されていること、Convexのスキーマ変更が既存データと後方互換であることを確認してください。

@@ -5,6 +5,7 @@ allowBuilds:
   msw: true
   prisma: true
   protobufjs: true
+  workerd: true
 onlyBuiltDependencies:
   - '@firebase/util'
   - '@prisma/engines'

@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-start/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/../convex/_generated/api";
+import type { Account } from "@/components/AccountProvider";
 import { env } from "@/env/client";
 import { env as serverEnv } from "@/env/server";
 import {
@@ -172,7 +173,7 @@ export const getAuthUser = createServerFn({ method: "GET" }).handler(
       });
       if (res.status === 422) return null;
       if (!res.ok) throw new Error("Failed to fetch user");
-      return await res.json();
+      return (await res.json()) as Account | null;
     } catch (error) {
       console.error("getAuthUser: Auth verification failed:", error);
       return null;
