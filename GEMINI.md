@@ -6,6 +6,7 @@
   - コマンド実行時のパス区切り文字やシェルコマンド（`;` の扱い、ファイル操作コマンド等）は PowerShell の構文に従うこと。
   - Windows PowerShell 7未満 では `&&` 演算子が構文エラー（`トークン '&&' は、このバージョンでは有効なステートメント区切り記号ではありません`）となるため使用できません。
   - コマンドを連続実行する際は、先頭に `$ErrorActionPreference = "Stop"` を記述して `;` で繋ぐ（例: `$ErrorActionPreference = "Stop"; コマンド1; コマンド2`）ことで、途中でエラーが出た瞬間にスクリプト全体を安全に強制終了させてください。
+  - パスに丸括弧 `()` が含まれる場合（例: `src/routes/(app)/records/$id.tsx`）、PowerShell が式として誤解釈するため、必ずダブルクォートで囲むこと（例: `git add "src/routes/(app)/records/file.tsx"`）。
 - **Package Manager**: `pnpm`
   - パッケージの追加・削除・実行には必ず `pnpm` を使用すること（`npm`, `yarn` は使用禁止）。
 
