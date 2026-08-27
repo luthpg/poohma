@@ -3,7 +3,8 @@ import { z } from "zod";
 export const OwnerType = ["user", "family"] as const;
 
 /** Base64形式の正規表現（標準Base64、空文字は不可） */
-const BASE64_REGEX = /^[A-Za-z0-9+/]+={0,2}$/;
+const BASE64_REGEX =
+  /^(?:[A-Za-z0-9+/]{4})+(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$|^(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)$/;
 
 /** IVは必ず12バイト。Base64でちょうど16文字かつパディングなし */
 const IV_REGEX = /^[A-Za-z0-9+/]{16}$/;
