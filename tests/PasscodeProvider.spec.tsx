@@ -9,6 +9,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import "react";
+import { toast } from "sonner";
 import {
   afterEach,
   beforeEach,
@@ -19,10 +20,26 @@ import {
   vi,
 } from "vitest";
 import { PasscodeProvider, usePasscode } from "@/components/PasscodeProvider";
+import * as biometricLib from "@/lib/biometric";
 import * as cryptoLib from "@/lib/crypto";
 
 vi.mock("@tanstack/react-router", () => ({
   useRouteContext: vi.fn(),
+}));
+
+vi.mock("sonner", () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
+vi.mock("@/lib/biometric", () => ({
+  isBiometricSupported: vi.fn().mockResolvedValue(true),
+  isBiometricEnabledForUser: vi.fn().mockResolvedValue(false),
+  decryptPasscodeWithBiometrics: vi.fn(),
+  disableBiometricUnlock: vi.fn(),
+  registerBiometricUnlock: vi.fn(),
 }));
 
 vi.mock("@/lib/crypto", async (importOriginal) => {
@@ -574,4 +591,133 @@ describe("PasscodeProvider - 誤入力時の指数バックオフ・ロックア
       expect(getSubmitButton().hasAttribute("disabled")).toBe(true);
     });
   }, 10000);
+});
+
+describe("PasscodeProvider - 生体認証ロック解除とパスコード変更時の自動解除", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    vi.mocked(useRouteContext).mockReturnValue({
+      user: {
+        id: "user-123",
+        familyId: "family-1",
+        family: {
+          name: "Test Family",
+          masterKeyEncrypted: "encrypted-key",
+          masterKeyIv: "iv",
+          masterKeySalt: "salt",
+        },
+      },
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it("生体認証でのパスコード復号成功後にマスターキー復号（unlock）が失敗した場合、生体認証データを削除して再登録案内を表示すること", async () => {
+    vi.mocked(biometricLib.isBiometricSupported).mockResolvedValue(true);
+    vi.mocked(biometricLib.isBiometricEnabledForUser).mockResolvedValue(true);
+    vi.mocked(biometricLib.decryptPasscodeWithBiometrics).mockResolvedValue(
+      "old-passcode",
+    );
+    // パスコードが変更されているためマスターキー復号に失敗
+    (cryptoLib.deriveKeyFromPasscode as Mock).mockResolvedValue(
+      {} as CryptoKey,
+    );
+    (cryptoLib.unwrapMasterKey as Mock).mockRejectedValue(
+      new Error("bad master key or invalid passcode"),
+    );
+
+    let requireUnlockRef: (() => Promise<boolean>) | null = null;
+    const TestComponent = () => {
+      const { requireUnlock } = usePasscode();
+      requireUnlockRef = requireUnlock;
+      return <div>Test</div>;
+    };
+
+    render(
+      <PasscodeProvider>
+        <TestComponent />
+      </PasscodeProvider>,
+    );
+
+    // ダイアログを開く
+    // biome-ignore lint/style/noNonNullAssertion: testing ref is non-null
+    requireUnlockRef!();
+
+    await waitFor(() => {
+      expect(screen.getByText("家族パスコードの入力")).toBeTruthy();
+    });
+
+    const biometricButton = screen.getByRole("button", {
+      name: /FaceID \/ 指紋認証で解除/i,
+    });
+    expect(biometricButton).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(biometricButton);
+    });
+
+    await waitFor(() => {
+      expect(biometricLib.decryptPasscodeWithBiometrics).toHaveBeenCalledWith(
+        "user-123",
+      );
+      // 生体認証保持データの削除が呼ばれること
+      expect(biometricLib.disableBiometricUnlock).toHaveBeenCalledWith(
+        "user-123",
+      );
+      // 再登録の案内トーストが表示されること
+      expect(toast.error).toHaveBeenCalledWith(
+        "家族パスコードが変更された可能性があるため、保存された生体認証を解除しました。新しいパスコードでロック解除後、生体認証を再登録してください。",
+      );
+    });
+  });
+
+  it("生体認証がキャンセル（NotAllowedError）された場合は生体認証データを削除しないこと", async () => {
+    vi.mocked(biometricLib.isBiometricSupported).mockResolvedValue(true);
+    vi.mocked(biometricLib.isBiometricEnabledForUser).mockResolvedValue(true);
+    const cancelError = new Error("User canceled");
+    cancelError.name = "NotAllowedError";
+    vi.mocked(biometricLib.decryptPasscodeWithBiometrics).mockRejectedValue(
+      cancelError,
+    );
+
+    let requireUnlockRef: (() => Promise<boolean>) | null = null;
+    const TestComponent = () => {
+      const { requireUnlock } = usePasscode();
+      requireUnlockRef = requireUnlock;
+      return <div>Test</div>;
+    };
+
+    render(
+      <PasscodeProvider>
+        <TestComponent />
+      </PasscodeProvider>,
+    );
+
+    // biome-ignore lint/style/noNonNullAssertion: testing ref is non-null
+    requireUnlockRef!();
+
+    await waitFor(() => {
+      expect(screen.getByText("家族パスコードの入力")).toBeTruthy();
+    });
+
+    const biometricButton = screen.getByRole("button", {
+      name: /FaceID \/ 指紋認証で解除/i,
+    });
+
+    await act(async () => {
+      fireEvent.click(biometricButton);
+    });
+
+    await waitFor(() => {
+      expect(biometricLib.decryptPasscodeWithBiometrics).toHaveBeenCalledWith(
+        "user-123",
+      );
+      // キャンセル時は削除されないこと
+      expect(biometricLib.disableBiometricUnlock).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -49,7 +49,10 @@ import { notifyBiometricEventServerFn } from "@/services/security.functions";
 interface PasscodeContextType {
   masterKey: CryptoKey | null;
   getMasterKey: () => CryptoKey | null;
-  unlock: (passcode: string) => Promise<boolean>;
+  unlock: (
+    passcode: string,
+    options?: { silent?: boolean },
+  ) => Promise<boolean>;
   requireUnlock: () => Promise<boolean>;
   decryptHint: (
     encrypted: string,
@@ -160,7 +163,7 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
   }, [targetUserId]);
 
   const unlock = useCallback(
-    async (code: string) => {
+    async (code: string, options?: { silent?: boolean }) => {
       if (
         !currentAccount?.family?.masterKeyEncrypted ||
         !currentAccount?.family?.masterKeyIv ||
@@ -200,7 +203,9 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
         return true;
       } catch (error) {
         console.error("Unlock failed:", error);
-        toast.error("パスコードが正しくないか、エラーが発生しました。");
+        if (!options?.silent) {
+          toast.error("パスコードが正しくないか、エラーが発生しました。");
+        }
         return false;
       } finally {
         setIsUnlocking(false);
@@ -357,7 +362,7 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const success = await unlock(decryptedPasscode);
+      const success = await unlock(decryptedPasscode, { silent: true });
       if (success) {
         setIsPromptOpen(false);
         setPasscode("");
@@ -368,6 +373,13 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
           resolvePromiseRef.current(true);
           resolvePromiseRef.current = null;
         }
+      } else {
+        // 生体認証によるパスコード復号は成功したが、マスターキー復号に失敗（別端末でのパスコード変更等）
+        await disableBiometricUnlock(targetUserId);
+        setBiometricEnabled(false);
+        toast.error(
+          "家族パスコードが変更された可能性があるため、保存された生体認証を解除しました。新しいパスコードでロック解除後、生体認証を再登録してください。",
+        );
       }
     } catch (error) {
       console.error("Biometric unlock failed:", error);

@@ -1273,8 +1273,6 @@ function FamilyComponent() {
                     他の家族メンバーおよび別端末では次回新パスコードでのロック解除が必要
                   </strong>
                   となり、生体認証をご利用の場合は再登録が必要になります。
-                  <br />※
-                  すでにマスターキー等の漏洩が疑われる場合はこの操作だけでは不十分です。家族グループの作り直しをご検討ください。
                 </p>
                 <form onSubmit={handleChangePasscode} className="space-y-3">
                   <div>
