@@ -231,19 +231,17 @@ export function useRecordForm(initialValues?: Partial<RecordFormValues>) {
   // ---- credential 操作 ------------------------------------------------
 
   const addCredential = useCallback(() => {
-    setValues((prev) => {
-      if (prev.credentials.length >= MAX_CREDENTIALS_PER_RECORD) {
-        toast.error(
-          `アカウント情報は${MAX_CREDENTIALS_PER_RECORD}件まで登録できます`,
-        );
-        return prev;
-      }
-      return {
-        ...prev,
-        credentials: [...prev.credentials, { ...EMPTY_CREDENTIAL }],
-      };
-    });
-  }, []);
+    if (values.credentials.length >= MAX_CREDENTIALS_PER_RECORD) {
+      toast.error(
+        `アカウント情報は${MAX_CREDENTIALS_PER_RECORD}件まで登録できます`,
+      );
+      return;
+    }
+    setValues((prev) => ({
+      ...prev,
+      credentials: [...prev.credentials, { ...EMPTY_CREDENTIAL }],
+    }));
+  }, [values.credentials.length]);
 
   const removeCredential = useCallback((index: number) => {
     setValues((prev) => {

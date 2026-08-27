@@ -215,11 +215,18 @@ function RecordDetailComponent({
       (c) => c.passwordHint && c.passwordHintIv,
     );
 
+    let credentials: {
+      id?: string;
+      label: string;
+      loginId: string;
+      passwordHint: string;
+    }[];
+
     if (hasEncryptedHints) {
       const unlocked = await requireUnlock();
       if (!unlocked) return; // user cancelled or failed
 
-      const decryptedCreds = await Promise.all(
+      credentials = await Promise.all(
         record.credentials.map(async (c) => {
           if (c.passwordHint && c.passwordHintIv) {
             try {
@@ -253,35 +260,26 @@ function RecordDetailComponent({
           };
         }),
       );
-      form.reset({
-        title: record.title,
-        titleReading: record.titleReading || "",
-        url: record.url || "",
-        ogpImage: record.ogpImage || "",
-        ogpDescription: record.ogpDescription || "",
-        tags: record.tags,
-        memo: record.memo || "",
-        ownerType: record.ownerType ?? "user",
-        credentials: decryptedCreds,
-      });
     } else {
-      form.reset({
-        title: record.title,
-        titleReading: record.titleReading || "",
-        url: record.url || "",
-        ogpImage: record.ogpImage || "",
-        ogpDescription: record.ogpDescription || "",
-        tags: record.tags,
-        memo: record.memo || "",
-        ownerType: record.ownerType ?? "user",
-        credentials: record.credentials.map((c) => ({
-          id: c.id,
-          label: c.label || "",
-          loginId: c.loginId || "",
-          passwordHint: c.passwordHint || "",
-        })),
-      });
+      credentials = record.credentials.map((c) => ({
+        id: c.id,
+        label: c.label || "",
+        loginId: c.loginId || "",
+        passwordHint: c.passwordHint || "",
+      }));
     }
+
+    form.reset({
+      title: record.title,
+      titleReading: record.titleReading || "",
+      url: record.url || "",
+      ogpImage: record.ogpImage || "",
+      ogpDescription: record.ogpDescription || "",
+      tags: record.tags,
+      memo: record.memo || "",
+      ownerType: record.ownerType ?? "user",
+      credentials,
+    });
 
     setIsEditing(true);
   };
