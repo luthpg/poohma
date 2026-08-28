@@ -99,40 +99,52 @@ Service Worker (Workbox等):
 
 ## 3. ディレクトリ構成（抜粋）
 
-```
-convex/
-  _generated/           … Convexが自動生成する型・APIクライアント
-  actions.ts             … OGP取得・ふりがな取得・メール送信 (Node runtime)
-  auth.config.ts          … Firebase IDトークンの信頼プロバイダ設定
-  crons.ts                … 定期バッチ定義
-  customBuilders.ts       … 認証・認可レベル別のQuery/Mutationビルダー
-  families.ts              … 家族グループ・参加申請・家族移行ロジック
-  http.ts                  … 内部HTTPエンドポイント (getUserByFirebaseUid)
-  records.ts                … サービスレコードCRUD・検索・タグ・一括操作
-  rls.ts                     … レコード単位アクセス制御 (requireRecordAccess)
-  schema.ts                  … DBスキーマ定義
-  users.ts                    … ユーザー同期・プロフィール・退会
+本プロジェクトは pnpm workspace + Turborepo によるモノレポ構成を採用しています。
 
-src/
-  components/            … 共通UIコンポーネント (AppHeader, PasscodeProvider 等)
-  emails/                … メールテンプレート定義・配信レジストリ (React Email / Resend)
-    _components/         … メール共通コンポーネント (EmailLayout, EmailButton 等)
-    templates/           … 用途別テンプレート (account/, family/, security/)
-    dispatch.ts          … メール送信ディスパッチャ
-    registry.ts          … テンプレートレジストリ・Convex Payloadスキーマ
-  env/                    … クライアント/サーバー環境変数スキーマ (t3-env)
-  hooks/                  … usePersistentQuery, useConvexFirebaseAuth, use-export-csv 等
-  lib/                    … crypto.ts (E2EE), biometric.ts (WebAuthn), cms.server.ts
-  routes/
-    (app)/                … 認証必須ルート群 (dashboard, records, family, settings)
-    (public)/              … 公開ルート群 (LP, usage, faq, login, 規約等)
-    __root.tsx              … 全体レイアウト・グローバルProvider
-  services/                … サーバー関数 (auth.functions.ts, cms.functions.ts, prefs.functions.ts,
-                                security.functions.ts, firebase-admin.server.ts)
-  utils/                    … schemas.ts (zod), geo-ip.server.ts (位置情報取得),
-                                request-context.server.ts (リクエストメタデータ解析),
-                                url-safety.ts (SSRF対策), csv-sanitize.ts,
-                                index-group.ts (五十音インデックス), chunk-processor.ts
+```
+poohma/                    … プロジェクトルート（Turborepo / pnpm workspace）
+├── apps/
+│   └── web/               … @poohma/web（TanStack Start + Convex）
+│       ├── convex/         … Convexのスキーマ・Query/Mutation/Action定義
+│       │   ├── _generated/ … Convexが自動生成する型・APIクライアント
+│       │   ├── actions.ts  … OGP取得・ふりがな取得・メール送信 (Node runtime)
+│       │   ├── auth.config.ts … Firebase IDトークンの信頼プロバイダ設定
+│       │   ├── crons.ts    … 定期バッチ定義
+│       │   ├── customBuilders.ts … 認証・認可レベル別のQuery/Mutationビルダー
+│       │   ├── families.ts … 家族グループ・参加申請・家族移行ロジック
+│       │   ├── http.ts     … 内部HTTPエンドポイント (getUserByFirebaseUid)
+│       │   ├── records.ts  … サービスレコードCRUD・検索・タグ・一括操作
+│       │   ├── rls.ts      … レコード単位アクセス制御 (requireRecordAccess)
+│       │   ├── schema.ts   … DBスキーマ定義
+│       │   └── users.ts    … ユーザー同期・プロフィール・退会
+│       ├── src/
+│       │   ├── components/ … 共通UIコンポーネント (AppHeader, PasscodeProvider 等)
+│       │   ├── emails/     … メールテンプレート定義・配信レジストリ (React Email / Resend)
+│       │   │   ├── _components/ … メール共通コンポーネント (EmailLayout, EmailButton 等)
+│       │   │   ├── templates/   … 用途別テンプレート (account/, family/, security/)
+│       │   │   ├── dispatch.ts  … メール送信ディスパッチャ
+│       │   │   └── registry.ts  … テンプレートレジストリ・Convex Payloadスキーマ
+│       │   ├── env/        … クライアント/サーバー環境変数スキーマ (t3-env)
+│       │   ├── hooks/      … usePersistentQuery, useConvexFirebaseAuth, use-export-csv 等
+│       │   ├── lib/        … crypto.ts (E2EE), biometric.ts (WebAuthn), cms.server.ts
+│       │   ├── routes/
+│       │   │   ├── (app)/  … 認証必須ルート群 (dashboard, records, family, settings)
+│       │   │   ├── (public)/ … 公開ルート群 (LP, usage, faq, login, 規約等)
+│       │   │   └── __root.tsx … 全体レイアウト・グローバルProvider
+│       │   ├── services/   … サーバー関数 (auth.functions.ts, cms.functions.ts, prefs.functions.ts,
+│       │   │                   security.functions.ts, firebase-admin.server.ts)
+│       │   └── utils/      … schemas.ts (zod), geo-ip.server.ts (位置情報取得),
+│       │                       request-context.server.ts (リクエストメタデータ解析),
+│       │                       url-safety.ts (SSRF対策), csv-sanitize.ts,
+│       │                       index-group.ts (五十音インデックス), chunk-processor.ts
+│       └── tests/          … 単体・結合テスト群 (Vitest / convex-test)
+├── workers/
+│   └── backup/            … @poohma/backup（定期自動バックアップ用Cloudflare Worker）
+├── pnpm-workspace.yaml    … ワークスペース定義
+├── turbo.json             … Turborepo パイプライン設定
+├── tsconfig.base.json     … 共通 TypeScript 設定
+├── biome.json             … 統一 Lint / Format 設定
+└── package.json           … ルート定義・スクリプト
 ```
 
 ## 4. データベース設計（Convexスキーマ）
@@ -902,37 +914,44 @@ cleanupExpiredMigrationsInternal:
 | microCMS                | FAQ・利用規約・プライバシーポリシーの コンテンツ管理 | APIキー（サーバーサイドのみ）                       |
 | Resend                  | 通知メール送信                      | APIキー                                  |
 | Yahoo!テキスト解析API         | サービス名からのふりがな自動生成             | アプリケーションID                             |
+| Cloudflare Workers / R2 | Convexデータの定期自動バックアップ（日次）   | Cloudflare Secret（`CONVEX_DEPLOY_KEY`） |
 
 ## 14. 環境変数一覧
 
-### クライアント（src/env/client.ts, VITE\_プレフィックス）
+### クライアント（src/env/client.ts, VITE_プレフィックス）
 
 | 変数名                             | 必須 | 説明                   |
 | ------------------------------- | -- | -------------------- |
-| VITE\_APP\_TITLE                | 任意 | アプリタイトル              |
-| VITE\_FIREBASE\_API\_KEY        | 必須 | Firebase APIキー       |
-| VITE\_FIREBASE\_AUTH\_DOMAIN    | 必須 | Firebase Authドメイン    |
-| VITE\_FIREBASE\_PROJECT\_ID     | 必須 | FirebaseプロジェクトID     |
-| VITE\_FIREBASE\_STORAGE\_BUCKET | 必須 | Firebase Storageバケット |
-| VITE\_CONVEX\_URL               | 必須 | ConvexデプロイURL        |
+| VITE_APP_TITLE                | 任意 | アプリタイトル              |
+| VITE_FIREBASE_API_KEY        | 必須 | Firebase APIキー       |
+| VITE_FIREBASE_AUTH_DOMAIN    | 必須 | Firebase Authドメイン    |
+| VITE_FIREBASE_PROJECT_ID     | 必須 | FirebaseプロジェクトID     |
+| VITE_FIREBASE_STORAGE_BUCKET | 必須 | Firebase Storageバケット |
+| VITE_CONVEX_URL               | 必須 | ConvexデプロイURL        |
 
 ### サーバー（src/env/server.ts）
 
 | 変数名                            | 必須 | 説明                                              |
 | --------------------------------- | -- | ------------------------------------------------- |
-| SERVER\_URL                       | 任意 | サーバーURL                                         |
-| MICROCMS\_SERVICE\_DOMAIN         | 必須 | microCMSサービスドメイン                                |
-| MICROCMS\_API\_KEY                | 必須 | microCMS APIキー                                  |
-| CONVEX\_INTERNAL\_SECRET          | 必須 | Convex HTTP Action（内部API）保護用シークレット      |
-| ABSTRACT\_IP\_GEOLOCATION\_API\_KEY | 任意 | Abstract API GeoIP（ログイン・監査メール位置情報取得用） |
+| SERVER_URL                       | 任意 | サーバーURL                                         |
+| MICROCMS_SERVICE_DOMAIN         | 必須 | microCMSサービスドメイン                                |
+| MICROCMS_API_KEY                | 必須 | microCMS APIキー                                  |
+| CONVEX_INTERNAL_SECRET          | 必須 | Convex HTTP Action（内部API）保護用シークレット      |
+| ABSTRACT_IP_GEOLOCATION_API_KEY | 任意 | Abstract API GeoIP（ログイン・監査メール位置情報取得用） |
 
 ### その他（Convex実行環境）
 
 | 変数名                                                          | 説明                                             |
 | ------------------------------------------------------------ | ---------------------------------------------- |
-| FIREBASE\_SERVICE\_ACCOUNT / FIREBASE\_ADMINSDK\_CREDENTIALS | Firebase Admin初期化用サービスアカウント（JSON文字列 or ファイルパス） |
-| RESEND\_API\_KEY / RESEND\_MAIL\_FROM                        | メール送信設定                                        |
-| YAHOO\_CLIENT\_ID                                            | ふりがな取得API用アプリケーションID                           |
+| FIREBASE_SERVICE_ACCOUNT / FIREBASE_ADMINSDK_CREDENTIALS | Firebase Admin初期化用サービスアカウント（JSON文字列 or ファイルパス） |
+| RESEND_API_KEY / RESEND_MAIL_FROM                        | メール送信設定                                        |
+| YAHOO_CLIENT_ID                                            | ふりがな取得API用アプリケーションID                           |
+
+### バックアップ環境（Cloudflare Workers Secret: workers/backup）
+
+| 変数名 | 説明 |
+| --- | --- |
+| `CONVEX_DEPLOY_KEY` | Convex Deploy Key（`prod:...` 形式）。Cloudflare Secrets で暗号化保存（`wrangler secret put CONVEX_DEPLOY_KEY`）。 |
 
 ## 15. デプロイ構成
 
@@ -945,6 +964,9 @@ cleanupExpiredMigrationsInternal:
     導入時は、Firebase Authのリダイレクト（ `/__/auth/*` ）やmicroCMS/Resendへの通信がブロックされないよう、許可ドメインリストを実装済みの外部連携先（13章）と突き合わせてから有効化する。
 - **開発環境** ：vite.config.ts にてFirebase Auth関連パスのプロキシ設定、および自己署名証明書（@vitejs/plugin-basic-ssl）によるローカルHTTPS対応（WebAuthn等はHTTPS必須のため）。
 - **バックエンド** ：Convex Cloudにデプロイ（ `pnpm dev:convex` / Convexデプロイパイプライン）。
+- **定期自動バックアップ（NFR-AVAIL-05）** ：Cloudflare Workers（Cron Trigger: 毎日 UTC 18:00 / JST 03:00）により Convex Export API から ZIP データをストリーム取得し、Cloudflare R2（`poohma-backups` バケット）へ直接保存する。
+  - **セキュリティ**：HTTP口（`fetch` ハンドラー）を排して Cron 実行専用とし、不要な外部エンドポイントを公開しない。Deploy Key は Cloudflare Secret として暗号化管理する。
+  - **ライフサイクル**：R2 バケット側で 90 日経過したバックアップオブジェクトを自動削除するライフサイクルルールを設定し、保管容量を最適化する。
 - **SSR注意事項** ： `ssr.external: ["papaparse"]` の設定により、papaparseはSSRバンドルから除外しクライアント専用として扱う。
 
 ## 16. テスト・品質管理

@@ -1,0 +1,17 @@
+{
+  "name": "@poohma/backup",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev --test-scheduled",
+    "typegen": "wrangler types --env-interface Env cloudflare-env.d.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "wrangler deploy --dry-run",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260826.1",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.126.0"
+  }
+}

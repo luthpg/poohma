@@ -11,9 +11,9 @@ count.txt
 .output
 .vinxi
 
-/generated/prisma
-/secrets
-/coverage
+secrets
+coverage
 .vercel
 *storybook.log
 storybook-static
+.turbo

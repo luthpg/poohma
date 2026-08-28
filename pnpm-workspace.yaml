@@ -1,3 +1,7 @@
+packages:
+  - "apps/*"
+  - "workers/*"
+
 allowBuilds:
   '@firebase/util': true
   '@prisma/engines': true
@@ -5,6 +9,7 @@ allowBuilds:
   msw: true
   prisma: true
   protobufjs: true
+  workerd: true
 onlyBuiltDependencies:
   - '@firebase/util'
   - '@prisma/engines'
