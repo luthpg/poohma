@@ -91,6 +91,8 @@ WebAuthn（生体認証）はHTTPS環境でのみ動作するため、ローカ�
 
 ### 1. 依存関係のインストール
 
+プロジェクトルートで実行します。pnpm workspace により全ワークスペースの依存が一括インストールされます。
+
 ```
 pnpm install
 ```
@@ -142,7 +144,7 @@ npx convex dev
 
 ### 4. 開発サーバーの起動
 
-別ターミナルでフロントエンドの開発サーバーを起動します。
+別ターミナルでフロントエンドの開発サーバーを起動します（プロジェクトルートから実行）。
 
 ```
 pnpm dev
@@ -152,28 +154,30 @@ pnpm dev
 
 | コマンド              | 内容                                    |
 | ----------------- | ------------------------------------- |
-| `pnpm dev`        | フロントエンド開発サーバーの起動                      |
-| `pnpm dev:convex` | Convexのローカル開発同期（ `npx convex dev` 相当） |
-| `pnpm build`      | 本番ビルド                                 |
-| `pnpm check`      | Biomeによる静的解析・フォーマット                   |
-| `pnpm tsc`        | TypeScriptによる静的解析・型チェック               |
-| `pnpm test`       | Vitestによる単体・結合テストの実行                  |
-| `pnpm storybook`  | Storybookの起動（コンポーネントカタログ）             |
+| `pnpm dev`        | Turborepo 経由で Web アプリの開発サーバーを起動       |
+| `pnpm build`      | Turborepo 経由で全ワークスペースの本番ビルド      |
+| `pnpm typecheck`  | Turborepo 経由で全ワークスペースの型チェック     |
+| `pnpm check`      | Biomeによる静的解析・フォーマット（自動修正）       |
+| `pnpm test`       | Turborepo 経由でテスト実行               |
 
 実際のスクリプト名・オプションは `package.json` を正としてください。
 
 ## ディレクトリ構成
 
 ```
-convex/       … Convexのスキーマ・Query/Mutation/Action定義
+poohma/           … プロジェクトルート（Turborepo / pnpm workspace）
+apps/
+  web/            … @poohma/web（TanStack Start + Convex）
+    convex/       … Convexのスキーマ・Query/Mutation/Action定義
+    src/
+      components/ … 共通UIコンポーネント
+      routes/      … TanStack Routerのファイルベースルーティング
+      lib/          … 暗号化（crypto.ts）・生体認証（biometric.ts）等のコアロジック
+      hooks/        … カスタムフック
+      utils/         … バリデーションスキーマ・SSRF対策等のユーティリティ
+    tests/        … Vitest テスト
 workers/
-  backup/     … 定期自動バックアップ用Cloudflare Worker（Convex -> R2）
-src/
-  components/ … 共通UIコンポーネント
-  routes/      … TanStack Routerのファイルベースルーティング
-  lib/          … 暗号化（crypto.ts）・生体認証（biometric.ts）等のコアロジック
-  hooks/        … カスタムフック
-  utils/         … バリデーションスキーマ・SSRF対策等のユーティリティ
+  backup/         … @poohma/backup（定期自動バックアップ用Cloudflare Worker）
 ```
 
 詳細なディレクトリ構成は設計書の「ディレクトリ構成」章を参照してください。

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.7/schema.json",
+  "root": false,
+  "vcs": {
+    "enabled": false,
+    "clientKind": "git",
+    "useIgnoreFile": false
+  },
+  "files": {
+    "ignoreUnknown": false,
+    "includes": [
+      "**/src/**/*",
+      ".storybook/**/*",
+      "*.config.*",
+      ".*",
+      "tests/**/*",
+      "**/.vscode/**/*",
+      "**/index.html",
+      "**/vite.config.ts",
+      "!**/src/routeTree.gen.ts",
+      "!**/src/styles.css",
+      "!**/coverage/**/*"
+    ]
+  }
+}

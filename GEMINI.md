@@ -14,12 +14,12 @@
 
 コード変更や機能実装を行った後、またはユーザーからの検証要求時は、以下のコマンドでエラーがないか確認・通過させること。
 
-1. **Type Check**: `pnpm tsc`
+1. **Type Check**: `pnpm typecheck`（Turborepo 経由で全ワークスペースの型チェックを実行）
 2. **Static Check / Lint/ Format**: `pnpm check`
 3. **Test**: `pnpm test`
-4. **Build Check**: `pnpm build`
+4. **Build Check**: `pnpm build`（Turborepo 経由で全ワークスペースのビルドを実行）
 
-> **Note**: コマンドの連続実行時は、`$ErrorActionPreference = "Stop"; pnpm tsc; pnpm check; pnpm test; pnpm build` のように `$ErrorActionPreference = "Stop"` を付与して `;` で繋ぐか、`pnpm` 側のスクリプトを活用すること（`&&` は Windows PowerShell では構文エラーになります）。
+> **Note**: コマンドの連続実行時は、`$ErrorActionPreference = "Stop"; pnpm typecheck; pnpm check; pnpm test; pnpm build` のように `$ErrorActionPreference = "Stop"` を付与して `;` で繋ぐか、`pnpm` 側のスクリプトを活用すること（`&&` は Windows PowerShell では構文エラーになります）。
 
 ## 3. Git Commit Message Guidelines
 
@@ -105,4 +105,29 @@ try {
   1. コミット前にコード変更差分を精査し、ドキュメントの更新（機能要件の追加、DBスキーマ・API仕様・環境変数の変更、脅威モデルの更新等）が必要でないかチェックする。
   2. ドキュメントの更新が必要な場合は、変更箇所・更新方針をユーザーに確認し、許諾を得た上でドキュメントの更新を行う。
   3. ドキュメント更新を含めた状態で品質検証コマンドを実行し、コミットを行う。
+
+## 6. Monorepo Structure
+
+本プロジェクトは **pnpm workspace + Turborepo** によるモノレポ構成です。
+
+```
+poohma/                    # ルート（Turborepo オーケストレーション）
+├── apps/
+│   └── web/               # @poohma/web（TanStack Start + Convex）
+│       ├── convex/         # Convex バックエンド（schema, functions, _generated）
+│       ├── src/
+│       └── tests/
+├── workers/
+│   └── backup/            # @poohma/backup（Cloudflare Workers 定期バックアップ）
+├── pnpm-workspace.yaml
+├── turbo.json
+├── tsconfig.base.json     # 共通 TypeScript 設定
+├── biome.json             # 統一 Lint / Format 設定
+└── package.json           # Turborepo スクリプト
+```
+
+- Web アプリケーションのコードは `apps/web/` 配下にあります。`src/` 内の参照には `@/*` パスエイリアスを使用してください。
+- Convex 関数から `src/` 内のユーティリティを参照する場合は `../src/...` の相対パスを使用します。
+- 各ワークスペースの `tsconfig.json` は `../../tsconfig.base.json` を extends しています。
+- Vercel デプロイ時は Root Directory を `apps/web` に設定してください。
 

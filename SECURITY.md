@@ -14,8 +14,8 @@ PoohMaは、家族のアカウント情報・パスワードヒントを扱う�
 ### 対象内（In Scope）
 
 - 本番環境のPoohMaアプリケーション（フロントエンド／Convexバックエンド／認証フロー）
-- 暗号化・鍵管理ロジック（`src/lib/crypto.ts`, `src/lib/biometric.ts` 相当）
-- 認可・アクセス制御ロジック（`convex/customBuilders.ts`, `convex/rls.ts` 相当）
+- 暗号化・鍵管理ロジック（`apps/web/src/lib/crypto.ts`, `apps/web/src/lib/biometric.ts` 相当）
+- 認可・アクセス制御ロジック（`apps/web/convex/customBuilders.ts`, `apps/web/convex/rls.ts` 相当）
 - OGP取得等、外部リクエストを発生させる機能（SSRF関連）
 - CSVインポート／エクスポート機能
 

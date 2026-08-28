@@ -65,8 +65,8 @@ jobs:
       - name: Lint & Format Check (Biome)
         run: pnpm run check:ci
 
-      - name: Type Check (tsgo)
-        run: pnpm run tsc
+      - name: Type Check
+        run: pnpm run typecheck
 
       - name: Build
         run: pnpm run build

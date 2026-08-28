@@ -7,22 +7,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": [
-      "**/src/**/*",
-      "**/convex/**/*",
-      ".storybook/**/*",
-      "*.config.*",
-      ".*",
-      "tests/**/*",
-      "**/.vscode/**/*",
-      "**/index.html",
-      "**/vite.config.ts",
-      "!**/src/routeTree.gen.ts",
-      "!**/src/styles.css",
-      "!**/coverage/**/*",
-      "./workers/**/*",
-      "!**/cloudflare-env.d.ts"
-    ]
+    "includes": ["apps/**/*", "packages/**/*", "workers/**/*", "./*"]
   },
   "formatter": {
     "enabled": true,
