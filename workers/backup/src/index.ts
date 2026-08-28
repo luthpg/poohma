@@ -29,9 +29,20 @@ async function runBackup(env: Env): Promise<{ fileName: string }> {
 		throw new Error("Invalid CONVEX_DEPLOY_KEY format.");
 	}
 
-	const deploymentIdentifier = rawKey.replace(/^(prod|preview|dev):/, "");
+	let deploymentIdentifier = rawKey;
+	for (const prefix of ["prod:", "preview:", "dev:"]) {
+		if (deploymentIdentifier.startsWith(prefix)) {
+			deploymentIdentifier = deploymentIdentifier.slice(prefix.length);
+			break;
+		}
+	}
+
+	while (deploymentIdentifier.endsWith("/")) {
+		deploymentIdentifier = deploymentIdentifier.slice(0, -1);
+	}
+
 	const baseUrl = deploymentIdentifier.startsWith("http")
-		? deploymentIdentifier.replace(/\/+$/, "")
+		? deploymentIdentifier
 		: `https://${deploymentIdentifier}.convex.cloud`;
 
 	const authHeaders = {
