@@ -55,12 +55,12 @@ jobs:
       # 2. Chromium と Linux 依存ライブラリのインストール
       - name: Install Playwright Chromium with dependencies
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install chromium --with-deps
+        run: pnpm --filter @poohma/web exec playwright install chromium --with-deps
 
       # キャッシュヒット時でも Linux 依存ライブラリのチェックを行う
       - name: Install Playwright OS dependencies only
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium
+        run: pnpm --filter @poohma/web exec playwright install-deps chromium
 
       - name: Lint & Format Check (Biome)
         run: pnpm run check:ci
