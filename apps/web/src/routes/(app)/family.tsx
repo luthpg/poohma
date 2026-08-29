@@ -286,16 +286,7 @@ function FamilyComponent() {
 		setIsLoading(true);
 		let currentMigrationId: Id<"familyMigrations"> | null = null;
 		try {
-			// 1. 旧マスターキーが未解除の場合は解除を要求
-			if (!getMasterKey()) {
-				const unlocked = await requireUnlock();
-				if (!unlocked) {
-					setIsLoading(false);
-					return;
-				}
-			}
-
-			// 2. prepare
+			// 1. prepare
 			const { migrationId } = await prepareFamilyMigrationMut({
 				accountId: activeAccountId || undefined,
 				action: "join",
@@ -303,7 +294,7 @@ function FamilyComponent() {
 			});
 			currentMigrationId = migrationId;
 
-			// 3. 移行先の家族情報を取得
+			// 2. 移行先の家族情報を取得
 			const existingFamily = await convex.query(
 				api.families.getFamilyInfoByInviteCode,
 				{
@@ -330,22 +321,38 @@ function FamilyComponent() {
 				wrappingKey,
 			);
 
-			// 4. 所有するレコードの暗号化対象を取得し再ラップ
+			// 3. 所有するレコードの暗号化対象を取得し再ラップ
 			const migrationData = await convex.query(
 				api.families.getMigrationForEncryption,
 				{ migrationId },
 			);
-			const oldMasterKey = getMasterKey();
-			if (!oldMasterKey) {
-				throw new Error("旧マスターキーが利用できません");
+			let reEncryptedCredentials: Awaited<
+				ReturnType<typeof reEncryptCredentials>
+			> = [];
+			if (migrationData.records.length > 0) {
+				if (!getMasterKey()) {
+					const unlocked = await requireUnlock();
+					if (!unlocked) {
+						await abortFamilyMigrationMut({
+							accountId: activeAccountId || undefined,
+							migrationId,
+						});
+						currentMigrationId = null;
+						return;
+					}
+				}
+				const oldMasterKey = getMasterKey();
+				if (!oldMasterKey) {
+					throw new Error("旧マスターキーが利用できません");
+				}
+				reEncryptedCredentials = await reEncryptCredentials(
+					migrationData.records,
+					oldMasterKey,
+					newMasterKey,
+				);
 			}
-			const reEncryptedCredentials = await reEncryptCredentials(
-				migrationData.records,
-				oldMasterKey,
-				newMasterKey,
-			);
 
-			// 5. commit
+			// 4. commit
 			await commitFamilyMigrationMut({
 				accountId: activeAccountId || undefined,
 				migrationId,

@@ -449,9 +449,9 @@ DEKは serviceRecords.credentials[].passwordHintDekEncrypted / passwordHintDekIv
   マスターキー（パスコード経路と同一のものに到達する）
 ```
 
-備考：DEKが存在しない旧形式のレコード（passwordHintDekEncrypted未設定）については、
-decryptHint/encryptHint 側でマスターキー直接暗号化にフォールバックする実装になっている
-（過去バージョンとの互換維持）。
+備考：DEKが存在しない旧形式のレコード（passwordHintDekEncrypted未設定）は、
+decryptHint でのみマスターキーを直接使用して復号する読み取り互換を維持する。
+encryptHint と家族移行時の再暗号化にマスターキー直接暗号化へのフォールバックはなく、DEKを必須とする。
 
 ### 6.2 実装関数（src/lib/crypto.ts, src/utils/passcode-strength.ts）
 
@@ -517,6 +517,7 @@ decryptHint/encryptHint 側でマスターキー直接暗号化にフォール�
 3. クライアント側の再暗号化処理 (family.tsx - reEncryptCredentials)
    - 旧マスターキーで各DEKをunwrap → 新マスターキーで各DEKを再wrap
      （パスワードヒント本体は再暗号化不要、DEKの付け替えのみ）
+   - DEK情報がない場合は reWrapCredential がエラーとし、マスターキー直接暗号化にはフォールバックしない
 
 4. commitFamilyMigration Mutation（NFR-AVAIL-03/04対応：バッチ分割・楽観的ロック）
    - 再暗号化済みcredentialsを、1回あたり20〜50件程度のバッチに分割して複数回のMutation呼び出しで送信する
