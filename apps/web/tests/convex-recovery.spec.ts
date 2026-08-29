@@ -73,6 +73,13 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 		const t = convexTest(schema, modules);
 
 		let familyId!: Id<"families">;
+		const validRecoveryCode = "ABCD-EFGH-JKMN-PQRT-WXYZ-2345-6789-BCDF";
+		const validNormalized = "ABCDEFGHJKMNPQRTWXYZ23456789BCDF";
+		const bufferCode = new TextEncoder().encode(validNormalized);
+		const digestCode = await crypto.subtle.digest("SHA-256", bufferCode);
+		const recoveryCodeHash = btoa(
+			String.fromCharCode(...new Uint8Array(digestCode)),
+		);
 
 		await t.run(async (ctx) => {
 			familyId = await ctx.db.insert("families", {
@@ -83,6 +90,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 				recoveryMasterKeyEncrypted: "RecoveryEncryptedKeySuzuki==",
 				recoveryMasterKeyIv: "RecoveryIvSuzuki==",
 				recoveryMasterKeySalt: "RecoverySaltSuzuki==",
+				recoveryCodeHash,
 				recoveryKdfIterations: 300_000,
 				recoveryCryptoVersion: 1,
 				recoveryIssuedAt: Date.now(),
@@ -123,10 +131,28 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 
 		const otpId = otpDoc._id;
 
-		// 3. 誤ったOTPコードの検証（試行回数カウントアップとエラーメッセージの返却）
+		// 3-a. 誤ったリカバリーコードでの検証（Recovery Code 不正エラー）
+		const failCodeResult = await user.mutation(
+			api.recovery.verifyRecoveryOtpAndGetRecoveryData,
+			{
+				otpCode: "123456",
+				recoveryCode: "INVALID-CODE-XXXX-YYYY",
+			},
+		);
+		expect(failCodeResult.success).toBe(false);
+		if (!failCodeResult.success) {
+			expect(failCodeResult.error).toContain(
+				"リカバリーコードが正しくありません",
+			);
+		}
+
+		// 3-b. 誤ったOTPコードの検証（試行回数カウントアップとエラーメッセージの返却）
 		const failResult = await user.mutation(
 			api.recovery.verifyRecoveryOtpAndGetRecoveryData,
-			{ otpCode: "000000" },
+			{
+				otpCode: "000000",
+				recoveryCode: validRecoveryCode,
+			},
 		);
 		expect(failResult.success).toBe(false);
 		if (!failResult.success) {
@@ -149,10 +175,13 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 			await ctx.db.patch(otpId, { codeHash: testHash, attempts: 0 });
 		});
 
-		// 4. 正しいコードでの検証成功と Wrapped MasterKey データの取得
+		// 4. 正しいコード（Recovery Code + OTP）での検証成功と Wrapped MasterKey データの取得
 		const recoveryData = await user.mutation(
 			api.recovery.verifyRecoveryOtpAndGetRecoveryData,
-			{ otpCode: testCode },
+			{
+				otpCode: testCode,
+				recoveryCode: validRecoveryCode,
+			},
 		);
 		expect(recoveryData.success).toBe(true);
 		if (!recoveryData.success)
@@ -282,6 +311,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 		await expect(
 			userFamNoKit.mutation(api.recovery.verifyRecoveryOtpAndGetRecoveryData, {
 				otpCode: "123456",
+				recoveryCode: "DUMMY-CODE",
 			}),
 		).rejects.toThrow("リカバリー情報が見つかりません");
 
@@ -289,7 +319,10 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 		await expect(
 			userFamWithKitNoOtp.mutation(
 				api.recovery.verifyRecoveryOtpAndGetRecoveryData,
-				{ otpCode: "123456" },
+				{
+					otpCode: "123456",
+					recoveryCode: "DUMMY-CODE",
+				},
 			),
 		).rejects.toThrow("認証コードが発行されていないか");
 
@@ -333,6 +366,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 		await expect(
 			userTakahashi.mutation(api.recovery.verifyRecoveryOtpAndGetRecoveryData, {
 				otpCode: "123456",
+				recoveryCode: "DUMMY-CODE",
 			}),
 		).rejects.toThrow("有効期限が切れています");
 	});

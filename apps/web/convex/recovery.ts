@@ -38,6 +38,18 @@ function generate6DigitOtp(): string {
 }
 
 /**
+ * リカバリーコードの正規化（ハイフン・スペース除去、大文字化、誤読文字 O->0, I/L->1 置換）
+ */
+function normalizeRecoveryCode(code: string): string {
+	return code
+		.trim()
+		.toUpperCase()
+		.replace(/[\s-]/g, "")
+		.replace(/[O]/g, "0")
+		.replace(/[IL]/g, "1");
+}
+
+/**
  * リカバリーキット情報の登録 / 再発行（旧Recovery情報の完全上書き）
  */
 export const registerRecoveryKit = familyBoundMutation({
@@ -45,6 +57,7 @@ export const registerRecoveryKit = familyBoundMutation({
 		recoveryMasterKeyEncrypted: v.string(),
 		recoveryMasterKeyIv: v.string(),
 		recoveryMasterKeySalt: v.string(),
+		recoveryCodeHash: v.optional(v.string()),
 		recoveryKdfIterations: v.optional(v.number()),
 		recoveryCryptoVersion: v.optional(v.number()),
 	},
@@ -61,6 +74,7 @@ export const registerRecoveryKit = familyBoundMutation({
 			recoveryMasterKeyEncrypted: args.recoveryMasterKeyEncrypted,
 			recoveryMasterKeyIv: args.recoveryMasterKeyIv,
 			recoveryMasterKeySalt: args.recoveryMasterKeySalt,
+			recoveryCodeHash: args.recoveryCodeHash,
 			recoveryKdfIterations: args.recoveryKdfIterations ?? 300_000,
 			recoveryCryptoVersion: args.recoveryCryptoVersion ?? 1,
 			recoveryIssuedAt: now,
@@ -224,11 +238,12 @@ function generateSessionToken(): string {
 }
 
 /**
- * Email OTP を検証し、一致すれば短命な認可セッショントークンと Wrapped MasterKey 暗号データを返却
+ * Email OTP と Recovery Code を検証し、一致すれば短命な認可セッショントークンと Wrapped MasterKey 暗号データを返却
  */
 export const verifyRecoveryOtpAndGetRecoveryData = authenticatedMutation({
 	args: {
 		otpCode: v.string(),
+		recoveryCode: v.string(),
 	},
 	handler: async (ctx, args) => {
 		const { user } = ctx;
@@ -244,6 +259,19 @@ export const verifyRecoveryOtpAndGetRecoveryData = authenticatedMutation({
 			!family.recoveryMasterKeySalt
 		) {
 			throw new Error("リカバリー情報が見つかりません");
+		}
+
+		// 1. Recovery Code のサーバー側照合（設定されている場合）
+		if (family.recoveryCodeHash) {
+			const normalizedCode = normalizeRecoveryCode(args.recoveryCode);
+			const inputCodeHash = await hashText(normalizedCode);
+			if (inputCodeHash !== family.recoveryCodeHash) {
+				return {
+					success: false as const,
+					error: "リカバリーコードが正しくありません。入力内容をご確認ください。",
+					remainingAttempts: undefined,
+				};
+			}
 		}
 
 		const now = Date.now();

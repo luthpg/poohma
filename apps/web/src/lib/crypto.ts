@@ -410,6 +410,16 @@ export function isValidRecoveryCode(code: string): boolean {
 }
 
 /**
+ * サーバー検証用リカバリーコードのハッシュ（SHA-256 Base64）を計算
+ */
+export async function hashRecoveryCode(code: string): Promise<string> {
+	const normalized = normalizeRecoveryCode(code);
+	const buffer = new TextEncoder().encode(normalized);
+	const digest = await crypto.subtle.digest("SHA-256", buffer);
+	return btoa(String.fromCharCode(...new Uint8Array(digest)));
+}
+
+/**
  * リカバリーコードからキーを導出 (PBKDF2)
  */
 export async function deriveKeyFromRecoveryCode(

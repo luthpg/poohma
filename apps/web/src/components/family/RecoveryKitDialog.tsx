@@ -25,6 +25,7 @@ import {
 	deriveKeyFromRecoveryCode,
 	generateRecoveryCode,
 	generateSalt,
+	hashRecoveryCode,
 	RECOVERY_KDF_ITERATIONS,
 	RECOVERY_KDF_VERSION,
 	wrapMasterKeyWithRecovery,
@@ -137,10 +138,12 @@ export function RecoveryKitDialog({
 			const url = URL.createObjectURL(blob);
 
 			// 5. バックエンドへの登録（PDF生成完了後に旧リカバリー情報の上書き/無効化を実行）
+			const recoveryCodeHash = await hashRecoveryCode(recoveryCode);
 			await registerRecoveryKitMut({
 				recoveryMasterKeyEncrypted: wrapped.encrypted,
 				recoveryMasterKeyIv: wrapped.iv,
 				recoveryMasterKeySalt: recoverySalt,
+				recoveryCodeHash,
 				recoveryKdfIterations: RECOVERY_KDF_ITERATIONS,
 				recoveryCryptoVersion: RECOVERY_KDF_VERSION,
 			});

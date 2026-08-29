@@ -178,6 +178,7 @@ serviceRecords 1 ── * credentials(内包配列)
 | recoveryMasterKeyEncrypted | string(optional) | リカバリーキー由来鍵でラップされたマスターキー（Base64、FR-CRYPT-06）                                       |
 | recoveryMasterKeyIv        | string(optional) | 上記リカバリーラップ処理のIV（Base64）                                                                |
 | recoveryMasterKeySalt      | string(optional) | リカバリーキー鍵導出（PBKDF2）に使うソルト（Base64）                                                   |
+| recoveryCodeHash           | string(optional) | 正規化リカバリーコードのSHA-256ハッシュ（サーバー側検証用、平文コードは非保存）                                  |
 | recoveryKdfIterations      | number(optional) | リカバリーキー鍵導出（PBKDF2）の反復回数（デフォルト300,000）                                         |
 | recoveryCryptoVersion      | number(optional) | リカバリーキー暗号化スキームのバージョン番号（デフォルト1）                                                   |
 | recoveryIssuedAt           | number(optional) | リカバリーキット発行・再発行日時                                                                   |

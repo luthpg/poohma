@@ -13,6 +13,7 @@ export default defineSchema({
     recoveryMasterKeyEncrypted: v.optional(v.string()),
     recoveryMasterKeyIv: v.optional(v.string()),
     recoveryMasterKeySalt: v.optional(v.string()),
+    recoveryCodeHash: v.optional(v.string()), // 正規化リカバリーコードのSHA-256ハッシュ（サーバー検証用）
     recoveryKdfIterations: v.optional(v.number()),
     recoveryCryptoVersion: v.optional(v.number()),
     recoveryIssuedAt: v.optional(v.number()),

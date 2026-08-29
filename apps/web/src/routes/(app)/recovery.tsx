@@ -188,8 +188,11 @@ function RecoveryPageComponent() {
 
 		setIsVerifyingOtp(true);
 		try {
-			// 1. バックエンドで OTP を検証し、Wrapped MasterKey とセッショントークンを取得
-			const res = await verifyRecoveryOtpMut({ otpCode: otp });
+			// 1. バックエンドで OTP と Recovery Code を検証し、Wrapped MasterKey とセッショントークンを取得
+			const res = await verifyRecoveryOtpMut({
+				otpCode: otp,
+				recoveryCode: rawCode,
+			});
 			if (!res.success) {
 				toast.error(res.error);
 				setIsVerifyingOtp(false);

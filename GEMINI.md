@@ -24,11 +24,10 @@
 
 ## 3. Convex Workflow & Code Generation
 
-Convex のスキーマ（`schema.ts`）や関数（`convex/*.ts`）を変更した場合は、以下の手順に従ってプレビュー反映・型定義の生成・フォーマットを行ってください。
+Convex のスキーマ（`schema.ts`）や関数（`convex/*.ts`）を変更した場合は、以下の手順に従って反映・型定義の生成・フォーマットを行ってください。
 
-1. **Deploy to Preview / Cloud**: `pnpm convex:deploy`
-   - Convex プレビュー環境・クラウド環境へスキーマおよび関数をアップロードします。
-2. **Codegen**: `pnpm convex:codegen`
+1. **Development & Sync**: `pnpm convex:dev`（開発環境でのローカル同期）または `pnpm convex:deploy`（プレビュー/ステージング/本番デプロイ）
+2. **Codegen & Format**: `pnpm convex:codegen`
    - `convex codegen` を実行して `apps/web/convex/_generated/` 内の型定義（`api.d.ts`, `dataModel.d.ts` 等）を最新化し、直後に `pnpm check` で自動フォーマットを適用します。
 3. **Verify Pipeline**: `pnpm verify`
    - 型定義更新後、プロジェクト全体の一括品質検証を実行します。
