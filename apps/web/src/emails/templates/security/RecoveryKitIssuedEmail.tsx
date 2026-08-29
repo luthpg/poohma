@@ -8,14 +8,10 @@ const props = v.object({
 	displayName: v.string(),
 	familyName: v.string(),
 	issuerName: v.string(),
-	issuedAt: numberOrTimestampValidator(),
+	issuedAt: v.number(),
 	isReissue: v.boolean(),
 	ctaUrl: v.optional(v.string()),
 });
-
-function numberOrTimestampValidator() {
-	return v.number();
-}
 
 type Props = Infer<typeof props>;
 

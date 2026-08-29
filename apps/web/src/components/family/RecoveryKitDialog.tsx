@@ -123,16 +123,7 @@ export function RecoveryKitDialog({
 				recoveryKey,
 			);
 
-			// 4. バックエンドへの登録（旧リカバリー情報の上書き/無効化）
-			await registerRecoveryKitMut({
-				recoveryMasterKeyEncrypted: wrapped.encrypted,
-				recoveryMasterKeyIv: wrapped.iv,
-				recoveryMasterKeySalt: recoverySalt,
-				recoveryKdfIterations: RECOVERY_KDF_ITERATIONS,
-				recoveryCryptoVersion: RECOVERY_KDF_VERSION,
-			});
-
-			// 5. PDFドキュメントの生成
+			// 4. PDFドキュメントの生成（PDF生成が成功した後にDB登録を行う）
 			const pdfBytes = await generateRecoveryKitPdf({
 				familyName,
 				issuedAt,
@@ -144,6 +135,15 @@ export function RecoveryKitDialog({
 				type: "application/pdf",
 			});
 			const url = URL.createObjectURL(blob);
+
+			// 5. バックエンドへの登録（PDF生成完了後に旧リカバリー情報の上書き/無効化を実行）
+			await registerRecoveryKitMut({
+				recoveryMasterKeyEncrypted: wrapped.encrypted,
+				recoveryMasterKeyIv: wrapped.iv,
+				recoveryMasterKeySalt: recoverySalt,
+				recoveryKdfIterations: RECOVERY_KDF_ITERATIONS,
+				recoveryCryptoVersion: RECOVERY_KDF_VERSION,
+			});
 
 			setGeneratedCode(recoveryCode);
 			setPdfBlob(blob);
@@ -189,8 +189,12 @@ export function RecoveryKitDialog({
 			setTimeout(() => {
 				printWindow.print();
 			}, 500);
+			setHasPrinted(true);
+		} else {
+			toast.error(
+				"印刷ウィンドウを開けませんでした。ポップアップブロックを解除してください。",
+			);
 		}
-		setHasPrinted(true);
 	};
 
 	// Google Drive に保存
@@ -199,7 +203,7 @@ export function RecoveryKitDialog({
 		setIsDriveUploading(true);
 
 		try {
-			const clientId = process.env.VITE_GOOGLE_CLIENT_ID;
+			const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 			if (!clientId) {
 				toast.info(
 					"Google Drive 連携の Client ID が未設定です。ローカル保存をご利用ください。",

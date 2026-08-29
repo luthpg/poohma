@@ -155,13 +155,15 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 			{ otpCode: testCode },
 		);
 		expect(recoveryData.success).toBe(true);
-		if (recoveryData.success) {
-			expect(recoveryData.recoveryMasterKeyEncrypted).toBe(
-				"RecoveryEncryptedKeySuzuki==",
-			);
-			expect(recoveryData.recoveryMasterKeyIv).toBe("RecoveryIvSuzuki==");
-			expect(recoveryData.recoveryMasterKeySalt).toBe("RecoverySaltSuzuki==");
-		}
+		if (!recoveryData.success)
+			throw new Error("Verification failed unexpectedly");
+
+		expect(recoveryData.sessionToken).toBeDefined();
+		expect(recoveryData.recoveryMasterKeyEncrypted).toBe(
+			"RecoveryEncryptedKeySuzuki==",
+		);
+		expect(recoveryData.recoveryMasterKeyIv).toBe("RecoveryIvSuzuki==");
+		expect(recoveryData.recoveryMasterKeySalt).toBe("RecoverySaltSuzuki==");
 
 		// 5. 使用済み OTP レコードが削除されていること
 		const otpAfterSuccess = await t.run(async (ctx) => {
@@ -169,10 +171,21 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 		});
 		expect(otpAfterSuccess).toBeNull();
 
-		// 6. 新しいパスコードでマスターキーを再登録（復旧完了）
+		// 6. 不正なセッショントークンでの復元試行が拒否されること
+		await expect(
+			user.mutation(api.recovery.redeemRecoveryAndRotatePasscode, {
+				sessionToken: "invalid_session_token",
+				masterKeyEncrypted: "NewRedeemedMasterKeyBase64==",
+				masterKeyIv: "NewRedeemedIvBase64==",
+				masterKeySalt: "NewRedeemedSaltBase64==",
+			}),
+		).rejects.toThrow("無効な復元認可セッションです");
+
+		// 7. 正しいセッショントークンで新しいパスコード・マスターキーを再登録（復旧完了）
 		const redeemRes = await user.mutation(
 			api.recovery.redeemRecoveryAndRotatePasscode,
 			{
+				sessionToken: recoveryData.sessionToken,
 				masterKeyEncrypted: "NewRedeemedMasterKeyBase64==",
 				masterKeyIv: "NewRedeemedIvBase64==",
 				masterKeySalt: "NewRedeemedSaltBase64==",
@@ -186,12 +199,23 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 		expect(updatedFamily?.masterKeyEncrypted).toBe(
 			"NewRedeemedMasterKeyBase64==",
 		);
+
+		// 8. 使用済みセッショントークンでの再利用が拒否されること（ワンタイム消費）
+		await expect(
+			user.mutation(api.recovery.redeemRecoveryAndRotatePasscode, {
+				sessionToken: recoveryData.sessionToken,
+				masterKeyEncrypted: "NewRedeemedMasterKeyBase64==",
+				masterKeyIv: "NewRedeemedIvBase64==",
+				masterKeySalt: "NewRedeemedSaltBase64==",
+			}),
+		).rejects.toThrow("無効な復元認可セッションです");
 	});
 
 	it("異常系: 家族未所属、リカバリーキット未発行、期限切れOTP、上限到達時のエラーハンドリング", async () => {
 		const t = convexTest(schema, modules);
 
 		let familyNoKitId!: Id<"families">;
+		let familyWithKitNoOtpId!: Id<"families">;
 
 		await t.run(async (ctx) => {
 			await ctx.db.insert("users", {
@@ -212,6 +236,23 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 				familyId: familyNoKitId,
 				updatedAt: Date.now(),
 			});
+			familyWithKitNoOtpId = await ctx.db.insert("families", {
+				name: "野村家",
+				masterKeyEncrypted: "MasterKeyNomura==",
+				masterKeyIv: "IvNomura==",
+				masterKeySalt: "SaltNomura==",
+				recoveryMasterKeyEncrypted: "RecEncNomura==",
+				recoveryMasterKeyIv: "RecIvNomura==",
+				recoveryMasterKeySalt: "RecSaltNomura==",
+				recoveryIssuedAt: Date.now(),
+				updatedAt: Date.now(),
+			});
+			await ctx.db.insert("users", {
+				userId: "user_fam_with_kit_no_otp",
+				email: "famkitnootp@example.com",
+				familyId: familyWithKitNoOtpId,
+				updatedAt: Date.now(),
+			});
 		});
 
 		const userNoFam = t.withIdentity({
@@ -221,6 +262,10 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 		const userFamNoKit = t.withIdentity({
 			subject: "user_fam_nokit",
 			email: "famnokit@example.com",
+		});
+		const userFamWithKitNoOtp = t.withIdentity({
+			subject: "user_fam_with_kit_no_otp",
+			email: "famkitnootp@example.com",
 		});
 
 		// 家族未所属でのOTP送信
@@ -233,12 +278,20 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 			userFamNoKit.mutation(api.recovery.sendRecoveryOtp, {}),
 		).rejects.toThrow("この家族にはリカバリーキットが発行されていません");
 
-		// OTPレコードが存在しない状態での検証
+		// リカバリーキット未発行状態での検証
 		await expect(
 			userFamNoKit.mutation(api.recovery.verifyRecoveryOtpAndGetRecoveryData, {
 				otpCode: "123456",
 			}),
 		).rejects.toThrow("リカバリー情報が見つかりません");
+
+		// リカバリーキット発行済みだがOTP未発行状態での検証（OTP未存在分岐）
+		await expect(
+			userFamWithKitNoOtp.mutation(
+				api.recovery.verifyRecoveryOtpAndGetRecoveryData,
+				{ otpCode: "123456" },
+			),
+		).rejects.toThrow("認証コードが発行されていないか");
 
 		// 期限切れOTPのテスト
 		let familyWithKitId!: Id<"families">;

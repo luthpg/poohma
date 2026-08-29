@@ -309,15 +309,29 @@ credentials要素：
 
 インデックス: by\_recordId（新しい順に取得しタイムラインを表示）。一定期間分（例：直近50件）を超えたログは、レコード削除時と合わせてバッチで間引く運用を想定。
 
-#### recordEditingSessions（新設、FR-REC-15）
+#### recoveryOtps（FR-CRYPT-07）
 
-| フィールド           | 型                  | 説明         |
-| --------------- | ------------------ | ---------- |
-| recordId        | Id<serviceRecords> | 編集中のレコード   |
-| userId          | string             | 編集中のユーザー   |
-| lastHeartbeatAt | number             | 最終ハートビート日時 |
+| フィールド   | 型                 | 説明                                                     |
+| ------------ | ------------------ | -------------------------------------------------------- |
+| accountId    | Id<users>          | 対象アカウントID                                         |
+| familyId     | Id<families>       | 所属家族グループID                                       |
+| codeHash     | string             | 6桁OTPのSHA-256ハッシュ（平文はサーバー非保持）          |
+| expiresAt    | number             | 有効期限日時（発行から10分）                             |
+| attempts     | number             | 試行回数（最大5回超過で無効化）                          |
+| lastSentAt   | number             | 再送レート制限用タイムスタンプ（60秒インターバル）       |
 
-インデックス: by\_recordId。編集画面を開いている間、クライアントが一定間隔（例：15秒）でハートビートを送信して行を作成・更新し、画面を離れる・一定時間ハートビートが途絶えた場合はレコードを削除する。他メンバーはこのテーブルをConvexのリアクティブクエリで購読し、「編集中」表示に用いる（詳細は9.6）。
+インデックス: by_accountId, by_familyId_accountId
+
+#### recoverySessions（FR-CRYPT-07）
+
+| フィールド        | 型                 | 説明                                                     |
+| ----------------- | ------------------ | -------------------------------------------------------- |
+| accountId         | Id<users>          | 対象アカウントID                                         |
+| familyId          | Id<families>       | 所属家族グループID                                       |
+| sessionTokenHash  | string             | ワンタイム認可セッショントークンのSHA-256ハッシュ       |
+| expiresAt         | number             | 有効期限日時（発行から10分）                             |
+
+インデックス: by_accountId, by_familyId_accountId。OTP検証成功時に一回限りのセッショントークンを発行・記録し、新パスコードによるマスターキー再ラップ実行時に検証・即時消費（削除）する。
 
 ## 5. 認証・認可設計
 
@@ -592,38 +606,42 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
    Compare-And-Swapにより他端末・他メンバーとの同時更新時の競合を防止する）
 5. 実行端末で生体認証が有効な場合は既存PRFシードを用いてローカル暗号化パスコードを更新。
    他の家族メンバーや別端末には通知メールを送信し、次回新パスコードでの解錠と生体認証の再登録を促す
-6. リカバリーキーが発行済みの場合、masterKeyRecoveryEncrypted 等は
+6. リカバリーキーが発行済みの場合、recoveryMasterKeyEncrypted 等は
    同一マスターキーへの別経路のラップであるため、本操作による影響を受けず有効なまま残る
 ```
 
-### 6.6 リカバリーキー（復元コード, FR-CRYPT-06）
+### 6.6 リカバリーキット（復元コード, FR-CRYPT-06, FR-CRYPT-07）
 
 ```
 発行フロー：
-  1. crypto.getRandomValues 等で高エントロピーなリカバリーキー（例：4〜6文字ブロック×5個の英数字）
-     を生成し、画面上に一度だけ表示する（再表示不可。サーバーには平文はもちろん、
-     導出可能な形でも一切送信しない）
-  2. リカバリーキーからHKDF-SHA256でAES-GCM鍵（リカバリーキー導出鍵）を導出
-  3. 展開済みのマスターキーをリカバリーキー導出鍵でwrapし、
-     masterKeyRecoveryEncrypted / masterKeyRecoveryIv としてサーバーへ送信・保存
-  4. リカバリーキーの文字列とQRコード（qrcode.react）をA4印刷用レイアウトのPDF
-     （jsPDF等でクライアントサイド生成）としてダウンロードさせる
-  5. PDF保存後、リカバリーキーの平文はサーバー・アプリのメモリ・IndexedDBからすべて消去され、
-     再表示できないことを画面上で明示する。ダウンロードされたPDFのみが唯一の保管媒体となるため、
-     安全な保管と管理はユーザーの責任範囲であることをUI上で案内する
+  1. crypto.getRandomValues により高エントロピーなリカバリーコード（32文字のCrockford's Base32、4文字×8ブロック）
+     を生成し、画面上に表示する（サーバーには平文はもちろん、導出可能な形でも一切送信しない）
+  2. リカバリーコードと新規ソルトから PBKDF2-SHA256（300,000回）でAES-GCM鍵（リカバリー導出鍵）を導出
+  3. 展開済みのマスターキーをリカバリー導出鍵でwrap
+  4. リカバリーコードとQRコード、発行日時・対象家族名を記載したA4印刷・保管用PDF（pdf-libでクライアントサイド生成）を作成
+  5. PDF生成完了後、Mutation recovery.registerRecoveryKit を呼び出し、
+     recoveryMasterKeyEncrypted / recoveryMasterKeyIv / recoveryMasterKeySalt を更新（旧情報は即時無効化）
+  6. 家族メンバー全員へリカバリーキット発行・再発行通知メールを送信
+  7. ユーザーはPDFダウンロード、印刷、またはGoogle Drive連携により安全に保管する
 
-利用（パスコード忘却時の復旧）フロー：
-  1. 「パスコードを忘れた場合」導線からリカバリーキー入力画面へ
-  2. 入力されたリカバリーキーからリカバリーキー導出鍵を導出
-  3. families.masterKeyRecoveryEncrypted / masterKeyRecoveryIv をunwrapし、マスターキーを復元
-  4. 復元したマスターキーを、新たに入力させたパスコードで再wrapし、6.5と同様の
-     rotatePasscode 相当の処理でmasterKeyEncrypted等を更新する
-     （リカバリーによって同時にパスコードの再設定も完了させる）
+利用（パスコード忘却時の2段階復元）フロー：
+  1. 「パスコードを忘れた場合」導線または /recovery 画面へアクセス
+  2. Step 1: リカバリーコードの入力（手入力、またはPDF/QRコード画像ドラッグ＆ドロップによる自動読み取り）
+  3. Step 2: 登録メールアドレスへ6桁のワンタイムパスワード（OTP）を送信（sendRecoveryOtp）。
+     OTPのSHA-256ハッシュをDBに保存（有効期限10分、試行回数上限5回、60秒再送レート制限）
+  4. Step 3: OTPを入力し、Mutation verifyRecoveryOtpAndGetRecoveryData で検証。
+     OTP検証成功時に短命なワンタイム認可セッショントークン（recoverySessions）を発行し、
+     recoveryMasterKeyEncrypted 等の暗号化データを返却
+  5. クライアント側でリカバリーコードから導出した鍵で recoveryMasterKeyEncrypted をunwrapし、マスターキーを復元
+  6. Step 4: 新しい家族パスコードを入力させ、復元したマスターキーを新パスコード鍵で再wrap。
+     Mutation recovery.redeemRecoveryAndRotatePasscode に認可セッショントークンと共に送信し、
+     認可トークンを原子的消費（削除）した上で masterKeyEncrypted 等を更新
+  7. 家族メンバー全員にパスコード変更通知メールを送信し、復元完了
 
 再発行：
-  - リカバリーキーは使い切り前提とはせず、設定画面から任意のタイミングで再発行できる
-  - 再発行時は、展開済みマスターキーを新しいリカバリーキー由来鍵で再wrapし、
-    masterKeyRecoveryEncrypted等を上書きする（旧リカバリーキーは以後無効になる）
+  - リカバリーキットは家族設定画面から任意のタイミングで再発行できる
+  - 再発行時は、展開済みマスターキーを新しいリカバリーコード由来鍵で再wrapし、
+    recoveryMasterKeyEncrypted 等を上書きする（過去に発行された旧コードは即座に完全失効する）
 ```
 
 ## 7. API設計（Convex Functions一覧）

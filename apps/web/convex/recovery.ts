@@ -209,7 +209,16 @@ export const sendRecoveryOtp = authenticatedMutation({
 });
 
 /**
- * Email OTP を検証し、一致すれば Wrapped MasterKey 暗号データを返却
+ * ランダムな復元セッショントークンを生成 (32バイト hex)
+ */
+function generateSessionToken(): string {
+	const array = new Uint8Array(32);
+	crypto.getRandomValues(array);
+	return Array.from(array, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Email OTP を検証し、一致すれば短命な認可セッショントークンと Wrapped MasterKey 暗号データを返却
  */
 export const verifyRecoveryOtpAndGetRecoveryData = authenticatedMutation({
 	args: {
@@ -277,9 +286,31 @@ export const verifyRecoveryOtpAndGetRecoveryData = authenticatedMutation({
 		// 認証成功: ワンタイムOTPを即時消費（削除）
 		await ctx.db.delete(otpRecord._id);
 
-		// リカバリー用の Wrapped MasterKey 暗号化データを返却
+		// 短命な一回限り復元セッショントークンを発行（有効期限10分）
+		// 既存のセッションがあればクリーンアップ
+		const existingSessions = await ctx.db
+			.query("recoverySessions")
+			.withIndex("by_familyId_accountId", (q) =>
+				q.eq("familyId", user.familyId as Id<"families">).eq("accountId", user._id),
+			)
+			.collect();
+		for (const session of existingSessions) {
+			await ctx.db.delete(session._id);
+		}
+
+		const sessionToken = generateSessionToken();
+		const sessionTokenHash = await hashText(sessionToken);
+		await ctx.db.insert("recoverySessions", {
+			accountId: user._id,
+			familyId: user.familyId,
+			sessionTokenHash,
+			expiresAt: now + OTP_EXPIRY_MS,
+		});
+
+		// リカバリー用の Wrapped MasterKey 暗号化データと認可トークンを返却
 		return {
 			success: true as const,
+			sessionToken,
 			recoveryMasterKeyEncrypted: family.recoveryMasterKeyEncrypted,
 			recoveryMasterKeyIv: family.recoveryMasterKeyIv,
 			recoveryMasterKeySalt: family.recoveryMasterKeySalt,
@@ -290,12 +321,13 @@ export const verifyRecoveryOtpAndGetRecoveryData = authenticatedMutation({
 	},
 });
 
-
 /**
  * リカバリー復元後の新パスコード設定（マスターキーの更新）
+ * 有効な一回限りの認可セッショントークンを検証して消費
  */
 export const redeemRecoveryAndRotatePasscode = familyBoundMutation({
 	args: {
+		sessionToken: v.string(),
 		masterKeyEncrypted: v.string(),
 		masterKeyIv: v.string(),
 		masterKeySalt: v.string(),
@@ -308,6 +340,27 @@ export const redeemRecoveryAndRotatePasscode = familyBoundMutation({
 		if (!family) throw new Error("Family not found");
 
 		const now = Date.now();
+
+		// 認可セッショントークンの検証
+		const tokenHash = await hashText(args.sessionToken.trim());
+		const sessionRecord = await ctx.db
+			.query("recoverySessions")
+			.withIndex("by_familyId_accountId", (q) =>
+				q.eq("familyId", familyId).eq("accountId", user._id),
+			)
+			.first();
+
+		if (!sessionRecord || sessionRecord.sessionTokenHash !== tokenHash) {
+			throw new Error("無効な復元認可セッションです。最初からやり直してください。");
+		}
+
+		if (now > sessionRecord.expiresAt) {
+			await ctx.db.delete(sessionRecord._id);
+			throw new Error("復元認可セッションの有効期限が切れています。最初からやり直してください。");
+		}
+
+		// セッショントークンを即時消費（削除）
+		await ctx.db.delete(sessionRecord._id);
 
 		// 新しいパスコードでラップされたマスターキーで家族レコードを更新
 		await ctx.db.patch(familyId, {

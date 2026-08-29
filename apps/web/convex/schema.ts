@@ -31,6 +31,15 @@ export default defineSchema({
     .index("by_accountId", ["accountId"])
     .index("by_familyId_accountId", ["familyId", "accountId"]),
 
+  recoverySessions: defineTable({
+    accountId: v.id("users"),
+    familyId: v.id("families"),
+    sessionTokenHash: v.string(), // SHA-256 ハッシュ
+    expiresAt: v.number(), // 有効期限（10分）
+  })
+    .index("by_accountId", ["accountId"])
+    .index("by_familyId_accountId", ["familyId", "accountId"]),
+
 
   loginEvents: defineTable({
     accountId: v.id("users"),

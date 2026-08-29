@@ -11,12 +11,16 @@ export interface RecoveryKitPdfParams {
 
 /**
  * pdf-lib の標準フォント (WinAnsi) で描画可能な文字のみに安全にサニタイズ
- * （標準フォントはマルチバイト日本語に対応していないため）
+ * WinAnsi非対応文字（日本語等）のみで構成される場合は指定されたフォールバック文字列を返却
  */
-function sanitizeWinAnsiText(text: string): string {
-	if (!text) return "";
-	// ASCII printable characters (0x20 - 0x7E)
-	return text.replace(/[^\x20-\x7E]/g, "?");
+function sanitizeWinAnsiText(text: string, fallback = ""): string {
+	if (!text) return fallback;
+	// 描画可能な ASCII 文字 (0x20 - 0x7E) が1文字も含まれていない場合はフォールバック
+	const hasAscii = /[\x20-\x7E]/.test(text);
+	if (!hasAscii) return fallback;
+	// ASCII printable 以外の文字を安全な代替文字または除去
+	const sanitized = text.replace(/[^\x20-\x7E]/g, "").trim();
+	return sanitized || fallback;
 }
 
 /**
@@ -83,7 +87,7 @@ export async function generateRecoveryKitPdf({
 		font: fontBold,
 		color: rgb(0.3, 0.35, 0.4),
 	});
-	page.drawText(sanitizeWinAnsiText(familyName) || "Family", {
+	page.drawText(sanitizeWinAnsiText(familyName, "Family"), {
 		x: 170,
 		y: height - 145,
 		size: 11,
@@ -113,7 +117,7 @@ export async function generateRecoveryKitPdf({
 		font: fontBold,
 		color: rgb(0.3, 0.35, 0.4),
 	});
-	page.drawText(sanitizeWinAnsiText(issuerName) || "Family Admin", {
+	page.drawText(sanitizeWinAnsiText(issuerName, "Family Admin"), {
 		x: 170,
 		y: height - 185,
 		size: 10,

@@ -81,6 +81,7 @@ function RecoveryPageComponent() {
 
 	const [recoveredMasterKey, setRecoveredMasterKey] =
 		useState<CryptoKey | null>(null);
+	const [sessionToken, setSessionToken] = useState<string | null>(null);
 	const [newPasscode, setNewPasscode] = useState("");
 	const [newPasscodeConfirm, setNewPasscodeConfirm] = useState("");
 	const [showNewPasscode, setShowNewPasscode] = useState(false);
@@ -187,7 +188,7 @@ function RecoveryPageComponent() {
 
 		setIsVerifyingOtp(true);
 		try {
-			// 1. バックエンドで OTP を検証し、Wrapped MasterKey を取得
+			// 1. バックエンドで OTP を検証し、Wrapped MasterKey とセッショントークンを取得
 			const res = await verifyRecoveryOtpMut({ otpCode: otp });
 			if (!res.success) {
 				toast.error(res.error);
@@ -211,6 +212,7 @@ function RecoveryPageComponent() {
 			);
 
 			setRecoveredMasterKey(unwrappedKey);
+			setSessionToken(res.sessionToken);
 			setStep(3);
 
 			toast.success(
@@ -231,8 +233,8 @@ function RecoveryPageComponent() {
 	// Step 3 -> 完了: 新しいパスコードの設定
 	const handleSetNewPasscode = async (e: React.FormEvent) => {
 		e.preventDefault();
-		if (!recoveredMasterKey) {
-			toast.error("復旧されたマスターキーが見つかりません");
+		if (!recoveredMasterKey || !sessionToken) {
+			toast.error("復旧されたマスターキーまたは認可セッションが見つかりません");
 			return;
 		}
 
@@ -262,8 +264,9 @@ function RecoveryPageComponent() {
 				newPasscodeKey,
 			);
 
-			// バックエンドでパスコード情報を更新
+			// バックエンドでパスコード情報を更新（ワンタイム認可トークンを消費）
 			await redeemRecoveryMut({
+				sessionToken,
 				masterKeyEncrypted: newWrapped.encrypted,
 				masterKeyIv: newWrapped.iv,
 				masterKeySalt: newSalt,

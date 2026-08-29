@@ -62,12 +62,23 @@ export async function loadGoogleScripts(): Promise<boolean> {
 		loadScript(GOOGLE_GIS_SCRIPT_URL),
 	]);
 
-	if (!gapiLoaded || !gisLoaded) return false;
+	if (!gapiLoaded || !gisLoaded || !window.gapi) return false;
 
 	return new Promise<boolean>((resolve) => {
-		window.gapi?.load("picker", () => {
-			resolve(true);
-		});
+		const timeoutId = setTimeout(() => {
+			resolve(false);
+		}, 10000);
+
+		try {
+			window.gapi?.load("picker", () => {
+				clearTimeout(timeoutId);
+				resolve(true);
+			});
+		} catch (error) {
+			clearTimeout(timeoutId);
+			console.error("Failed to load Google Picker:", error);
+			resolve(false);
+		}
 	});
 }
 
@@ -82,19 +93,30 @@ export async function getGoogleAccessToken(
 	}
 
 	return new Promise((resolve) => {
-		const tokenClient = window.google?.accounts?.oauth2?.initTokenClient({
-			client_id: clientId,
-			scope: DRIVE_SCOPE,
-			callback: (response: GoogleTokenResponse) => {
-				if (response.error || !response.access_token) {
-					resolve(null);
-				} else {
-					resolve(response.access_token);
-				}
-			},
-		});
+		const timeoutId = setTimeout(() => {
+			resolve(null);
+		}, 60000); // 60秒でタイムアウト
 
-		tokenClient?.requestAccessToken({ prompt: "consent" });
+		try {
+			const tokenClient = window.google?.accounts?.oauth2?.initTokenClient({
+				client_id: clientId,
+				scope: DRIVE_SCOPE,
+				callback: (response: GoogleTokenResponse) => {
+					clearTimeout(timeoutId);
+					if (response.error || !response.access_token) {
+						resolve(null);
+					} else {
+						resolve(response.access_token);
+					}
+				},
+			});
+
+			tokenClient?.requestAccessToken({ prompt: "consent" });
+		} catch (error) {
+			clearTimeout(timeoutId);
+			console.error("Failed to initialize Google token client:", error);
+			resolve(null);
+		}
 	});
 }
 
