@@ -135,12 +135,11 @@ function FamilyComponent() {
 			if (auth) await signOut(auth);
 			await logout();
 			clearQueryCache();
-			await queryClient.invalidateQueries({ queryKey: ["authUser"] });
-			queryClient.setQueryData(["authUser"], null);
-			await router.invalidate();
-			await router.navigate({ to: "/" });
-		} catch (_error) {
-			toast.error("ログアウトに失敗しました");
+			queryClient.clear();
+			window.location.href = "/";
+		} catch (error) {
+			console.error("Logout failed:", error);
+			window.location.href = "/";
 		}
 	};
 	const createFamilyInviteMut = useMutation(api.families.createFamilyInvite);

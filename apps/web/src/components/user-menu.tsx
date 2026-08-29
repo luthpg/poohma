@@ -1,4 +1,4 @@
-﻿import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useRouter } from "@tanstack/react-router";
 import { useConvex, useMutation } from "convex/react";
 import { signOut } from "firebase/auth";
@@ -94,12 +94,11 @@ export function UserMenu({
 			if (auth) await signOut(auth);
 			await logout();
 			clearQueryCache();
-			await queryClient.invalidateQueries({ queryKey: ["authUser"] });
-			queryClient.setQueryData(["authUser"], null);
-			await router.invalidate();
-			await router.navigate({ to: "/" });
-		} catch (_error) {
-			toast.error("ログアウトに失敗しました");
+			queryClient.clear();
+			window.location.href = "/";
+		} catch (error) {
+			console.error("Logout failed:", error);
+			window.location.href = "/";
 		}
 	};
 
