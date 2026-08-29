@@ -18,6 +18,7 @@ import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
+import { AccountSwitcher } from "@/components/AccountSwitcher";
 import { usePasscode } from "@/components/PasscodeProvider";
 import { PasscodeStrengthMeter } from "@/components/PasscodeStrengthMeter";
 import { Separator } from "@/components/ui/separator";
@@ -105,7 +106,7 @@ function FamilyPending() {
 
 function FamilyComponent() {
 	const { isAuthenticated } = useConvexAuth();
-	const { activeAccountId, activeAccount, accounts } = useAccount();
+	const { activeAccountId, activeAccount } = useAccount();
 	const family = useQuery(
 		api.families.getFamilyMembers,
 		isAuthenticated ? { accountId: activeAccountId || undefined } : "skip",
@@ -738,17 +739,20 @@ function FamilyComponent() {
 	if (!family && myJoinRequest) {
 		return (
 			<div className="mx-auto max-w-3xl p-6">
-				<div className="mb-8 flex items-center justify-between">
-					<h1 className="text-[32px] font-semibold tracking-geist-h1 text-foreground">
+				<div className="mb-6 sm:mb-8 flex flex-wrap items-center justify-between gap-3">
+					<h1 className="text-[26px] sm:text-[32px] font-semibold tracking-geist-h1 text-foreground">
 						家族管理
 					</h1>
-					<button
-						type="button"
-						onClick={handleLogout}
-						className="rounded-md bg-card px-4 py-2 text-[14px] font-medium text-red-500 shadow-border hover:bg-accent transition cursor-pointer"
-					>
-						ログアウト
-					</button>
+					<div className="flex items-center gap-2 sm:gap-3 ml-auto shrink-0">
+						<AccountSwitcher />
+						<button
+							type="button"
+							onClick={handleLogout}
+							className="rounded-md bg-card px-3.5 py-1.5 sm:px-4 sm:py-2 text-[13px] sm:text-[14px] font-medium text-red-500 shadow-border hover:bg-accent transition cursor-pointer"
+						>
+							ログアウト
+						</button>
+					</div>
 				</div>
 
 				{myJoinRequest.status === "pending" && (
@@ -926,17 +930,20 @@ function FamilyComponent() {
 	if (family && isChangingFamily && myJoinRequest?.status === "approved") {
 		return (
 			<div className="mx-auto max-w-3xl p-6">
-				<div className="mb-8 flex items-center justify-between">
-					<h1 className="text-[32px] font-semibold tracking-geist-h1 text-foreground">
+				<div className="mb-6 sm:mb-8 flex flex-wrap items-center justify-between gap-3">
+					<h1 className="text-[26px] sm:text-[32px] font-semibold tracking-geist-h1 text-foreground">
 						家族管理
 					</h1>
-					<button
-						type="button"
-						onClick={() => setIsChangingFamily(false)}
-						className="text-[14px] px-3 py-1 bg-background rounded-md border shadow-sm text-foreground hover:bg-accent transition"
-					>
-						キャンセル
-					</button>
+					<div className="flex items-center gap-2 sm:gap-3 ml-auto shrink-0">
+						<AccountSwitcher />
+						<button
+							type="button"
+							onClick={() => setIsChangingFamily(false)}
+							className="text-[13px] sm:text-[14px] px-3 py-1.5 bg-background rounded-md border shadow-sm text-foreground hover:bg-accent transition cursor-pointer"
+						>
+							キャンセル
+						</button>
+					</div>
 				</div>
 
 				<div className="rounded-lg bg-card p-6 shadow-card transition-shadow">
@@ -1018,26 +1025,29 @@ function FamilyComponent() {
 
 	return (
 		<div className="mx-auto max-w-3xl p-6">
-			<div className="mb-8 flex items-center justify-between">
-				<h1 className="text-[32px] font-semibold tracking-geist-h1 text-foreground">
+			<div className="mb-6 sm:mb-8 flex flex-wrap items-center justify-between gap-3">
+				<h1 className="text-[26px] sm:text-[32px] font-semibold tracking-geist-h1 text-foreground">
 					家族管理
 				</h1>
-				{family ? (
-					<Link
-						to="/dashboard"
-						className="rounded-md bg-card px-4 py-2 text-[14px] font-medium text-foreground shadow-border hover:bg-accent transition"
-					>
-						ダッシュボードへ
-					</Link>
-				) : (
-					<button
-						type="button"
-						onClick={handleLogout}
-						className="rounded-md bg-card px-4 py-2 text-[14px] font-medium text-red-500 shadow-border hover:bg-accent transition cursor-pointer"
-					>
-						ログアウト
-					</button>
-				)}
+				<div className="flex items-center gap-2 sm:gap-3 ml-auto shrink-0">
+					<AccountSwitcher />
+					{family ? (
+						<Link
+							to="/dashboard"
+							className="rounded-md bg-card px-3.5 py-1.5 sm:px-4 sm:py-2 text-[13px] sm:text-[14px] font-medium text-foreground shadow-border hover:bg-accent transition"
+						>
+							ダッシュボードへ
+						</Link>
+					) : (
+						<button
+							type="button"
+							onClick={handleLogout}
+							className="rounded-md bg-card px-3.5 py-1.5 sm:px-4 sm:py-2 text-[13px] sm:text-[14px] font-medium text-red-500 shadow-border hover:bg-accent transition cursor-pointer"
+						>
+							ログアウト
+						</button>
+					)}
+				</div>
 			</div>
 
 			{family && !isChangingFamily ? (
@@ -1650,22 +1660,20 @@ function FamilyComponent() {
 					)}
 
 					{/* 操作対象アカウントの明示 */}
-					<div className="rounded-lg border border-border bg-card p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+					<div className="rounded-lg border border-border bg-card p-3 sm:p-4 flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 text-xs">
 						<div className="flex items-center gap-2 min-w-0">
 							<span className="text-muted-foreground shrink-0">
 								操作対象アカウント:
 							</span>
-							<span className="font-semibold text-foreground truncate">
+							<span className="font-semibold text-foreground truncate max-w-[140px] sm:max-w-none">
 								{activeAccount?.displayName ||
 									activeAccount?.name ||
 									"アカウント"}
 							</span>
 						</div>
-						{accounts.length > 1 && (
-							<span className="text-muted-foreground text-[11px] shrink-0">
-								※別のアカウントで操作する場合は、ヘッダーのアカウントメニューから切り替えてください
-							</span>
-						)}
+						<div className="flex items-center gap-2 ml-auto shrink-0">
+							<AccountSwitcher />
+						</div>
 					</div>
 
 					<div className="grid gap-6 md:grid-cols-2">
