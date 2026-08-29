@@ -1,5 +1,6 @@
 import jsQR from "jsqr";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import QRCode from "qrcode";
 import { isValidRecoveryCode, normalizeRecoveryCode } from "./crypto";
 
 export interface RecoveryKitPdfParams {
@@ -33,6 +34,13 @@ export async function generateRecoveryKitPdf({
 	recoveryCode,
 }: RecoveryKitPdfParams): Promise<Uint8Array> {
 	const pdfDoc = await PDFDocument.create();
+
+	// PDF メタデータの設定（ファイル直接アップロード時の安全・確実な復元用）
+	pdfDoc.setTitle("PoohMa - Emergency Recovery Kit");
+	pdfDoc.setAuthor("PoohMa");
+	pdfDoc.setSubject(recoveryCode);
+	pdfDoc.setKeywords([recoveryCode, "PoohMa", "RecoveryKit", "E2EE"]);
+
 	// A4 サイズ: 595.28 x 841.89 pt
 	const page = pdfDoc.addPage([595.28, 841.89]);
 	const { width, height } = page.getSize();
@@ -144,23 +152,54 @@ export async function generateRecoveryKitPdf({
 		borderWidth: 1.5,
 	});
 
+	// QR コード画像の生成と埋め込み
+	try {
+		const qrDataUrl = await QRCode.toDataURL(recoveryCode, {
+			margin: 1,
+			errorCorrectionLevel: "M",
+			width: 180,
+			color: {
+				dark: "#1e293b",
+				light: "#f8fafc",
+			},
+		});
+		// DataURL からバイナリデータを取得して埋め込み
+		const base64Data = qrDataUrl.split(",")[1];
+		if (base64Data) {
+			const binaryString = atob(base64Data);
+			const bytes = new Uint8Array(binaryString.length);
+			for (let i = 0; i < binaryString.length; i++) {
+				bytes[i] = binaryString.charCodeAt(i);
+			}
+			const qrImage = await pdfDoc.embedPng(bytes);
+			page.drawImage(qrImage, {
+				x: width - 50 - 95 - 10,
+				y: height - 362,
+				width: 95,
+				height: 95,
+			});
+		}
+	} catch (err) {
+		console.error("Failed to generate QR code for PDF:", err);
+	}
+
 	// リカバリーコードを2行に分けて描画（各16文字/4グループ）
 	const chunks = recoveryCode.split("-");
 	const line1 = chunks.slice(0, 4).join("-");
 	const line2 = chunks.slice(4, 8).join("-");
 
 	page.drawText(line1, {
-		x: 75,
+		x: 70,
 		y: height - 295,
-		size: 20,
+		size: 17,
 		font: fontMono,
 		color: rgb(0.05, 0.1, 0.2),
 	});
 
 	page.drawText(line2, {
-		x: 75,
+		x: 70,
 		y: height - 335,
-		size: 20,
+		size: 17,
 		font: fontMono,
 		color: rgb(0.05, 0.1, 0.2),
 	});
@@ -200,39 +239,38 @@ export async function generateRecoveryKitPdf({
 		y: curY - 95,
 		width: width - 100,
 		height: 95,
-		color: rgb(1.0, 0.97, 0.95),
-		borderColor: rgb(0.95, 0.6, 0.4),
+		color: rgb(1, 0.97, 0.95),
+		borderColor: rgb(0.95, 0.8, 0.7),
 		borderWidth: 1,
 	});
 
 	page.drawText("CRITICAL SECURITY NOTICE", {
 		x: 70,
-		y: curY - 22,
+		y: curY - 25,
 		size: 10.5,
 		font: fontBold,
 		color: rgb(0.75, 0.25, 0.1),
 	});
 
-	const warnings = [
-		"- This Recovery Kit is the ONLY rescue method if you lose your Family Passcode.",
-		"- PoohMa servers DO NOT store this Recovery Code and cannot recover your data for you.",
-		"- Store this document in a secure physical location (e.g. fireproof safe) or encrypted drive.",
-		"- Never share this code with anyone. PoohMa staff will NEVER ask for your Recovery Code.",
+	const notices = [
+		"- This document is the ONLY way to recover your vault if you forget your Family Passcode.",
+		"- PoohMa uses Zero-Knowledge encryption. Customer Support CANNOT recover your data.",
+		"- Store this document in a safe physical location or an encrypted cloud drive.",
 	];
 
-	let warnY = curY - 40;
-	for (const w of warnings) {
-		page.drawText(w, {
+	let noticeY = curY - 45;
+	for (const notice of notices) {
+		page.drawText(notice, {
 			x: 70,
-			y: warnY,
+			y: noticeY,
 			size: 8.5,
 			font: fontRegular,
 			color: rgb(0.4, 0.2, 0.15),
 		});
-		warnY -= 14;
+		noticeY -= 16;
 	}
 
-	// フッター
+	// フッター区切り線
 	page.drawLine({
 		start: { x: 50, y: 50 },
 		end: { x: width - 50, y: 50 },
@@ -276,12 +314,39 @@ export function extractRecoveryCodeFromImageData(
 }
 
 /**
- * 画像ファイル（File）から QR コードを読み取り
+ * アップロードされたファイル（PDF または 画像）から Recovery Code を抽出
  */
 export async function extractRecoveryCodeFromFile(
 	file: File,
 ): Promise<string | null> {
-	if (typeof window === "undefined") return null;
+	// 1. PDF ファイルの場合: メタデータから高速・確実に抽出
+	const isPdf =
+		file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+	if (isPdf) {
+		try {
+			const arrayBuffer = await file.arrayBuffer();
+			const pdfDoc = await PDFDocument.load(arrayBuffer);
+			const subject = pdfDoc.getSubject();
+			if (subject && isValidRecoveryCode(subject)) {
+				return normalizeRecoveryCode(subject);
+			}
+			const keywords = pdfDoc.getKeywords();
+			if (keywords) {
+				for (const kw of keywords) {
+					if (isValidRecoveryCode(kw)) {
+						return normalizeRecoveryCode(kw);
+					}
+				}
+			}
+		} catch (err) {
+			console.warn("Failed to extract code from PDF metadata:", err);
+		}
+	}
+
+	// 2. 画像ファイル（またはメタデータが取得できないPDF）: 画像として QR コードを解析
+	if (typeof window === "undefined" || typeof Image === "undefined") {
+		return null;
+	}
 
 	return new Promise((resolve) => {
 		const img = new Image();
