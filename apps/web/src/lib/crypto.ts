@@ -261,3 +261,91 @@ export async function unwrapDEK(
 		["encrypt", "decrypt"],
 	);
 }
+
+export interface ReEncryptCredentialInput {
+	recordId?: string;
+	id: string;
+	passwordHint: string;
+	passwordHintIv: string;
+	passwordHintDekEncrypted?: string;
+	passwordHintDekIv?: string;
+}
+
+export interface ReEncryptRecordInput {
+	_id?: string;
+	id?: string;
+	credentials: {
+		id: string;
+		passwordHint: string;
+		passwordHintIv: string;
+		passwordHintDekEncrypted?: string;
+		passwordHintDekIv?: string;
+	}[];
+}
+
+export interface ReEncryptedCredentialOutput {
+	recordId?: string;
+	id: string;
+	passwordHint: string;
+	passwordHintIv: string;
+	passwordHintDekEncrypted: string;
+	passwordHintDekIv: string;
+}
+
+/**
+ * 単一のクレデンシャルの DEK を旧マスターキーで復号し、新マスターキーで再ラップする
+ */
+export async function reWrapCredential(
+	cred: ReEncryptCredentialInput,
+	oldMasterKey: CryptoKey,
+	newMasterKey: CryptoKey,
+): Promise<ReEncryptedCredentialOutput> {
+	if (!cred.passwordHintDekEncrypted || !cred.passwordHintDekIv) {
+		throw new Error(
+			`Credential (id: ${cred.id}) is missing DEK information for re-wrapping`,
+		);
+	}
+
+	const dek = await unwrapDEK(
+		cred.passwordHintDekEncrypted,
+		cred.passwordHintDekIv,
+		oldMasterKey,
+	);
+	const dekWrapped = await wrapDEK(dek, newMasterKey);
+
+	return {
+		recordId: cred.recordId,
+		id: cred.id,
+		passwordHint: cred.passwordHint,
+		passwordHintIv: cred.passwordHintIv,
+		passwordHintDekEncrypted: dekWrapped.encrypted,
+		passwordHintDekIv: dekWrapped.iv,
+	};
+}
+
+/**
+ * 移行対象レコード群の全クレデンシャルの DEK を旧マスターキーで復号し、新マスターキーで再ラップする
+ */
+export async function reEncryptCredentials(
+	records: ReEncryptRecordInput[],
+	oldMasterKey: CryptoKey,
+	newMasterKey: CryptoKey,
+): Promise<ReEncryptedCredentialOutput[]> {
+	const reEncryptedCredentials: ReEncryptedCredentialOutput[] = [];
+
+	for (const record of records) {
+		const recordId = record._id ?? record.id;
+		for (const cred of record.credentials) {
+			if (cred.passwordHint && cred.passwordHintIv) {
+				const result = await reWrapCredential(
+					{ ...cred, recordId },
+					oldMasterKey,
+					newMasterKey,
+				);
+				reEncryptedCredentials.push(result);
+			}
+		}
+	}
+
+	return reEncryptedCredentials;
+}

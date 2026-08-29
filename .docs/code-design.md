@@ -461,6 +461,7 @@ decryptHint/encryptHint 側でマスターキー直接暗号化にフォール�
 | generateMasterKey() / generateDEK()         | AES-GCM鍵の新規生成                                                                         |
 | wrapMasterKey / unwrapMasterKey             | マスターキーのラップ／アンラップ                                                                    |
 | wrapDEK / unwrapDEK                         | DEKのラップ／アンラップ（マスターキーで）                                                                |
+| reWrapCredential / reEncryptCredentials     | 移行時のDEK再暗号化（旧マスターキーでアンラップし、新マスターキーで再ラップ）                                            |
 | encrypt / decrypt                           | AES-GCMによる汎用の暗号化／復号（IV自動生成）                                                           |
 | generateSalt                                | PBKDF2用ソルトの生成                                                                         |
 | evaluatePasscodeStrength(passcode)          | `@zxcvbn-ts` を用いたパスコード強度判定（最低10文字、zxcvbnスコア2以上、推測耐性チェック）                           |
@@ -513,11 +514,9 @@ decryptHint/encryptHint 側でマスターキー直接暗号化にフォール�
 2. getMigrationForEncryption Query
    - 対象レコードの暗号化済みDEK・パスワードヒント・IV一覧をクライアントへ返却
 
-3. クライアント側の再暗号化処理 (family.tsx)
-   - DEKが存在する認証情報：旧マスターキーでDEKをunwrap → 新マスターキーでDEKを再wrap
+3. クライアント側の再暗号化処理 (family.tsx - reEncryptCredentials)
+   - 旧マスターキーで各DEKをunwrap → 新マスターキーで各DEKを再wrap
      （パスワードヒント本体は再暗号化不要、DEKの付け替えのみ）
-   - DEKが存在しない旧形式：旧マスターキーで直接ヒントを復号 → 新DEK生成 →
-     新DEKでヒントを再暗号化 → 新マスターキーでDEKをwrap
 
 4. commitFamilyMigration Mutation（NFR-AVAIL-03/04対応：バッチ分割・楽観的ロック）
    - 再暗号化済みcredentialsを、1回あたり20〜50件程度のバッチに分割して複数回のMutation呼び出しで送信する
@@ -979,7 +978,6 @@ cleanupExpiredMigrationsInternal:
 
 ## 17. 今後の課題（技術的観点）
 
-- DEKを持たない旧形式credentialへのフォールバック処理（マスターキー直接暗号化）の将来的な廃止・移行計画。
 - 家族移行のPREPARED状態が複数端末から同時実行された場合の競合制御（現状は同一ユーザーの既存PREPAREDを都度EXPIRED化する方式）。
 - オフラインキャッシュ（1.1）は読み取り専用として設計しているため、オフライン中の書き込み操作（新規登録・編集等）に対応する場合は、書き込みキューイングと競合解決（9.6の楽観的ロックとの整合）の設計が別途必要になる。
 - 複数家族（マルチ・ワークスペース）対応：要件定義書10章の検討課題のとおり、現行は1ユーザー1家族グループ（users.familyIdが単一値）を前提としたスキーマ・認可設計（5.3のfamilyBoundQuery/Mutation等）となっている。対応する場合はusersテーブルの家族所属を配列化し、家族切替時にどのfamilyIdをコンテキストとして扱うか（アクティブ家族の概念）を含めた設計見直しが必要。

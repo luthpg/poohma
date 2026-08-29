@@ -8,6 +8,8 @@ import {
 	generateDEK,
 	generateMasterKey,
 	LEGACY_PBKDF2_ITERATIONS,
+	reEncryptCredentials,
+	reWrapCredential,
 	unwrapDEK,
 	unwrapMasterKey,
 	wrapDEK,
@@ -448,6 +450,178 @@ describe("1.1 暗号化コアロジックの単体テスト (src/lib/crypto.ts)"
 			await expect(
 				unwrapMasterKey(newWrapped.encrypted, newWrapped.iv, oldWrappingKey),
 			).rejects.toThrow();
+		});
+	});
+
+	/**
+	 * 1.1.7 再暗号化共通関数 (reWrapCredential / reEncryptCredentials)
+	 */
+	describe("1.1.7 再暗号化共通関数 (reWrapCredential / reEncryptCredentials)", () => {
+		it("reWrapCredential: 単一クレデンシャルが新マスターキーで正しく再ラップされ、暗号文を維持したまま新キーで復号できること", async () => {
+			const oldMasterKey = await generateMasterKey();
+			const newMasterKey = await generateMasterKey();
+
+			// 元データの生成
+			const dek = await generateDEK();
+			const { encrypted: passwordHint, iv: passwordHintIv } = await encrypt(
+				SECRET_HINT_DATA,
+				dek,
+			);
+			const wrappedDekOld = await wrapDEK(dek, oldMasterKey);
+
+			const input = {
+				recordId: "record-1",
+				id: "cred-1",
+				passwordHint,
+				passwordHintIv,
+				passwordHintDekEncrypted: wrappedDekOld.encrypted,
+				passwordHintDekIv: wrappedDekOld.iv,
+			};
+
+			// 再ラップ実行
+			const result = await reWrapCredential(input, oldMasterKey, newMasterKey);
+
+			// 検証: IDや暗号文自体は変更されていないこと
+			expect(result.recordId).toBe("record-1");
+			expect(result.id).toBe("cred-1");
+			expect(result.passwordHint).toBe(passwordHint);
+			expect(result.passwordHintIv).toBe(passwordHintIv);
+			expect(result.passwordHintDekEncrypted).toBeDefined();
+			expect(result.passwordHintDekIv).toBeDefined();
+
+			// 新マスターキーで DEK がアンラップでき、平文が復号できること
+			const unwrappedDek = await unwrapDEK(
+				result.passwordHintDekEncrypted,
+				result.passwordHintDekIv,
+				newMasterKey,
+			);
+			const decrypted = await decrypt(
+				result.passwordHint,
+				result.passwordHintIv,
+				unwrappedDek,
+			);
+			expect(decrypted).toBe(SECRET_HINT_DATA);
+
+			// 旧マスターキーでは新しくラップされた DEK をアンラップできないこと
+			await expect(
+				unwrapDEK(
+					result.passwordHintDekEncrypted,
+					result.passwordHintDekIv,
+					oldMasterKey,
+				),
+			).rejects.toThrow();
+		});
+
+		it("reWrapCredential: DEK情報が欠落している場合はエラーをスローすること（DEKなしパターンの廃止検証）", async () => {
+			const oldMasterKey = await generateMasterKey();
+			const newMasterKey = await generateMasterKey();
+
+			const inputWithoutDek = {
+				id: "cred-no-dek",
+				passwordHint: "some-hint",
+				passwordHintIv: "some-iv",
+			};
+
+			await expect(
+				reWrapCredential(inputWithoutDek, oldMasterKey, newMasterKey),
+			).rejects.toThrow(
+				"Credential (id: cred-no-dek) is missing DEK information for re-wrapping",
+			);
+		});
+
+		it("reEncryptCredentials: 複数レコード・複数クレデンシャルの一括再ラップが正しく動作し、暗号化情報のないクレデンシャルはスキップされること", async () => {
+			const oldMasterKey = await generateMasterKey();
+			const newMasterKey = await generateMasterKey();
+
+			// レコード1: 2件の暗号化クレデンシャル
+			const dek1 = await generateDEK();
+			const enc1 = await encrypt("hint-record1-cred1", dek1);
+			const wrap1 = await wrapDEK(dek1, oldMasterKey);
+
+			const dek2 = await generateDEK();
+			const enc2 = await encrypt("hint-record1-cred2", dek2);
+			const wrap2 = await wrapDEK(dek2, oldMasterKey);
+
+			// レコード2: 1件の暗号化クレデンシャル + 1件の空クレデンシャル（パスワードヒントなし）
+			const dek3 = await generateDEK();
+			const enc3 = await encrypt("hint-record2-cred1", dek3);
+			const wrap3 = await wrapDEK(dek3, oldMasterKey);
+
+			const recordsInput = [
+				{
+					_id: "rec-1",
+					credentials: [
+						{
+							id: "c1",
+							passwordHint: enc1.encrypted,
+							passwordHintIv: enc1.iv,
+							passwordHintDekEncrypted: wrap1.encrypted,
+							passwordHintDekIv: wrap1.iv,
+						},
+						{
+							id: "c2",
+							passwordHint: enc2.encrypted,
+							passwordHintIv: enc2.iv,
+							passwordHintDekEncrypted: wrap2.encrypted,
+							passwordHintDekIv: wrap2.iv,
+						},
+					],
+				},
+				{
+					id: "rec-2", // _id ではなく id プロパティの場合
+					credentials: [
+						{
+							id: "c3",
+							passwordHint: enc3.encrypted,
+							passwordHintIv: enc3.iv,
+							passwordHintDekEncrypted: wrap3.encrypted,
+							passwordHintDekIv: wrap3.iv,
+						},
+						{
+							id: "c4-empty",
+							passwordHint: "",
+							passwordHintIv: "",
+						},
+					],
+				},
+			];
+
+			const results = await reEncryptCredentials(
+				recordsInput,
+				oldMasterKey,
+				newMasterKey,
+			);
+
+			// c4-empty はスキップされ、合計3件になること
+			expect(results).toHaveLength(3);
+
+			// 各クレデンシャルの検証
+			const [res1, res2, res3] = results;
+			expect(res1?.recordId).toBe("rec-1");
+			expect(res1?.id).toBe("c1");
+			expect(res2?.recordId).toBe("rec-1");
+			expect(res2?.id).toBe("c2");
+			expect(res3?.recordId).toBe("rec-2");
+			expect(res3?.id).toBe("c3");
+
+			// 新マスターキーで各平文が正常に復号できること
+			for (const [res, expectedPlain] of [
+				[res1, "hint-record1-cred1"],
+				[res2, "hint-record1-cred2"],
+				[res3, "hint-record2-cred1"],
+			] as const) {
+				const unwrappedDek = await unwrapDEK(
+					res.passwordHintDekEncrypted,
+					res.passwordHintDekIv,
+					newMasterKey,
+				);
+				const plain = await decrypt(
+					res.passwordHint,
+					res.passwordHintIv,
+					unwrappedDek,
+				);
+				expect(plain).toBe(expectedPlain);
+			}
 		});
 	});
 });

@@ -1,4 +1,4 @@
-﻿import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useConvex, useConvexAuth, useMutation, useQuery } from "convex/react";
 import { signOut } from "firebase/auth";
 import { Check, Eye, EyeOff, X } from "lucide-react";
@@ -23,16 +23,13 @@ import {
 	CURRENT_KDF_ITERATIONS,
 	CURRENT_KDF_VERSION,
 	deriveKeyFromPasscode,
-	encrypt,
-	generateDEK,
 	generateMasterKey,
 	generateSalt,
 	type KdfVersion,
 	LEGACY_KDF_VERSION,
 	LEGACY_PBKDF2_ITERATIONS,
-	unwrapDEK,
+	reEncryptCredentials,
 	unwrapMasterKey,
-	wrapDEK,
 	wrapMasterKey,
 } from "@/lib/crypto";
 import { logout } from "@/services/auth.functions";
@@ -249,7 +246,7 @@ function FamilyComponent() {
 	const [showNewPasscode, setShowNewPasscode] = useState(false);
 	const [showNewPasscodeConfirm, setShowNewPasscodeConfirm] = useState(false);
 
-	const { getMasterKey, requireUnlock, decryptHint, unlock } = usePasscode();
+	const { getMasterKey, requireUnlock, unlock } = usePasscode();
 	const [isChangingFamily, setIsChangingFamily] = useState(
 		!!search.inviteCode && family !== undefined && family !== null,
 	);
@@ -289,10 +286,8 @@ function FamilyComponent() {
 		setIsLoading(true);
 		let currentMigrationId: Id<"familyMigrations"> | null = null;
 		try {
-			const hasSourceFamily = !!family;
-
-			// 1. 旧家族がある場合のみ旧マスターキーを解除
-			if (hasSourceFamily && !getMasterKey()) {
+			// 1. 旧マスターキーが未解除の場合は解除を要求
+			if (!getMasterKey()) {
 				const unlocked = await requireUnlock();
 				if (!unlocked) {
 					setIsLoading(false);
@@ -335,80 +330,20 @@ function FamilyComponent() {
 				wrappingKey,
 			);
 
-			// 4. 所有するレコードの暗号化対象を取得
+			// 4. 所有するレコードの暗号化対象を取得し再ラップ
 			const migrationData = await convex.query(
 				api.families.getMigrationForEncryption,
 				{ migrationId },
 			);
-			const reEncryptedCredentials: {
-				recordId?: string;
-				id: string;
-				passwordHint: string;
-				passwordHintIv: string;
-				passwordHintDekEncrypted?: string;
-				passwordHintDekIv?: string;
-			}[] = [];
-
-			for (const record of migrationData.records) {
-				for (const cred of record.credentials) {
-					if (cred.passwordHint && cred.passwordHintIv) {
-						if (
-							hasSourceFamily &&
-							cred.passwordHintDekEncrypted &&
-							cred.passwordHintDekIv
-						) {
-							// 旧家族あり: 旧マスターキーで DEK をアンラップし、新マスターキーで再ラップ
-							const oldMasterKey = getMasterKey();
-							if (!oldMasterKey)
-								throw new Error("旧マスターキーが利用できません");
-							const dek = await unwrapDEK(
-								cred.passwordHintDekEncrypted,
-								cred.passwordHintDekIv,
-								oldMasterKey,
-							);
-							const dekWrapped = await wrapDEK(dek, newMasterKey);
-							reEncryptedCredentials.push({
-								recordId: record._id,
-								id: cred.id,
-								passwordHint: cred.passwordHint,
-								passwordHintIv: cred.passwordHintIv,
-								passwordHintDekEncrypted: dekWrapped.encrypted,
-								passwordHintDekIv: dekWrapped.iv,
-							});
-						} else if (hasSourceFamily) {
-							// 旧家族あり・DEK なし: 旧パスコードで復号し新 DEK で暗号化
-							const plainHint = await decryptHint(
-								cred.passwordHint,
-								cred.passwordHintIv,
-							);
-							const dek = await generateDEK();
-							const { encrypted, iv } = await encrypt(plainHint, dek);
-							const dekWrapped = await wrapDEK(dek, newMasterKey);
-							reEncryptedCredentials.push({
-								recordId: record._id,
-								id: cred.id,
-								passwordHint: encrypted,
-								passwordHintIv: iv,
-								passwordHintDekEncrypted: dekWrapped.encrypted,
-								passwordHintDekIv: dekWrapped.iv,
-							});
-						} else {
-							// 家族未所属: 旧マスターキーなし、新 DEK で暗号化
-							const dek = await generateDEK();
-							const { encrypted, iv } = await encrypt(cred.passwordHint, dek);
-							const dekWrapped = await wrapDEK(dek, newMasterKey);
-							reEncryptedCredentials.push({
-								recordId: record._id,
-								id: cred.id,
-								passwordHint: encrypted,
-								passwordHintIv: iv,
-								passwordHintDekEncrypted: dekWrapped.encrypted,
-								passwordHintDekIv: dekWrapped.iv,
-							});
-						}
-					}
-				}
+			const oldMasterKey = getMasterKey();
+			if (!oldMasterKey) {
+				throw new Error("旧マスターキーが利用できません");
 			}
+			const reEncryptedCredentials = await reEncryptCredentials(
+				migrationData.records,
+				oldMasterKey,
+				newMasterKey,
+			);
 
 			// 5. commit
 			await commitFamilyMigrationMut({
@@ -442,12 +377,10 @@ function FamilyComponent() {
 	}, [
 		myJoinRequest,
 		joinPasscode,
-		family,
 		getMasterKey,
 		requireUnlock,
 		prepareFamilyMigrationMut,
 		convex,
-		decryptHint,
 		commitFamilyMigrationMut,
 		abortFamilyMigrationMut,
 		queryClient,
@@ -507,7 +440,7 @@ function FamilyComponent() {
 				});
 				currentMigrationId = migrationId;
 
-				// 4. 所有するレコードの暗号化対象を取得
+				// 4. 所有するレコードの暗号化対象を取得し再ラップ
 				const migrationData = await convex.query(
 					api.families.getMigrationForEncryption,
 					{
@@ -515,56 +448,15 @@ function FamilyComponent() {
 						migrationId,
 					},
 				);
-				const reEncryptedCredentials: {
-					recordId?: string;
-					id: string;
-					passwordHint: string;
-					passwordHintIv: string;
-					passwordHintDekEncrypted?: string;
-					passwordHintDekIv?: string;
-				}[] = [];
-
-				for (const record of migrationData.records) {
-					for (const cred of record.credentials) {
-						if (cred.passwordHint && cred.passwordHintIv) {
-							if (cred.passwordHintDekEncrypted && cred.passwordHintDekIv) {
-								const oldMasterKey = getMasterKey();
-								if (!oldMasterKey)
-									throw new Error("旧マスターキーが利用できません");
-								const dek = await unwrapDEK(
-									cred.passwordHintDekEncrypted,
-									cred.passwordHintDekIv,
-									oldMasterKey,
-								);
-								const dekWrapped = await wrapDEK(dek, newMasterKey);
-								reEncryptedCredentials.push({
-									recordId: record._id,
-									id: cred.id,
-									passwordHint: cred.passwordHint,
-									passwordHintIv: cred.passwordHintIv,
-									passwordHintDekEncrypted: dekWrapped.encrypted,
-									passwordHintDekIv: dekWrapped.iv,
-								});
-							} else {
-								const plainHint = await decryptHint(
-									cred.passwordHint,
-									cred.passwordHintIv,
-								);
-								const dek = await generateDEK();
-								const { encrypted, iv } = await encrypt(plainHint, dek);
-								const dekWrapped = await wrapDEK(dek, newMasterKey);
-								reEncryptedCredentials.push({
-									recordId: record._id,
-									id: cred.id,
-									passwordHint: encrypted,
-									passwordHintIv: iv,
-									passwordHintDekEncrypted: dekWrapped.encrypted,
-									passwordHintDekIv: dekWrapped.iv,
-								});
-							}
-						}
-					}
+				const oldMasterKey = getMasterKey();
+				if (!oldMasterKey) {
+					throw new Error("旧マスターキーが利用できません");
 				}
+				const reEncryptedCredentials = await reEncryptCredentials(
+					migrationData.records,
+					oldMasterKey,
+					newMasterKey,
+				);
 
 				// 5. commit
 				await commitFamilyMigrationMut({
