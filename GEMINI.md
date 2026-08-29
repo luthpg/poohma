@@ -24,11 +24,19 @@
 
 ## 3. Convex Workflow & Code Generation
 
-Convex のスキーマ（`schema.ts`）や関数（`convex/*.ts`）を変更した場合は、以下の手順に従って反映・型定義の生成・フォーマットを行ってください。
+Convex のスキーマ（`schema.ts`）やバックエンド関数（`convex/*.ts`）を変更した場合は、以下の手順に従ってプレビュー反映・型定義の生成・フォーマットを行ってください。
 
-1. **Development & Sync**: `pnpm convex:dev`（開発環境でのローカル同期）または `pnpm convex:deploy`（プレビュー/ステージング/本番デプロイ）
-2. **Codegen & Format**: `pnpm convex:codegen`
-   - `convex codegen` を実行して `apps/web/convex/_generated/` 内の型定義（`api.d.ts`, `dataModel.d.ts` 等）を最新化し、直後に `pnpm check` で自動フォーマットを適用します。
+> **Warning（Watch モード常駐の回避）**:
+> `convex dev` コマンドはファイル変更監視（watch モード）によってプロセスが常駐してしまうため、AI エージェント実行時や単発の型同期には使用しないでください。
+> 変更を反映して最新の型定義を得る際は、必ず **ワンショットで完了する `pnpm convex:sync`（または `convex deploy` → `convex codegen`）** を使用してください。
+
+### 同期・コード生成手順
+
+1. **一括同期（推奨）**: `pnpm convex:sync`
+   - `convex deploy`（プレビュー環境へのワンショット反映） → `convex codegen`（型定義最新化） → `pnpm check`（自動フォーマット）を一括実行します。
+2. **個別に実行する場合**:
+   - **Deploy**: `pnpm convex:deploy`（プレビュー環境へのワンショット反映）
+   - **Codegen & Format**: `pnpm convex:codegen`（`_generated/` 型定義の最新化とフォーマット）
 3. **Verify Pipeline**: `pnpm verify`
    - 型定義更新後、プロジェクト全体の一括品質検証を実行します。
 
