@@ -72,6 +72,22 @@ export async function reconcileAdminsOnLeave(
 }
 
 /**
+ * 家族削除時に紐づく招待コードをカスケード削除するヘルパー
+ */
+export async function deleteFamilyInvites(
+  ctx: { db: MutationCtx["db"] },
+  familyId: Id<"families">,
+) {
+  const invites = await ctx.db
+    .query("familyInvites")
+    .withIndex("by_familyId", (q) => q.eq("familyId", familyId))
+    .collect();
+  for (const inv of invites) {
+    await ctx.db.delete(inv._id);
+  }
+}
+
+/**
  * 移行前（ownerType未設定）データも考慮してユーザーの個人レコードを取得するヘルパー
  */
 async function getPersonalRecordsForUser(
@@ -230,13 +246,13 @@ export const createFamily = authenticatedMutation({
 
 export const joinFamily = authenticatedMutation({
   args: {
-    inviteCode: v.id("families"),
+    familyId: v.id("families"),
   },
   handler: async (ctx, args) => {
     const { user } = ctx;
 
-    const family = await ctx.db.get(args.inviteCode);
-    if (!family) throw new Error("Invalid invite code");
+    const family = await ctx.db.get(args.familyId);
+    if (!family) throw new Error("Invalid family ID");
 
     // Verify approved request
     const approvedRequest =
@@ -334,12 +350,12 @@ export const joinFamily = authenticatedMutation({
   },
 });
 
-export const getFamilyInfoByInviteCode = authenticatedQuery({
-  args: { inviteCode: v.id("families") },
+export const getFamilyInfoByFamilyId = authenticatedQuery({
+  args: { familyId: v.id("families") },
   handler: async (ctx, args) => {
     const { user } = ctx;
-    const family = await ctx.db.get(args.inviteCode);
-    if (!family) throw new Error("Invalid invite code");
+    const family = await ctx.db.get(args.familyId);
+    if (!family) throw new Error("Invalid family ID");
 
     const isMember = user.familyId === family._id;
     const approvedRequest =
@@ -408,6 +424,7 @@ export const cleanupExpiredMigrationsInternal = internalMutation({
         .first();
 
       if (members.length === 0 && !remainingRecord) {
+        await deleteFamilyInvites(ctx, migration.targetFamilyId);
         await ctx.db.delete(migration.targetFamilyId);
       }
     }
@@ -450,6 +467,7 @@ export const abortFamilyMigration = authenticatedMutation({
       .first();
 
     if (members.length === 0 && !remainingRecord) {
+      await deleteFamilyInvites(ctx, migration.targetFamilyId);
       await ctx.db.delete(migration.targetFamilyId);
     }
 
@@ -466,7 +484,7 @@ export const prepareFamilyMigration = authenticatedMutation({
     masterKeySalt: v.optional(v.string()),
     kdfIterations: v.optional(v.number()),
     cryptoVersion: v.optional(v.number()),
-    inviteCode: v.optional(v.string()),
+    familyId: v.optional(v.id("families")),
   },
   handler: async (ctx, args) => {
     const { user } = ctx;
@@ -501,6 +519,7 @@ export const prepareFamilyMigration = authenticatedMutation({
         .first();
 
       if (members.length === 0 && !remainingRecord) {
+        await deleteFamilyInvites(ctx, stale.targetFamilyId);
         await ctx.db.delete(stale.targetFamilyId);
       }
     }
@@ -530,9 +549,9 @@ export const prepareFamilyMigration = authenticatedMutation({
         updatedAt: Date.now(),
       });
     } else {
-      if (!args.inviteCode) throw new Error("Missing invite code");
-      const family = await ctx.db.get(args.inviteCode as Id<"families">);
-      if (!family) throw new Error("Invalid invite code");
+      if (!args.familyId) throw new Error("Missing family ID");
+      const family = await ctx.db.get(args.familyId);
+      if (!family) throw new Error("Invalid family ID");
 
       // Verify approved join request
       const approvedRequest =
@@ -788,6 +807,7 @@ export const commitFamilyMigration = authenticatedMutation({
         .first();
 
       if (remainingUsers.length === 0 && !remainingRecord) {
+        await deleteFamilyInvites(ctx, migration.sourceFamilyId);
         await ctx.db.delete(migration.sourceFamilyId);
       }
     }
@@ -850,7 +870,7 @@ export const changeFamily = authenticatedMutation({
     masterKeySalt: v.optional(v.string()),
     kdfIterations: v.optional(v.number()),
     cryptoVersion: v.optional(v.number()),
-    inviteCode: v.optional(v.string()),
+    familyId: v.optional(v.id("families")),
     credentials: v.array(
       v.object({
         recordId: v.optional(v.string()),
@@ -889,9 +909,9 @@ export const changeFamily = authenticatedMutation({
         updatedAt: Date.now(),
       });
     } else {
-      if (!args.inviteCode) throw new Error("Missing invite code");
-      const family = await ctx.db.get(args.inviteCode as Id<"families">);
-      if (!family) throw new Error("Invalid invite code");
+      if (!args.familyId) throw new Error("Missing family ID");
+      const family = await ctx.db.get(args.familyId);
+      if (!family) throw new Error("Invalid family ID");
 
       const approvedRequest =
         (await ctx.db
@@ -923,30 +943,25 @@ export const changeFamily = authenticatedMutation({
       targetFamilyId = family._id;
     }
 
-    const userRecords = await getPersonalRecordsForUser(ctx, user._id);
-
-    const serviceRecordIds = userRecords.map((r) => r._id);
-    const now = Date.now();
-
     const migrationId = await ctx.db.insert("familyMigrations", {
       userId: user.userId,
       accountId: user._id,
       sourceFamilyId: user.familyId,
       targetFamilyId,
-      serviceRecordIds,
+      serviceRecordIds: [],
       status: "PREPARED",
-      createdAt: now,
-      expiresAt: now + 30 * 60 * 1000,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 30 * 60 * 1000,
     });
 
-    const credUpdates = new Map<string, (typeof args.credentials)[number]>();
-    for (const c of args.credentials) {
-      if (c.recordId) {
-        credUpdates.set(`${c.recordId}:${c.id}`, c);
-      } else {
-        credUpdates.set(c.id, c);
-      }
-    }
+    const userRecords = await getPersonalRecordsForUser(ctx, user._id);
+
+    const credUpdates = new Map(
+      args.credentials.map((c) => [
+        c.recordId ? `${c.recordId}:${c.id}` : c.id,
+        c,
+      ]),
+    );
 
     for (const record of userRecords) {
       let needsUpdate = false;
@@ -1018,6 +1033,7 @@ export const changeFamily = authenticatedMutation({
         .first();
 
       if (remainingUsers.length === 0 && !remainingRecord) {
+        await deleteFamilyInvites(ctx, user.familyId);
         await ctx.db.delete(user.familyId);
       }
     }
@@ -1131,25 +1147,177 @@ export const rotatePasscode = familyBoundMutation({
   },
 });
 
-export const getFamilyPublicInfo = authenticatedQuery({
-  args: { inviteCode: v.id("families") },
+export const createFamilyInvite = familyBoundMutation({
+  args: {
+    ttlMinutes: v.optional(v.number()),
+  },
   handler: async (ctx, args) => {
-    const family = await ctx.db.get(args.inviteCode);
-    if (!family) throw new Error("Invalid invite code");
+    const { user, familyId } = ctx;
+    const DEFAULT_TTL_MINUTES = 7 * 24 * 60; // 7日 (10080分)
+    const MIN_TTL_MINUTES = 15; // 15分
+    const MAX_TTL_MINUTES = 30 * 24 * 60; // 30日 (43200分)
+
+    const rawTtl = args.ttlMinutes ?? DEFAULT_TTL_MINUTES;
+    if (!Number.isFinite(rawTtl) || !Number.isInteger(rawTtl)) {
+      throw new Error("ttlMinutes must be a finite integer");
+    }
+    const clampedTtl = Math.min(
+      Math.max(rawTtl, MIN_TTL_MINUTES),
+      MAX_TTL_MINUTES,
+    );
+
+    const code = crypto.randomUUID();
+    const now = Date.now();
+    const expiresAt = now + clampedTtl * 60 * 1000;
+
+    const inviteId = await ctx.db.insert("familyInvites", {
+      familyId,
+      code,
+      createdBy: user.userId,
+      createdAt: now,
+      expiresAt,
+      useCount: 0,
+    });
+
+    return {
+      _id: inviteId,
+      code,
+      expiresAt,
+      familyId,
+    };
+  },
+});
+
+export const revokeFamilyInvite = familyBoundMutation({
+  args: {
+    inviteId: v.id("familyInvites"),
+  },
+  handler: async (ctx, args) => {
+    const { familyId } = ctx;
+    const invite = await ctx.db.get(args.inviteId);
+    if (!invite || invite.familyId !== familyId) {
+      throw new Error("Invite not found or access denied");
+    }
+    if (invite.revokedAt != null) {
+      return { success: true };
+    }
+    await ctx.db.patch(invite._id, {
+      revokedAt: Date.now(),
+    });
+    return { success: true };
+  },
+});
+
+export const getFamilyInvites = familyBoundQuery({
+  args: {},
+  handler: async (ctx) => {
+    const { familyId } = ctx;
+    const now = Date.now();
+    const invites = await ctx.db
+      .query("familyInvites")
+      .withIndex("by_familyId", (q) => q.eq("familyId", familyId))
+      .collect();
+
+    // 作成日時の新しい順
+    invites.sort((a, b) => b.createdAt - a.createdAt);
+
+    return invites.map((inv) => {
+      let status: "active" | "expired" | "revoked" = "active";
+      if (inv.revokedAt != null) {
+        status = "revoked";
+      } else if (inv.expiresAt < now) {
+        status = "expired";
+      }
+      return {
+        ...inv,
+        status,
+      };
+    });
+  },
+});
+
+export const cleanupExpiredFamilyInvitesInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const RETENTION_MS = 30 * 24 * 60 * 60 * 1000; // 30日
+    const cutoff = Date.now() - RETENTION_MS;
+    // 1回のcron実行あたり最大100件を処理（Convexトランザクション上限への配慮）
+    const invites = await ctx.db.query("familyInvites").take(100);
+
+    for (const invite of invites) {
+      const isRevokedOld =
+        invite.revokedAt != null && invite.revokedAt < cutoff;
+      const isExpiredOld = invite.expiresAt < cutoff;
+      if (isRevokedOld || isExpiredOld) {
+        // 参加申請（監査証跡）から参照されていないかインデックスでチェック
+        const referenced = await ctx.db
+          .query("joinRequests")
+          .withIndex("by_invitedByCode", (q) =>
+            q.eq("invitedByCode", invite._id),
+          )
+          .first();
+        if (!referenced) {
+          await ctx.db.delete(invite._id);
+        }
+      }
+    }
+  },
+});
+
+export const getFamilyPublicInfo = authenticatedQuery({
+  args: { code: v.string() },
+  handler: async (ctx, args) => {
+    const invite = await ctx.db
+      .query("familyInvites")
+      .withIndex("by_code", (q) => q.eq("code", args.code))
+      .first();
+
+    if (!invite) {
+      throw new Error("Invalid invite code");
+    }
+    if (invite.revokedAt != null) {
+      throw new Error("This invite link has been revoked");
+    }
+    if (invite.expiresAt < Date.now()) {
+      throw new Error("This invite link has expired");
+    }
+
+    const family = await ctx.db.get(invite.familyId);
+    if (!family) {
+      throw new Error("Family not found");
+    }
 
     return {
       id: family._id,
       name: family.name,
+      expiresAt: invite.expiresAt,
     };
   },
 });
 
 export const createJoinRequest = authenticatedMutation({
-  args: { inviteCode: v.id("families") },
+  args: { code: v.string() },
   handler: async (ctx, args) => {
     const { user } = ctx;
-    const family = await ctx.db.get(args.inviteCode);
-    if (!family) throw new Error("Invalid invite code");
+    const invite = await ctx.db
+      .query("familyInvites")
+      .withIndex("by_code", (q) => q.eq("code", args.code))
+      .first();
+
+    if (!invite) {
+      throw new Error("Invalid invite code");
+    }
+    if (invite.revokedAt != null) {
+      throw new Error("This invite link has been revoked");
+    }
+    if (invite.expiresAt < Date.now()) {
+      throw new Error("This invite link has expired");
+    }
+
+    const family = await ctx.db.get(invite.familyId);
+    if (!family) {
+      throw new Error("Family not found");
+    }
 
     if (user.familyId === family._id) {
       throw new Error("You are already a member of this family");
@@ -1217,10 +1385,16 @@ export const createJoinRequest = authenticatedMutation({
       await ctx.db.delete(r._id);
     }
 
+    // Increment useCount on the invite
+    await ctx.db.patch(invite._id, {
+      useCount: invite.useCount + 1,
+    });
+
     const requestId = await ctx.db.insert("joinRequests", {
       familyId: family._id,
       userId: user.userId,
       accountId: user._id,
+      invitedByCode: invite._id,
       status: "pending",
       createdAt: Date.now(),
       updatedAt: Date.now(),

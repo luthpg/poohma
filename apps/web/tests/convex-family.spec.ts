@@ -1,4 +1,4 @@
-﻿import { convexTest } from "convex-test";
+import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
 import { api, internal } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
@@ -241,31 +241,37 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 				email: "applicant_b@example.com",
 			});
 
-			// 1. 申請前は getFamilyInfoByInviteCode で鍵を取得できないこと
+			// 0. 招待コードを発行する
+			const invite = await memberA.mutation(api.families.createFamilyInvite, {
+				ttlMinutes: 1440,
+			});
+			expect(invite.code).toBeDefined();
+
+			// 1. 申請前は getFamilyInfoByFamilyId で鍵を取得できないこと
 			await expect(
-				applicantB.query(api.families.getFamilyInfoByInviteCode, {
-					inviteCode: familyId,
+				applicantB.query(api.families.getFamilyInfoByFamilyId, {
+					familyId,
 				}),
 			).rejects.toThrow("Access denied");
 
 			// 2. 家族公開情報は取得できること
 			const publicInfo = await applicantB.query(
 				api.families.getFamilyPublicInfo,
-				{ inviteCode: familyId },
+				{ code: invite.code },
 			);
 			expect(publicInfo.name).toBe("田中家");
 
 			// 3. 参加申請を作成する
 			const requestId = await applicantB.mutation(
 				api.families.createJoinRequest,
-				{ inviteCode: familyId },
+				{ code: invite.code },
 			);
 			expect(requestId).toBeDefined();
 
 			// 4. 重複申請がエラーになること
 			await expect(
 				applicantB.mutation(api.families.createJoinRequest, {
-					inviteCode: familyId,
+					code: invite.code,
 				}),
 			).rejects.toThrow("pending join request");
 
@@ -300,17 +306,17 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 				requestId,
 			});
 
-			// 9. 承認後は getFamilyInfoByInviteCode が通ること
+			// 9. 承認後は getFamilyInfoByFamilyId が通ること
 			const infoAfterApproval = await applicantB.query(
-				api.families.getFamilyInfoByInviteCode,
-				{ inviteCode: familyId },
+				api.families.getFamilyInfoByFamilyId,
+				{ familyId },
 			);
 			expect(infoAfterApproval.masterKeyEncrypted).toBe("SGVsbG9Xb3JsZA==");
 
 			// 10. 承認状態の申請があるため joinFamily で正式に参加できること
 			const joinedFamilyId = await applicantB.mutation(
 				api.families.joinFamily,
-				{ inviteCode: familyId },
+				{ familyId },
 			);
 			expect(joinedFamilyId).toBe(familyId);
 
@@ -362,10 +368,16 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 				email: "z@example.com",
 			});
 
+			// 招待コードを発行
+			const invite = await memberY.mutation(
+				api.families.createFamilyInvite,
+				{},
+			);
+
 			// 申請
 			const requestId = await applicantZ.mutation(
 				api.families.createJoinRequest,
-				{ inviteCode: familyId },
+				{ code: invite.code },
 			);
 
 			// 却下
@@ -388,7 +400,427 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 		});
 	});
 
-	describe("2.1.4 prepare / commit フローによる安全な家族移行機能の検証", () => {
+	describe("2.1.4 有効期限付き家族招待コード（Issue 132）のセキュリティとライフサイクル", () => {
+		it("createFamilyInviteのTTLがサーバー側で15分〜30日にクランプされること", async () => {
+			const t = convexTest(schema, modules);
+			let familyId!: Id<"families">;
+
+			await t.run(async (ctx) => {
+				familyId = await ctx.db.insert("families", {
+					name: "佐藤家",
+					updatedAt: Date.now(),
+				});
+				await ctx.db.insert("users", {
+					userId: "user_sato",
+					email: "sato@example.com",
+					familyId,
+					updatedAt: Date.now(),
+				});
+			});
+
+			const userSato = t.withIdentity({
+				subject: "user_sato",
+				email: "sato@example.com",
+			});
+
+			const before = Date.now();
+
+			// 1. 0分（極小値）を指定 -> 15分（900秒 = 900,000ms）にクランプ
+			const minInvite = await userSato.mutation(
+				api.families.createFamilyInvite,
+				{ ttlMinutes: 0 },
+			);
+			expect(minInvite.expiresAt).toBeGreaterThanOrEqual(
+				before + 14 * 60 * 1000,
+			);
+			expect(minInvite.expiresAt).toBeLessThanOrEqual(
+				Date.now() + 16 * 60 * 1000,
+			);
+
+			// 2. 100日（極大値）を指定 -> 30日（43200分）にクランプ
+			const maxInvite = await userSato.mutation(
+				api.families.createFamilyInvite,
+				{ ttlMinutes: 100 * 24 * 60 },
+			);
+			const expected30DaysMs = 30 * 24 * 60 * 60 * 1000;
+			expect(maxInvite.expiresAt).toBeGreaterThanOrEqual(
+				before + expected30DaysMs - 10000,
+			);
+			expect(maxInvite.expiresAt).toBeLessThanOrEqual(
+				Date.now() + expected30DaysMs + 10000,
+			);
+
+			// 3. デフォルト指定 -> 7日（10080分）
+			const defaultInvite = await userSato.mutation(
+				api.families.createFamilyInvite,
+				{},
+			);
+			const expected7DaysMs = 7 * 24 * 60 * 60 * 1000;
+			expect(defaultInvite.expiresAt).toBeGreaterThanOrEqual(
+				before + expected7DaysMs - 10000,
+			);
+			expect(defaultInvite.expiresAt).toBeLessThanOrEqual(
+				Date.now() + expected7DaysMs + 10000,
+			);
+		});
+
+		it("createFamilyInviteは有限の整数でないTTLを拒否すること", async () => {
+			const t = convexTest(schema, modules);
+
+			await t.run(async (ctx) => {
+				const familyId = await ctx.db.insert("families", {
+					name: "TTL検証家",
+					updatedAt: Date.now(),
+				});
+				await ctx.db.insert("users", {
+					userId: "user_ttl_validation",
+					email: "ttl@example.com",
+					familyId,
+					updatedAt: Date.now(),
+				});
+			});
+
+			const user = t.withIdentity({
+				subject: "user_ttl_validation",
+				email: "ttl@example.com",
+			});
+
+			for (const ttlMinutes of [Number.NaN, Number.POSITIVE_INFINITY, 1.5]) {
+				await expect(
+					user.mutation(api.families.createFamilyInvite, { ttlMinutes }),
+				).rejects.toThrow("ttlMinutes must be a finite integer");
+			}
+		});
+
+		it("期限切れの招待コードで参加申請または情報取得を行うとエラーになること", async () => {
+			const t = convexTest(schema, modules);
+			let familyId!: Id<"families">;
+			const expiredCode = "expired-uuid-1234";
+
+			await t.run(async (ctx) => {
+				familyId = await ctx.db.insert("families", {
+					name: "期限切れ家",
+					updatedAt: Date.now(),
+				});
+				await ctx.db.insert("familyInvites", {
+					familyId,
+					code: expiredCode,
+					createdBy: "creator_uid",
+					createdAt: Date.now() - 100000,
+					expiresAt: Date.now() - 1000, // 既に期限切れ
+					useCount: 0,
+				});
+				await ctx.db.insert("users", {
+					userId: "applicant_expired",
+					email: "exp@example.com",
+					updatedAt: Date.now(),
+				});
+			});
+
+			const applicant = t.withIdentity({
+				subject: "applicant_expired",
+				email: "exp@example.com",
+			});
+
+			await expect(
+				applicant.query(api.families.getFamilyPublicInfo, {
+					code: expiredCode,
+				}),
+			).rejects.toThrow("expired");
+
+			await expect(
+				applicant.mutation(api.families.createJoinRequest, {
+					code: expiredCode,
+				}),
+			).rejects.toThrow("expired");
+		});
+
+		it("無効化（revokedAt設定済み）の招待コードで参加申請を行うとエラーになること", async () => {
+			const t = convexTest(schema, modules);
+			let familyId!: Id<"families">;
+			const revokedCode = "revoked-uuid-1234";
+
+			await t.run(async (ctx) => {
+				familyId = await ctx.db.insert("families", {
+					name: "失効家",
+					updatedAt: Date.now(),
+				});
+				await ctx.db.insert("familyInvites", {
+					familyId,
+					code: revokedCode,
+					createdBy: "creator_uid",
+					createdAt: Date.now() - 10000,
+					expiresAt: Date.now() + 100000,
+					revokedAt: Date.now() - 5000, // 無効化済み
+					useCount: 0,
+				});
+				await ctx.db.insert("users", {
+					userId: "applicant_revoked",
+					email: "rev@example.com",
+					updatedAt: Date.now(),
+				});
+			});
+
+			const applicant = t.withIdentity({
+				subject: "applicant_revoked",
+				email: "rev@example.com",
+			});
+
+			await expect(
+				applicant.query(api.families.getFamilyPublicInfo, {
+					code: revokedCode,
+				}),
+			).rejects.toThrow("revoked");
+
+			await expect(
+				applicant.mutation(api.families.createJoinRequest, {
+					code: revokedCode,
+				}),
+			).rejects.toThrow("revoked");
+		});
+
+		it("自家族以外の招待コードを無効化できないこと（認可チェック）", async () => {
+			const t = convexTest(schema, modules);
+			let familyAId!: Id<"families">;
+			let familyBId!: Id<"families">;
+			let inviteAId!: Id<"familyInvites">;
+
+			await t.run(async (ctx) => {
+				familyAId = await ctx.db.insert("families", {
+					name: "家族A",
+					updatedAt: Date.now(),
+				});
+				familyBId = await ctx.db.insert("families", {
+					name: "家族B",
+					updatedAt: Date.now(),
+				});
+				await ctx.db.insert("users", {
+					userId: "user_a",
+					email: "a@example.com",
+					familyId: familyAId,
+					updatedAt: Date.now(),
+				});
+				await ctx.db.insert("users", {
+					userId: "user_b",
+					email: "b@example.com",
+					familyId: familyBId,
+					updatedAt: Date.now(),
+				});
+				inviteAId = await ctx.db.insert("familyInvites", {
+					familyId: familyAId,
+					code: "invite-a",
+					createdBy: "user_a",
+					createdAt: Date.now(),
+					expiresAt: Date.now() + 100000,
+					useCount: 0,
+				});
+			});
+
+			const userB = t.withIdentity({
+				subject: "user_b",
+				email: "b@example.com",
+			});
+
+			await expect(
+				userB.mutation(api.families.revokeFamilyInvite, {
+					inviteId: inviteAId,
+				}),
+			).rejects.toThrow("Invite not found or access denied");
+		});
+
+		it("参加申請作成時にuseCountが加算され、joinRequests.invitedByCodeに記録されること", async () => {
+			const t = convexTest(schema, modules);
+			let familyId!: Id<"families">;
+
+			await t.run(async (ctx) => {
+				familyId = await ctx.db.insert("families", {
+					name: "鈴木家",
+					updatedAt: Date.now(),
+				});
+				await ctx.db.insert("users", {
+					userId: "member_suzuki",
+					email: "suzuki@example.com",
+					familyId,
+					updatedAt: Date.now(),
+				});
+				await ctx.db.insert("users", {
+					userId: "applicant_suzuki",
+					email: "suzuki_app@example.com",
+					updatedAt: Date.now(),
+				});
+			});
+
+			const member = t.withIdentity({
+				subject: "member_suzuki",
+				email: "suzuki@example.com",
+			});
+			const applicant = t.withIdentity({
+				subject: "applicant_suzuki",
+				email: "suzuki_app@example.com",
+			});
+
+			const invite = await member.mutation(api.families.createFamilyInvite, {});
+
+			const requestId = await applicant.mutation(
+				api.families.createJoinRequest,
+				{ code: invite.code },
+			);
+
+			// 申請レコードの検証
+			const joinReq = await t.run(async (ctx) => {
+				return await ctx.db.get(requestId);
+			});
+			expect(joinReq?.invitedByCode).toBe(invite._id);
+
+			// 招待レコードの useCount 検証
+			const updatedInvite = await t.run(async (ctx) => {
+				return await ctx.db.get(invite._id);
+			});
+			expect(updatedInvite?.useCount).toBe(1);
+		});
+
+		it("アカウント削除で最後のメンバーが退会した際、familyInvitesがカスケード削除されること", async () => {
+			const t = convexTest(schema, modules);
+			let familyId!: Id<"families">;
+			let userId!: Id<"users">;
+			let inviteId!: Id<"familyInvites">;
+
+			await t.run(async (ctx) => {
+				familyId = await ctx.db.insert("families", {
+					name: "孤立予定家族",
+					updatedAt: Date.now(),
+				});
+				userId = await ctx.db.insert("users", {
+					userId: "lone_user",
+					email: "lone@example.com",
+					familyId,
+					updatedAt: Date.now(),
+				});
+				inviteId = await ctx.db.insert("familyInvites", {
+					familyId,
+					code: "lone-invite",
+					createdBy: "lone_user",
+					createdAt: Date.now(),
+					expiresAt: Date.now() + 100000,
+					useCount: 0,
+				});
+			});
+
+			const user = t.withIdentity({
+				subject: "lone_user",
+				email: "lone@example.com",
+			});
+
+			await user.mutation(api.users.deleteAccount, { accountId: userId });
+
+			const remainingFamily = await t.run(async (ctx) => ctx.db.get(familyId));
+			expect(remainingFamily).toBeNull();
+
+			const remainingInvite = await t.run(async (ctx) => ctx.db.get(inviteId));
+			expect(remainingInvite).toBeNull();
+		});
+
+		it("cleanupExpiredFamilyInvitesInternalで30日以上前の失効・期限切れレコードが削除されること", async () => {
+			const t = convexTest(schema, modules);
+			let familyId!: Id<"families">;
+			let oldExpiredId!: Id<"familyInvites">;
+			let oldRevokedId!: Id<"familyInvites">;
+			let referencedOldExpiredId!: Id<"familyInvites">;
+			let recentExpiredId!: Id<"familyInvites">;
+			let activeId!: Id<"familyInvites">;
+
+			const now = Date.now();
+			const thirtyOneDaysAgo = now - 31 * 24 * 60 * 60 * 1000;
+			const tenDaysAgo = now - 10 * 24 * 60 * 60 * 1000;
+
+			await t.run(async (ctx) => {
+				familyId = await ctx.db.insert("families", {
+					name: "クリーンアップテスト家",
+					updatedAt: now,
+				});
+
+				// 31日前に期限切れ
+				oldExpiredId = await ctx.db.insert("familyInvites", {
+					familyId,
+					code: "old-expired",
+					createdBy: "u",
+					createdAt: thirtyOneDaysAgo - 1000,
+					expiresAt: thirtyOneDaysAgo,
+					useCount: 0,
+				});
+
+				// 31日前に無効化
+				oldRevokedId = await ctx.db.insert("familyInvites", {
+					familyId,
+					code: "old-revoked",
+					createdBy: "u",
+					createdAt: thirtyOneDaysAgo - 10000,
+					expiresAt: now + 100000,
+					revokedAt: thirtyOneDaysAgo,
+					useCount: 0,
+				});
+
+				// 参加申請の監査証跡から参照されているため削除対象外
+				referencedOldExpiredId = await ctx.db.insert("familyInvites", {
+					familyId,
+					code: "referenced-old-expired",
+					createdBy: "u",
+					createdAt: thirtyOneDaysAgo - 1000,
+					expiresAt: thirtyOneDaysAgo,
+					useCount: 1,
+				});
+				await ctx.db.insert("joinRequests", {
+					familyId,
+					userId: "applicant",
+					invitedByCode: referencedOldExpiredId,
+					status: "approved",
+					createdAt: thirtyOneDaysAgo,
+					updatedAt: thirtyOneDaysAgo,
+				});
+
+				// 10日前に期限切れ（まだ削除対象外）
+				recentExpiredId = await ctx.db.insert("familyInvites", {
+					familyId,
+					code: "recent-expired",
+					createdBy: "u",
+					createdAt: tenDaysAgo - 1000,
+					expiresAt: tenDaysAgo,
+					useCount: 0,
+				});
+
+				// 現在有効（削除対象外）
+				activeId = await ctx.db.insert("familyInvites", {
+					familyId,
+					code: "active-code",
+					createdBy: "u",
+					createdAt: now,
+					expiresAt: now + 7 * 24 * 60 * 60 * 1000,
+					useCount: 0,
+				});
+			});
+
+			await t.mutation(
+				internal.families.cleanupExpiredFamilyInvitesInternal,
+				{},
+			);
+
+			const rOldExpired = await t.run((ctx) => ctx.db.get(oldExpiredId));
+			const rOldRevoked = await t.run((ctx) => ctx.db.get(oldRevokedId));
+			const rReferencedOldExpired = await t.run((ctx) =>
+				ctx.db.get(referencedOldExpiredId),
+			);
+			const rRecentExpired = await t.run((ctx) => ctx.db.get(recentExpiredId));
+			const rActive = await t.run((ctx) => ctx.db.get(activeId));
+
+			expect(rOldExpired).toBeNull();
+			expect(rOldRevoked).toBeNull();
+			expect(rReferencedOldExpired).toBeDefined();
+			expect(rRecentExpired).toBeDefined();
+			expect(rActive).toBeDefined();
+		});
+	});
+
+	describe("2.1.5 prepare / commit フローによる安全な家族移行機能の検証", () => {
 		it("prepare で移行対象が確定し、commit で一括更新・旧Family削除が行われること", async () => {
 			const t = convexTest(schema, modules);
 

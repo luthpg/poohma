@@ -15,4 +15,10 @@ crons.interval(
   internal.users.cleanupOldLoginEventsInternal,
 );
 
+crons.interval(
+  "cleanup expired family invites",
+  { hours: 24 },
+  internal.families.cleanupExpiredFamilyInvitesInternal,
+);
+
 export default crons;

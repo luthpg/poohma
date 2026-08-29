@@ -7,7 +7,7 @@ import {
   identityVerifiedMutation,
   identityVerifiedQuery,
 } from "./customBuilders";
-import { reconcileAdminsOnLeave } from "./families";
+import { deleteFamilyInvites, reconcileAdminsOnLeave } from "./families";
 
 /**
  * ユーザー同期（ログイン時に呼ばれる）
@@ -310,6 +310,7 @@ export const deleteAllAccounts = identityVerifiedMutation({
             await ctx.db.delete(req._id);
           }
 
+          await deleteFamilyInvites(ctx, familyId);
           await ctx.db.delete(familyId);
         } else {
           // 他のメンバーがいる場合は、このアカウントの個人レコードのみ削除し、共有レコードの管理者を調停
@@ -407,6 +408,7 @@ export const deleteAccount = authenticatedMutation({
           await ctx.db.delete(req._id);
         }
 
+        await deleteFamilyInvites(ctx, familyId);
         await ctx.db.delete(familyId);
       } else {
         // 他のメンバーがいる場合は、このアカウントの個人レコードのみ削除し、共有レコードの管理者を調停
