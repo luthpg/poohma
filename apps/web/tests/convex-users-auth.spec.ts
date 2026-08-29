@@ -688,7 +688,6 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 			const t = convexTest(schema, modules);
 			let famId!: Id<"families">;
 			let acc1Id!: Id<"users">;
-			let acc2Id!: Id<"users">;
 			let otherAccId!: Id<"users">;
 
 			await t.run(async (ctx) => {
@@ -708,7 +707,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 					familyId: famId,
 					updatedAt: Date.now(),
 				});
-				acc2Id = await ctx.db.insert("users", {
+				await ctx.db.insert("users", {
 					userId: "internal_user_uid",
 					email: "internal@example.com",
 					displayName: "内部2",
