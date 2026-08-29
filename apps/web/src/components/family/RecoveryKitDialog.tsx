@@ -6,9 +6,10 @@ import {
 	HardDrive,
 	KeyRound,
 	Printer,
+	Share2,
 	ShieldCheck,
 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -67,7 +68,27 @@ export function RecoveryKitDialog({
 	const [hasSavedLocally, setHasSavedLocally] = useState(false);
 	const [hasPrinted, setHasPrinted] = useState(false);
 	const [hasSavedDrive, setHasSavedDrive] = useState(false);
+	const [hasShared, setHasShared] = useState(false);
 	const [isDriveUploading, setIsDriveUploading] = useState(false);
+	const [canShareFile, setCanShareFile] = useState(false);
+
+	// Web Share API でファイル共有が可能か判定
+	useEffect(() => {
+		if (
+			typeof navigator !== "undefined" &&
+			typeof navigator.share === "function" &&
+			typeof navigator.canShare === "function"
+		) {
+			try {
+				const testFile = new File(["test"], "test.pdf", {
+					type: "application/pdf",
+				});
+				setCanShareFile(navigator.canShare({ files: [testFile] }));
+			} catch {
+				setCanShareFile(false);
+			}
+		}
+	}, []);
 
 	const handleReset = useCallback(() => {
 		if (pdfUrl) {
@@ -182,6 +203,37 @@ export function RecoveryKitDialog({
 		toast.success("リカバリーキットPDFをダウンロードしました");
 	};
 
+	// Web Share API による共有（モバイル / 対応環境）
+	const handleShare = async () => {
+		if (!pdfBlob) return;
+		try {
+			const safeFamilyName = familyName.replace(
+				/[^a-zA-Z0-9_\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff-]/g,
+				"",
+			);
+			const fileName = `PoohMa-RecoveryKit-${safeFamilyName}-${new Date().toISOString().slice(0, 10)}.pdf`;
+			const file = new File([pdfBlob], fileName, { type: "application/pdf" });
+
+			if (navigator.canShare && navigator.canShare({ files: [file] })) {
+				await navigator.share({
+					files: [file],
+					title: `PoohMa リカバリーキット (${familyName})`,
+					text: "PoohMa の緊急リカバリーキット PDF です。Google ドライブやファイルアプリ等に安全に保管してください。",
+				});
+				setHasShared(true);
+				toast.success("共有メニューを開きました");
+			} else {
+				handleDownload();
+			}
+		} catch (err) {
+			if (err instanceof Error && err.name === "AbortError") {
+				return;
+			}
+			console.error("Share failed:", err);
+			toast.error("共有に失敗しました。ダウンロードをご利用ください。");
+		}
+	};
+
 	// 印刷
 	const handlePrint = () => {
 		if (!pdfUrl) return;
@@ -200,9 +252,16 @@ export function RecoveryKitDialog({
 		}
 	};
 
-	// Google Drive に保存
+	// Google Drive に保存（モバイルは共有シート優先、PCはAPI連携）
 	const handleSaveToDrive = async () => {
 		if (!pdfBlob) return;
+
+		// モバイル等で Web Share API が利用可能な場合は、OAuthブロックを回避して共有シート（Googleドライブアプリ等）を起動
+		if (canShareFile) {
+			await handleShare();
+			return;
+		}
+
 		setIsDriveUploading(true);
 
 		try {
@@ -211,7 +270,6 @@ export function RecoveryKitDialog({
 				toast.info(
 					"Google Drive 連携の Client ID が未設定です。ローカル保存をご利用ください。",
 				);
-				// フォールバックとしてダウンロード
 				handleDownload();
 				setIsDriveUploading(false);
 				return;
@@ -253,7 +311,8 @@ export function RecoveryKitDialog({
 		}
 	};
 
-	const hasSavedAtLeastOne = hasSavedLocally || hasPrinted || hasSavedDrive;
+	const hasSavedAtLeastOne =
+		hasSavedLocally || hasPrinted || hasSavedDrive || hasShared;
 
 	return (
 		<Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
@@ -264,90 +323,72 @@ export function RecoveryKitDialog({
 							<ShieldCheck className="h-6 w-6" />
 						</div>
 						<div>
-							<DialogTitle className="text-xl">
+							<DialogTitle className="text-lg sm:text-xl">
 								{isReissue
 									? "リカバリーキットの再発行"
 									: "リカバリーキットの発行"}
 							</DialogTitle>
-							<DialogDescription className="text-sm mt-1">
-								家族パスコードを忘れた場合に備え、復元コードを保管します
+							<DialogDescription className="text-xs sm:text-sm">
+								家族「{familyName}」の緊急復元用ドキュメント
 							</DialogDescription>
 						</div>
 					</div>
 				</DialogHeader>
 
-				{step === "initial" && (
+				{step === "initial" ? (
 					<div className="space-y-4 py-2">
-						<div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-4 text-amber-900 dark:text-amber-200">
-							<div className="flex items-start gap-3">
-								<AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-								<div className="text-xs sm:text-sm space-y-1.5 leading-relaxed">
-									<p className="font-semibold">
-										{isReissue
-											? "再発行に伴う重要な注意事項"
-											: "リカバリーキットについて"}
+						<div className="rounded-lg border bg-muted/40 p-4 space-y-3">
+							<div className="flex items-start gap-2.5">
+								<KeyRound className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+								<div className="space-y-1">
+									<h4 className="text-sm font-semibold">
+										リカバリーキットとは？
+									</h4>
+									<p className="text-xs text-muted-foreground leading-relaxed">
+										家族パスコードを忘れた場合に、マスターキーを復元してデータを救出するための緊急バックアップPDFです。
 									</p>
-									<p>
-										{isReissue
-											? "新しくリカバリーキットを発行すると、過去に発行された古い復元コードはすべて即座に無効化されます。"
-											: "家族パスコードを忘れてしまった場合、リカバリーキットと登録メールアドレスへの2段階認証で復元できます。"}
-									</p>
-									<p>
-										発行される復元コードはサーバーに保存されないため、必ずPDFを安全な場所に保管してください。
+								</div>
+							</div>
+
+							<div className="flex items-start gap-2.5 pt-2 border-t border-border/60">
+								<AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+								<div className="space-y-1">
+									<h4 className="text-sm font-semibold text-amber-600 dark:text-amber-400">
+										保管に関する注意事項
+									</h4>
+									<p className="text-xs text-muted-foreground leading-relaxed">
+										リカバリーコードはサーバーに平文保存されず、再表示できません。生成されるPDFを必ず安全な場所（印刷保管、Google
+										Drive、パスワード管理ソフト等）に保存してください。
 									</p>
 								</div>
 							</div>
 						</div>
 
-						<div className="rounded-lg border bg-muted/40 p-4 space-y-2 text-xs sm:text-sm">
-							<div className="flex justify-between">
-								<span className="text-muted-foreground">対象家族:</span>
-								<span className="font-medium text-foreground">
-									{familyName}
-								</span>
-							</div>
-							<div className="flex justify-between">
-								<span className="text-muted-foreground">発行者:</span>
-								<span className="font-medium text-foreground">
-									{issuerName}
-								</span>
-							</div>
-						</div>
-
-						<DialogFooter className="gap-2 sm:gap-0 mt-4">
+						<DialogFooter className="mt-6">
 							<Button variant="outline" onClick={handleClose}>
 								キャンセル
 							</Button>
-							<Button onClick={handleGenerate} className="gap-2 font-semibold">
-								<KeyRound className="h-4 w-4" />
-								{isReissue ? "同意して再発行する" : "リカバリーキットを発行"}
+							<Button
+								onClick={handleGenerate}
+								className="font-semibold gap-1.5"
+							>
+								<ShieldCheck className="h-4 w-4" />
+								リカバリーキットを生成
 							</Button>
 						</DialogFooter>
 					</div>
-				)}
-
-				{step === "generating" && (
-					<div className="py-12 flex flex-col items-center justify-center gap-4 text-center">
-						<Spinner className="h-8 w-8 text-primary" />
-						<div className="space-y-1">
-							<p className="text-base font-semibold">暗号鍵とPDFを生成中...</p>
-							<p className="text-xs text-muted-foreground">
-								高エントロピーな復元コードの生成と暗号化を実行しています
-							</p>
-						</div>
-					</div>
-				)}
-
-				{step === "saved" && generatedCode && (
-					<div className="space-y-5 py-2">
-						<div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-4 text-emerald-900 dark:text-emerald-200">
-							<div className="flex items-center gap-2 font-semibold text-sm">
-								<CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-								リカバリーキットが正常に作成されました
+				) : (
+					<div className="space-y-4 py-2">
+						<div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 flex items-start gap-3">
+							<CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+							<div className="space-y-1">
+								<h4 className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+									リカバリーキットが生成されました
+								</h4>
+								<p className="text-xs text-muted-foreground leading-relaxed">
+									以下のいずれかの方法でPDFを保管してください。少なくとも1つの保存方法を実行すると完了ボタンが有効になります。
+								</p>
 							</div>
-							<p className="text-xs mt-1 text-emerald-800/90 dark:text-emerald-300">
-								以下のいずれかの方法でPDFを保管してください。
-							</p>
 						</div>
 
 						{/* 復元コードプレビュー */}
@@ -391,26 +432,42 @@ export function RecoveryKitDialog({
 									{hasPrinted ? "印刷済" : "印刷する"}
 								</span>
 							</button>
-
-							<button
-								type="button"
-								onClick={handleSaveToDrive}
-								disabled={isDriveUploading}
-								className={`flex flex-col items-center justify-center gap-2 p-3.5 rounded-lg border text-center transition-all disabled:opacity-50 ${
-									hasSavedDrive
-										? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-										: "border-border bg-card hover:bg-muted text-foreground"
-								}`}
-							>
-								{isDriveUploading ? (
-									<Spinner className="h-5 w-5" />
-								) : (
-									<HardDrive className="h-5 w-5" />
-								)}
-								<span className="text-xs font-semibold">
-									{hasSavedDrive ? "Drive保存済" : "Google Drive"}
-								</span>
-							</button>
+							{canShareFile ? (
+								<button
+									type="button"
+									onClick={handleShare}
+									className={`flex flex-col items-center justify-center gap-2 p-3.5 rounded-lg border text-center transition-all ${
+										hasShared
+											? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+											: "border-border bg-card hover:bg-muted text-foreground"
+									}`}
+								>
+									<Share2 className="h-5 w-5 text-primary" />
+									<span className="text-xs font-semibold">
+										{hasShared ? "共有・保存済" : "アプリ・Driveへ共有"}
+									</span>
+								</button>
+							) : (
+								<button
+									type="button"
+									onClick={handleSaveToDrive}
+									disabled={isDriveUploading}
+									className={`flex flex-col items-center justify-center gap-2 p-3.5 rounded-lg border text-center transition-all disabled:opacity-50 ${
+										hasSavedDrive
+											? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+											: "border-border bg-card hover:bg-muted text-foreground"
+									}`}
+								>
+									{isDriveUploading ? (
+										<Spinner className="h-5 w-5" />
+									) : (
+										<HardDrive className="h-5 w-5" />
+									)}
+									<span className="text-xs font-semibold">
+										{hasSavedDrive ? "Drive保存済" : "Google Drive"}
+									</span>
+								</button>
+							)}
 						</div>
 
 						<DialogFooter className="mt-4">
