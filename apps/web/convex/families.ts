@@ -350,7 +350,7 @@ export const joinFamily = authenticatedMutation({
   },
 });
 
-export const getFamilyInfoByInviteCode = authenticatedQuery({
+export const getFamilyInfoByFamilyId = authenticatedQuery({
   args: { familyId: v.id("families") },
   handler: async (ctx, args) => {
     const { user } = ctx;
@@ -1241,22 +1241,24 @@ export const cleanupExpiredFamilyInvitesInternal = internalMutation({
   handler: async (ctx) => {
     const RETENTION_MS = 30 * 24 * 60 * 60 * 1000; // 30日
     const cutoff = Date.now() - RETENTION_MS;
-    const invites = await ctx.db.query("familyInvites").collect();
-    const joinRequests = await ctx.db.query("joinRequests").collect();
-    const referencedInviteIds = new Set(
-      joinRequests.flatMap((request) =>
-        request.invitedByCode ? [request.invitedByCode] : [],
-      ),
-    );
+    // 1回のcron実行あたり最大100件を処理（Convexトランザクション上限への配慮）
+    const invites = await ctx.db.query("familyInvites").take(100);
+
     for (const invite of invites) {
       const isRevokedOld =
         invite.revokedAt != null && invite.revokedAt < cutoff;
       const isExpiredOld = invite.expiresAt < cutoff;
-      if (
-        (isRevokedOld || isExpiredOld) &&
-        !referencedInviteIds.has(invite._id)
-      ) {
-        await ctx.db.delete(invite._id);
+      if (isRevokedOld || isExpiredOld) {
+        // 参加申請（監査証跡）から参照されていないかインデックスでチェック
+        const referenced = await ctx.db
+          .query("joinRequests")
+          .withIndex("by_invitedByCode", (q) =>
+            q.eq("invitedByCode", invite._id),
+          )
+          .first();
+        if (!referenced) {
+          await ctx.db.delete(invite._id);
+        }
       }
     }
   },

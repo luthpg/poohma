@@ -237,7 +237,7 @@ serviceRecords 1 ── * credentials(内包配列)
 | status                | "pending" \| "approved" \| "rejected" | 申請状態                        |
 | createdAt / updatedAt | number                                | 作成・更新日時                     |
 
-インデックス: by\_familyId\_status, by\_userId\_status, by\_familyId\_userId, by\_accountId\_status, by\_familyId\_accountId
+インデックス: by\_familyId\_status, by\_userId\_status, by\_familyId\_userId, by\_accountId\_status, by\_familyId\_accountId, by\_invitedByCode
 
 #### serviceRecords
 
@@ -628,7 +628,7 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
 | getFamilyMembers                       | Query            | authenticated | 自分の所属家族のメンバー一覧取得                                                                                                      |
 | createFamily                           | Mutation         | authenticated | 家族グループ新規作成＋通知メール送信                                                                                                    |
 | joinFamily                             | Mutation         | authenticated | 承認済み参加申請をもとに家族へ参加確定                                                                                                   |
-| getFamilyInfoByInviteCode              | Query            | authenticated | 招待コードから家族の暗号鍵情報を取得（メンバー or 承認済み申請者のみ）                                                                                 |
+| getFamilyInfoByFamilyId                | Query            | authenticated | 家族IDから家族の暗号鍵情報を取得（メンバー or 承認済み申請者のみ）                                                                                    |
 | getFamilyPublicInfo                    | Query            | authenticated | 招待コードから家族名等の公開情報のみ取得                                                                                                  |
 | createJoinRequest                      | Mutation         | authenticated | 参加申請の送信＋既存メンバーへの通知メール                                                                                                 |
 | cancelJoinRequest                      | Mutation         | authenticated | 自分の保留中申請のキャンセル                                                                                                        |

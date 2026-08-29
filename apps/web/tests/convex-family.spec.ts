@@ -247,9 +247,9 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 			});
 			expect(invite.code).toBeDefined();
 
-			// 1. 申請前は getFamilyInfoByInviteCode で鍵を取得できないこと
+			// 1. 申請前は getFamilyInfoByFamilyId で鍵を取得できないこと
 			await expect(
-				applicantB.query(api.families.getFamilyInfoByInviteCode, {
+				applicantB.query(api.families.getFamilyInfoByFamilyId, {
 					familyId,
 				}),
 			).rejects.toThrow("Access denied");
@@ -306,9 +306,9 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 				requestId,
 			});
 
-			// 9. 承認後は getFamilyInfoByInviteCode が通ること
+			// 9. 承認後は getFamilyInfoByFamilyId が通ること
 			const infoAfterApproval = await applicantB.query(
-				api.families.getFamilyInfoByInviteCode,
+				api.families.getFamilyInfoByFamilyId,
 				{ familyId },
 			);
 			expect(infoAfterApproval.masterKeyEncrypted).toBe("SGVsbG9Xb3JsZA==");

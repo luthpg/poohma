@@ -390,7 +390,7 @@ function FamilyComponent() {
 
 			// 2. 移行先の家族情報を取得
 			const existingFamily = await convex.query(
-				api.families.getFamilyInfoByInviteCode,
+				api.families.getFamilyInfoByFamilyId,
 				{
 					accountId: activeAccountId || undefined,
 					familyId: myJoinRequest.familyId,

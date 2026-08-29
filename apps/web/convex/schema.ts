@@ -89,7 +89,8 @@ export default defineSchema({
     .index("by_userId_status", ["userId", "status"])
     .index("by_familyId_userId", ["familyId", "userId"])
     .index("by_accountId_status", ["accountId", "status"])
-    .index("by_familyId_accountId", ["familyId", "accountId"]),
+    .index("by_familyId_accountId", ["familyId", "accountId"])
+    .index("by_invitedByCode", ["invitedByCode"]),
 
   serviceRecords: defineTable({
     title: v.string(),
