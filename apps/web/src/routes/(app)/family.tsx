@@ -941,20 +941,17 @@ function FamilyComponent() {
 	if (family && isChangingFamily && myJoinRequest?.status === "approved") {
 		return (
 			<div className="mx-auto max-w-3xl p-6">
-				<div className="mb-6 sm:mb-8 flex flex-wrap items-center justify-between gap-3">
+				<div className="mb-6 sm:mb-8 flex items-center justify-between">
 					<h1 className="text-[26px] sm:text-[32px] font-semibold tracking-geist-h1 text-foreground">
 						家族管理
 					</h1>
-					<div className="flex items-center gap-2 sm:gap-3 ml-auto shrink-0">
-						<AccountSwitcher />
-						<button
-							type="button"
-							onClick={() => setIsChangingFamily(false)}
-							className="text-[13px] sm:text-[14px] px-3 py-1.5 bg-background rounded-md border shadow-sm text-foreground hover:bg-accent transition cursor-pointer"
-						>
-							キャンセル
-						</button>
-					</div>
+					<button
+						type="button"
+						onClick={() => setIsChangingFamily(false)}
+						className="text-[13px] sm:text-[14px] px-3 py-1.5 bg-background rounded-md border shadow-sm text-foreground hover:bg-accent transition cursor-pointer"
+					>
+						キャンセル
+					</button>
 				</div>
 
 				<div className="rounded-lg bg-card p-6 shadow-card transition-shadow">
@@ -1041,7 +1038,6 @@ function FamilyComponent() {
 					家族管理
 				</h1>
 				<div className="flex items-center gap-2 sm:gap-3 ml-auto shrink-0">
-					<AccountSwitcher />
 					{family ? (
 						<Link
 							to="/dashboard"
@@ -1050,13 +1046,16 @@ function FamilyComponent() {
 							ダッシュボードへ
 						</Link>
 					) : (
-						<button
-							type="button"
-							onClick={handleLogout}
-							className="rounded-md bg-card px-3.5 py-1.5 sm:px-4 sm:py-2 text-[13px] sm:text-[14px] font-medium text-red-500 shadow-border hover:bg-accent transition cursor-pointer"
-						>
-							ログアウト
-						</button>
+						<>
+							<AccountSwitcher />
+							<button
+								type="button"
+								onClick={handleLogout}
+								className="rounded-md bg-card px-3.5 py-1.5 sm:px-4 sm:py-2 text-[13px] sm:text-[14px] font-medium text-red-500 shadow-border hover:bg-accent transition cursor-pointer"
+							>
+								ログアウト
+							</button>
+						</>
 					)}
 				</div>
 			</div>
