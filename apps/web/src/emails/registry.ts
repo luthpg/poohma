@@ -13,6 +13,8 @@ import { biometricRegisteredEmail } from "./templates/security/BiometricRegister
 import { biometricRemovedEmail } from "./templates/security/BiometricRemovedEmail";
 import { csvExportedEmail } from "./templates/security/CsvExportedEmail";
 import { newDeviceLoginEmail } from "./templates/security/LoginNotificationEmail";
+import { recoveryKitIssuedEmail } from "./templates/security/RecoveryKitIssuedEmail";
+import { recoveryOtpEmail } from "./templates/security/RecoveryOtpEmail";
 
 export const emailTemplates = [
 	familyWelcomeEmail,
@@ -29,6 +31,8 @@ export const emailTemplates = [
 	csvExportedEmail,
 	biometricRegisteredEmail,
 	biometricRemovedEmail,
+	recoveryOtpEmail,
+	recoveryKitIssuedEmail,
 ] as const;
 
 export const emailPayload = v.union(
@@ -87,6 +91,14 @@ export const emailPayload = v.union(
 	v.object({
 		template: v.literal(biometricRemovedEmail.key),
 		props: biometricRemovedEmail.props,
+	}),
+	v.object({
+		template: v.literal(recoveryOtpEmail.key),
+		props: recoveryOtpEmail.props,
+	}),
+	v.object({
+		template: v.literal(recoveryKitIssuedEmail.key),
+		props: recoveryKitIssuedEmail.props,
 	}),
 );
 

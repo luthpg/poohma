@@ -15,6 +15,7 @@ import type * as families from "../families.js";
 import type * as http from "../http.js";
 import type * as migrations from "../migrations.js";
 import type * as records from "../records.js";
+import type * as recovery from "../recovery.js";
 import type * as rls from "../rls.js";
 import type * as users from "../users.js";
 
@@ -32,6 +33,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   migrations: typeof migrations;
   records: typeof records;
+  recovery: typeof recovery;
   rls: typeof rls;
   users: typeof users;
 }>;

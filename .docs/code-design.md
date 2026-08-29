@@ -175,10 +175,28 @@ serviceRecords 1 ── * credentials(内包配列)
 | masterKeySalt              | string(optional) | パスコードからの鍵導出（PBKDF2）に使うソルト（Base64）                                                 |
 | kdfIterations              | number(optional) | パスコード鍵導出（PBKDF2）の反復回数。作成・パスコード変更時点の値を記録し、復号時はこの値を動的に適用する（NFR-SEC-14）。未設定時はレガシー値300,000 |
 | cryptoVersion              | number(optional) | KDF・暗号化スキームのバージョン番号。未設定時はレガシー値1                                                                |
-| masterKeyRecoveryEncrypted | string(optional) | リカバリーキー由来鍵でラップされたマスターキー（Base64、FR-CRYPT-06）                                       |
-| masterKeyRecoveryIv        | string(optional) | 上記ラップ処理のIV（Base64）                                                                |
-| recoveryKeyIssuedAt        | number(optional) | リカバリーキー発行・再発行日時                                                                   |
+| recoveryMasterKeyEncrypted | string(optional) | リカバリーキー由来鍵でラップされたマスターキー（Base64、FR-CRYPT-06）                                       |
+| recoveryMasterKeyIv        | string(optional) | 上記リカバリーラップ処理のIV（Base64）                                                                |
+| recoveryMasterKeySalt      | string(optional) | リカバリーキー鍵導出（PBKDF2）に使うソルト（Base64）                                                   |
+| recoveryKdfIterations      | number(optional) | リカバリーキー鍵導出（PBKDF2）の反復回数（デフォルト300,000）                                         |
+| recoveryCryptoVersion      | number(optional) | リカバリーキー暗号化スキームのバージョン番号（デフォルト1）                                                   |
+| recoveryIssuedAt           | number(optional) | リカバリーキット発行・再発行日時                                                                   |
+| recoveryIssuedByAccountId  | Id<"users">(optional) | リカバリーキットを発行・再発行したユーザーアカウントID                                                |
 | updatedAt                  | number           | 更新日時（epoch ms）                                                                    |
+
+#### recoveryOtps
+
+| フィールド   | 型                 | 説明                                                         |
+| ------------ | ------------------ | ------------------------------------------------------------ |
+| accountId    | Id<"users">        | 復元をリクエストしたPoohMaアカウントID                       |
+| familyId     | Id<"families">     | 復元対象の家族グループID                                     |
+| codeHash     | string             | 生成された6桁OTPのSHA-256ハッシュ値（平文保存禁止）          |
+| expiresAt    | number             | 認証コード有効期限（発行から10分）                           |
+| attempts     | number             | 入力試行回数（最大5回で失効）                                |
+| lastSentAt   | number             | 最終送信日時（60秒以内の再送レート制限制御）                 |
+
+インデックス: by\_accountId, by\_familyId\_accountId
+
 
 #### users
 

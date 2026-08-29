@@ -1,4 +1,4 @@
-﻿import { render } from "@react-email/render";
+import { render } from "@react-email/render";
 import { describe, expect, it } from "vitest";
 import { resolveEmail } from "../src/emails/dispatch";
 import { type EmailPayload, emailTemplates } from "../src/emails/registry";
@@ -162,6 +162,28 @@ function samplePayloadFor(key: string): EmailPayload {
 					ipAddress: "203.0.113.1",
 					location: "東京都, 日本",
 					ctaUrl: "https://poohma.ciderlabs.link/settings",
+				},
+			};
+		case "recoveryOtp":
+			return {
+				template: "recoveryOtp",
+				props: {
+					displayName: "山田 太郎",
+					otpCode: "123456",
+					expiresInMinutes: 10,
+					familyName: "山田家",
+				},
+			};
+		case "recoveryKitIssued":
+			return {
+				template: "recoveryKitIssued",
+				props: {
+					displayName: "山田 太郎",
+					familyName: "山田家",
+					issuerName: "山田 太郎",
+					isReissue: false,
+					issuedAt: Date.now(),
+					ctaUrl: "https://poohma.ciderlabs.link/family",
 				},
 			};
 		default:

@@ -22,6 +22,13 @@ export const CURRENT_KDF_ITERATIONS =
 export const LEGACY_PBKDF2_ITERATIONS = 300_000;
 export const LEGACY_KDF_VERSION: KdfVersion = 1;
 
+// リカバリーキット用KDFパラメータ
+export const RECOVERY_KDF_VERSION: KdfVersion = 1;
+export const RECOVERY_KDF_ITERATIONS = 300_000;
+
+// Crockford's Base32 character set (excluding I, L, O, U to avoid misreading)
+const CROCKFORD_BASE32_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
 /**
  * 文字列を Uint8Array に変換
  */
@@ -353,4 +360,88 @@ export async function reEncryptCredentials(
 	}
 
 	return reEncryptedCredentials;
+}
+
+/**
+ * 暗号学的に安全なリカバリーコードを生成（32文字 Crockford's Base32, 4文字ごとハイフン区切り）
+ * 例: `ABCD-EFGH-JKMN-PQRT-WXYZ-2345-6789-BCDF`
+ */
+export function generateRecoveryCode(): string {
+	const randomBytes = crypto.getRandomValues(new Uint8Array(32));
+	const chars: string[] = [];
+	for (let i = 0; i < 32; i++) {
+		// 0..31 のインデックスにマッピング
+		const idx = randomBytes[i] % CROCKFORD_BASE32_ALPHABET.length;
+		chars.push(CROCKFORD_BASE32_ALPHABET[idx]);
+	}
+
+	// 4文字ずつハイフンで区切る (8グループ)
+	const chunks: string[] = [];
+	for (let i = 0; i < 32; i += 4) {
+		chunks.push(chars.slice(i, i + 4).join(""));
+	}
+	return chunks.join("-");
+}
+
+/**
+ * リカバリーコードの正規化（ハイフン・スペース除去、大文字化、誤読文字 O->0, I/L->1 の置換）
+ */
+export function normalizeRecoveryCode(code: string): string {
+	let normalized = code.trim().toUpperCase().replace(/[\s-]/g, "");
+
+	// 類似文字の正規化
+	normalized = normalized.replace(/[O]/g, "0").replace(/[IL]/g, "1");
+
+	return normalized;
+}
+
+/**
+ * リカバリーコードが有効な形式（32文字のBase32）か検証
+ */
+export function isValidRecoveryCode(code: string): boolean {
+	const normalized = normalizeRecoveryCode(code);
+	if (normalized.length !== 32) return false;
+	for (let i = 0; i < normalized.length; i++) {
+		if (!CROCKFORD_BASE32_ALPHABET.includes(normalized[i])) {
+			return false;
+		}
+	}
+	return true;
+}
+
+/**
+ * リカバリーコードからキーを導出 (PBKDF2)
+ */
+export async function deriveKeyFromRecoveryCode(
+	recoveryCode: string,
+	salt: string,
+	iterations: number = RECOVERY_KDF_ITERATIONS,
+	kdfVersion: KdfVersion = RECOVERY_KDF_VERSION,
+): Promise<CryptoKey> {
+	const normalized = normalizeRecoveryCode(recoveryCode);
+	return await deriveKeyFromPasscode(normalized, salt, iterations, kdfVersion);
+}
+
+/**
+ * マスターキーをリカバリーキーでラップ
+ */
+export async function wrapMasterKeyWithRecovery(
+	masterKey: CryptoKey,
+	recoveryKey: CryptoKey,
+): Promise<{
+	encrypted: string;
+	iv: string;
+}> {
+	return await wrapMasterKey(masterKey, recoveryKey);
+}
+
+/**
+ * リカバリーキーでラップされたマスターキーを復号
+ */
+export async function unwrapMasterKeyWithRecovery(
+	encryptedBase64: string,
+	ivBase64: string,
+	recoveryKey: CryptoKey,
+): Promise<CryptoKey> {
+	return await unwrapMasterKey(encryptedBase64, ivBase64, recoveryKey);
 }

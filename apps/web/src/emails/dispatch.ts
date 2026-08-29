@@ -14,6 +14,8 @@ import { biometricRegisteredEmail } from "./templates/security/BiometricRegister
 import { biometricRemovedEmail } from "./templates/security/BiometricRemovedEmail";
 import { csvExportedEmail } from "./templates/security/CsvExportedEmail";
 import { newDeviceLoginEmail } from "./templates/security/LoginNotificationEmail";
+import { recoveryKitIssuedEmail } from "./templates/security/RecoveryKitIssuedEmail";
+import { recoveryOtpEmail } from "./templates/security/RecoveryOtpEmail";
 
 function resolve<Props>(
 	definition: {
@@ -58,5 +60,9 @@ export function resolveEmail(payload: EmailPayload) {
 			return resolve(biometricRegisteredEmail, payload.props);
 		case "biometricRemoved":
 			return resolve(biometricRemovedEmail, payload.props);
+		case "recoveryOtp":
+			return resolve(recoveryOtpEmail, payload.props);
+		case "recoveryKitIssued":
+			return resolve(recoveryKitIssuedEmail, payload.props);
 	}
 }

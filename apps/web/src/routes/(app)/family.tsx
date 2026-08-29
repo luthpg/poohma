@@ -14,18 +14,24 @@ import {
 	Copy,
 	Eye,
 	EyeOff,
+	KeyRound,
 	Plus,
 	QrCode,
+	RotateCcw,
 	Share2,
+	ShieldCheck,
 	X,
 } from "lucide-react";
+
 import { QRCodeCanvas } from "qrcode.react";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
 import { AccountSwitcher } from "@/components/AccountSwitcher";
+import { RecoveryKitDialog } from "@/components/family/RecoveryKitDialog";
 import { usePasscode } from "@/components/PasscodeProvider";
+
 import { PasscodeStrengthMeter } from "@/components/PasscodeStrengthMeter";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -127,8 +133,15 @@ function FamilyComponent() {
 			? { accountId: activeAccountId || undefined }
 			: "skip",
 	);
+	const recoveryStatus = useQuery(
+		api.recovery.getRecoveryStatus,
+		isAuthenticated && family ? {} : "skip",
+	);
+	const [isRecoveryKitModalOpen, setIsRecoveryKitModalOpen] = useState(false);
+
 	const search = Route.useSearch();
 	const router = useRouter();
+
 	const { queryClient } = Route.useRouteContext();
 	const convex = useConvex();
 	const handleLogout = async () => {
@@ -1594,6 +1607,90 @@ function FamilyComponent() {
 							</div>
 						)}
 					</div>
+
+					{/* リカバリーキット（復元コード） */}
+					<div className="mt-8 border-t border-border pt-6">
+						<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+							<div>
+								<div className="flex items-center gap-2">
+									<ShieldCheck className="h-4 w-4 text-primary" />
+									<h3 className="text-[14px] font-medium text-foreground">
+										リカバリーキット（復元コード）
+									</h3>
+									{recoveryStatus?.hasRecoveryKit ? (
+										<span className="text-[11px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium px-2 py-0.5 rounded-full border border-emerald-500/20">
+											発行済み
+										</span>
+									) : (
+										<span className="text-[11px] bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium px-2 py-0.5 rounded-full border border-amber-500/20">
+											未発行（推奨）
+										</span>
+									)}
+								</div>
+								<p className="text-[12px] text-muted-foreground mt-1">
+									家族パスコードを忘れた場合にMasterKeyを安全に復元するためのPDFキットを発行・保管します。
+								</p>
+							</div>
+
+							<div className="flex items-center gap-2 shrink-0">
+								<Link
+									to="/recovery"
+									className="flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-[13px] font-medium text-foreground shadow-sm hover:bg-muted transition cursor-pointer"
+								>
+									<RotateCcw className="h-3.5 w-3.5" />
+									リカバリーキットから復元
+								</Link>
+								<button
+									type="button"
+									onClick={() => setIsRecoveryKitModalOpen(true)}
+									className="flex items-center gap-1.5 rounded-md bg-foreground px-3.5 py-1.5 text-[13px] font-medium text-background shadow-sm hover:bg-foreground/90 transition cursor-pointer"
+								>
+									<KeyRound className="h-3.5 w-3.5" />
+									{recoveryStatus?.hasRecoveryKit
+										? "再発行する"
+										: "キットを発行"}
+								</button>
+							</div>
+						</div>
+
+						{recoveryStatus?.hasRecoveryKit && recoveryStatus.issuedAt ? (
+							<div className="rounded-md bg-muted/30 p-3.5 border border-border/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+								<div className="space-y-0.5">
+									<div className="text-muted-foreground">
+										有効なリカバリーキット発行情報:
+									</div>
+									<div className="font-medium text-foreground">
+										発行日時:{" "}
+										{new Date(recoveryStatus.issuedAt).toLocaleString("ja-JP")}{" "}
+										（発行者: {recoveryStatus.issuerName}）
+									</div>
+								</div>
+								<div className="text-[11px] text-muted-foreground">
+									※手元のPDF記載の発行日時と一致していることをご確認ください
+								</div>
+							</div>
+						) : (
+							<div className="rounded-md bg-amber-500/5 p-3.5 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-300 space-y-1">
+								<p className="font-semibold">
+									⚠️ 万が一のパスコード忘れに備えてください
+								</p>
+								<p>
+									PoohMaは完全なEnd-to-End暗号化を採用しているため、家族全員がパスコードを忘れると復旧できなくなります。金庫や安全な場所へのPDF保管を推奨します。
+								</p>
+							</div>
+						)}
+					</div>
+
+					{/* リカバリーキット発行モーダル */}
+					{family && (
+						<RecoveryKitDialog
+							isOpen={isRecoveryKitModalOpen}
+							onClose={() => setIsRecoveryKitModalOpen(false)}
+							familyName={family.name}
+							issuerName={activeAccount?.displayName || "管理者"}
+							isReissue={recoveryStatus?.hasRecoveryKit ?? false}
+						/>
+					)}
 
 					<div className="mt-8 border-t border-border pt-6 text-center">
 						<button

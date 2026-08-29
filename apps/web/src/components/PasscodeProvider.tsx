@@ -1,6 +1,7 @@
-import { useRouteContext } from "@tanstack/react-router";
-import { Eye, EyeOff, Fingerprint } from "lucide-react";
+import { Link, useRouteContext } from "@tanstack/react-router";
+import { Eye, EyeOff, Fingerprint, RotateCcw } from "lucide-react";
 import type React from "react";
+
 import {
 	createContext,
 	useCallback,
@@ -594,6 +595,17 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
 									"ロック解除"
 								)}
 							</button>
+						</div>
+
+						<div className="pt-2 text-center border-t">
+							<Link
+								to="/recovery"
+								onClick={handleCancelUnlock}
+								className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition underline underline-offset-4"
+							>
+								<RotateCcw className="h-3.5 w-3.5" />
+								家族パスコードを忘れた場合はこちら（リカバリーキット復元）
+							</Link>
 						</div>
 					</form>
 				</DialogContent>
