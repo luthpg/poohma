@@ -265,8 +265,8 @@ export async function unwrapDEK(
 export interface ReEncryptCredentialInput {
 	recordId?: string;
 	id: string;
-	passwordHint: string;
-	passwordHintIv: string;
+	passwordHint?: string;
+	passwordHintIv?: string;
 	passwordHintDekEncrypted?: string;
 	passwordHintDekIv?: string;
 }
@@ -276,8 +276,8 @@ export interface ReEncryptRecordInput {
 	id?: string;
 	credentials: {
 		id: string;
-		passwordHint: string;
-		passwordHintIv: string;
+		passwordHint?: string;
+		passwordHintIv?: string;
 		passwordHintDekEncrypted?: string;
 		passwordHintDekIv?: string;
 	}[];
@@ -300,6 +300,11 @@ export async function reWrapCredential(
 	oldMasterKey: CryptoKey,
 	newMasterKey: CryptoKey,
 ): Promise<ReEncryptedCredentialOutput> {
+	if (!cred.passwordHint || !cred.passwordHintIv) {
+		throw new Error(
+			`Credential (id: ${cred.id}) is missing password hint information for re-wrapping`,
+		);
+	}
 	if (!cred.passwordHintDekEncrypted || !cred.passwordHintDekIv) {
 		throw new Error(
 			`Credential (id: ${cred.id}) is missing DEK information for re-wrapping`,
