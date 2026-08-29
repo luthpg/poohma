@@ -370,8 +370,8 @@ export function generateRecoveryCode(): string {
 	const randomBytes = crypto.getRandomValues(new Uint8Array(32));
 	const chars: string[] = [];
 	for (let i = 0; i < 32; i++) {
-		// 0..31 のインデックスにマッピング
-		const idx = randomBytes[i] % CROCKFORD_BASE32_ALPHABET.length;
+		// Crockford's Base32 は 32 文字（2^5）のため、下位5ビット (0..31) をマスク抽出してバイアスを排除
+		const idx = randomBytes[i] & 0x1f;
 		chars.push(CROCKFORD_BASE32_ALPHABET[idx]);
 	}
 

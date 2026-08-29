@@ -22,13 +22,19 @@ async function hashText(text: string): Promise<string> {
 }
 
 /**
- * 6桁の数字 OTP コードを生成
+ * 6桁の数字 OTP コードを生成（Rejection sampling によるバイアス排除）
  */
 function generate6DigitOtp(): string {
+	// 2^32 未満で 1,000,000 の最大の倍数 (4,294,000,000)
+	const maxValid = 4_294_000_000;
 	const array = new Uint32Array(1);
-	crypto.getRandomValues(array);
-	const num = array[0] % 1_000_000;
-	return num.toString().padStart(6, "0");
+	while (true) {
+		crypto.getRandomValues(array);
+		if (array[0] < maxValid) {
+			const num = array[0] % 1_000_000;
+			return num.toString().padStart(6, "0");
+		}
+	}
 }
 
 /**
