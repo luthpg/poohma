@@ -155,7 +155,9 @@ poohma/                    … プロジェクトルート（Turborepo / pnpm wo
 families 1 ── * users            (users.familyId → families._id)
 families 1 ── * serviceRecords    (serviceRecords.familyId → families._id)
 families 1 ── * joinRequests       (joinRequests.familyId → families._id)
+families 1 ── * familyInvites       (familyInvites.familyId → families._id)
 families 1 ── * familyMigrations    (familyMigrations.targetFamilyId / sourceFamilyId → families._id)
+familyInvites 1 ── * joinRequests   (joinRequests.invitedByCode → familyInvites._id, optional)
 users     1 ── * serviceRecords      (serviceRecords.userId = users.userId, 文字列参照)
 users     1 ── * joinRequests         (joinRequests.userId = users.userId, 文字列参照)
 serviceRecords 1 ── * credentials(内包配列)
@@ -210,15 +212,30 @@ serviceRecords 1 ── * credentials(内包配列)
 
 インデックス: by\_userId, by\_status
 
+#### familyInvites
+
+| フィールド   | 型                      | 説明                                         |
+| ------------ | ----------------------- | -------------------------------------------- |
+| familyId     | Id<families>            | 招待対象の家族ID                             |
+| code         | string                  | 招待コード（UUID等のランダム文字列）         |
+| createdBy    | string                  | 発行者の Firebase UID                        |
+| createdAt    | number                  | 作成日時                                     |
+| expiresAt    | number                  | 有効期限日時（TTLに基づき算出）              |
+| revokedAt    | number(optional)        | 手動失効日時（設定時は即無効）               |
+| useCount     | number                  | この招待コード経由で作成された申請数（監査用）|
+
+インデックス: by\_code, by\_familyId
+
 #### joinRequests
 
-| フィールド                 | 型                                     | 説明                    |
-| --------------------- | ------------------------------------- | --------------------- |
-| familyId              | Id<families>                          | 申請対象の家族               |
-| userId                | string                                | 申請者の Firebase UID     |
-| accountId             | Id<users>(optional)                   | 申請元の PoohMa Account ID |
-| status                | "pending" \| "approved" \| "rejected" | 申請状態                  |
-| createdAt / updatedAt | number                                | 作成・更新日時               |
+| フィールド                 | 型                                     | 説明                          |
+| --------------------- | ------------------------------------- | ---------------------------- |
+| familyId              | Id<families>                          | 申請対象の家族                     |
+| userId                | string                                | 申請者の Firebase UID           |
+| accountId             | Id<users>(optional)                   | 申請元の PoohMa Account ID       |
+| invitedByCode         | Id<familyInvites>(optional)           | 申請に利用された招待コードID（監査証跡） |
+| status                | "pending" \| "approved" \| "rejected" | 申請状態                        |
+| createdAt / updatedAt | number                                | 作成・更新日時                     |
 
 インデックス: by\_familyId\_status, by\_userId\_status, by\_familyId\_userId, by\_accountId\_status, by\_familyId\_accountId
 
@@ -628,7 +645,11 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
 | issueRecoveryKey                       | Mutation         | familyBound   | リカバリーキーの発行／再発行（masterKeyRecoveryEncrypted等を保存、6.6）                                                                    |
 | recoverWithRecoveryKey                 | Mutation         | authenticated | リカバリーキー経由でのマスターキー復元後、新パスコードでの再wrap結果を保存（6.6）                                                                          |
 | getRecordsForReEncryption              | Query            | familyBound   | 再暗号化対象データ取得（家族所属前提）                                                                                                   |
+| createFamilyInvite                     | Mutation         | familyBound   | 有効期限付き招待コードの発行（TTL: 15分〜30日、デフォルト7日）                                                                                   |
+| revokeFamilyInvite                     | Mutation         | familyBound   | 自家族の招待コードの手動失効                                                                                                           |
+| getFamilyInvites                       | Query            | familyBound   | 自家族の招待コード一覧取得（ステータス: active/expired/revoked付き）                                                                           |
 | cleanupExpiredMigrationsInternal       | InternalMutation | 内部限定（Cron）    | 期限切れ移行データの自動クリーンアップ                                                                                                   |
+| cleanupExpiredFamilyInvitesInternal    | InternalMutation | 内部限定（Cron）    | 30日以上前の期限切れ・失効済み招待コードの自動削除                                                                                             |
 
 ### 7.3 convex/records.ts
 

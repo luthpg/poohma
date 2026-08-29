@@ -60,10 +60,23 @@ export default defineSchema({
     .index("by_accountId", ["accountId"])
     .index("by_status", ["status"]),
 
+  familyInvites: defineTable({
+    familyId: v.id("families"),
+    code: v.string(), // crypto.randomUUID() 等の高エントロピー文字列
+    createdBy: v.string(), // 発行者の Firebase UID
+    createdAt: v.number(),
+    expiresAt: v.number(), // 発行時に選択した TTL に基づき算出
+    revokedAt: v.optional(v.number()), // セットされていれば即無効
+    useCount: v.number(), // この招待経由で作成された参加申請数（監査用）
+  })
+    .index("by_code", ["code"])
+    .index("by_familyId", ["familyId"]),
+
   joinRequests: defineTable({
     familyId: v.id("families"),
     userId: v.string(), // 申請者の Firebase UID
     accountId: v.optional(v.id("users")), // 申請元 PoohMa Account ID
+    invitedByCode: v.optional(v.id("familyInvites")),
     status: v.union(
       v.literal("pending"),
       v.literal("approved"),
