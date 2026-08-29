@@ -13,7 +13,10 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "email:dev": "email dev --dir src/emails/templates --port 7878",
-    "email:export": "email export --dir src/emails/templates"
+    "email:export": "email export --dir src/emails/templates",
+    "convex:dev": "convex dev",
+    "convex:deploy": "convex deploy",
+    "convex:codegen": "convex codegen"
   },
   "dependencies": {
     "@fontsource/geist-mono": "^5.3.0",
