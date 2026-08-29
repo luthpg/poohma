@@ -138,7 +138,9 @@ function RecoveryPageComponent() {
 
 		setIsSendingOtp(true);
 		try {
-			const res = await sendRecoveryOtpMut({});
+			const res = await sendRecoveryOtpMut({
+				accountId: activeAccountId || undefined,
+			});
 			setOtpSentEmail(res.email);
 			setOtpCooldown(60);
 			setStep(2);
@@ -162,7 +164,9 @@ function RecoveryPageComponent() {
 		if (otpCooldown > 0 || isSendingOtp) return;
 		setIsSendingOtp(true);
 		try {
-			const res = await sendRecoveryOtpMut({});
+			const res = await sendRecoveryOtpMut({
+				accountId: activeAccountId || undefined,
+			});
 			setOtpCooldown(60);
 			toast.success(
 				`登録メールアドレス（${res.email}）に認証コードを再送信しました`,
@@ -190,6 +194,7 @@ function RecoveryPageComponent() {
 		try {
 			// 1. バックエンドで OTP と Recovery Code を検証し、Wrapped MasterKey とセッショントークンを取得
 			const res = await verifyRecoveryOtpMut({
+				accountId: activeAccountId || undefined,
 				otpCode: otp,
 				recoveryCode: rawCode,
 			});
@@ -269,6 +274,7 @@ function RecoveryPageComponent() {
 
 			// バックエンドでパスコード情報を更新（ワンタイム認可トークンを消費）
 			await redeemRecoveryMut({
+				accountId: activeAccountId || undefined,
 				sessionToken,
 				masterKeyEncrypted: newWrapped.encrypted,
 				masterKeyIv: newWrapped.iv,

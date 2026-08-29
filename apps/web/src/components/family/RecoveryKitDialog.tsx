@@ -21,6 +21,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
+import { useAccount } from "@/hooks/useAccount";
 import { api } from "../../../convex/_generated/api";
 import {
 	deriveKeyFromRecoveryCode,
@@ -57,6 +58,7 @@ export function RecoveryKitDialog({
 	onSuccess,
 }: RecoveryKitDialogProps) {
 	const { getMasterKey, requireUnlock } = usePasscode();
+	const { activeAccountId } = useAccount();
 	const registerRecoveryKitMut = useMutation(api.recovery.registerRecoveryKit);
 
 	const [step, setStep] = useState<"initial" | "generating" | "saved">(
@@ -161,6 +163,7 @@ export function RecoveryKitDialog({
 			// 5. バックエンドへの登録（PDF生成完了後に旧リカバリー情報の上書き/無効化を実行）
 			const recoveryCodeHash = await hashRecoveryCode(recoveryCode);
 			await registerRecoveryKitMut({
+				accountId: activeAccountId || undefined,
 				recoveryMasterKeyEncrypted: wrapped.encrypted,
 				recoveryMasterKeyIv: wrapped.iv,
 				recoveryMasterKeySalt: recoverySalt,

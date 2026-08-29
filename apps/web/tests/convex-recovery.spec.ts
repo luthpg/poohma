@@ -370,4 +370,85 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 			}),
 		).rejects.toThrow("有効期限が切れています");
 	});
+
+	it("同一Firebase UIDに複数アカウントが存在する場合、accountId指定によりリカバリー状態が完全に分離されること", async () => {
+		const t = convexTest(schema, modules);
+
+		let familyAId!: Id<"families">;
+		let familyBId!: Id<"families">;
+		let accountAId!: Id<"users">;
+		let accountBId!: Id<"users">;
+
+		const sharedFirebaseUid = "firebase_user_multi_123";
+
+		await t.run(async (ctx) => {
+			// 家族A（リカバリーキット発行済み）
+			familyAId = await ctx.db.insert("families", {
+				name: "田中家本家",
+				masterKeyEncrypted: "MasterKeyA==",
+				masterKeyIv: "IvA==",
+				masterKeySalt: "SaltA==",
+				recoveryMasterKeyEncrypted: "RecEncA==",
+				recoveryMasterKeyIv: "RecIvA==",
+				recoveryMasterKeySalt: "RecSaltA==",
+				recoveryIssuedAt: Date.now() - 5000,
+				updatedAt: Date.now(),
+			});
+			accountAId = await ctx.db.insert("users", {
+				userId: sharedFirebaseUid,
+				email: "multi@example.com",
+				displayName: "田中アカウントA",
+				familyId: familyAId,
+				updatedAt: Date.now(),
+			});
+
+			// 家族B（新規作成、リカバリーキット未発行）
+			familyBId = await ctx.db.insert("families", {
+				name: "田中家分家",
+				masterKeyEncrypted: "MasterKeyB==",
+				masterKeyIv: "IvB==",
+				masterKeySalt: "SaltB==",
+				updatedAt: Date.now(),
+			});
+			accountBId = await ctx.db.insert("users", {
+				userId: sharedFirebaseUid,
+				email: "multi@example.com",
+				displayName: "田中アカウントB",
+				familyId: familyBId,
+				updatedAt: Date.now(),
+			});
+		});
+
+		const user = t.withIdentity({
+			subject: sharedFirebaseUid,
+			email: "multi@example.com",
+		});
+
+		// 1. アカウントAのステータス取得: リカバリーキット発行済み
+		const statusA = await user.query(api.recovery.getRecoveryStatus, {
+			accountId: accountAId,
+		});
+		expect(statusA.hasRecoveryKit).toBe(true);
+
+		// 2. アカウントBのステータス取得: リカバリーキット未発行（アカウントAの情報を誤って拾わないこと）
+		const statusB = await user.query(api.recovery.getRecoveryStatus, {
+			accountId: accountBId,
+		});
+		expect(statusB.hasRecoveryKit).toBe(false);
+
+		// 3. アカウントBでリカバリーキットを登録
+		const registerResB = await user.mutation(api.recovery.registerRecoveryKit, {
+			accountId: accountBId,
+			recoveryMasterKeyEncrypted: "RecEncB==",
+			recoveryMasterKeyIv: "RecIvB==",
+			recoveryMasterKeySalt: "RecSaltB==",
+		});
+		expect(registerResB.success).toBe(true);
+
+		// 4. 登録後のアカウントBのステータス確認
+		const statusBAfter = await user.query(api.recovery.getRecoveryStatus, {
+			accountId: accountBId,
+		});
+		expect(statusBAfter.hasRecoveryKit).toBe(true);
+	});
 });

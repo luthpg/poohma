@@ -135,7 +135,9 @@ function FamilyComponent() {
 	);
 	const recoveryStatus = useQuery(
 		api.recovery.getRecoveryStatus,
-		isAuthenticated && family ? {} : "skip",
+		isAuthenticated && family
+			? { accountId: activeAccountId || undefined }
+			: "skip",
 	);
 	const [isRecoveryKitModalOpen, setIsRecoveryKitModalOpen] = useState(false);
 
