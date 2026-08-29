@@ -1,5 +1,11 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useConvex, useConvexAuth, useMutation, useQuery } from "convex/react";
+import {
+	useConvex,
+	useConvexAuth,
+	useMutation,
+	useQuery,
+	useQuery_experimental,
+} from "convex/react";
 import { signOut } from "firebase/auth";
 import {
 	Ban,
@@ -309,15 +315,21 @@ function FamilyComponent() {
 		useState(false);
 	const [showJoinPasscode, setShowJoinPasscode] = useState(false);
 
-	const publicFamilyInfo = useQuery(
-		api.families.getFamilyPublicInfo,
-		joinCode.trim()
+	const publicFamilyInfoQuery = useQuery_experimental({
+		query: api.families.getFamilyPublicInfo,
+		args: joinCode.trim()
 			? {
 					accountId: activeAccountId || undefined,
 					code: joinCode.trim(),
 				}
 			: "skip",
-	);
+	});
+	const publicFamilyInfo =
+		publicFamilyInfoQuery.status === "success"
+			? publicFamilyInfoQuery.data
+			: publicFamilyInfoQuery.status === "error"
+				? null
+				: undefined;
 
 	const [isChangingPasscode, setIsChangingPasscode] = useState(false);
 	const [currentPasscode, setCurrentPasscode] = useState("");

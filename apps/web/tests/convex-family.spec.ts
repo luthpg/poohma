@@ -464,6 +464,34 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 			);
 		});
 
+		it("createFamilyInviteは有限の整数でないTTLを拒否すること", async () => {
+			const t = convexTest(schema, modules);
+
+			await t.run(async (ctx) => {
+				const familyId = await ctx.db.insert("families", {
+					name: "TTL検証家",
+					updatedAt: Date.now(),
+				});
+				await ctx.db.insert("users", {
+					userId: "user_ttl_validation",
+					email: "ttl@example.com",
+					familyId,
+					updatedAt: Date.now(),
+				});
+			});
+
+			const user = t.withIdentity({
+				subject: "user_ttl_validation",
+				email: "ttl@example.com",
+			});
+
+			for (const ttlMinutes of [Number.NaN, Number.POSITIVE_INFINITY, 1.5]) {
+				await expect(
+					user.mutation(api.families.createFamilyInvite, { ttlMinutes }),
+				).rejects.toThrow("ttlMinutes must be a finite integer");
+			}
+		});
+
 		it("期限切れの招待コードで参加申請または情報取得を行うとエラーになること", async () => {
 			const t = convexTest(schema, modules);
 			let familyId!: Id<"families">;
@@ -697,6 +725,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 			let familyId!: Id<"families">;
 			let oldExpiredId!: Id<"familyInvites">;
 			let oldRevokedId!: Id<"familyInvites">;
+			let referencedOldExpiredId!: Id<"familyInvites">;
 			let recentExpiredId!: Id<"familyInvites">;
 			let activeId!: Id<"familyInvites">;
 
@@ -731,6 +760,24 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 					useCount: 0,
 				});
 
+				// 参加申請の監査証跡から参照されているため削除対象外
+				referencedOldExpiredId = await ctx.db.insert("familyInvites", {
+					familyId,
+					code: "referenced-old-expired",
+					createdBy: "u",
+					createdAt: thirtyOneDaysAgo - 1000,
+					expiresAt: thirtyOneDaysAgo,
+					useCount: 1,
+				});
+				await ctx.db.insert("joinRequests", {
+					familyId,
+					userId: "applicant",
+					invitedByCode: referencedOldExpiredId,
+					status: "approved",
+					createdAt: thirtyOneDaysAgo,
+					updatedAt: thirtyOneDaysAgo,
+				});
+
 				// 10日前に期限切れ（まだ削除対象外）
 				recentExpiredId = await ctx.db.insert("familyInvites", {
 					familyId,
@@ -759,11 +806,15 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
 			const rOldExpired = await t.run((ctx) => ctx.db.get(oldExpiredId));
 			const rOldRevoked = await t.run((ctx) => ctx.db.get(oldRevokedId));
+			const rReferencedOldExpired = await t.run((ctx) =>
+				ctx.db.get(referencedOldExpiredId),
+			);
 			const rRecentExpired = await t.run((ctx) => ctx.db.get(recentExpiredId));
 			const rActive = await t.run((ctx) => ctx.db.get(activeId));
 
 			expect(rOldExpired).toBeNull();
 			expect(rOldRevoked).toBeNull();
+			expect(rReferencedOldExpired).toBeDefined();
 			expect(rRecentExpired).toBeDefined();
 			expect(rActive).toBeDefined();
 		});

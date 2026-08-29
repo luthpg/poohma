@@ -1158,6 +1158,9 @@ export const createFamilyInvite = familyBoundMutation({
     const MAX_TTL_MINUTES = 30 * 24 * 60; // 30日 (43200分)
 
     const rawTtl = args.ttlMinutes ?? DEFAULT_TTL_MINUTES;
+    if (!Number.isFinite(rawTtl) || !Number.isInteger(rawTtl)) {
+      throw new Error("ttlMinutes must be a finite integer");
+    }
     const clampedTtl = Math.min(
       Math.max(rawTtl, MIN_TTL_MINUTES),
       MAX_TTL_MINUTES,
@@ -1239,11 +1242,20 @@ export const cleanupExpiredFamilyInvitesInternal = internalMutation({
     const RETENTION_MS = 30 * 24 * 60 * 60 * 1000; // 30日
     const cutoff = Date.now() - RETENTION_MS;
     const invites = await ctx.db.query("familyInvites").collect();
+    const joinRequests = await ctx.db.query("joinRequests").collect();
+    const referencedInviteIds = new Set(
+      joinRequests.flatMap((request) =>
+        request.invitedByCode ? [request.invitedByCode] : [],
+      ),
+    );
     for (const invite of invites) {
       const isRevokedOld =
         invite.revokedAt != null && invite.revokedAt < cutoff;
       const isExpiredOld = invite.expiresAt < cutoff;
-      if (isRevokedOld || isExpiredOld) {
+      if (
+        (isRevokedOld || isExpiredOld) &&
+        !referencedInviteIds.has(invite._id)
+      ) {
         await ctx.db.delete(invite._id);
       }
     }
