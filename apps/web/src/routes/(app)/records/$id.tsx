@@ -1,4 +1,4 @@
-﻿import {
+import {
 	createFileRoute,
 	getRouteApi,
 	Link,
@@ -497,12 +497,13 @@ function RecordDetailComponent({
 								</button>
 							)}
 
-							{/* 共有設定ボタン (共有レコードかつ管理者の場合) */}
-							{isShared && isAdmin && (
+							{/* 共有設定ボタン (共有レコードの場合) */}
+							{isShared && (
 								<ShareSettingsDialog
 									record={record}
 									familyMembers={familyMembers}
 									activeAccountId={activeAccountId}
+									isAdmin={isAdmin}
 									onRecordUpdated={async () => {
 										await router.invalidate();
 									}}
@@ -620,6 +621,7 @@ function ShareSettingsDialog({
 	record,
 	familyMembers,
 	activeAccountId,
+	isAdmin,
 	onRecordUpdated,
 }: {
 	record: Doc<"serviceRecords"> & {
@@ -632,6 +634,7 @@ function ShareSettingsDialog({
 		displayName?: string;
 	}[];
 	activeAccountId?: Id<"users"> | null;
+	isAdmin: boolean;
 	onRecordUpdated: () => Promise<void>;
 }) {
 	const [isOpen, setIsOpen] = useState(false);
@@ -718,9 +721,13 @@ function ShareSettingsDialog({
 			</DialogTrigger>
 			<DialogContent className="max-w-md">
 				<DialogHeader>
-					<DialogTitle>共有と管理者の設定</DialogTitle>
+					<DialogTitle>
+						{isAdmin ? "共有と管理者の設定" : "共有設定"}
+					</DialogTitle>
 					<DialogDescription>
-						家族共有レコードの管理者権限の追加・削除や共有の解除を行えます。
+						{isAdmin
+							? "家族共有レコードの管理者権限の追加・削除や共有の解除を行えます。"
+							: "家族共有レコードの管理者および共有メンバーを確認できます。"}
 					</DialogDescription>
 				</DialogHeader>
 
@@ -757,7 +764,7 @@ function ShareSettingsDialog({
 											</div>
 										)}
 									</div>
-									{adminIds.length > 1 && (
+									{isAdmin && adminIds.length > 1 && (
 										<button
 											type="button"
 											disabled={isSubmitting}
@@ -773,8 +780,43 @@ function ShareSettingsDialog({
 						</div>
 					</div>
 
-					{/* 管理者を追加 */}
-					{nonAdminMembers.length > 0 && (
+					{/* 共有メンバー一覧 */}
+					<div className="border-t border-border pt-4">
+						<h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+							共有メンバー ({familyMembers.length}名)
+						</h3>
+						<div className="space-y-2 max-h-40 overflow-y-auto">
+							{familyMembers.map((member) => {
+								const isMemberAdmin = adminIds.includes(member.id);
+								return (
+									<div
+										key={member.id}
+										className="flex items-center justify-between p-2 rounded-md bg-muted/40 text-sm"
+									>
+										<div>
+											<div className="font-medium text-foreground">
+												{member.displayName || "メンバー"}
+												{member.id === activeAccountId && " (あなた)"}
+											</div>
+											{member.email && (
+												<div className="text-xs text-muted-foreground">
+													{member.email}
+												</div>
+											)}
+										</div>
+										{isMemberAdmin && (
+											<span className="rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] px-1.5 py-0.5 font-medium">
+												管理者
+											</span>
+										)}
+									</div>
+								);
+							})}
+						</div>
+					</div>
+
+					{/* 管理者を追加 (管理者のみ) */}
+					{isAdmin && nonAdminMembers.length > 0 && (
 						<div className="border-t border-border pt-4">
 							<h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
 								管理者の追加
@@ -805,23 +847,25 @@ function ShareSettingsDialog({
 						</div>
 					)}
 
-					{/* 共有解除 */}
-					<div className="border-t border-border pt-4">
-						<h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-							共有の解除
-						</h3>
-						<p className="text-xs text-muted-foreground mb-3">
-							共有を解除すると、このレコードはあなたの個人用（自分のみ）になり、他の家族メンバーは閲覧できなくなります。
-						</p>
-						<button
-							type="button"
-							disabled={isSubmitting}
-							onClick={handleUnshare}
-							className="w-full rounded-md border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs font-medium text-red-600 hover:bg-red-500/20 disabled:opacity-50 transition cursor-pointer"
-						>
-							共有を解除して個人用にする
-						</button>
-					</div>
+					{/* 共有解除 (管理者のみ) */}
+					{isAdmin && (
+						<div className="border-t border-border pt-4">
+							<h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+								共有の解除
+							</h3>
+							<p className="text-xs text-muted-foreground mb-3">
+								共有を解除すると、このレコードはあなたの個人用（自分のみ）になり、他の家族メンバーは閲覧できなくなります。
+							</p>
+							<button
+								type="button"
+								disabled={isSubmitting}
+								onClick={handleUnshare}
+								className="w-full rounded-md border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs font-medium text-red-600 hover:bg-red-500/20 disabled:opacity-50 transition cursor-pointer"
+							>
+								共有を解除して個人用にする
+							</button>
+						</div>
+					)}
 				</div>
 			</DialogContent>
 		</Dialog>
