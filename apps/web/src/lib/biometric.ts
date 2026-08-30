@@ -82,9 +82,7 @@ export async function registerBiometricUnlock(
 		throw new BiometricNotSupportedError();
 	}
 
-	if (
-		typeof window.PublicKeyCredential.getClientCapabilities === "function"
-	) {
+	if (typeof window.PublicKeyCredential.getClientCapabilities === "function") {
 		try {
 			const capabilities =
 				await window.PublicKeyCredential.getClientCapabilities();
