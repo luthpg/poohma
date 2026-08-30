@@ -465,7 +465,15 @@ function RecordDetailComponent({
 								}`}
 							>
 								{isShared
-									? `共有中${record.admins && record.admins.length > 0 ? ` (${record.admins.length}名管理)` : ""}`
+									? `共有中${
+											(
+												record.adminUsers
+													? record.adminUsers.length
+													: (record.admins?.length ?? 0)
+											) > 0
+												? ` (${record.adminUsers ? record.adminUsers.length : record.admins?.length}名管理)`
+												: ""
+										}`
 									: "自分のみ"}
 							</span>
 
@@ -644,8 +652,21 @@ function ShareSettingsDialog({
 	const removeRecordAdmin = useMutation(api.records.removeRecordAdmin);
 	const unshareRecord = useMutation(api.records.unshareRecord);
 
-	const adminIds = record.admins ?? [];
-	const nonAdminMembers = familyMembers.filter((m) => !adminIds.includes(m.id));
+	// 有効な管理者一覧の特定（adminUsers を優先し、未設定時は familyMembers から解決できるものだけに限定）
+	const activeAdminUsers =
+		record.adminUsers ??
+		(record.admins ?? [])
+			.map((id) => familyMembers.find((f) => f.id === id))
+			.filter((m): m is NonNullable<typeof m> => m != null)
+			.map((m) => ({
+				_id: m.id,
+				displayName: m.displayName,
+				email: m.email,
+			}));
+	const activeAdminIds = activeAdminUsers.map((a) => a._id);
+	const nonAdminMembers = familyMembers.filter(
+		(m) => !activeAdminIds.includes(m.id),
+	);
 
 	const handleAddAdmin = async () => {
 		if (!selectedMemberId) return;
@@ -735,20 +756,10 @@ function ShareSettingsDialog({
 					{/* 管理者一覧 */}
 					<div>
 						<h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-							現在の管理者 ({adminIds.length}名)
+							現在の管理者 ({activeAdminUsers.length}名)
 						</h3>
 						<div className="space-y-2 max-h-40 overflow-y-auto">
-							{(record.adminUsers && record.adminUsers.length > 0
-								? record.adminUsers
-								: adminIds.map((id) => {
-										const m = familyMembers.find((f) => f.id === id);
-										return {
-											_id: id,
-											displayName: m?.displayName || "メンバー",
-											email: m?.email || "",
-										};
-									})
-							).map((admin) => (
+							{activeAdminUsers.map((admin) => (
 								<div
 									key={admin._id}
 									className="flex items-center justify-between p-2 rounded-md bg-muted/40 text-sm"
@@ -764,7 +775,7 @@ function ShareSettingsDialog({
 											</div>
 										)}
 									</div>
-									{isAdmin && adminIds.length > 1 && (
+									{isAdmin && activeAdminUsers.length > 1 && (
 										<button
 											type="button"
 											disabled={isSubmitting}
@@ -787,7 +798,7 @@ function ShareSettingsDialog({
 						</h3>
 						<div className="space-y-2 max-h-40 overflow-y-auto">
 							{familyMembers.map((member) => {
-								const isMemberAdmin = adminIds.includes(member.id);
+								const isMemberAdmin = activeAdminIds.includes(member.id);
 								return (
 									<div
 										key={member.id}
