@@ -82,11 +82,19 @@ export async function registerBiometricUnlock(
 		throw new BiometricNotSupportedError();
 	}
 
-	const getClientCapabilities = window.PublicKeyCredential.getClientCapabilities;
-	if (typeof getClientCapabilities === "function") {
-		const capabilities = await getClientCapabilities();
-		if (capabilities["extension:prf"] !== true) {
-			throw new BiometricPrfNotSupportedError();
+	if (
+		typeof window.PublicKeyCredential.getClientCapabilities === "function"
+	) {
+		try {
+			const capabilities =
+				await window.PublicKeyCredential.getClientCapabilities();
+			if (capabilities["extension:prf"] !== true) {
+				throw new BiometricPrfNotSupportedError();
+			}
+		} catch (error) {
+			if (error instanceof BiometricPrfNotSupportedError) {
+				throw error;
+			}
 		}
 	}
 
