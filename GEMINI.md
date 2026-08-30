@@ -24,7 +24,7 @@
 
 ## 3. Convex Workflow & Code Generation
 
-Convex のスキーマ（`schema.ts`）やバックエンド関数（`convex/*.ts`）を変更した場合は、以下の手順に従ってプレビュー反映・型定義の生成・フォーマットを行ってください。
+Convex のスキーマ（`schema.ts`）やバックエンド関数（`convex/*.ts`）を変更した場合は、以下の手順に従ってデプロイ・型定義の生成・フォーマットを行ってください。`convex deploy` の対象環境は、実行時に設定されている `CONVEX_DEPLOY_KEY` によって決まります。
 
 > **Warning（Watch モード常駐の回避）**:
 > `convex dev` コマンドはファイル変更監視（watch モード）によってプロセスが常駐してしまうため、AI エージェント実行時や単発の型同期には使用しないでください。
@@ -33,12 +33,15 @@ Convex のスキーマ（`schema.ts`）やバックエンド関数（`convex/*.t
 ### 同期・コード生成手順
 
 1. **一括同期（推奨）**: `pnpm convex:sync`
-   - `convex deploy`（プレビュー環境へのワンショット反映） → `convex codegen`（型定義最新化） → `pnpm check`（自動フォーマット）を一括実行します。
+   - `convex deploy` → `convex codegen`（型定義最新化） → `pnpm check`（自動フォーマット）の順に一括実行します。
+   - CI でプレビューデプロイキーを `CONVEX_DEPLOY_KEY` に設定した場合に限り、プレビュー環境へ反映されます。
 2. **個別に実行する場合**:
-   - **Deploy**: `pnpm convex:deploy`（プレビュー環境へのワンショット反映）
+   - **Deploy**: `pnpm convex:deploy`（実行時の `CONVEX_DEPLOY_KEY` が示す環境へのワンショット反映。プレビューデプロイキーを設定した場合に限りプレビュー環境へ反映）
    - **Codegen & Format**: `pnpm convex:codegen`（`_generated/` 型定義の最新化とフォーマット）
 3. **Verify Pipeline**: `pnpm verify`
    - 型定義更新後、プロジェクト全体の一括品質検証を実行します。
+
+本番デプロイは、プレビュー用とは別の認証情報を使用し、定められたリリース運用に従って実行してください。
 
 ## 4. Git Commit Message Guidelines
 
