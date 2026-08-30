@@ -311,7 +311,19 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
 					);
 				} catch (error) {
 					console.error("Biometric registration failed:", error);
-					if (error instanceof Error && error.name !== "NotAllowedError") {
+					if (error instanceof Error) {
+						if (
+							error.name === "NotAllowedError" ||
+							error.name === "AbortError"
+						) {
+							// ユーザーによるキャンセル
+						} else {
+							toast.error(
+								error.message ||
+									"生体認証の登録に失敗しました。パスコード認証をご利用ください。",
+							);
+						}
+					} else {
 						toast.error("生体認証の登録に失敗しました。");
 					}
 				}
@@ -378,12 +390,25 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
 				toast.error(
 					"家族パスコードが変更された可能性があるため、保存された生体認証を解除しました。新しいパスコードでロック解除後、生体認証を再登録してください。",
 				);
+				setTimeout(() => {
+					passcodeInputRef.current?.focus();
+				}, 50);
 			}
 		} catch (error) {
 			console.error("Biometric unlock failed:", error);
-			if (error instanceof Error && error.name !== "NotAllowedError") {
-				toast.error("生体認証によるロック解除に失敗しました。");
+			if (error instanceof Error) {
+				if (error.name === "NotAllowedError" || error.name === "AbortError") {
+					// ユーザーキャンセル
+				} else {
+					toast.error(
+						error.message || "生体認証によるロック解除に失敗しました。",
+					);
+				}
 			}
+			// パスコード入力欄へ自然にフォールバック
+			setTimeout(() => {
+				passcodeInputRef.current?.focus();
+			}, 50);
 		} finally {
 			setIsBiometricAuthenticating(false);
 		}

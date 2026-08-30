@@ -733,4 +733,98 @@ describe("PasscodeProvider - 生体認証ロック解除とパスコード変更
 			expect(biometricLib.disableBiometricUnlock).not.toHaveBeenCalled();
 		});
 	});
+
+	it("生体認証非対応デバイスでは登録チェックボックスおよびクイック解除ボタンが表示されないこと", async () => {
+		vi.mocked(biometricLib.isBiometricSupported).mockResolvedValue(false);
+		vi.mocked(biometricLib.isBiometricEnabledForUser).mockResolvedValue(false);
+
+		let requireUnlockRef: (() => Promise<boolean>) | null = null;
+		const TestComponent = () => {
+			const { requireUnlock } = usePasscode();
+			requireUnlockRef = requireUnlock;
+			return <div>Test</div>;
+		};
+
+		render(
+			<PasscodeProvider>
+				<TestComponent />
+			</PasscodeProvider>,
+		);
+
+		// biome-ignore lint/style/noNonNullAssertion: testing ref is non-null
+		requireUnlockRef!();
+
+		await waitFor(() => {
+			expect(screen.getByText("家族パスコードの入力")).toBeTruthy();
+		});
+
+		// 非対応端末ではチェックボックスが表示されないこと
+		expect(
+			screen.queryByLabelText(/次回から指紋\/FaceIDでロック解除する/i),
+		).toBeNull();
+		// クイック解除ボタンも表示されないこと
+		expect(
+			screen.queryByRole("button", {
+				name: /指紋 \/ FaceID でロック解除/i,
+			}),
+		).toBeNull();
+	});
+
+	it("生体認証登録時にPRF非対応等のエラーが発生しても、パスコードによるロック解除は中断せず成功すること", async () => {
+		vi.mocked(biometricLib.isBiometricSupported).mockResolvedValue(true);
+		vi.mocked(biometricLib.isBiometricEnabledForUser).mockResolvedValue(false);
+		vi.mocked(cryptoLib.deriveKeyFromPasscode).mockResolvedValue(
+			{} as CryptoKey,
+		);
+		vi.mocked(cryptoLib.unwrapMasterKey).mockResolvedValue({
+			type: "secret",
+		} as unknown as CryptoKey);
+		vi.mocked(biometricLib.registerBiometricUnlock).mockRejectedValue(
+			new Error(
+				"このデバイスは高度な暗号化保護（PRF拡張）に対応していません。",
+			),
+		);
+
+		let requireUnlockRef: (() => Promise<boolean>) | null = null;
+		let unlockResult: boolean | null = null;
+		const TestComponent = () => {
+			const { requireUnlock } = usePasscode();
+			requireUnlockRef = requireUnlock;
+			return <div>Test</div>;
+		};
+
+		render(
+			<PasscodeProvider>
+				<TestComponent />
+			</PasscodeProvider>,
+		);
+
+		// biome-ignore lint/style/noNonNullAssertion: testing ref is non-null
+		requireUnlockRef!().then((res) => {
+			unlockResult = res;
+		});
+
+		await waitFor(() => {
+			expect(screen.getByText("家族パスコードの入力")).toBeTruthy();
+		});
+
+		// チェックボックスをオンにしてパスコードを入力
+		const checkbox = screen.getByRole("checkbox");
+		fireEvent.click(checkbox);
+
+		const input = screen.getByPlaceholderText("パスコード");
+		fireEvent.change(input, { target: { value: "valid-passcode" } });
+
+		const submitButton = screen.getByRole("button", { name: "ロック解除" });
+		fireEvent.click(submitButton);
+
+		await waitFor(() => {
+			// 生体認証登録エラーの通知が表示されること
+			expect(toast.error).toHaveBeenCalledWith(
+				"このデバイスは高度な暗号化保護（PRF拡張）に対応していません。",
+			);
+			// それでもロック解除処理自体は成功として完了すること（フォールバック）
+			expect(unlockResult).toBe(true);
+		});
+	});
 });

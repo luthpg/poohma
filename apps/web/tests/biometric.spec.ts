@@ -95,6 +95,30 @@ describe("生体認証解除機能のテスト (PRF拡張対応版: src/lib/biom
 			expect(supported).toBe(true);
 		});
 
+		it("プラットフォーム認証器が利用不可の場合 false を返すこと", async () => {
+			Object.defineProperty(globalThis, "PublicKeyCredential", {
+				value: {
+					isUserVerifyingPlatformAuthenticatorAvailable: vi
+						.fn()
+						.mockResolvedValue(false),
+				},
+				writable: true,
+				configurable: true,
+			});
+			const supported = await isBiometricSupported();
+			expect(supported).toBe(false);
+		});
+
+		it("isUserVerifyingPlatformAuthenticatorAvailable が関数でない場合 false を返すこと", async () => {
+			Object.defineProperty(globalThis, "PublicKeyCredential", {
+				value: {},
+				writable: true,
+				configurable: true,
+			});
+			const supported = await isBiometricSupported();
+			expect(supported).toBe(false);
+		});
+
 		it("PublicKeyCredential が存在しない場合 false を返すこと", async () => {
 			Object.defineProperty(globalThis, "PublicKeyCredential", {
 				value: undefined,
@@ -114,6 +138,78 @@ describe("生体認証解除機能のテスト (PRF拡張対応版: src/lib/biom
 	});
 
 	describe("registerBiometricUnlock (PRF拡張版)", () => {
+		it("非対応端末で実行した場合に BiometricNotSupportedError をスローすること", async () => {
+			Object.defineProperty(globalThis, "PublicKeyCredential", {
+				value: {
+					isUserVerifyingPlatformAuthenticatorAvailable: vi
+						.fn()
+						.mockResolvedValue(false),
+				},
+				writable: true,
+				configurable: true,
+			});
+
+			await expect(
+				registerBiometricUnlock(mockUserId, mockPasscode),
+			).rejects.toThrow(
+				"このデバイスまたはブラウザは生体認証に対応していません。",
+			);
+		});
+
+		it("デバイスがPRF拡張に対応していない場合（prfSeedが空）に BiometricPrfNotSupportedError をスローすること", async () => {
+			const mockCredentialNoPrf = {
+				rawId: new Uint8Array([1, 2, 3, 4]).buffer,
+				id: "AQIDBA",
+				type: "public-key",
+				response: {},
+				getClientExtensionResults: vi.fn().mockReturnValue({
+					prf: {}, // results.first が存在しない
+				}),
+			};
+
+			Object.defineProperty(navigator, "credentials", {
+				value: {
+					create: vi.fn().mockResolvedValue(mockCredentialNoPrf),
+					get: vi.fn(),
+				},
+				writable: true,
+				configurable: true,
+			});
+
+			await expect(
+				registerBiometricUnlock(mockUserId, mockPasscode),
+			).rejects.toThrow(
+				"このデバイスは高度な暗号化保護（PRF拡張）に対応していません。",
+			);
+		});
+
+		it.each([
+			["false を返す", { "extension:prf": false }],
+			["PRF の能力を返さない", {}],
+		])(
+			"getClientCapabilities が %s 場合、Credential を作成しないこと",
+			async (_description, capabilities) => {
+				const create = vi.mocked(navigator.credentials.create);
+				Object.defineProperty(globalThis, "PublicKeyCredential", {
+					value: {
+						isUserVerifyingPlatformAuthenticatorAvailable: vi
+							.fn()
+							.mockResolvedValue(true),
+						getClientCapabilities: vi.fn().mockResolvedValue(capabilities),
+					},
+					writable: true,
+					configurable: true,
+				});
+
+				await expect(
+					registerBiometricUnlock(mockUserId, mockPasscode),
+				).rejects.toThrow(
+					"このデバイスは高度な暗号化保護（PRF拡張）に対応していません。",
+				);
+				expect(create).not.toHaveBeenCalled();
+			},
+		);
+
 		it("WebAuthn PRF拡張を用いてパスコードを暗号化し、生の鍵(encryptionKey)を保存せずにIndexedDBへ格納すること", async () => {
 			await registerBiometricUnlock(mockUserId, mockPasscode);
 
