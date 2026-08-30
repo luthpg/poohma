@@ -141,6 +141,9 @@ function SettingsComponent() {
 			// 1. Firebase 再認証を最初に実行（セキュリティ確認）
 			try {
 				const provider = new GoogleAuthProvider();
+				provider.setCustomParameters({
+					prompt: "select_account",
+				});
 				await reauthenticateWithPopup(currentUser, provider);
 			} catch (reauthError) {
 				console.error("Re-authentication failed:", reauthError);

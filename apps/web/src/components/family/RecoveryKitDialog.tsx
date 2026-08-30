@@ -218,11 +218,11 @@ export function RecoveryKitDialog({
 			const fileName = `PoohMa-RecoveryKit-${safeFamilyName}-${new Date().toISOString().slice(0, 10)}.pdf`;
 			const file = new File([pdfBlob], fileName, { type: "application/pdf" });
 
-			if (navigator.canShare && navigator.canShare({ files: [file] })) {
+			if (navigator.canShare?.({ files: [file] })) {
 				await navigator.share({
 					files: [file],
 					title: `PoohMa リカバリーキット (${familyName})`,
-					text: "PoohMa の緊急リカバリーキット PDF です。Google ドライブやファイルアプリ等に安全に保管してください。",
+					text: "PoohMa の非常時用リカバリーキットPDFです。Googleドライブやファイルアプリ等に安全に保管してください。",
 				});
 				setHasShared(true);
 				toast.success("共有メニューを開きました");

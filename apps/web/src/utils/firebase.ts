@@ -18,6 +18,9 @@ if (isBrowser) {
 	app = getApps()?.length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 	auth = getAuth(app);
 	googleProvider = new GoogleAuthProvider();
+	googleProvider.setCustomParameters({
+		prompt: "select_account",
+	});
 }
 
 export { auth, googleProvider };
