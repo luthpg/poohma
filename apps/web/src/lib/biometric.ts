@@ -4,6 +4,24 @@ import { bufferToBase64 } from "@/lib/crypto";
 // ユーザーIDに基づいてIndexedDBのキーを一意に決定する
 const getBiometricKey = (userId: string) => `poohma_biometric_${userId}`;
 
+export class BiometricNotSupportedError extends Error {
+	constructor(
+		message = "このデバイスまたはブラウザは生体認証に対応していません。",
+	) {
+		super(message);
+		this.name = "BiometricNotSupportedError";
+	}
+}
+
+export class BiometricPrfNotSupportedError extends Error {
+	constructor(
+		message = "このデバイスは高度な暗号化保護（PRF拡張）に対応していません。",
+	) {
+		super(message);
+		this.name = "BiometricPrfNotSupportedError";
+	}
+}
+
 export interface BiometricCredentials {
 	credentialId: string;
 	encryptedPasscode: string;
@@ -15,7 +33,12 @@ export interface BiometricCredentials {
  * デバイスおよびブラウザが生体認証（WebAuthn / プラットフォーム認証）に対応しているか判定
  */
 export async function isBiometricSupported(): Promise<boolean> {
-	if (typeof window === "undefined" || window.PublicKeyCredential == null) {
+	if (
+		typeof window === "undefined" ||
+		window.PublicKeyCredential == null ||
+		typeof window.PublicKeyCredential
+			.isUserVerifyingPlatformAuthenticatorAvailable !== "function"
+	) {
 		return false;
 	}
 	try {
@@ -56,7 +79,7 @@ export async function registerBiometricUnlock(
 
 	const supported = await isBiometricSupported();
 	if (!supported) {
-		throw new Error("このデバイスまたはブラウザは生体認証に対応していません。");
+		throw new BiometricNotSupportedError();
 	}
 
 	const challenge = crypto.getRandomValues(new Uint8Array(32));
@@ -112,9 +135,7 @@ export async function registerBiometricUnlock(
 	const prfSeed = extensionResults.prf?.results?.first;
 
 	if (!prfSeed) {
-		throw new Error(
-			"このデバイスは高度な暗号化保護（PRF拡張）に対応していません。",
-		);
+		throw new BiometricPrfNotSupportedError();
 	}
 
 	// シードをAES-GCMキーに変換
