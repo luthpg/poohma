@@ -1645,6 +1645,7 @@ import {
 	decrypt,
 	deriveKeyFromPasscode,
 	encrypt,
+	exportKeyToBase64,
 	generateDEK,
 	unwrapDEK,
 	wrapDEK,
@@ -1683,6 +1684,15 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 			passwordHintDekIv: wrappedDekOld.iv,
 		};
 
+		// ローテーション前: 旧マスターキーではアンラップでき、新マスターキーでは失敗することを確認
+		await expect(
+			unwrapDEK(
+				mockDbCredential.passwordHintDekEncrypted,
+				mockDbCredential.passwordHintDekIv,
+				newMasterKey,
+			),
+		).rejects.toThrow();
+
 		//---------------------------------------------------------
 		// 2. 実行段階: family.tsx 内のローテーションロジックのシミュレーション
 		//---------------------------------------------------------
@@ -1705,9 +1715,6 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 			passwordHintDekIv: reWrappedDek.iv,
 		};
 
-		// (必要に応じてここで Convex のテストクライアントを叩く)
-		// await t.mutation(api.records.updateFamilyPasscode, { credentials: [rotatedCredentialPayload], ... });
-
 		//---------------------------------------------------------
 		// 3. 検証段階: 新しいパスコード（新マスターキー）だけで復号ができるか
 		//---------------------------------------------------------
@@ -1718,6 +1725,13 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 			newMasterKey,
 		);
 
+		// 復号後のDEKが期待する鍵用途・アルゴリズム・生データと完全に一致することを検証
+		expect(decryptedDek.algorithm.name).toBe("AES-GCM");
+		expect(decryptedDek.usages).toEqual(["encrypt", "decrypt"]);
+		expect(await exportKeyToBase64(decryptedDek)).toBe(
+			await exportKeyToBase64(originalDek),
+		);
+
 		// アンラップしたDEKで、暗号文が元の平文に戻るか
 		const finalPlainHint = await decrypt(
 			rotatedCredentialPayload.passwordHint,
@@ -1725,10 +1739,17 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 			decryptedDek,
 		);
 
-		// 最終アサーション: 鍵が書き換わっても、データの中身が正しく復元できること
+		// 鍵が書き換わっても、データの中身が正しく復元できること
 		expect(finalPlainHint).toBe(secretHint);
-		// 元のDEKオブジェクト（鍵の生データ情報）が同一性を保っていることの検証
-		expect(decryptedDek).toBeDefined();
+
+		// ローテーション後: 旧マスターキー（旧パスコード）では復号できないことを検証
+		await expect(
+			unwrapDEK(
+				rotatedCredentialPayload.passwordHintDekEncrypted,
+				rotatedCredentialPayload.passwordHintDekIv,
+				oldMasterKey,
+			),
+		).rejects.toThrow();
 	});
 
 	describe("2.1.5 家族移行（familyMigrations）のアカウント境界とアクセス制御", () => {
