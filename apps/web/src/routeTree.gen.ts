@@ -13,6 +13,7 @@ import { Route as appRouteRouteImport } from './routes/(app)/route'
 import { Route as publicRouteRouteImport } from './routes/(public)/route'
 import { Route as appDashboardRouteImport } from './routes/(app)/dashboard'
 import { Route as appFamilyRouteImport } from './routes/(app)/family'
+import { Route as appRecoveryRouteImport } from './routes/(app)/recovery'
 import { Route as appSettingsRouteImport } from './routes/(app)/settings'
 import { Route as publicIndexRouteImport } from './routes/(public)/index'
 import { Route as publicFaqRouteImport } from './routes/(public)/faq'
@@ -39,6 +40,11 @@ const appDashboardRoute = appDashboardRouteImport.update({
 const appFamilyRoute = appFamilyRouteImport.update({
   id: '/family',
   path: '/family',
+  getParentRoute: () => appRouteRoute,
+} as any)
+const appRecoveryRoute = appRecoveryRouteImport.update({
+  id: '/recovery',
+  path: '/recovery',
   getParentRoute: () => appRouteRoute,
 } as any)
 const appSettingsRoute = appSettingsRouteImport.update({
@@ -90,6 +96,7 @@ const appRecordsNewRoute = appRecordsNewRouteImport.update({
 export interface FileRoutesByFullPath {
   '/dashboard': typeof appDashboardRoute
   '/family': typeof appFamilyRoute
+  '/recovery': typeof appRecoveryRoute
   '/settings': typeof appSettingsRoute
   '/faq': typeof publicFaqRoute
   '/login': typeof publicLoginRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/dashboard': typeof appDashboardRoute
   '/family': typeof appFamilyRoute
+  '/recovery': typeof appRecoveryRoute
   '/settings': typeof appSettingsRoute
   '/faq': typeof publicFaqRoute
   '/login': typeof publicLoginRoute
@@ -119,6 +127,7 @@ export interface FileRoutesById {
   '/(public)': typeof publicRouteRouteWithChildren
   '/(app)/dashboard': typeof appDashboardRoute
   '/(app)/family': typeof appFamilyRoute
+  '/(app)/recovery': typeof appRecoveryRoute
   '/(app)/settings': typeof appSettingsRoute
   '/(public)/faq': typeof publicFaqRoute
   '/(public)/login': typeof publicLoginRoute
@@ -134,6 +143,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/dashboard'
     | '/family'
+    | '/recovery'
     | '/settings'
     | '/faq'
     | '/login'
@@ -147,6 +157,7 @@ export interface FileRouteTypes {
   to:
     | '/dashboard'
     | '/family'
+    | '/recovery'
     | '/settings'
     | '/faq'
     | '/login'
@@ -162,6 +173,7 @@ export interface FileRouteTypes {
     | '/(public)'
     | '/(app)/dashboard'
     | '/(app)/family'
+    | '/(app)/recovery'
     | '/(app)/settings'
     | '/(public)/faq'
     | '/(public)/login'
@@ -206,6 +218,13 @@ declare module '@tanstack/react-router' {
       path: '/family'
       fullPath: '/family'
       preLoaderRoute: typeof appFamilyRouteImport
+      parentRoute: typeof appRouteRoute
+    }
+    '/(app)/recovery': {
+      id: '/(app)/recovery'
+      path: '/recovery'
+      fullPath: '/recovery'
+      preLoaderRoute: typeof appRecoveryRouteImport
       parentRoute: typeof appRouteRoute
     }
     '/(app)/settings': {
@@ -277,6 +296,7 @@ declare module '@tanstack/react-router' {
 interface appRouteRouteChildren {
   appDashboardRoute: typeof appDashboardRoute
   appFamilyRoute: typeof appFamilyRoute
+  appRecoveryRoute: typeof appRecoveryRoute
   appSettingsRoute: typeof appSettingsRoute
   appRecordsIdRoute: typeof appRecordsIdRoute
   appRecordsNewRoute: typeof appRecordsNewRoute
@@ -285,6 +305,7 @@ interface appRouteRouteChildren {
 const appRouteRouteChildren: appRouteRouteChildren = {
   appDashboardRoute: appDashboardRoute,
   appFamilyRoute: appFamilyRoute,
+  appRecoveryRoute: appRecoveryRoute,
   appSettingsRoute: appSettingsRoute,
   appRecordsIdRoute: appRecordsIdRoute,
   appRecordsNewRoute: appRecordsNewRoute,

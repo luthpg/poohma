@@ -4,16 +4,22 @@ import {
 	CURRENT_KDF_VERSION,
 	decrypt,
 	deriveKeyFromPasscode,
+	deriveKeyFromRecoveryCode,
 	encrypt,
 	generateDEK,
 	generateMasterKey,
+	generateRecoveryCode,
+	isValidRecoveryCode,
 	LEGACY_PBKDF2_ITERATIONS,
+	normalizeRecoveryCode,
 	reEncryptCredentials,
 	reWrapCredential,
 	unwrapDEK,
 	unwrapMasterKey,
+	unwrapMasterKeyWithRecovery,
 	wrapDEK,
 	wrapMasterKey,
+	wrapMasterKeyWithRecovery,
 } from "@/lib/crypto";
 
 describe("1.1 暗号化コアロジックの単体テスト (src/lib/crypto.ts)", () => {
@@ -622,6 +628,93 @@ describe("1.1 暗号化コアロジックの単体テスト (src/lib/crypto.ts)"
 				);
 				expect(plain).toBe(expectedPlain);
 			}
+		});
+	});
+
+	describe("1.4 リカバリーキット・Recovery Codeの単体テスト", () => {
+		it("generateRecoveryCode: 32文字のBase32（4文字ごとハイフン区切りの8グループ）が生成されること", () => {
+			const code = generateRecoveryCode();
+			expect(code).toMatch(/^[0-9A-HJKMNP-Z]{4}(-[0-9A-HJKMNP-Z]{4}){7}$/);
+			expect(code.replace(/-/g, "").length).toBe(32);
+		});
+
+		it("normalizeRecoveryCode: 小文字、ハイフン、スペース、混同しやすい文字(O->0, I/L->1)が正しく正規化されること", () => {
+			const raw = "abcd-efgh-jkmn-pqrt-wxyz-2345-6789-oilu";
+			const normalized = normalizeRecoveryCode(raw);
+			// o -> 0, i -> 1, l -> 1
+			expect(normalized).toBe("ABCDEFGHJKMNPQRTWXYZ23456789011U");
+		});
+
+		it("isValidRecoveryCode: 有効なコードと無効なコードを正しく判定できること", () => {
+			const validCode = generateRecoveryCode();
+			expect(isValidRecoveryCode(validCode)).toBe(true);
+
+			// 短すぎる
+			expect(isValidRecoveryCode("ABCD-EFGH")).toBe(false);
+			// 不正な文字
+			expect(
+				isValidRecoveryCode("ABCD-EFGH-JKMN-PQRT-WXYZ-2345-6789-@@@@"),
+			).toBe(false);
+		});
+
+		it("リカバリーキーによるマスターキーのラップ・アンラップとデータ復号が成立すること", async () => {
+			const recoveryCode = generateRecoveryCode();
+			const salt = "RecoverySaltBase64Val==";
+			const masterKey = await generateMasterKey();
+
+			// 1. リカバリーキーの導出
+			const recoveryKey = await deriveKeyFromRecoveryCode(recoveryCode, salt);
+
+			// 2. マスターキーをリカバリーキーでラップ
+			const wrapped = await wrapMasterKeyWithRecovery(masterKey, recoveryKey);
+			expect(wrapped.encrypted).toBeTypeOf("string");
+			expect(wrapped.iv).toBeTypeOf("string");
+
+			// 3. リカバリーキーでマスターキーをアンラップ
+			const unwrappedMasterKey = await unwrapMasterKeyWithRecovery(
+				wrapped.encrypted,
+				wrapped.iv,
+				recoveryKey,
+			);
+
+			// 4. 元のマスターキーで暗号化したデータを復元されたマスターキーで復号できること
+			const testData = "TopSecretRecoveryData123";
+			const encrypted = await encrypt(testData, masterKey);
+			const decrypted = await decrypt(
+				encrypted.encrypted,
+				encrypted.iv,
+				unwrappedMasterKey,
+			);
+			expect(decrypted).toBe(testData);
+		});
+
+		it("異なるリカバリーコードではマスターキーのアンラップに失敗すること", async () => {
+			const recoveryCodeCorrect = generateRecoveryCode();
+			const recoveryCodeWrong = generateRecoveryCode();
+			const salt = "RecoverySaltBase64Val==";
+			const masterKey = await generateMasterKey();
+
+			const recoveryKeyCorrect = await deriveKeyFromRecoveryCode(
+				recoveryCodeCorrect,
+				salt,
+			);
+			const recoveryKeyWrong = await deriveKeyFromRecoveryCode(
+				recoveryCodeWrong,
+				salt,
+			);
+
+			const wrapped = await wrapMasterKeyWithRecovery(
+				masterKey,
+				recoveryKeyCorrect,
+			);
+
+			await expect(
+				unwrapMasterKeyWithRecovery(
+					wrapped.encrypted,
+					wrapped.iv,
+					recoveryKeyWrong,
+				),
+			).rejects.toThrow();
 		});
 	});
 });

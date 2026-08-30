@@ -9,8 +9,38 @@ export default defineSchema({
     masterKeySalt: v.optional(v.string()),
     kdfIterations: v.optional(v.number()),
     cryptoVersion: v.optional(v.number()),
+    // リカバリーキット用フィールド
+    recoveryMasterKeyEncrypted: v.optional(v.string()),
+    recoveryMasterKeyIv: v.optional(v.string()),
+    recoveryMasterKeySalt: v.optional(v.string()),
+    recoveryCodeHash: v.optional(v.string()), // 正規化リカバリーコードのSHA-256ハッシュ（サーバー検証用）
+    recoveryKdfIterations: v.optional(v.number()),
+    recoveryCryptoVersion: v.optional(v.number()),
+    recoveryIssuedAt: v.optional(v.number()),
+    recoveryIssuedByAccountId: v.optional(v.id("users")),
     updatedAt: v.number(),
   }),
+
+  recoveryOtps: defineTable({
+    accountId: v.id("users"),
+    familyId: v.id("families"),
+    codeHash: v.string(), // SHA-256 ハッシュ（平文保存しない）
+    expiresAt: v.number(), // 有効期限（発行から10分）
+    attempts: v.number(), // 試行回数（最大5回）
+    lastSentAt: v.number(), // 再送レート制限用（60秒インターバル）
+  })
+    .index("by_accountId", ["accountId"])
+    .index("by_familyId_accountId", ["familyId", "accountId"]),
+
+  recoverySessions: defineTable({
+    accountId: v.id("users"),
+    familyId: v.id("families"),
+    sessionTokenHash: v.string(), // SHA-256 ハッシュ
+    expiresAt: v.number(), // 有効期限（10分）
+  })
+    .index("by_accountId", ["accountId"])
+    .index("by_familyId_accountId", ["familyId", "accountId"]),
+
 
   loginEvents: defineTable({
     accountId: v.id("users"),

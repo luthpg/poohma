@@ -9,7 +9,12 @@
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
     "check": "biome check --write",
-    "check:ci": "biome ci"
+    "check:ci": "biome ci",
+    "verify": "pnpm typecheck && pnpm check && pnpm test && pnpm build",
+    "convex:dev": "pnpm -F @poohma/web exec convex dev",
+    "convex:sync": "pnpm -F @poohma/web exec convex deploy && pnpm -F @poohma/web exec convex codegen && pnpm check",
+    "convex:codegen": "pnpm -F @poohma/web exec convex codegen && pnpm check",
+    "convex:deploy": "pnpm -F @poohma/web exec convex deploy"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.7",

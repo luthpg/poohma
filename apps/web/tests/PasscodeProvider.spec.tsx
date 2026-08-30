@@ -25,6 +25,19 @@ import * as cryptoLib from "@/lib/crypto";
 
 vi.mock("@tanstack/react-router", () => ({
 	useRouteContext: vi.fn(),
+	Link: ({
+		children,
+		onClick,
+		to,
+	}: {
+		children: React.ReactNode;
+		onClick?: () => void;
+		to: string;
+	}) => (
+		<a href={to} onClick={onClick}>
+			{children}
+		</a>
+	),
 }));
 
 vi.mock("sonner", () => ({

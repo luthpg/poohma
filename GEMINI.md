@@ -5,7 +5,7 @@
 - **OS / Shell**: Windows (PowerShell)
   - コマンド実行時のパス区切り文字やシェルコマンド（`;` の扱い、ファイル操作コマンド等）は PowerShell の構文に従うこと。
   - Windows PowerShell 7未満 では `&&` 演算子が構文エラー（`トークン '&&' は、このバージョンでは有効なステートメント区切り記号ではありません`）となるため使用できません。
-  - コマンドを連続実行する際は、先頭に `$ErrorActionPreference = "Stop"` を記述して `;` で繋ぐ（例: `$ErrorActionPreference = "Stop"; コマンド1; コマンド2`）ことで、途中でエラーが出た瞬間にスクリプト全体を安全に強制終了させてください。
+  - コマンドの連続実行はパイプラインの途中での失敗をキャッチできない場合があるため、避けてください。やむを得ない場合は、先頭に `$ErrorActionPreference = "Stop"` を記述して `;` で繋ぐ（例: `$ErrorActionPreference = "Stop"; コマンド1; コマンド2`）ことで、途中でエラーが出た瞬間にスクリプト全体を安全に強制終了させてください。
   - パスに丸括弧 `()` が含まれる場合（例: `src/routes/(app)/records/$id.tsx`）、PowerShell が式として誤解釈するため、必ずダブルクォートで囲むこと（例: `git add "src/routes/(app)/records/file.tsx"`）。
 - **Package Manager**: `pnpm`
   - パッケージの追加・削除・実行には必ず `pnpm` を使用すること（`npm`, `yarn` は使用禁止）。
@@ -18,10 +18,32 @@
 2. **Static Check / Lint/ Format**: `pnpm check`
 3. **Test**: `pnpm test`
 4. **Build Check**: `pnpm build`（Turborepo 経由で全ワークスペースのビルドを実行）
+5. **Full Pipeline**: `pnpm verify`（上記1〜4を一括で順次実行し、エラー発生時に即時停止）
 
-> **Note**: コマンドの連続実行時は、`$ErrorActionPreference = "Stop"; pnpm typecheck; pnpm check; pnpm test; pnpm build` のように `$ErrorActionPreference = "Stop"` を付与して `;` で繋ぐか、`pnpm` 側のスクリプトを活用すること（`&&` は Windows PowerShell では構文エラーになります）。
+> **Note**: 一括検証を行う際は、ルートの `pnpm verify` を使用してください（個別のスクリプトが失敗した時点で確実に処理が中断されます）。
 
-## 3. Git Commit Message Guidelines
+## 3. Convex Workflow & Code Generation
+
+Convex のスキーマ（`schema.ts`）やバックエンド関数（`convex/*.ts`）を変更した場合は、以下の手順に従ってデプロイ・型定義の生成・フォーマットを行ってください。`convex deploy` の対象環境は、実行時に設定されている `CONVEX_DEPLOY_KEY` によって決まります。
+
+> **Warning（Watch モード常駐の回避）**:
+> `convex dev` コマンドはファイル変更監視（watch モード）によってプロセスが常駐してしまうため、AI エージェント実行時や単発の型同期には使用しないでください。
+> 変更を反映して最新の型定義を得る際は、必ず **ワンショットで完了する `pnpm convex:sync`（または `convex deploy` → `convex codegen`）** を使用してください。
+
+### 同期・コード生成手順
+
+1. **一括同期（推奨）**: `pnpm convex:sync`
+   - `convex deploy` → `convex codegen`（型定義最新化） → `pnpm check`（自動フォーマット）の順に一括実行します。
+   - CI でプレビューデプロイキーを `CONVEX_DEPLOY_KEY` に設定した場合に限り、プレビュー環境へ反映されます。
+2. **個別に実行する場合**:
+   - **Deploy**: `pnpm convex:deploy`（実行時の `CONVEX_DEPLOY_KEY` が示す環境へのワンショット反映。プレビューデプロイキーを設定した場合に限りプレビュー環境へ反映）
+   - **Codegen & Format**: `pnpm convex:codegen`（`_generated/` 型定義の最新化とフォーマット）
+3. **Verify Pipeline**: `pnpm verify`
+   - 型定義更新後、プロジェクト全体の一括品質検証を実行します。
+
+本番デプロイは、プレビュー用とは別の認証情報を使用し、定められたリリース運用に従って実行してください。
+
+## 4. Git Commit Message Guidelines
 
 Git コミットメッセージを生成または実行する場合は、**Conventional Commits** 形式に厳格に従うこと。
 
@@ -64,7 +86,7 @@ try {
 }
 ```
 
-## 4. GitHub CLI (`gh`) Usage in PowerShell
+## 5. GitHub CLI (`gh`) Usage in PowerShell
 
 PowerShell 上で `gh pr create` や `gh issue create` を実行して本文（Body）を渡す場合は、以下のルールを厳守すること。
 
@@ -90,7 +112,7 @@ try {
 }
 ```
 
-## 5. Documentation Update Check During Planning and Before Commit
+## 6. Documentation Update Check During Planning and Before Commit
 
 コード変更や機能追加・仕様変更を計画時、またはコミットする前に、関連するドキュメントの更新要否を必ず確認すること。
 
@@ -106,7 +128,7 @@ try {
   2. ドキュメントの更新が必要な場合は、変更箇所・更新方針をユーザーに確認し、許諾を得た上でドキュメントの更新を行う。
   3. ドキュメント更新を含めた状態で品質検証コマンドを実行し、コミットを行う。
 
-## 6. Monorepo Structure
+## 7. Monorepo Structure
 
 本プロジェクトは **pnpm workspace + Turborepo** によるモノレポ構成です。
 
