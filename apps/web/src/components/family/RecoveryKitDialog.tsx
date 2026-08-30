@@ -103,6 +103,7 @@ export function RecoveryKitDialog({
 		setHasSavedLocally(false);
 		setHasPrinted(false);
 		setHasSavedDrive(false);
+		setHasShared(false);
 		setIsDriveUploading(false);
 	}, [pdfUrl]);
 
