@@ -57,7 +57,7 @@ export const registerRecoveryKit = familyBoundMutation({
 		recoveryMasterKeyEncrypted: v.string(),
 		recoveryMasterKeyIv: v.string(),
 		recoveryMasterKeySalt: v.string(),
-		recoveryCodeHash: v.optional(v.string()),
+		recoveryCodeHash: v.string(),
 		recoveryKdfIterations: v.optional(v.number()),
 		recoveryCryptoVersion: v.optional(v.number()),
 	},
@@ -261,17 +261,19 @@ export const verifyRecoveryOtpAndGetRecoveryData = authenticatedMutation({
 			throw new Error("リカバリー情報が見つかりません");
 		}
 
-		// 1. Recovery Code のサーバー側照合（設定されている場合）
-		if (family.recoveryCodeHash) {
-			const normalizedCode = normalizeRecoveryCode(args.recoveryCode);
-			const inputCodeHash = await hashText(normalizedCode);
-			if (inputCodeHash !== family.recoveryCodeHash) {
-				return {
-					success: false as const,
-					error: "リカバリーコードが正しくありません。入力内容をご確認ください。",
-					remainingAttempts: undefined,
-				};
-			}
+		// 1. Recovery Code のサーバー側照合
+		if (!family.recoveryCodeHash) {
+			throw new Error("リカバリーコードの検証情報が見つかりません");
+		}
+
+		const normalizedCode = normalizeRecoveryCode(args.recoveryCode);
+		const inputCodeHash = await hashText(normalizedCode);
+		if (inputCodeHash !== family.recoveryCodeHash) {
+			return {
+				success: false as const,
+				error: "リカバリーコードが正しくありません。入力内容をご確認ください。",
+				remainingAttempts: undefined,
+			};
 		}
 
 		const now = Date.now();

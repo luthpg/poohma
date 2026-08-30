@@ -381,6 +381,13 @@ export function RecoveryKitDialog({
 							</Button>
 						</DialogFooter>
 					</div>
+				) : step === "generating" || !generatedCode || !pdfBlob ? (
+					<div className="flex flex-col items-center justify-center gap-3 py-10">
+						<Spinner className="h-6 w-6" />
+						<p className="text-sm text-muted-foreground">
+							リカバリーキットを生成しています…
+						</p>
+					</div>
 				) : (
 					<div className="space-y-4 py-2">
 						<div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 flex items-start gap-3">

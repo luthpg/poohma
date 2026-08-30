@@ -43,6 +43,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 			recoveryMasterKeyEncrypted: "RecoveryEncryptedKey1==",
 			recoveryMasterKeyIv: "RecoveryIv1==",
 			recoveryMasterKeySalt: "RecoverySalt1==",
+			recoveryCodeHash: "RecoveryCodeHash1==",
 		});
 		expect(registerRes.success).toBe(true);
 		expect(registerRes.issuedAt).toBeDefined();
@@ -53,11 +54,29 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 		expect(statusAfter.issuedAt).toBe(registerRes.issuedAt);
 		expect(statusAfter.issuerName).toBe("佐藤太郎");
 
-		// 4. 再発行: 新しいリカバリー情報で上書き
+		// 4. 必須のハッシュを省略した直接 mutation 呼び出しは拒否され、保存済みハッシュも維持される
+		const missingHashArgs = {
+			recoveryMasterKeyEncrypted: "InvalidRecoveryEncryptedKey==",
+			recoveryMasterKeyIv: "InvalidRecoveryIv==",
+			recoveryMasterKeySalt: "InvalidRecoverySalt==",
+		};
+		await expect(
+			user.mutation(api.recovery.registerRecoveryKit, missingHashArgs as never),
+		).rejects.toThrow(/recoveryCodeHash/);
+
+		const familyAfterRejectedRegistration = await t.run(async (ctx) => {
+			return await ctx.db.get(familyId);
+		});
+		expect(familyAfterRejectedRegistration?.recoveryCodeHash).toBe(
+			"RecoveryCodeHash1==",
+		);
+
+		// 5. 再発行: 新しいリカバリー情報で上書き
 		const reissueRes = await user.mutation(api.recovery.registerRecoveryKit, {
 			recoveryMasterKeyEncrypted: "RecoveryEncryptedKey2==",
 			recoveryMasterKeyIv: "RecoveryIv2==",
 			recoveryMasterKeySalt: "RecoverySalt2==",
+			recoveryCodeHash: "RecoveryCodeHash2==",
 		});
 		expect(reissueRes.success).toBe(true);
 
@@ -67,6 +86,44 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 		expect(updatedFamily?.recoveryMasterKeyEncrypted).toBe(
 			"RecoveryEncryptedKey2==",
 		);
+		expect(updatedFamily?.recoveryCodeHash).toBe("RecoveryCodeHash2==");
+	});
+
+	it("ハッシュのない既存リカバリーキットでは復元を拒否すること", async () => {
+		const t = convexTest(schema, modules);
+
+		let familyId!: Id<"families">;
+		await t.run(async (ctx) => {
+			familyId = await ctx.db.insert("families", {
+				name: "旧式キット家族",
+				masterKeyEncrypted: "MasterKey==",
+				masterKeyIv: "MasterIv==",
+				masterKeySalt: "MasterSalt==",
+				recoveryMasterKeyEncrypted: "RecoveryEncryptedKey==",
+				recoveryMasterKeyIv: "RecoveryIv==",
+				recoveryMasterKeySalt: "RecoverySalt==",
+				recoveryIssuedAt: Date.now(),
+				updatedAt: Date.now(),
+			});
+			await ctx.db.insert("users", {
+				userId: "user_legacy_recovery_kit",
+				email: "legacy@example.com",
+				familyId,
+				updatedAt: Date.now(),
+			});
+		});
+
+		const user = t.withIdentity({
+			subject: "user_legacy_recovery_kit",
+			email: "legacy@example.com",
+		});
+
+		await expect(
+			user.mutation(api.recovery.verifyRecoveryOtpAndGetRecoveryData, {
+				otpCode: "123456",
+				recoveryCode: "DUMMY-CODE",
+			}),
+		).rejects.toThrow("リカバリーコードの検証情報が見つかりません");
 	});
 
 	it("OTP発行・レート制限・認証検証・ロックアウトおよびデータ復旧フローの統合検証", async () => {
@@ -242,6 +299,14 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 
 	it("異常系: 家族未所属、リカバリーキット未発行、期限切れOTP、上限到達時のエラーハンドリング", async () => {
 		const t = convexTest(schema, modules);
+		const dummyCodeBuffer = new TextEncoder().encode("DUMMYC0DE");
+		const dummyCodeDigest = await crypto.subtle.digest(
+			"SHA-256",
+			dummyCodeBuffer,
+		);
+		const dummyRecoveryCodeHash = btoa(
+			String.fromCharCode(...new Uint8Array(dummyCodeDigest)),
+		);
 
 		let familyNoKitId!: Id<"families">;
 		let familyWithKitNoOtpId!: Id<"families">;
@@ -273,6 +338,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 				recoveryMasterKeyEncrypted: "RecEncNomura==",
 				recoveryMasterKeyIv: "RecIvNomura==",
 				recoveryMasterKeySalt: "RecSaltNomura==",
+				recoveryCodeHash: dummyRecoveryCodeHash,
 				recoveryIssuedAt: Date.now(),
 				updatedAt: Date.now(),
 			});
@@ -338,6 +404,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 				recoveryMasterKeyEncrypted: "RecEnc==",
 				recoveryMasterKeyIv: "RecIv==",
 				recoveryMasterKeySalt: "RecSalt==",
+				recoveryCodeHash: dummyRecoveryCodeHash,
 				recoveryIssuedAt: Date.now(),
 				updatedAt: Date.now(),
 			});
@@ -442,6 +509,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 			recoveryMasterKeyEncrypted: "RecEncB==",
 			recoveryMasterKeyIv: "RecIvB==",
 			recoveryMasterKeySalt: "RecSaltB==",
+			recoveryCodeHash: "RecoveryCodeHashB==",
 		});
 		expect(registerResB.success).toBe(true);
 
