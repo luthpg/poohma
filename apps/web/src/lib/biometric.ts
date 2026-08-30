@@ -82,6 +82,22 @@ export async function registerBiometricUnlock(
 		throw new BiometricNotSupportedError();
 	}
 
+	if (
+		typeof window.PublicKeyCredential.getClientCapabilities === "function"
+	) {
+		try {
+			const capabilities =
+				await window.PublicKeyCredential.getClientCapabilities();
+			if (capabilities["extension:prf"] !== true) {
+				throw new BiometricPrfNotSupportedError();
+			}
+		} catch (error) {
+			if (error instanceof BiometricPrfNotSupportedError) {
+				throw error;
+			}
+		}
+	}
+
 	const challenge = crypto.getRandomValues(new Uint8Array(32));
 
 	// ユーザーID（String）をバイト列に変換し、WebAuthn仕様に準拠したuser.idとして設定
