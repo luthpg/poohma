@@ -69,8 +69,43 @@ it("正常系: 家族作成とユーザーの familyId 紐付け", async () => {
 
 ### 認可エラー・RLS 拒否のテスト
 ```typescript
-it("異常系: 未所属ユーザーによる共有レコード操作は拒否される", async () => {
+it("異常系: 対象家族に未所属のユーザーによる共有レコード操作は拒否される", async () => {
   const t = convexTest(schema, modules);
+  const targetRecordId = await t.run(async (ctx) => {
+    const targetFamilyId = await ctx.db.insert("families", {
+      name: "Target Family",
+      updatedAt: Date.now(),
+    });
+    const attackerFamilyId = await ctx.db.insert("families", {
+      name: "Attacker Family",
+      updatedAt: Date.now(),
+    });
+    const ownerAccountId = await ctx.db.insert("users", {
+      userId: "owner_uid",
+      email: "owner@example.com",
+      familyId: targetFamilyId,
+      updatedAt: Date.now(),
+    });
+    await ctx.db.insert("users", {
+      userId: "attacker_uid",
+      email: "attacker@example.com",
+      familyId: attackerFamilyId,
+      updatedAt: Date.now(),
+    });
+
+    return await ctx.db.insert("serviceRecords", {
+      title: "Target Record",
+      userId: "owner_uid",
+      accountId: ownerAccountId,
+      familyId: targetFamilyId,
+      ownerType: "family",
+      ownerFamilyId: targetFamilyId,
+      admins: [ownerAccountId],
+      credentials: [],
+      tags: [],
+      updatedAt: Date.now(),
+    });
+  });
   const attacker = t.withIdentity({ subject: "attacker_uid" });
 
   await expect(

@@ -8,11 +8,11 @@ AI Agent が誤りやすい点、過去に問題となった点、実装上の�
 
 ### `&&` 演算子の使用禁止
 - **問題**: Windows PowerShell 7 未満では `&&` が構文エラーになる。
-- **回避法**: コマンドの連続実行は避け、個別実行するか、`$ErrorActionPreference = "Stop"; cmd1; cmd2` 形式を使用する。
+- **回避法**: コマンドの連続実行は避け、個別実行する。やむを得ず連続実行する場合は、各外部コマンドの直後に `$LASTEXITCODE` を確認し、非ゼロなら次のコマンドを実行する前に停止または失敗を報告する（例: `cmd1; if ($LASTEXITCODE -ne 0) { throw "cmd1 failed: $LASTEXITCODE" }; cmd2; if ($LASTEXITCODE -ne 0) { throw "cmd2 failed: $LASTEXITCODE" }`）。
 
 ### 丸括弧 `()` を含むパスの誤解釈
 - **問題**: `src/routes/(app)/records/$id.tsx` のようなパスをクォートなしで渡すと PowerShell が式として解釈しエラーになる。
-- **回避法**: パスは必ずダブルクォートで囲む（例: `git add "src/routes/(app)/records/$id.tsx"`）。
+- **回避法**: パスは必ずクォートで囲み、`$id` のようなリテラルの `$` を含む場合はシングルクォートを使用する（例: `git add 'src/routes/(app)/records/$id.tsx'`）。
 
 ### 日本語コミットメッセージ・PR本文の文字化け
 - **問題**: PowerShell の標準パイプライン（`|`）や `-m` 引数はエンコーディングにより日本語が `?` に化ける。
@@ -48,7 +48,7 @@ AI Agent が誤りやすい点、過去に問題となった点、実装上の�
 
 ### CryptoKey の `extractable` と `keyUsages` の不整合
 - **問題**: `generateDEK()` や `unwrapMasterKey()` で `extractable: false` に設定すると、後の再ラップ（`wrapKey`）や家族移行処理でエクスポートできずランタイムエラーになる。また DEK の usages に不要な `wrapKey` を含めると暗号化仕様の整合性を欠く。
-- **回避法**: `src/lib/crypto.ts` の既存関数（`generateDEK`, `wrapMasterKey`, `unwrapDEK`）のパラメータ設計を厳守し、独自に `crypto.subtle.generateKey` を呼ばない。
+- **回避法**: `apps/web/src/lib/crypto.ts` の既存関数（`generateDEK`, `wrapMasterKey`, `unwrapDEK`）のパラメータ設計を厳守し、独自に `crypto.subtle.generateKey` を呼ばない。
 
 ### `KDF_VERSIONS` の変更による既存データ復号不能
 - **問題**: パスコード反復回数を引き上げる際に `KDF_VERSIONS[1]` の値を書き換えると、既存ファミリーのデータが復号できなくなる。
