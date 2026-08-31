@@ -85,7 +85,10 @@ export function NewDeviceLoginEmail({
 				) : null}
 				{location ? (
 					<Text style={infoItem}>
-						<strong>推定位置:</strong> {location}
+						<strong>推定位置:</strong> {location} <br />
+						<i style={{ fontSize: "12px" }}>
+							※IPアドレスから推定した位置情報です。実際の場所と異なる場合があります。
+						</i>
 					</Text>
 				) : null}
 			</Section>
