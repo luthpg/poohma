@@ -102,7 +102,7 @@ sequenceDiagram
 ### Passcode 変更（パスコードのみのローテーション）
 
 - マスターキー自体は変更しない。展開済みのマスターキーを、新しいパスコードから導出した新しい鍵で再 wrap するのみ。
-- `families.rotatePasscode` は `masterKeyEncrypted` / `masterKeyIv` / `masterKeySalt` / `kdfIterations` / `cryptoVersion` のみを更新する（Issue #138）。各レコードの DEK・パスワードヒントは一切変更されない（マスターキーが不変のため）。
+- 暗号フィールドの更新は `masterKeyEncrypted` / `masterKeyIv` / `masterKeySalt` / `kdfIterations` / `cryptoVersion` の定数個のみで O(1) となり、各レコードの DEK・パスワードヒントは一切変更されない（マスターキーが不変のため）。ただし `families.rotatePasscode` ミューテーション全体では、`updatedAt` の更新、メンバー一覧の取得、実行者以外の各メンバーへの通知ジョブの投入も行う（Issue #138）。
 - Compare-And-Swap により複数端末・複数メンバーからの同時更新の競合を防止する。
 - リカバリーキーが発行済みの場合、`recoveryMasterKeyEncrypted` は同一マスターキーへの別経路のラップであるため、このパスコード変更による影響を受けず有効なまま残る。
 
@@ -115,7 +115,7 @@ sequenceDiagram
 
 ### Recovery
 
-- パスコードとは別に、リカバリーコード（高エントロピーなランダム文字列、サーバー非保存・発行時に一度だけ提示、Issue #134「致命的なデータ喪失を防ぐ『リカバリーキット（復元コード）』の発行」、closed）経由の入口を用意する。
+- パスコードとは別に、リカバリーコード（高エントロピーなランダム文字列、平文はサーバーに保存せず発行時に一度だけ提示、Issue #134「致命的なデータ喪失を防ぐ『リカバリーキット（復元コード）』の発行」、closed）経由の入口を用意する。復元時には平文コードを照合のためサーバーへ送信し、サーバーでそのハッシュを `recoveryCodeHash` と比較する。
 - リカバリーコードから HKDF-SHA256 で導出した鍵で `families.recoveryMasterKeyEncrypted` / `recoveryMasterKeyIv` を unwrap すると、パスコード経路と同一のマスターキーに到達する。
 - 復元時はリカバリーコード単体では成立せず、登録メールアドレスへの6桁 Email OTP（SHA-256ハッシュ保存、有効期限10分、最大5回試行、60秒レート制限）の検証が必須の2要素構成になっている。
 - 再発行のたびに旧リカバリー暗号情報は完全上書き・破棄され、旧コードは即座に無効化される。
@@ -126,10 +126,11 @@ sequenceDiagram
 | --- | --- | --- |
 | パスワードヒント平文 | | 不可（`credentials[].passwordHint` は常に暗号化済み） |
 | マスターキー・DEK平文 | | 不可（`masterKeyEncrypted` / `passwordHintDekEncrypted` は常に暗号化済み） |
-| 家族パスコード・リカバリーコード | | 不可（サーバーに送信されない） |
+| 家族パスコード | | 不可（サーバーに送信されない） |
+| リカバリーコード | 可（復元時に平文を送信してハッシュ照合。平文は非保存） | |
 | サービス名・URL・メモ・タグ・ログインID | 可（平文保存） | |
 | 家族構成（メンバー一覧、招待コードのメタデータ） | 可 | |
-| リカバリーコード自体 | | 不可（`recoveryCodeHash` としてハッシュのみ保存） |
+| リカバリーコードの保存内容 | `recoveryCodeHash` のみ | |
 
 ## 関連ドキュメント
 
@@ -137,4 +138,3 @@ sequenceDiagram
 - [Threat Model](./threat-model.md)
 - [Security Model](./security-model.md)
 - [Security Policy](../../SECURITY.md)
-

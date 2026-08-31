@@ -114,8 +114,8 @@ flowchart TD
     Passcode["🔑 <b>家族パスコード</b><br/>(ユーザー記憶 / サーバー非保存)"]:::inputNode
     PasscodeKey["🛡️ <b>パスコード導出鍵</b><br/>(AES-GCM 256)"]:::derivedNode
     MasterKey["🏛️ <b>マスターキー</b><br/>(家族共通, AES-GCM 256)"]:::masterNode
-    DEK["📄 <b>DEK (Data Encryption Key)</b><br/>(認証情報1件ごと, AES-GCM 256)"]:::dekNode
-    EncryptedHint["🔒 <b>暗号化パスワードヒント</b><br/>(credentials.passwordHint)"]:::hintNode
+    DEK["📄 <b>DEK (Data Encryption Key)</b><br/>(認証情報1件ごと, AES-GCM 256)<br/>credentials.passwordHintDekEncrypted<br/>credentials.passwordHintDekIv"]:::dekNode
+    EncryptedHint["🔒 <b>暗号化パスワードヒント</b><br/>credentials.passwordHint<br/>credentials.passwordHintIv"]:::hintNode
 
     Passcode -->|"PBKDF2 (SHA-256, families.kdfIterations, families.masterKeySalt)"| PasscodeKey
     PasscodeKey -->|"unwrapKey (families.masterKeyEncrypted)"| MasterKey
@@ -159,4 +159,3 @@ flowchart TD
   - リカバリーキット（`recovery-kit.ts`, `recovery.ts`）への波及確認
 - **認証・セッション変更時**:
   - `apps/web/src/services/auth.functions.ts`, `firebase-admin.server.ts`, `useConvexFirebaseAuth.ts`, `AccountProvider.tsx`
-
