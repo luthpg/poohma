@@ -58,8 +58,8 @@ PoohMaの暗号化アーキテクチャは、3つの信頼領域にまたがる�
   - microCMS由来のリッチテキスト（CmsRichTextコンポーネント）は、許可されたHTMLタグのallowlist（h2, h3, p, code, ul, li, strong, em, a, br）に基づき、それ以外のタグを除去する基本的なサニタイズを実施
   - リンク（a要素）のhref属性は、http/https/mailtoスキームのみを許可し、javascript:等の危険なスキームを除外
   - インラインイベントハンドラー（onclick, onerror等）を除去
-  - CSP等のセキュリティヘッダーは未導入（NFR-SEC-12として計画中）
-- **残存リスク**：**PoohMaのE2EEは「ブラウザのJS実行環境が健全であること」を前提としている。** XSSが成立した場合、攻撃者は展開済みのマスターキー・画面表示中の平文ヒントを直接窃取できる。E2EEはサーバー側の攻撃者からは保護するが、クライアント側のコード実行を奪われた場合は無力化される。現行のallowlistベース基本サニタイズは完全なXSS防止策ではなく、より厳格な対策（DOMPurify等の専用ライブラリ、CSP導入（NFR-SEC-12）、Trusted Types等）との組み合わせが推奨される。
+  - `apps/web/src/start.ts` のサーバーミドルウェアにより、全GETリクエストに対してnonceベースの厳格なCSP（`default-src 'none'`, `script-src 'strict-dynamic' 'nonce-...'`, `frame-ancestors 'none'`）およびセキュリティヘッダー（`X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`）を適用済み（Issue #128）
+- **残存リスク**：**PoohMaのE2EEは「ブラウザのJS実行環境が健全であること」を前提としている。** XSSが成立した場合、攻撃者は展開済みのマスターキー・画面表示中の平文ヒントを直接窃取できる。E2EEはサーバー側の攻撃者からは保護するが、クライアント側のコード実行を奪われた場合は無力化される。現行のCSPおよびallowlistベースサニタイズはこのリスクを大幅に軽減するが、ブラウザ拡張機能や端末マルウェアを含む完全なクライアント環境侵害を防ぐものではない。
 
 ### T4: 端末レベルの攻撃者
 
@@ -129,12 +129,13 @@ PoohMaの暗号化アーキテクチャは、3つの信頼領域にまたがる�
 
 | 残存リスク | 対応する要件ID | 状態 |
 | --- | --- | --- |
-| XSS成立時にマスターキーが無防備になる | NFR-SEC-12（CSP導入） | 部分対応（CmsRichTextの基本サニタイズのみ実施済み、CSP未導入） |
+| XSS成立時にマスターキーが無防備になる | NFR-SEC-12（CSP導入） | 対応済み（`start.ts` サーバーミドルウェアによる nonce ベース厳格 CSP・セキュリティヘッダー適用） |
 | パスコードの複雑性チェックがない | NFR-SEC-13 | 対応済み（@zxcvbn-tsによる強度判定・メーター導入、最低10文字＆スコア2以上） |
 | パスコード入力の無制限再試行によるオフライン総当たり攻撃 | FR-CRYPT-04（指数バックオフ・ロックアウト） | 対応済み（3回以上連続誤入力時の指数バックオフおよび一時ロックアウト実装） |
 | PBKDF2反復回数を将来引き上げる際の後方互換性 | NFR-SEC-14 | 対応済み（`families.kdfIterations` / `families.cryptoVersion` によるスキーマ管理とフォールバック実装） |
 | パスコード・生体認証端末を両方失った場合のデータロスト | FR-CRYPT-06, 07, 08（リカバリーキット・2FA復元） | 対応済み（PDF発行、Google Drive/ローカル保存/印刷、Email OTP 2段階復元） |
-| OGP取得機能を悪用したリソース枯渇（DoS） | NFR-SEC-11 | 未対応 |
+| OGP取得機能を悪用したリソース枯渇（DoS） | NFR-SEC-11 | 対応済み（リダイレクト上限10回・5MBサイズ制限・5秒タイムアウト・循環検知を `fetchSafeBuffer` で実装） |
 
 本表は要件定義書の更新に合わせて随時見直すこと。
+
 
