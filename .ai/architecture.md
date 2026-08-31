@@ -26,7 +26,7 @@ poohma/
 | Workspace | 責務 | 主要技術 |
 | --- | --- | --- |
 | `apps/web` | メインWebアプリケーション（フロントエンド、SSR、Server Functions、Convex BaaSバックエンド） | React 19, TanStack Start, TanStack Router, Convex, Tailwind CSS v4, shadcn/ui, Web Crypto API |
-| `workers/backup` | Convex Cloud からの定期データエクスポートおよび Cloudflare R2 へのアーカイブ保存 | Cloudflare Workers, Cloudflare R2, Wrangler, Hono/Fetch |
+| `workers/backup` | Convex Cloud からの定期データエクスポートおよび Cloudflare R2 へのアーカイブ保存 | Cloudflare Workers, Cloudflare R2, Wrangler, Fetch |
 
 ---
 
@@ -70,21 +70,15 @@ poohma/
 
 ### 認証フロー
 
-```text
-[ブラウザ]
-  │ 1. Google ログイン (signInWithRedirect)
-  ▼
-[Firebase Auth]
-  │ 2. IDトークン取得
-  ▼
-[Server Function: syncUser] (TanStack Start / Node)
-  │ 3. IDトークン検証 (Firebase Admin SDK)
-  │ 4. Convex users.syncUser 実行
-  │ 5. httpOnly セッション Cookie (14日間) 発行 + デバイスID Cookie 発行
-  ▼
-[Convex Cloud]
-  │ 6. クライアント側 ConvexReactClient は useConvexFirebaseAuth 経由で Firebase ID トークンを直接渡す
-  │ 7. auth.config.ts の Issuer 設定に基づき Convex が ID トークンを直接検証
+```mermaid
+flowchart TD
+    Browser["ブラウザ"] -->|"1. Google ログイン (signInWithRedirect)"| FirebaseAuth["Firebase Auth"]
+    FirebaseAuth -->|"2. IDトークン取得"| ServerFn["Server Function: syncUser<br/>(TanStack Start / Node)"]
+    ServerFn -->|"3. IDトークン検証 (Firebase Admin SDK)"| ServerFn
+    ServerFn -->|"4. users.syncUser 実行"| Convex["Convex Cloud"]
+    ServerFn -->|"5. httpOnly セッション Cookie (14日間) + デバイスID 発行"| Browser
+    Browser -->|"6. useConvexFirebaseAuth 経由で IDトークン送信"| Convex
+    Convex -->|"7. auth.config.ts に基づき IDトークンを直接検証"| Convex
 ```
 
 ### 認可階層（Convex customBuilders）
@@ -99,20 +93,13 @@ poohma/
 
 ### 鍵階層（エンベロープ暗号化）
 
-```text
-家族パスコード (ユーザーの記憶。サーバー保存なし)
-  │ PBKDF2 (SHA-256, iterations=families.kdfIterations [既定300,000], salt=families.masterKeySalt)
-  ▼
-パスコード導出鍵 (AES-GCM 256)
-  │ unwrapKey
-  ▼
-マスターキー (家族共通, AES-GCM 256, families.masterKeyEncrypted)
-  │ wrapKey / unwrapKey
-  ▼
-DEK (Data Encryption Key, 認証情報1件ごと, serviceRecords.credentials[].passwordHintDekEncrypted)
-  │ encrypt / decrypt
-  ▼
-暗号化パスワードヒント (serviceRecords.credentials[].passwordHint)
+```mermaid
+flowchart TD
+    Passcode["家族パスコード<br/>(ユーザーの記憶。サーバー保存なし)"]
+    Passcode -->|"PBKDF2 (SHA-256, families.kdfIterations, families.masterKeySalt)"| PasscodeKey["パスコード導出鍵<br/>(AES-GCM 256)"]
+    PasscodeKey -->|"unwrapKey (families.masterKeyEncrypted)"| MasterKey["マスターキー<br/>(家族共通, AES-GCM 256)"]
+    MasterKey -->|"wrapKey / unwrapKey"| DEK["DEK (Data Encryption Key)<br/>(認証情報1件ごと, AES-GCM 256<br/>credentials.passwordHintDekEncrypted)"]
+    DEK -->|"encrypt / decrypt"| EncryptedHint["暗号化パスワードヒント<br/>(credentials.passwordHint)"]
 ```
 
 ### 生体認証（WebAuthn PRF拡張）の正確な位置づけ
@@ -140,7 +127,7 @@ DEK (Data Encryption Key, 認証情報1件ごと, serviceRecords.credentials[].p
 ## 6. 変更時に関連確認が必要な領域
 
 - **DB スキーマ変更時**:
-  - `apps/web/convex/schema.ts` 変更後、必ず `pnpm convex:sync`（または `pnpm convex:codegen`）を実行して `_generated/` を最新化
+  - `apps/web/convex/schema.ts` 変更後、必ず `pnpm convex:sync`（または `pnpm convex:codegen`）を実行して `_generated/` を最新化した後、 `pnpm check` でフォーマット
   - 影響を受ける Convex 関数（`records.ts`, `families.ts`, `users.ts` 等）およびフロントエンドの型参照
   - `.docs/code-design.md` の DB スキーマ表の更新要否
 - **所有権・アクセス制御変更時**:

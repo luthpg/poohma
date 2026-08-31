@@ -32,6 +32,7 @@ export const updateRecord = familyBoundMutation({
 ```
 
 ### ビルダーの選択基準
+
 - `identityVerifiedQuery / Mutation`: ユーザーの Convex DB レコードが存在しない初期登録時のみ使用。
 - `authenticatedQuery / Mutation`: アカウントの存在・所有権（IDOR防止）が解決された状態。個人設定やアカウント管理等で使用。
 - `familyBoundQuery / Mutation`: 家族所属が前提の操作（レコードCRUD、家族設定、招待管理等）で使用。
@@ -57,12 +58,14 @@ requireAdminAccess(ctx.user, record);
 ## 3. E2EE エンベロープ暗号化・再暗号化パターン (`apps/web/src/lib/crypto.ts`)
 
 ### 新規暗号化
+
 1. `generateDEK()` で認証情報単位の DEK を生成
 2. `encrypt(passwordHint, dek)` でヒント本体を暗号化
 3. `wrapDEK(dek, masterKey)` で DEK をマスターキーで暗号化
 4. 両方の暗号文と IV をペアで DB に保存
 
 ### 家族移行・パスコード変更時の再暗号化 (`reWrapCredential`)
+
 ヒント本体（暗号化テキスト）の再復号は行わず、**DEK のラップのみを旧マスターキーから新マスターキーへ付け替える**ことで、計算コストと平文漏洩リスクを最小化する。
 
 ```typescript
@@ -115,7 +118,8 @@ if (sessionStorage.getItem("poohma_logout")) {
 同一ブラウザでのアカウント切り替え時に前アカウントの機密データやクエリ結果が残存することを防ぐ。
 
 1. `PasscodeProvider`: `accountId` の変更を検知して `masterKey` を `null` にリセット（再ロック）。
-2. `AccountProvider`: 切り替え時に TanStack Query のキャッシュ全消去（`queryClient.clear()`）を実行。
+2. `AccountProvider`: 切り替え時にローカルメモリキャッシュの破棄（`clearQueryCache()`）と TanStack Query の無効化・再取得（`await queryClient.invalidateQueries()`）を実行。
+
 
 ---
 
@@ -134,8 +138,8 @@ if (sessionStorage.getItem("poohma_logout")) {
 
 ```typescript
 import { convexTest } from "convex-test";
-import { api } from "../../convex/_generated/api";
-import schema from "../../convex/schema";
+import { api } from "@/../convex/_generated/api";
+import schema from "@/../convex/schema";
 
 test("authenticated user can create record", async () => {
   const t = convexTest(schema);

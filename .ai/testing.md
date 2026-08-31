@@ -19,14 +19,15 @@ PoohMa におけるテストアーキテクチャ、テスト作成パターン�
 Convex の Mutation / Query / RLS テストは `convex-test` を用いてインメモリで完結して実行する。
 
 ### 基本セットアップ
+
 ```typescript
 import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
-import { api } from "../convex/_generated/api";
-import schema from "../convex/schema";
+import { api } from "@/../convex/_generated/api";
+import schema from "@/../convex/schema";
 
 // Convex モジュールを glob でロード
-const modules = import.meta.glob("../convex/**/*.ts");
+const modules = import.meta.glob("@/../convex/**/*.ts");
 
 it("正常系: 家族作成とユーザーの familyId 紐付け", async () => {
   const t = convexTest(schema, modules);
@@ -68,6 +69,7 @@ it("正常系: 家族作成とユーザーの familyId 紐付け", async () => {
 ```
 
 ### 認可エラー・RLS 拒否のテスト
+
 ```typescript
 it("異常系: 対象家族に未所属のユーザーによる共有レコード操作は拒否される", async () => {
   const t = convexTest(schema, modules);
@@ -141,4 +143,4 @@ Node.js 環境の `globalThis.crypto.subtle` を用いて、ブラウザと同�
 
 - **単体・統合テスト実行**: `pnpm test`
 - **一括品質パイプライン**: `pnpm verify`（Typecheck → Lint/Format → Test → Build）
-- テスト追加時は `apps/web/tests/` 配下に配置し、ファイル名規則は `*.spec.ts` または `*.test.ts` とする。
+- テスト追加時は `apps/web/tests/` 配下に配置し、ファイル名規則は、単体テスト系であれば `*.spec.ts` または統合テスト系であれば `*.test.ts` とする。

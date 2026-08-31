@@ -6,56 +6,54 @@ PoohMa における主要ドメインエンティティの関係性、ライフ�
 
 ## 1. エンティティ相関図 (Entity Relationships)
 
-```text
-[Firebase User] (userId)
-       │ 1:N
-       ▼
-  [PoohMa Account] (users._id) ── N:1 (各 Account は最大1 Family) ── [Family] (families._id)
-       │                                     │
-       ├──────────────┐                      ├──────────────┐
-       │ 1:N (owner)  │ 1:N (admin)          │ 1:N (scope)  │ 1:N
-       ▼              ▼                      ▼              ▼
-[serviceRecords] ◄── [serviceRecords]   [familyInvites]  [joinRequests]
- (ownerType: "user")  (ownerType: "family")
+```mermaid
+flowchart TD
+    FirebaseUser["Firebase User (userId)"] -->|"1:N"| PoohMaAccount["PoohMa Account (users._id)"]
+    PoohMaAccount -->|"N:1 (familyId)"| Family["Family (families._id)"]
+    
+    PoohMaAccount -->|"1:N owner"| RecUser["serviceRecords (ownerType: user)"]
+    PoohMaAccount -.->|"1:N admin"| RecFamily["serviceRecords (ownerType: family)"]
+    
+    Family -->|"1:N scope"| RecFamily
+    Family -->|"1:N"| Invites["familyInvites"]
+    Family -->|"1:N"| JoinReqs["joinRequests"]
 ```
 
 ---
 
 ## 2. 状態遷移とライフサイクル (State Transitions)
 
-### 2.1 家族参加申請 (`joinRequests`)
+### 2.1 家族招待 (`familyInvites`) と参加申請 (`joinRequests`) のライフサイクル
 
-```text
-   [招待コード利用 / 申請作成]
-               │
-               ▼
-           [pending]
-         /           \
-[既存家族メンバーのいずれかが承認]   [既存家族メンバーのいずれかが拒否 / 申請者が取り下げ]
-       │                   │
-       ▼                   ▼
-  [approved]          [rejected]
-       │
-[家族所属確定 (user.familyId 更新)]
+```mermaid
+flowchart TD
+    Issue["既存家族メンバーが招待コード発行<br/>(familyInvites: UUID, TTL)"]
+    Issue -->|"期限切れ / 手動失効 (revokedAt)"| Invalid["無効化 (申請不可)"]
+    Issue -->|"有効な招待コードを共有"| Apply["申請者が参加申請を作成<br/>(joinRequests: pending)"]
+    
+    Apply --> Pending["pending"]
+    Pending -->|"既存メンバーが承認 (approveJoinRequest)"| Approved["approved<br/>(user.familyId 更新)"]
+    Pending -->|"既存メンバーが拒否 / 申請者が取り下げ"| Rejected["rejected<br/>(アクセス権なし)"]
+    
+    Approved --> Unlock["家族パスコード入力でマスターキー解除"]
 ```
 
-- **トリガー**: 申請者が有効な `familyInvites` コードを用いて申請。
-- **承認時**: 既存家族メンバーのいずれかが承認すると、対象アカウントの `user.familyId` が更新され、申請者に通知。
-- **拒否時**: 申請レコードは `rejected` となり、家族へのアクセス権は付与されない。
+- **招待コード発行**: 既存家族メンバーが有効期限（15分〜30日）を指定して発行（`createInviteCode`）。いつでも手動失効（`revokeInviteCode`）可能。
+- **参加申請トリガー**: 申請者が有効な招待コード（リンク/QR）を入力して申請を作成（`createJoinRequestWithInvite`）。
+- **承認時**: 既存家族メンバーのいずれかが承認（`approveJoinRequest`）すると、対象アカウントの `user.familyId` が更新され、申請者に通知。
+- **拒否・取り下げ時**: 既存メンバーによる拒否（`rejectJoinRequest`）または申請者自身によるキャンセル（`cancelJoinRequest`）により `rejected` となり、家族へのアクセス権は付与されない。
+- **参加完了後**: 申請者は家族パスコードを入力してマスターキーをロック解除し、家族内での利用を開始する。
 
 ---
 
 ### 2.2 家族移行トランザクション (`familyMigrations`)
 
-```text
-[ユーザーが移行を開始]
-       │
-       ▼
-  [PREPARED] ── (30分タイムアウト / クリーンアップ) ──► [EXPIRED]
-       │
-       │ (クライアント側で全所有レコードの DEK を新マスターキーで再ラップ)
-       ▼
- [COMPLETED] ── (ユーザーの所属家族・全レコードの familyId を新家族へ一括更新)
+```mermaid
+flowchart TD
+    Start["ユーザーが移行を開始 (prepareFamilyMigration)"] --> Prepared["PREPARED<br/>(移行対象レコードのスナップショット保持)"]
+    Prepared -->|"30分タイムアウト / クリーンアップ"| Expired["EXPIRED"]
+    Prepared -->|"手動中断 (abortFamilyMigration)"| Aborted["ABORTED"]
+    Prepared -->|"クライアント側でDEK再ラップ完了<br/>(commitFamilyMigration)"| Completed["COMPLETED<br/>(所属家族・全レコードのfamilyId一括更新)"]
 ```
 
 - **ステータス**:
@@ -68,23 +66,17 @@ PoohMa における主要ドメインエンティティの関係性、ライフ�
 
 ### 2.3 リカバリー 2 段階復元 (`recoveryOtps` / `recoverySessions`)
 
-```text
-[1. 復元要求] ──► recoveryOtps レコード作成 (有効期限10分, 最大5回試行)
-       │
-       ▼
-[2. メール OTP (6桁) + リカバリーコード照合]
-       │
-       ├─ (試行失敗 < 5回) ──► attempts 加算
-       ├─ (試行失敗 >= 5回) ──► recoveryOtps 削除 (失効・やり直し)
-       │
-       ▼ (照合成功)
-[3. OTP レコード即時削除 + recoverySessions 発行] (有効期限10分)
-       │
-       ▼
-[4. 新パスコードでマスターキー再ラップ (redeemRecoveryAndRotatePasscode)]
-       │
-       ▼
-[5. recoverySessions レコード即時消費 (削除) + 家族メンバー全員へ通知]
+```mermaid
+flowchart TD
+    Req["1. 復元要求 (sendRecoveryOtp)"] --> OtpIssued["recoveryOtps 発行<br/>(有効期限10分, 最大5回試行)"]
+    OtpIssued --> Verify["2. メールOTP (6桁) + リカバリーコード照合<br/>(verifyRecoveryOtpAndGetRecoveryData)"]
+    
+    Verify -->|"試行失敗 (< 5回)"| Retry["attempts 加算"] --> Verify
+    Verify -->|"試行失敗 (>= 5回)"| Fail["recoveryOtps 削除 (失効・やり直し)"]
+    
+    Verify -->|"照合成功"| SessionIssued["3. OTP即時削除 + recoverySessions 発行<br/>(短命な認可セッショントークン, 有効期限10分)"]
+    SessionIssued --> Rotate["4. 新パスコードでマスターキー再ラップ<br/>(redeemRecoveryAndRotatePasscode)"]
+    Rotate --> Consumed["5. recoverySessions 即時消費 (削除)<br/>+ 家族メンバーへ通知"]
 ```
 
 ---
