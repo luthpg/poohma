@@ -26,6 +26,7 @@
 - レコード単位のアクセス制御は `convex/rls.ts` に集約している。
   - `requireContentAccess`：レコードの `familyId` とユーザーの `familyId` が一致することに加え、個人所有（`ownerType: "user"` かつ `accountId` 一致）または家族共有（`ownerType: "family"` かつ `ownerFamilyId` 一致）のいずれかであることを検証する。
   - `requireAdminAccess`：削除・共有解除・管理者変更には、個人レコードなら本人、共有レコードなら `admins` 配列に含まれるメンバーであることを要求する。共有レコードの公開設定（visibility）改ざんによるIDORはIssue #186で修正済み。非管理者でも誰が管理者かは閲覧可能（Issue #211）。
+  - なお `serviceRecords.visibility` フィールドは `ownerType` モデル導入前のレガシー値であり、`ownerType` を持たない旧データに対する読み取り専用の後方互換フォールバックとしてのみ参照される（`docs/architecture/data-model.md` 参照）。
 - 現行スキーマは1ユーザー1家族グループ（`users.familyId` が単一値）を前提としており、複数家族の並行所属には対応していない（複数家族対応はIssue #34で一度closeされているが、現行スキーマの制約としては単一家族が前提）。
 
 ## E2EE boundary
@@ -40,18 +41,20 @@
 - サーバー内部のみで完結すべき通信（`getUserByFirebaseUid`）は、共有シークレット（`CONVEX_INTERNAL_SECRET`）をヘッダーで検証する内部専用エンドポイントとして分離している。
 - CSP（Content Security Policy）は `apps/web/src/start.ts` のサーバーミドルウェアで全GETリクエストに適用済み（Issue #128、closed）。`default-src 'none'` を基本に、`script-src` はリクエストごとに発行されるnonceと `strict-dynamic` のみを許可し、`frame-ancestors 'none'` でクリックジャッキングを防止する。あわせて `X-Content-Type-Options: nosniff`、`Referrer-Policy: strict-origin-when-cross-origin`、カメラ・マイク・位置情報を無効化しWebAuthn関連APIのみ自オリジンで許可する `Permissions-Policy` も同時に設定される。環境変数 `CSP_MODE` により、強制モードとレポートのみモード（`Content-Security-Policy-Report-Only`）を切り替えられる。
 - XSS が成立しブラウザ内で任意コードが実行可能になった場合、展開済みのマスターキーや画面表示中の平文ヒントは保護できない（クライアント実行環境の健全性を前提とするため）。上記のCSPはこのリスクを軽減する主要な対策の一つだが、完全な防御を保証するものではない。
+- **Google Identity Services / Google Drive（オプトイン機能）**：リカバリーキットPDFの保存先としてユーザーが任意で選択できる。ブラウザからGoogleのOAuth同意画面・Drive APIへ直接アクセスし、PoohMaのサーバーはこの通信を一切中継しない。付与されるスコープは `drive.file`（アプリが作成したファイルのみにアクセス可能）に限定され、ユーザーの既存Driveファイルへのアクセス権は要求しない。この機能を利用しない場合、Googleとの通信は一切発生しない。
 
 ## Recovery
 
 - パスコード忘却時の復元は、リカバリーコード（高エントロピーなランダム文字列、発行時に一度だけ提示・サーバー非保存）と、登録メールアドレスへの6桁ワンタイムパスワード（Email OTP）の2要素で構成される（Issue #134）。
 - OTP は平文で保存せず SHA-256 ハッシュのみ保持し、有効期限10分・最大試行5回・再送インターバル60秒を課す。
 - OTP 検証成功時に短命なワンタイム認可セッショントークン（`recoverySessions`）を発行し、新パスコードでのマスターキー再ラップを完了した時点でこのトークンを原子的に消費（削除）する。
-- リカバリーキットの発行・再発行・パスコード復元完了時は、家族メンバー全員へ通知メールを送信する。
+- リカバリーキットの発行・再発行・パスコード復元完了時は、家族メンバー全員へ通知メールを送信する。発行者・発行日時は `families.recoveryIssuedByAccountId` / `recoveryIssuedAt` に記録され、家族設定画面で他メンバーに開示される。
+- リカバリーキットPDFの保存方法はローカル保存・印刷・Google Drive（オプトイン）から選択できる。いずれの方法を選んでもPDFの生成・暗号化された値自体はクライアント側で完結しており、PoohMaのサーバーはPDFの内容を受け取らない。
 
 ## Session
 
 - クライアントは Firebase ID トークンとサーバー発行のセッション Cookie という2種類の認証情報を持つ。
-- 無操作タイムアウトが発生すると、展開済みのマスターキーと画面上に表示中のパスワードヒントの両方を自動的にクリアする（Issue #122）。
+- 無操作タイムアウトが発生すると、展開済みのマスターキーと画面上に表示中のパスワードヒントの両方を自動的にクリアする（Issue #122）。タイムアウト時間はユーザーが変更可能（既定5分、0を指定すると無効化）。
 - セッション失効を検知した書き込み系操作は、フォーム入力を保持したまま再ログインモーダルを表示し、同一の idempotency key で自動再実行することで、二重送信や入力ロストを防ぐ（`FR-AUTH-07`）。
 - アカウント切り替え時は、展開済みのマスターキーを揮発性メモリから即時破棄し、TanStack Query / IndexedDB キャッシュを連動してクリアすることで、アカウント間のデータ混用を防止する。
 
@@ -73,4 +76,3 @@
 - [E2EE Design](./e2ee.md)
 - [Threat Model](./threat-model.md)
 - [Security Policy](../../SECURITY.md)
-
