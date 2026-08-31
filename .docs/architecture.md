@@ -56,82 +56,59 @@ PoohMa は、家族間でアカウント情報を共有・管理するための 
 - **Yahoo!テキスト解析API**：サービス名からのふりがな自動生成。
 - **任意の外部サイト（OGP取得）**：`src/utils/url-safety.ts` によるSSRF対策（プライベートIP拒否、DNS解決後の再検証、TCP接続時のDNS Rebinding対策、レスポンスサイズ・タイムアウト上限）を経由してのみアクセスする。
 - **Cloudflare R2**：Convex データの日次バックアップ保存先。
+- **Google Identity Services / Google Drive（オプトイン）**：リカバリーキットPDFの保存先の一つとして、ユーザーが任意で選択できる。ブラウザから直接 Google のOAuth同意画面を経由し、`drive.file`スコープ（アプリが作成したファイルのみにアクセス可能で、ユーザーの既存Driveファイルへは一切アクセスしない）でPoohMaのサーバーを経由せずにアップロードする。利用しない場合はローカル保存・印刷のみで完結し、この連携自体は必須ではない。
 
 ## アーキテクチャ図
 
 ```mermaid
 flowchart TB
-    %% ==========================================
-    %% Theme & Class Definitions (Dark/Light Safe)
-    %% ==========================================
-    classDef clientNode fill:#0284c7,stroke:#0369a1,stroke-width:2px,color:#ffffff;
-    classDef ssrNode fill:#334155,stroke:#1e293b,stroke-width:2px,color:#f8fafc;
-    classDef convexNode fill:#d97706,stroke:#b45309,stroke-width:2px,color:#ffffff;
-    classDef dbNode fill:#b45309,stroke:#78350f,stroke-width:2px,color:#ffffff;
-    classDef workerNode fill:#059669,stroke:#047857,stroke-width:2px,color:#ffffff;
-    classDef extNode fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#ffffff;
-    classDef storageNode fill:#475569,stroke:#334155,stroke-width:2px,color:#ffffff;
-
-    %% ==========================================
-    %% Subgraphs
-    %% ==========================================
-    subgraph Client["🖥️ Client (Browser)"]
-        WebApp["🌐 Web App<br/><b>React 19 / TanStack Start</b>"]:::clientNode
-        Crypto["🔐 E2EE & WebAuthn<br/><b>crypto.ts / biometric.ts</b>"]:::clientNode
-        IDB["💾 Offline Cache<br/><b>Service Worker + IndexedDB</b>"]:::clientNode
+    subgraph Client["Browser"]
+        WebApp["Web Application (React / TanStack Start)"]
+        Crypto["E2EE (crypto.ts) / WebAuthn PRF (biometric.ts)"]
+        IDB["Service Worker + IndexedDB (read-only cache)"]
     end
 
-    subgraph VercelHost["☁️ Vercel Edge / Serverless"]
-        SSR["⚙️ Server Functions & SSR<br/><b>CSP Middleware / Admin SDK</b>"]:::ssrNode
+    subgraph VercelHost["Vercel"]
+        SSR["TanStack Start SSR / Server Functions / CSPミドルウェア"]
     end
 
-    subgraph ConvexCloud["🔥 Convex Cloud (BaaS)"]
-        Fn["⚡ Query / Mutation<br/><b>families / users / records</b>"]:::convexNode
-        Action["🚀 Action (Node runtime)<br/><b>OGP / ふりがな / メール送信</b>"]:::convexNode
-        Http["🔒 Internal HTTP Action<br/><b>getUserByFirebaseUid</b>"]:::convexNode
-        Cron["⏱️ Cron Triggers<br/><b>データ自動クリーンアップ</b>"]:::convexNode
-        DB[("🗄️ Convex DB<br/><b>Reactive Database</b>")]:::dbNode
+    subgraph ConvexCloud["Convex Cloud"]
+        Fn["Query / Mutation (families / users / records)"]
+        Action["Action (OGP取得 / ふりがな / メール送信)"]
+        Http["HTTP Action (getUserByFirebaseUid)"]
+        Cron["Cron (期限切れデータの自動クリーンアップ)"]
+        DB[("Convex DB")]
     end
 
-    subgraph CFWorker["⚡ Cloudflare Platform"]
-        Backup["📦 Backup Worker<br/><b>Cloudflare Workers (Cron)</b>"]:::workerNode
-        R2[("🪣 Cloudflare R2<br/><b>Daily Backups (90d TTL)</b>")]:::storageNode
+    subgraph CFWorker["Cloudflare Workers"]
+        Backup["backup worker (日次Cron)"]
     end
 
-    subgraph ExtServices["🌍 External Services"]
-        Firebase["🔑 Firebase Auth<br/><b>Google OAuth / Token</b>"]:::extNode
-        Resend["✉️ Resend<br/><b>Transactional Email</b>"]:::extNode
-        MicroCMS["📝 microCMS<br/><b>FAQ & Legal Content</b>"]:::extNode
-        Yahoo["🔤 Yahoo! テキスト解析<br/><b>ふりがな自動補完</b>"]:::extNode
-        ExtSite["🌐 外部 Web サイト<br/><b>OGP Meta (SSRF Safe)</b>"]:::extNode
-    end
+    Firebase["Firebase Authentication / Admin SDK"]
+    Resend["Resend"]
+    MicroCMS["microCMS"]
+    Yahoo["Yahoo!テキスト解析API"]
+    ExtSite["外部サイト (OGP, SSRF対策経由)"]
+    GoogleDrive["Google Drive (オプトイン, リカバリーキット保存)"]
+    R2[("Cloudflare R2")]
 
-    %% ==========================================
-    %% Connections
-    %% ==========================================
-    WebApp <--> Crypto
-    WebApp <--> IDB
-    WebApp -->|Page Load & SSR| SSR
-    SSR <-->|Token Verify| Firebase
-    WebApp -->|認証済みWebSocket / RPC| Fn
-    Fn <--> DB
+    WebApp --> Crypto
+    WebApp --> IDB
+    WebApp --> SSR
+    SSR --> Firebase
+    WebApp -->|認証済みリアルタイム通信| Fn
+    Fn --> DB
     Fn --> Action
     Action --> Resend
     Action --> Yahoo
     Action --> ExtSite
-    SSR -->|Internal Auth Header| Http
+    SSR --> Http
     Http --> Fn
     Cron --> DB
-    ConvexCloud -.Export API (Daily Stream).-> Backup
+    ConvexCloud -.Export API.-> Backup
     Backup --> R2
-    WebApp -->|Content Fetch| MicroCMS
-
-    %% Subgraph Styling
-    style Client fill:#0284c715,stroke:#0284c7,stroke-width:1.5px,stroke-dasharray: 4 2;
-    style VercelHost fill:#33415515,stroke:#64748b,stroke-width:1.5px,stroke-dasharray: 4 2;
-    style ConvexCloud fill:#d9770615,stroke:#d97706,stroke-width:1.5px,stroke-dasharray: 4 2;
-    style CFWorker fill:#05966915,stroke:#059669,stroke-width:1.5px,stroke-dasharray: 4 2;
-    style ExtServices fill:#7c3aed15,stroke:#7c3aed,stroke-width:1.5px,stroke-dasharray: 4 2;
+    WebApp --> MicroCMS
+    WebApp -.オプトイン・サーバー非経由.-> GoogleDrive
 ```
 
 ## データフロー概要
@@ -140,6 +117,7 @@ flowchart TB
 - **ログイン**：Firebase でのログイン後、ID トークンをサーバー関数 `syncUser` に渡し、Convex 側にユーザー情報を同期。以後はセッション Cookie とリアルタイムな Convex 接続で認証状態を維持する。
 - **家族共有**：招待コード（TTL付き）経由の参加申請＋既存メンバーの承認という二段階フローを経て家族に参加する。共有データの復号に必要なマスターキーは、パスコードを知っているメンバーの端末上でのみ展開される。
 - **バックアップ**：アプリケーションの通常のリクエスト経路とは独立して、Cloudflare Workers が日次で Convex Export API から暗号化済みデータをそのまま取得し R2 に保存する。
+- **リカバリーキットの保存（任意）**：ユーザーがGoogle Driveへの保存を選んだ場合のみ、ブラウザから直接Googleへアップロードする。PoohMaのサーバーはこの経路に一切関与しない。
 
 ## 今後の変更予定
 
@@ -152,4 +130,3 @@ flowchart TB
 - [Threat Model](./security/threat-model.md)
 - [Security Model](./security/security-model.md)
 - [Data Model](./architecture/data-model.md)
-
