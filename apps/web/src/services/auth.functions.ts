@@ -1,4 +1,4 @@
-﻿import { createServerFn } from "@tanstack/react-start";
+import { createServerFn } from "@tanstack/react-start";
 import {
 	deleteCookie,
 	getCookie,
@@ -7,7 +7,6 @@ import {
 } from "@tanstack/react-start/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/../convex/_generated/api";
-import type { Id } from "@/../convex/_generated/dataModel";
 import type { Account } from "@/components/AccountProvider";
 import { env } from "@/env/client";
 import { env as serverEnv } from "@/env/server";
@@ -38,7 +37,7 @@ function createConvexClient() {
 /**
  * 認証ユーザーの同期とセッションクッキーの発行
  * @param idToken FirebaseのIDトークン
- * @returns 認証ユーザーID
+ * @returns アカウントID (Id<"users">)
  */
 export const syncUser = createServerFn({ method: "POST" })
 	.validator((data: { idToken: string }) => data)
@@ -50,7 +49,7 @@ export const syncUser = createServerFn({ method: "POST" })
 
 			const convexClient = createConvexClient();
 			convexClient.setAuth(idToken);
-			const userId = await convexClient.mutation(api.users.syncUser, {
+			const accountId = await convexClient.mutation(api.users.syncUser, {
 				displayName: name,
 				photoURL: picture,
 			});
@@ -75,7 +74,7 @@ export const syncUser = createServerFn({ method: "POST" })
 				const context = await getRequestContext();
 				await convexClient.mutation(api.users.recordLogin, {
 					deviceId,
-					accountId: userId as unknown as Id<"users">,
+					accountId,
 					...context,
 				});
 			} catch (logErr) {
@@ -97,7 +96,7 @@ export const syncUser = createServerFn({ method: "POST" })
 				maxAge: SESSION_EXPIRES_IN_SECONDS,
 			});
 
-			return userId;
+			return accountId;
 		} catch (error) {
 			console.error("syncUser failed:", error);
 			throw error;
