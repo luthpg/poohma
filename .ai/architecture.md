@@ -119,7 +119,7 @@ flowchart TD
 | Convex 認証・認可基盤 | `apps/web/convex/customBuilders.ts` |
 | レコード単位アクセス制御 (RLS) | `apps/web/convex/rls.ts` |
 | E2EE 暗号化・鍵導出アルゴリズム | `apps/web/src/lib/crypto.ts` |
-| 脅威モデル・セキュリティ境界 | `THREAT_MODEL.md` |
+| 脅威モデル・セキュリティ境界 | `docs/security/threat-model.md` |
 | 人間向け正規仕様・詳細設計 | `.docs/requirements.md`, `.docs/code-design.md` |
 
 ---
@@ -132,7 +132,7 @@ flowchart TD
   - `.docs/code-design.md` の DB スキーマ表の更新要否
 - **所有権・アクセス制御変更時**:
   - `apps/web/convex/rls.ts`, `apps/web/convex/customBuilders.ts`, `apps/web/convex/records.ts`
-  - `THREAT_MODEL.md` の脅威シナリオ（T6, T8）との整合性確認
+  - `docs/security/threat-model.md` の脅威シナリオ（T6, T8）との整合性確認
 - **E2EE / 暗号パラメータ変更時**:
   - `apps/web/src/lib/crypto.ts`（`KDF_VERSIONS` への追記、既存パラメータの不変性維持）
   - リカバリーキット（`recovery-kit.ts`, `recovery.ts`）への波及確認
