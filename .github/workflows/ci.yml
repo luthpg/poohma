@@ -24,6 +24,7 @@ jobs:
       MICROCMS_SERVICE_DOMAIN: "dummy"
       MICROCMS_API_KEY: "dummy"
       CONVEX_INTERNAL_SECRET: "dummy"
+      ABSTRACT_IP_GEOLOCATION_API_KEY: "dummy"
 
     steps:
       - name: Checkout code

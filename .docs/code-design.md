@@ -995,7 +995,7 @@ cleanupExpiredMigrationsInternal:
 | MICROCMS_SERVICE_DOMAIN         | 必須 | microCMSサービスドメイン                                |
 | MICROCMS_API_KEY                | 必須 | microCMS APIキー                                  |
 | CONVEX_INTERNAL_SECRET          | 必須 | Convex HTTP Action（内部API）保護用シークレット      |
-| ABSTRACT_IP_GEOLOCATION_API_KEY | 任意 | Abstract API GeoIP（ログイン・監査メール位置情報取得用） |
+| ABSTRACT_IP_GEOLOCATION_API_KEY | 必須 | Abstract API GeoIP（ログイン・監査メール位置情報取得用） |
 
 ### その他（Convex実行環境）
 
