@@ -1,5 +1,3 @@
-<!-- docs/demo-script.md -->
-
 # PoohMa Technical Demo 台本
 
 ## 概要
@@ -13,7 +11,7 @@
 
 - 家族での共有体験を見せるため、**テスト用アカウントを2つ**（例：`demo-owner@example.com` / `demo-member@example.com`）用意する。招待の受け側は別ブラウザまたはシークレットウィンドウで操作する。
 - クレデンシャル登録デモで入力するのは**すべてダミーデータ**とする（実在するサービス名・実際のパスワードヒントは使わない）。
-- E2EE・Architecture のシーンでは、`docs/security/e2ee.md` / `docs/architecture.md` の Mermaid 図を画像として書き出し、画面共有で見せる（アプリ画面だけでは鍵の流れが視覚化できないため）。
+- E2EE・Architecture のシーンでは、[E2EE Design](./security/e2ee.md) / [Architecture Overview](./architecture.md) の Mermaid 図を画像として書き出し、画面共有で見せる（アプリ画面だけでは鍵の流れが視覚化できないため）。
 - 録画解像度は 1920x1080 を基本とし、UIのフォントが小さい場合は編集時にズーム演出（DaVinci Resolveのパン&ズーム）で補う。
 
 ## シーン台本
@@ -143,7 +141,7 @@ URLを入力するだけで、サイトの情報が自動的に取得されま�
 
 ### 7. E2EEの概要（目安 45秒）
 
-**画面**：`docs/security/e2ee.md` の鍵階層図（Mermaid図を画像化したもの）を画面共有
+**画面**：[E2EE Design](./security/e2ee.md) の鍵階層図（Mermaid図を画像化したもの）を画面共有
 
 **ナレーション**：
 
@@ -187,7 +185,7 @@ URLを入力するだけで、サイトの情報が自動的に取得されま�
 
 ### 9. Architecture概要（目安 30秒）
 
-**画面**：`docs/architecture.md` のアーキテクチャ図（Mermaid図を画像化したもの）を画面共有
+**画面**：[Architecture Overview](./architecture.md) のアーキテクチャ図（Mermaid図を画像化したもの）を画面共有
 
 **ナレーション**：
 
@@ -220,7 +218,7 @@ PoohMaの詳しい設計やソースコードは、
 ````
 GitHub: (リポジトリURLを挿入)
 Portfolio LP: (LPのURLを挿入)
-Architecture / Security Docs: (docs/ へのリンクを挿入)
+Architecture / Security Docs: (.docs/ へのリンクを挿入)
 ````
 
 ## 3分版を作る場合の削減優先順位
@@ -239,3 +237,4 @@ Login・Credential登録・共有データ確認・E2EEの結論・クロージ�
 - 画面上に実在するメールアドレス・実際のブラウザのブックマーク・通知等が映り込まないよう、収録用のクリーンなブラウザプロファイルを使う。
 - リカバリーコード・招待コードなど、実際の値をそのまま映さない（ダミー値かモザイク処理をする）。
 - ナレーションと画面操作のタイミングが合うよう、まず無音で画面操作だけを収録し、後からナレーションを別トラックで録音してDaVinci Resolveで同期させる方法を推奨する。
+

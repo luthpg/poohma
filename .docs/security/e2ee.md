@@ -1,26 +1,58 @@
-<!-- docs/security/e2ee.md -->
-
 # E2EE Design
 
 ## 概要
 
-PoohMa の E2EE は「実際のパスワードではなく、家族だけがわかるパスワードのヒントを守る」ことを目的とする。サービス名・URL・メモ・タグ・ログインID等のメタデータは暗号化対象外であり、これは設計上の意図的な非対象である（詳細は `docs/security/threat-model.md` 5章、Issue #2で確認済み）。
+PoohMa の E2EE は「実際のパスワードではなく、家族だけがわかるパスワードのヒントを守る」ことを目的とする。サービス名・URL・メモ・タグ・ログインID等のメタデータは暗号化対象外であり、これは設計上の意図的な非対象である（詳細は [Threat Model](./threat-model.md) 5章、Issue #2で確認済み）。
 
 鍵管理はエンベロープ暗号化（封筒暗号化）方式で、家族パスコード・マスターキー・DEK（Data Encryption Key）の三層構造を持つ。実装は `apps/web/src/lib/crypto.ts`（Web Crypto API, AES-GCM / PBKDF2）による。
 
 ## Key Hierarchy
 
-````mermaid
+```mermaid
 flowchart TB
-    Passcode["家族パスコード<br/>(サーバー・ブラウザに保存されない)"] -->|PBKDF2-SHA256<br/>iterations=families.kdfIterations<br/>salt=families.masterKeySalt| KEK["パスコード導出鍵<br/>(KEK相当, AES-GCM 256)"]
-    KEK -->|unwrapKey| MK["マスターキー<br/>(families.masterKeyEncrypted / masterKeyIv)"]
-    MK -->|wrapKey / unwrapKey<br/>認証情報ごとに生成| DEK["DEK<br/>(credentials[].passwordHintDekEncrypted / passwordHintDekIv)"]
-    DEK -->|encrypt / decrypt| Hint["暗号化済みパスワードヒント<br/>(credentials[].passwordHint / passwordHintIv)"]
+    %% ==========================================
+    %% Theme & Class Definitions (Dark/Light Safe)
+    %% ==========================================
+    classDef inputNode fill:#4338ca,stroke:#3730a3,stroke-width:2px,color:#ffffff;
+    classDef derivedNode fill:#0284c7,stroke:#0369a1,stroke-width:2px,color:#ffffff;
+    classDef masterNode fill:#d97706,stroke:#b45309,stroke-width:2px,color:#ffffff;
+    classDef dekNode fill:#059669,stroke:#047857,stroke-width:2px,color:#ffffff;
+    classDef hintNode fill:#e11d48,stroke:#be123c,stroke-width:2px,color:#ffffff;
 
-    RecoveryCode["リカバリーコード<br/>(高エントロピー・サーバー非保存)"] -->|HKDF-SHA256| RK["リカバリー導出鍵"]
-    RK -->|unwrapKey| MK2["同一のマスターキー<br/>(families.recoveryMasterKeyEncrypted / recoveryMasterKeyIv)"]
-    MK2 -.-> MK
-````
+    subgraph PasscodeFlow["🔑 通常アクセス経路（パスコード認証）"]
+        Passcode["<b>家族パスコード</b><br/>(ユーザー記憶 / サーバー非保存)"]:::inputNode
+        KEK["<b>パスコード導出鍵 (KEK)</b><br/>AES-GCM 256<br/>PBKDF2-SHA256 (300k iter)"]:::derivedNode
+    end
+
+    subgraph RecoveryFlow["🆘 緊急復元経路（リカバリーキット）"]
+        RecoveryCode["<b>リカバリーコード</b><br/>(高エントロピー文字列 / サーバー非保存)"]:::inputNode
+        RK["<b>リカバリー導出鍵</b><br/>AES-GCM 256<br/>HKDF-SHA256"]:::derivedNode
+    end
+
+    subgraph MasterKeyLayer["🏛️ 家族マスターキー層"]
+        MK["<b>家族マスターキー</b><br/>AES-GCM 256<br/>(families.masterKeyEncrypted)"]:::masterNode
+    end
+
+    subgraph DataEncryptionLayer["📄 データ暗号化層 (レコード単位)"]
+        DEK["<b>個別 DEK (Data Encryption Key)</b><br/>AES-GCM 256<br/>(credentials[].passwordHintDekEncrypted)"]:::dekNode
+        Hint["🔒 <b>暗号化済みパスワードヒント</b><br/>(credentials[].passwordHint)"]:::hintNode
+    end
+
+    Passcode -->|PBKDF2 導出| KEK
+    KEK -->|unwrapKey| MK
+
+    RecoveryCode -->|HKDF 導出 + OTP検証| RK
+    RK -->|unwrapKey| MK
+
+    MK -->|wrapKey / unwrapKey<br/>クレデンシャル毎に生成| DEK
+    DEK -->|AES-GCM encrypt / decrypt| Hint
+
+    %% Subgraph Styling
+    style PasscodeFlow fill:#4338ca15,stroke:#4338ca,stroke-width:1.5px,stroke-dasharray: 4 2;
+    style RecoveryFlow fill:#0284c715,stroke:#0284c7,stroke-width:1.5px,stroke-dasharray: 4 2;
+    style MasterKeyLayer fill:#d9770615,stroke:#d97706,stroke-width:1.5px,stroke-dasharray: 4 2;
+    style DataEncryptionLayer fill:#05966915,stroke:#059669,stroke-width:1.5px,stroke-dasharray: 4 2;
+```
 
 ### 家族パスコード
 
@@ -45,19 +77,25 @@ flowchart TB
 
 ## Encryption / Decryption Flow
 
-````mermaid
+```mermaid
 sequenceDiagram
-    participant U as User (Client)
-    participant S as Server (Convex)
+    autonumber
+    actor U as 👤 ユーザー (Client)
+    participant B as 💻 ブラウザ暗号化 (crypto.ts)
+    participant S as ☁️ バックエンド (Convex)
 
-    U->>U: パスコードから PBKDF2 で導出鍵を生成
-    U->>U: 導出鍵で masterKeyEncrypted を unwrap → マスターキー展開
-    U->>U: generateDEK() で新規DEK生成 → マスターキーでwrap
-    U->>U: DEK でパスワードヒントを暗号化 (encrypt)
-    U->>S: 暗号化済みDEK・暗号化済みヒント・メタデータを送信 (createRecord)
-    S->>S: そのまま保存（復号しない）
-    Note over U,S: 復号も同様にクライアント側で完結し、平文がネットワークを通過しない
-````
+    Note over U,B: クレデンシャル登録・暗号化フロー
+    U->>B: 家族パスコード入力
+    B->>B: PBKDF2 で導出鍵 (KEK) 生成
+    B->>B: 導出鍵で masterKeyEncrypted を unwrap (マスターキー展開)
+    B->>B: generateDEK() で新規 DEK (AES-GCM 256) 生成
+    B->>B: マスターキーで DEK を wrapKey
+    B->>B: DEK でパスワードヒントを encrypt
+    B->>S: 暗号化済みDEK・暗号化済みヒント・平文メタデータを送信 (createRecord)
+    S->>S: 復号せず暗号文のまま DB 保存
+
+    Note over U,S: ※ サーバーは常に暗号化データのみを扱い、平文ヒント・鍵材料は到達しない
+```
 
 ## Key Lifecycle
 
@@ -95,6 +133,8 @@ sequenceDiagram
 
 ## 関連ドキュメント
 
-- Architecture Overview: `docs/architecture.md`
-- Threat Model: `docs/security/threat-model.md`
-- Security Policy: `SECURITY.md`
+- [Architecture Overview](../architecture.md)
+- [Threat Model](./threat-model.md)
+- [Security Model](./security-model.md)
+- [Security Policy](../../SECURITY.md)
+

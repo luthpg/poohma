@@ -1,12 +1,10 @@
-<!-- docs/architecture.md -->
-
 # Architecture Overview
 
 ## 概要
 
 PoohMa は、家族間でアカウント情報を共有・管理するための Web アプリケーションである。実際のパスワードは保存せず、家族だけがわかる「パスワードのヒント」をブラウザ側で暗号化してから保存する。サービス名・URL・メモ・タグ・ログインID等のメタデータは暗号化せず平文で保存する（暗号化対象を最小化し、実装・運用のリスクを絞る設計判断。Issue #2「平文をサーバサイドで扱ってないかチェック」でこの境界が確認されている）。
 
-本ドキュメントはコンポーネント構成とデータフローの全体像を示す。鍵管理の詳細は `docs/security/e2ee.md`、想定脅威は `docs/security/threat-model.md` を参照。
+本ドキュメントはコンポーネント構成とデータフローの全体像を示す。鍵管理の詳細は [E2EE Design](./security/e2ee.md)、想定脅威は [Threat Model](./security/threat-model.md) を参照。
 
 ## コンポーネント構成
 
@@ -17,7 +15,7 @@ PoohMa は、家族間でアカウント情報を共有・管理するための 
 - `ConvexReactClient` を `ConvexProviderWithAuth` でラップし、`useConvexFirebaseAuth` が Firebase の ID トークンを Convex 認証に供給する。
 - 暗号化・復号（`src/lib/crypto.ts`）と生体認証（`src/lib/biometric.ts`, WebAuthn PRF拡張）はすべてクライアント側で完結する。
 - Service Worker + IndexedDB による読み取り専用のオフラインキャッシュ（PWA）を持つ。書き込み系操作（新規登録・編集等）はオフライン中は無効化される。
-- サーバーミドルウェア（`start.ts`）が全GETリクエストに対して、nonceベースの厳格なCSPを含むセキュリティヘッダーを付与する（詳細は `docs/security/security-model.md`）。
+- サーバーミドルウェア（`start.ts`）が全GETリクエストに対して、nonceベースの厳格なCSPを含むセキュリティヘッダーを付与する（詳細は [Security Model](./security/security-model.md)）。
 
 ### Backend（Convex Cloud）
 
@@ -37,7 +35,7 @@ PoohMa は、家族間でアカウント情報を共有・管理するための 
 
 - Convex 自身が提供するリアクティブ DB を利用（別建ての DBMS は持たない）。
 - 主要テーブル：`families`（暗号化済み鍵材料を保持）、`users`、`serviceRecords`（クレデンシャル本体）、`familyInvites`、`joinRequests`、`familyMigrations`、`recoveryOtps` / `recoverySessions`（リカバリー用）、`loginEvents`。
-- 詳細なフィールド構成は `docs/architecture/data-model.md` を参照。
+- 詳細なフィールド構成は [Data Model](./architecture/data-model.md) を参照。
 
 ### Authentication
 
@@ -47,8 +45,8 @@ PoohMa は、家族間でアカウント情報を共有・管理するための 
 
 ### E2EE
 
-- クライアント側で完結する鍵管理・暗号化の仕組み（PBKDF2 によるパスコード導出鍵、AES-GCM のマスターキー／DEKによるエンベロープ暗号化）。詳細は `docs/security/e2ee.md` を参照。
-- サーバーが平文のパスワードヒントを一切受け取らないことがアーキテクチャ上の前提であり、DB侵害時の残存リスクとして「メタデータは平文のまま漏洩しうる」ことを `docs/security/threat-model.md` で明示している。
+- クライアント側で完結する鍵管理・暗号化の仕組み（PBKDF2 によるパスコード導出鍵、AES-GCM のマスターキー／DEKによるエンベロープ暗号化）。詳細は [E2EE Design](./security/e2ee.md) を参照。
+- サーバーが平文のパスワードヒントを一切受け取らないことがアーキテクチャ上の前提であり、DB侵害時の残存リスクとして「メタデータは平文のまま漏洩しうる」ことを [Threat Model](./security/threat-model.md) で明示している。
 
 ### External Services
 
@@ -63,51 +61,77 @@ PoohMa は、家族間でアカウント情報を共有・管理するための 
 
 ```mermaid
 flowchart TB
-    subgraph Client["Browser"]
-        WebApp["Web Application (React / TanStack Start)"]
-        Crypto["E2EE (crypto.ts) / WebAuthn PRF (biometric.ts)"]
-        IDB["Service Worker + IndexedDB (read-only cache)"]
+    %% ==========================================
+    %% Theme & Class Definitions (Dark/Light Safe)
+    %% ==========================================
+    classDef clientNode fill:#0284c7,stroke:#0369a1,stroke-width:2px,color:#ffffff;
+    classDef ssrNode fill:#334155,stroke:#1e293b,stroke-width:2px,color:#f8fafc;
+    classDef convexNode fill:#d97706,stroke:#b45309,stroke-width:2px,color:#ffffff;
+    classDef dbNode fill:#b45309,stroke:#78350f,stroke-width:2px,color:#ffffff;
+    classDef workerNode fill:#059669,stroke:#047857,stroke-width:2px,color:#ffffff;
+    classDef extNode fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#ffffff;
+    classDef storageNode fill:#475569,stroke:#334155,stroke-width:2px,color:#ffffff;
+
+    %% ==========================================
+    %% Subgraphs
+    %% ==========================================
+    subgraph Client["🖥️ Client (Browser)"]
+        WebApp["🌐 Web App<br/><b>React 19 / TanStack Start</b>"]:::clientNode
+        Crypto["🔐 E2EE & WebAuthn<br/><b>crypto.ts / biometric.ts</b>"]:::clientNode
+        IDB["💾 Offline Cache<br/><b>Service Worker + IndexedDB</b>"]:::clientNode
     end
 
-    subgraph VercelHost["Vercel"]
-        SSR["TanStack Start SSR / Server Functions / CSPミドルウェア"]
+    subgraph VercelHost["☁️ Vercel Edge / Serverless"]
+        SSR["⚙️ Server Functions & SSR<br/><b>CSP Middleware / Admin SDK</b>"]:::ssrNode
     end
 
-    subgraph ConvexCloud["Convex Cloud"]
-        Fn["Query / Mutation (families / users / records)"]
-        Action["Action (OGP取得 / ふりがな / メール送信)"]
-        Http["HTTP Action (getUserByFirebaseUid)"]
-        Cron["Cron (期限切れデータの自動クリーンアップ)"]
-        DB[("Convex DB")]
+    subgraph ConvexCloud["🔥 Convex Cloud (BaaS)"]
+        Fn["⚡ Query / Mutation<br/><b>families / users / records</b>"]:::convexNode
+        Action["🚀 Action (Node runtime)<br/><b>OGP / ふりがな / メール送信</b>"]:::convexNode
+        Http["🔒 Internal HTTP Action<br/><b>getUserByFirebaseUid</b>"]:::convexNode
+        Cron["⏱️ Cron Triggers<br/><b>データ自動クリーンアップ</b>"]:::convexNode
+        DB[("🗄️ Convex DB<br/><b>Reactive Database</b>")]:::dbNode
     end
 
-    subgraph CFWorker["Cloudflare Workers"]
-        Backup["backup worker (日次Cron)"]
+    subgraph CFWorker["⚡ Cloudflare Platform"]
+        Backup["📦 Backup Worker<br/><b>Cloudflare Workers (Cron)</b>"]:::workerNode
+        R2[("🪣 Cloudflare R2<br/><b>Daily Backups (90d TTL)</b>")]:::storageNode
     end
 
-    Firebase["Firebase Authentication / Admin SDK"]
-    Resend["Resend"]
-    MicroCMS["microCMS"]
-    Yahoo["Yahoo!テキスト解析API"]
-    ExtSite["外部サイト (OGP, SSRF対策経由)"]
-    R2[("Cloudflare R2")]
+    subgraph ExtServices["🌍 External Services"]
+        Firebase["🔑 Firebase Auth<br/><b>Google OAuth / Token</b>"]:::extNode
+        Resend["✉️ Resend<br/><b>Transactional Email</b>"]:::extNode
+        MicroCMS["📝 microCMS<br/><b>FAQ & Legal Content</b>"]:::extNode
+        Yahoo["🔤 Yahoo! テキスト解析<br/><b>ふりがな自動補完</b>"]:::extNode
+        ExtSite["🌐 外部 Web サイト<br/><b>OGP Meta (SSRF Safe)</b>"]:::extNode
+    end
 
-    WebApp --> Crypto
-    WebApp --> IDB
-    WebApp --> SSR
-    SSR --> Firebase
-    WebApp -->|認証済みリアルタイム通信| Fn
-    Fn --> DB
+    %% ==========================================
+    %% Connections
+    %% ==========================================
+    WebApp <--> Crypto
+    WebApp <--> IDB
+    WebApp -->|Page Load & SSR| SSR
+    SSR <-->|Token Verify| Firebase
+    WebApp -->|認証済みWebSocket / RPC| Fn
+    Fn <--> DB
     Fn --> Action
     Action --> Resend
     Action --> Yahoo
     Action --> ExtSite
-    SSR --> Http
+    SSR -->|Internal Auth Header| Http
     Http --> Fn
     Cron --> DB
-    ConvexCloud -.Export API.-> Backup
+    ConvexCloud -.Export API (Daily Stream).-> Backup
     Backup --> R2
-    WebApp --> MicroCMS
+    WebApp -->|Content Fetch| MicroCMS
+
+    %% Subgraph Styling
+    style Client fill:#0284c715,stroke:#0284c7,stroke-width:1.5px,stroke-dasharray: 4 2;
+    style VercelHost fill:#33415515,stroke:#64748b,stroke-width:1.5px,stroke-dasharray: 4 2;
+    style ConvexCloud fill:#d9770615,stroke:#d97706,stroke-width:1.5px,stroke-dasharray: 4 2;
+    style CFWorker fill:#05966915,stroke:#059669,stroke-width:1.5px,stroke-dasharray: 4 2;
+    style ExtServices fill:#7c3aed15,stroke:#7c3aed,stroke-width:1.5px,stroke-dasharray: 4 2;
 ```
 
 ## データフロー概要
@@ -124,7 +148,8 @@ flowchart TB
 
 ## 関連ドキュメント
 
-- E2EE Design: `docs/security/e2ee.md`
-- Threat Model: `docs/security/threat-model.md`
-- Security Model: `docs/security/security-model.md`
-- Data Model: `docs/architecture/data-model.md`
+- [E2EE Design](./security/e2ee.md)
+- [Threat Model](./security/threat-model.md)
+- [Security Model](./security/security-model.md)
+- [Data Model](./architecture/data-model.md)
+

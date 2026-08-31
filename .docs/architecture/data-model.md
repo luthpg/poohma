@@ -160,5 +160,8 @@ erDiagram
 
 ## 関連ドキュメント
 
-- Architecture Overview: `docs/architecture.md`
-- E2EE Design: `docs/security/e2ee.md`
+- [Architecture Overview](../architecture.md)
+- [E2EE Design](../security/e2ee.md)
+- [Threat Model](../security/threat-model.md)
+- [Security Model](../security/security-model.md)
+

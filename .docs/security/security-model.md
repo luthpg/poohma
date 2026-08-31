@@ -2,7 +2,7 @@
 
 ## 概要
 
-本ドキュメントは、PoohMa の認証・認可・E2EE境界を含むセキュリティモデルを、実装済みの制御を中心に整理したものである。未実装の対策は「未対応」として明示し、実装済みであるかのようには記載しない。攻撃者ごとの防御と残存リスクの詳細は `docs/security/threat-model.md` を参照。
+本ドキュメントは、PoohMa の認証・認可・E2EE境界を含むセキュリティモデルを、実装済みの制御を中心に整理したものである。未実装の対策は「未対応」として明示し、実装済みであるかのようには記載しない。攻撃者ごとの防御と残存リスクの詳細は [Threat Model](./threat-model.md) を参照。
 
 ## Authentication
 
@@ -19,7 +19,7 @@
   - `authenticatedQuery/Mutation`：Identity検証に加え `resolveAccount` による所有権検証（下記IDOR対策）
   - `familyBoundQuery/Mutation`：上記に加え、対象アカウントが家族グループに所属していることを検証
 - `resolveAccount` は、呼び出し側が任意で渡す `accountId` について、その `users` レコードの `userId`（Firebase UID）が現在ログイン中の `identity.subject` と一致するかを必ず照合し、不一致であれば `Unauthorized` を送出する（他人のアカウントIDを指定してのなりすまし＝IDORの防止）。
-- 上記はコード規約として徹底しており、Lint等による機械的な強制ではない。新規関数追加時のレビュー観点として `docs/security/threat-model.md` 6章にも明記している。
+- 上記はコード規約として徹底しており、Lint等による機械的な強制ではない。新規関数追加時のレビュー観点として [Threat Model](./threat-model.md) 6章にも明記している。
 
 ## Family boundary
 
@@ -30,8 +30,8 @@
 
 ## E2EE boundary
 
-- サーバーはパスワードヒント・マスターキー・DEK・家族パスコード・リカバリーコードのいずれも平文では受け取らない。詳細な鍵階層・暗号化フローは `docs/security/e2ee.md` を参照。
-- サービス名・URL・メモ・タグ・ログインID等のメタデータは暗号化対象外であり、E2EE境界の外側にある。これは意図的な設計判断であり、脆弱性ではない（`SECURITY.md` 「既知の設計上の非対象事項」参照）。
+- サーバーはパスワードヒント・マスターキー・DEK・家族パスコード・リカバリーコードのいずれも平文では受け取らない。詳細な鍵階層・暗号化フローは [E2EE Design](./e2ee.md) を参照。
+- サービス名・URL・メモ・タグ・ログインID等のメタデータは暗号化対象外であり、E2EE境界の外側にある。これは意図的な設計判断であり、脆弱性ではない（[`SECURITY.md`](../../SECURITY.md) 「既知の設計上の非対象事項」参照）。
 
 ## Server trust model
 
@@ -69,7 +69,8 @@
 
 ## 関連ドキュメント
 
-- Architecture Overview: `docs/architecture.md`
-- E2EE Design: `docs/security/e2ee.md`
-- Threat Model: `docs/security/threat-model.md`
-- Security Policy: `SECURITY.md`
+- [Architecture Overview](../architecture.md)
+- [E2EE Design](./e2ee.md)
+- [Threat Model](./threat-model.md)
+- [Security Policy](../../SECURITY.md)
+

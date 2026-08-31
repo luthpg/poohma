@@ -32,4 +32,4 @@ Issue #138 への対応として、3層のエンベロープ暗号化を導入�
 
 ## 関連ドキュメント
 
-- E2EE Design: `docs/security/e2ee.md`
+- [E2EE Design](../security/e2ee.md)

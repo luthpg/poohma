@@ -120,8 +120,9 @@ try {
   - 要件定義書（`.docs/requirements.md`）
   - 詳細設計書（`.docs/code-design.md`）
   - デザイン仕様書（`.docs/DESIGN.md`, `.docs/lp-design.md`）
-  - 脅威モデル（`docs/security/threat-model.md`）
+  - 脅威モデル（`.docs/security/threat-model.md`）
   - セキュリティポリシー（`SECURITY.md`）
+
   - プロジェクト概要・セットアップ（`README.md`）
 - **運用フロー**:
   1. 計画段階で変更内容に関連するドキュメントの更新要否（機能要件の追加、DBスキーマ・API仕様・環境変数の変更、脅威モデルの更新等）を確認し、コミット前にもコード変更差分を精査して再確認する。
@@ -306,14 +307,15 @@ commit / PR
 情報の判断では、以下を優先してください。
 
 1. ユーザーによる明示的な決定
-2. `docs/security/threat-model.md`（脅威モデルおよびセキュリティ境界に関する Source of Truth）
+2. `.docs/security/threat-model.md`（脅威モデルおよびセキュリティ境界に関する Source of Truth）
 3. 現在の実装
 4. `.docs/` の最新仕様・設計
 5. Git履歴
 6. Issue / PR等の履歴情報
 7. `.ai/` の既存情報
 
-脅威モデルおよびセキュリティ境界に関する判断では、`docs/security/threat-model.md` を Source of Truth とし、セキュリティ要件が現在の実装や `.ai/` の情報と矛盾する場合も `docs/security/threat-model.md` を優先してください。
+脅威モデルおよびセキュリティ境界に関する判断では、`.docs/security/threat-model.md` を Source of Truth とし、セキュリティ要件が現在の実装や `.ai/` の情報と矛盾する場合も `.docs/security/threat-model.md` を優先してください。
+
 
 既存の `.ai/` が上記と矛盾する場合、既存の `.ai/` を修正してください。
 

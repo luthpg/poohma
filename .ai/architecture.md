@@ -72,10 +72,20 @@ poohma/
 
 ```mermaid
 flowchart TD
-    Browser["ブラウザ"] -->|"1. Google ログイン (signInWithRedirect)"| FirebaseAuth["Firebase Auth"]
-    FirebaseAuth -->|"2. IDトークン取得"| ServerFn["Server Function: syncUser<br/>(TanStack Start / Node)"]
+    classDef clientNode fill:#0284c7,stroke:#0369a1,stroke-width:2px,color:#ffffff;
+    classDef serverNode fill:#334155,stroke:#1e293b,stroke-width:2px,color:#f8fafc;
+    classDef convexNode fill:#d97706,stroke:#b45309,stroke-width:2px,color:#ffffff;
+    classDef authNode fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#ffffff;
+
+    Browser["💻 <b>ブラウザ (Client)</b>"]:::clientNode
+    FirebaseAuth["🔑 <b>Firebase Auth</b>"]:::authNode
+    ServerFn["⚙️ <b>Server Function: syncUser</b><br/>(TanStack Start / Node)"]:::serverNode
+    Convex["🔥 <b>Convex Cloud</b>"]:::convexNode
+
+    Browser -->|"1. Google ログイン (signInWithRedirect)"| FirebaseAuth
+    FirebaseAuth -->|"2. IDトークン取得"| ServerFn
     ServerFn -->|"3. IDトークン検証 (Firebase Admin SDK)"| ServerFn
-    ServerFn -->|"4. users.syncUser 実行"| Convex["Convex Cloud"]
+    ServerFn -->|"4. users.syncUser 実行"| Convex
     ServerFn -->|"5. httpOnly セッション Cookie (14日間) + デバイスID 発行"| Browser
     Browser -->|"6. useConvexFirebaseAuth 経由で IDトークン送信"| Convex
     Convex -->|"7. auth.config.ts に基づき IDトークンを直接検証"| Convex
@@ -95,11 +105,22 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Passcode["家族パスコード<br/>(ユーザーの記憶。サーバー保存なし)"]
-    Passcode -->|"PBKDF2 (SHA-256, families.kdfIterations, families.masterKeySalt)"| PasscodeKey["パスコード導出鍵<br/>(AES-GCM 256)"]
-    PasscodeKey -->|"unwrapKey (families.masterKeyEncrypted)"| MasterKey["マスターキー<br/>(家族共通, AES-GCM 256)"]
-    MasterKey -->|"wrapKey / unwrapKey"| DEK["DEK (Data Encryption Key)<br/>(認証情報1件ごと, AES-GCM 256<br/>credentials.passwordHintDekEncrypted)"]
-    DEK -->|"encrypt / decrypt"| EncryptedHint["暗号化パスワードヒント<br/>(credentials.passwordHint)"]
+    classDef inputNode fill:#4338ca,stroke:#3730a3,stroke-width:2px,color:#ffffff;
+    classDef derivedNode fill:#0284c7,stroke:#0369a1,stroke-width:2px,color:#ffffff;
+    classDef masterNode fill:#d97706,stroke:#b45309,stroke-width:2px,color:#ffffff;
+    classDef dekNode fill:#059669,stroke:#047857,stroke-width:2px,color:#ffffff;
+    classDef hintNode fill:#e11d48,stroke:#be123c,stroke-width:2px,color:#ffffff;
+
+    Passcode["🔑 <b>家族パスコード</b><br/>(ユーザー記憶 / サーバー非保存)"]:::inputNode
+    PasscodeKey["🛡️ <b>パスコード導出鍵</b><br/>(AES-GCM 256)"]:::derivedNode
+    MasterKey["🏛️ <b>マスターキー</b><br/>(家族共通, AES-GCM 256)"]:::masterNode
+    DEK["📄 <b>DEK (Data Encryption Key)</b><br/>(認証情報1件ごと, AES-GCM 256)"]:::dekNode
+    EncryptedHint["🔒 <b>暗号化パスワードヒント</b><br/>(credentials.passwordHint)"]:::hintNode
+
+    Passcode -->|"PBKDF2 (SHA-256, families.kdfIterations, families.masterKeySalt)"| PasscodeKey
+    PasscodeKey -->|"unwrapKey (families.masterKeyEncrypted)"| MasterKey
+    MasterKey -->|"wrapKey / unwrapKey"| DEK
+    DEK -->|"encrypt / decrypt"| EncryptedHint
 ```
 
 ### 生体認証（WebAuthn PRF拡張）の正確な位置づけ
@@ -119,7 +140,7 @@ flowchart TD
 | Convex 認証・認可基盤 | `apps/web/convex/customBuilders.ts` |
 | レコード単位アクセス制御 (RLS) | `apps/web/convex/rls.ts` |
 | E2EE 暗号化・鍵導出アルゴリズム | `apps/web/src/lib/crypto.ts` |
-| 脅威モデル・セキュリティ境界 | `docs/security/threat-model.md` |
+| 脅威モデル・セキュリティ境界 | `.docs/security/threat-model.md` |
 | 人間向け正規仕様・詳細設計 | `.docs/requirements.md`, `.docs/code-design.md` |
 
 ---
@@ -132,9 +153,10 @@ flowchart TD
   - `.docs/code-design.md` の DB スキーマ表の更新要否
 - **所有権・アクセス制御変更時**:
   - `apps/web/convex/rls.ts`, `apps/web/convex/customBuilders.ts`, `apps/web/convex/records.ts`
-  - `docs/security/threat-model.md` の脅威シナリオ（T6, T8）との整合性確認
+  - `.docs/security/threat-model.md` の脅威シナリオ（T6, T8）との整合性確認
 - **E2EE / 暗号パラメータ変更時**:
   - `apps/web/src/lib/crypto.ts`（`KDF_VERSIONS` への追記、既存パラメータの不変性維持）
   - リカバリーキット（`recovery-kit.ts`, `recovery.ts`）への波及確認
 - **認証・セッション変更時**:
   - `apps/web/src/services/auth.functions.ts`, `firebase-admin.server.ts`, `useConvexFirebaseAuth.ts`, `AccountProvider.tsx`
+

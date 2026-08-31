@@ -6,15 +6,22 @@ PoohMa は Vitest（Node環境／ブラウザモード）、convex-test、Playwr
 
 ## テストレイヤーと責務
 
-````text
-Unit
-  ↓
-Integration (Convex Functions)
-  ↓
-Browser-dependent Tests
-  ↓
-CI（Lint / Typecheck / Build / Test = Regression Gate）
-````
+```mermaid
+flowchart TD
+    classDef unitNode fill:#0284c7,stroke:#0369a1,stroke-width:2px,color:#ffffff;
+    classDef intNode fill:#d97706,stroke:#b45309,stroke-width:2px,color:#ffffff;
+    classDef browserNode fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#ffffff;
+    classDef ciNode fill:#059669,stroke:#047857,stroke-width:2px,color:#ffffff;
+
+    Unit["🧪 <b>Unit Test</b><br/>純粋関数・暗号ロジック・バリデーション"]:::unitNode
+    Int["⚡ <b>Integration Test</b><br/>convex-test (Functions / RLS / 認可)"]:::intNode
+    Browser["🌐 <b>Browser-dependent Tests</b><br/>Vitest Browser Mode + Playwright (PRF/暗号UI)"]:::browserNode
+    CI["🛡️ <b>CI Pipeline (Regression Gate)</b><br/>Biome ➔ Typecheck ➔ Build ➔ Test 一括実行"]:::ciNode
+
+    Unit --> Int
+    Int --> Browser
+    Browser --> CI
+```
 
 PoohMa には専用の「Regression Test」フェーズは独立して存在しない。GitHub Actions の単一ジョブ（`.github/workflows/ci.yml`）が `main` への push / PR ごとに Biome（Lint/Format）→ 型チェック（`tsc`）→ ビルド → `pnpm test` を一括実行し、これが事実上のリグレッションゲートとして機能している。
 
@@ -72,9 +79,19 @@ README に明記されている通り、暗号化やWebAuthnなど実ブラウ�
 
 ## Critical User Flow とテストの対応
 
-````text
-Login → Family作成/参加 → Credential登録(暗号化) → 共有確認 → Passcode変更/Recovery
-````
+```mermaid
+flowchart LR
+    classDef flowNode fill:#1e293b,stroke:#475569,stroke-width:2px,color:#f8fafc;
+    classDef activeNode fill:#0284c7,stroke:#0369a1,stroke-width:2px,color:#ffffff;
+
+    F1["🔑 1. Login"]:::flowNode
+    F2["👨‍👩‍👧 2. Family 作成/参加"]:::flowNode
+    F3["📝 3. Credential 登録 (暗号化)"]:::activeNode
+    F4["👀 4. 共有確認"]:::flowNode
+    F5["🔄 5. Passcode 変更 / Recovery"]:::flowNode
+
+    F1 --> F2 --> F3 --> F4 --> F5
+```
 
 | フロー | 主な対応テスト |
 | --- | --- |
@@ -93,6 +110,7 @@ Login → Family作成/参加 → Credential登録(暗号化) → 共有確認 �
 
 ## 関連ドキュメント
 
-- Architecture Overview: `docs/architecture.md`
-- Security Model: `docs/security/security-model.md`
-- Threat Model: `docs/security/threat-model.md`
+- [Architecture Overview](./architecture.md)
+- [Security Model](./security/security-model.md)
+- [Threat Model](./security/threat-model.md)
+

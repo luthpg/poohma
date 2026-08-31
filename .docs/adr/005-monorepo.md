@@ -28,4 +28,5 @@ pnpm workspace（`pnpm-workspace.yaml`：`apps/*` / `workers/*`）とTurborepo�
 
 ## 関連ドキュメント
 
-- Architecture Overview: `docs/architecture.md`
+- [Architecture Overview](../architecture.md)
+
