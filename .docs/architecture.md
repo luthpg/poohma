@@ -23,7 +23,7 @@ PoohMa は、家族間でアカウント情報を共有・管理するための 
 - Query / Mutation（`families.ts` / `users.ts` / `records.ts`）、Action（`actions.ts`: OGP取得・ふりがな取得・メール送信、Node runtime）、HTTP Action（`http.ts`: `getUserByFirebaseUid`、内部シークレットヘッダーで保護）、Cron（`crons.ts`: 期限切れ家族移行・招待コードの定期クリーンアップ）で構成される。
 - 認可は `customBuilders.ts` の3段階のビルダー（`identityVerifiedQuery/Mutation` / `authenticatedQuery/Mutation` / `familyBoundQuery/Mutation`）を必ず経由する設計とし、生の `query` / `mutation` を直接エクスポートしない運用ルールを敷いている。
 - レコード単位のアクセス制御（`rls.ts`: `requireContentAccess` / `requireAdminAccess`）で、個人レコードと家族共有レコードの境界、共有レコードの管理者権限を強制する。
-- サーバーは暗号化済みのデータのみを保存・配信し、復号は行わない。
+- サーバーはパスワードヒントと鍵材料を暗号化済みのまま保存・配信し、復号は行わない。一方、`title`・`url`・`memo`・`tags`・`loginId` は平文メタデータとして保存・配信する。
 
 ### Workers
 
@@ -113,10 +113,10 @@ flowchart TB
 
 ## データフロー概要
 
-- **クレデンシャル登録**：クライアントで OGP・ふりがなを自動取得後、パスワードヒントのみを `crypto.ts` でクライアント側暗号化し、暗号化済みデータとメタデータをまとめて `records.createRecord` に送信する。サーバーは平文を受け取らない。
+- **クレデンシャル登録**：クライアントで OGP・ふりがなを自動取得後、パスワードヒントのみを `crypto.ts` でクライアント側暗号化し、暗号化済みデータと平文メタデータ（`title`・`url`・`memo`・`tags`・`loginId`）をまとめて `records.createRecord` に送信する。サーバーは平文のパスワードヒントを受け取らない。
 - **ログイン**：Firebase でのログイン後、ID トークンをサーバー関数 `syncUser` に渡し、Convex 側にユーザー情報を同期。以後はセッション Cookie とリアルタイムな Convex 接続で認証状態を維持する。
 - **家族共有**：招待コード（TTL付き）経由の参加申請＋既存メンバーの承認という二段階フローを経て家族に参加する。共有データの復号に必要なマスターキーは、パスコードを知っているメンバーの端末上でのみ展開される。
-- **バックアップ**：アプリケーションの通常のリクエスト経路とは独立して、Cloudflare Workers が日次で Convex Export API から暗号化済みデータをそのまま取得し R2 に保存する。
+- **バックアップ**：アプリケーションの通常のリクエスト経路とは独立して、Cloudflare Workers が日次で Convex Export API から、暗号化済みのパスワードヒント・鍵材料と平文メタデータ（`title`・`url`・`memo`・`tags`・`loginId`）を含む Convex データ全体を取得し R2 に保存する。
 - **リカバリーキットの保存（任意）**：ユーザーがGoogle Driveへの保存を選んだ場合のみ、ブラウザから直接Googleへアップロードする。PoohMaのサーバーはこの経路に一切関与しない。
 
 ## 今後の変更予定
