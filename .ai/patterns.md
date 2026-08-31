@@ -54,7 +54,7 @@ requireAdminAccess(ctx.user, record);
 
 ---
 
-## 3. E2EE エンベロープ暗号化・再暗号化パターン (`src/lib/crypto.ts`)
+## 3. E2EE エンベロープ暗号化・再暗号化パターン (`apps/web/src/lib/crypto.ts`)
 
 ### 新規暗号化
 1. `generateDEK()` で認証情報単位の DEK を生成
@@ -134,7 +134,8 @@ if (sessionStorage.getItem("poohma_logout")) {
 
 ```typescript
 import { convexTest } from "convex-test";
-import schema from "../convex/schema";
+import { api } from "../../convex/_generated/api";
+import schema from "../../convex/schema";
 
 test("authenticated user can create record", async () => {
   const t = convexTest(schema);
