@@ -91,7 +91,8 @@ export function NewDeviceLoginEmail({
 			</Section>
 			<Text style={text}>
 				ご自身によるログインの場合は、このメールへのご対応は不要です。
-				心当たりがない場合は、第三者に不正アクセスされた可能性があります。速やかにパスワードを変更してください。
+				<br />
+				心当たりがない場合は、第三者に不正アクセスされた可能性があります。速やかにGoogleアカウントのログインパスワードを変更してください。
 			</Text>
 			<Section style={buttonWrapper}>
 				<Button href={ctaUrl}>ダッシュボードへ</Button>
