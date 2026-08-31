@@ -136,10 +136,10 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 			});
 
 			// photoURL を省略した場合は既存の photoURL が維持される
-			const returnedUid = await user.mutation(api.users.syncUser, {
+			const returnedAccountId = await user.mutation(api.users.syncUser, {
 				displayName: "新規表示名",
 			});
-			expect(returnedUid).toBe("existing_user_uid");
+			expect(returnedAccountId).toBe(acc1Id);
 
 			await t.run(async (ctx) => {
 				const acc1 = await ctx.db.get(acc1Id);
@@ -154,7 +154,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 			});
 		});
 
-		it("同一メールで別UIDのレコードが存在する場合、各レコードやリクエストが新UIDに移行されること", async () => {
+		it("同一メールで別UIDのレコードが存在する場合、各レコードやリクエストが新UIDに移行され、アカウントIDが返されること", async () => {
 			const t = convexTest(schema, modules);
 			let familyId!: Id<"families">;
 			let oldAccId1!: Id<"users">;
@@ -216,7 +216,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 				displayName: "再作成後ユーザー",
 				photoURL: "https://new.com/recreated.png",
 			});
-			expect(res).toBe("new_firebase_uid");
+			expect(res).toBe(oldAccId1);
 
 			await t.run(async (ctx) => {
 				const rec = await ctx.db.get(recordId);
@@ -237,6 +237,72 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 				expect(acc2?.userId).toBe("new_firebase_uid");
 				expect(acc2?.displayName).toBe("保持される名前"); // 既存名は上書きされない
 			});
+		});
+
+		it("新規ユーザーの初回 syncUser で accountId が返され、その ID を用いて recordLogin が正常に完了すること", async () => {
+			const t = convexTest(schema, modules);
+			const brandNewUser = t.withIdentity({
+				subject: "brand_new_uid",
+				email: "brandnew@example.com",
+				emailVerified: true,
+			});
+
+			// 1. 初回 syncUser 実行
+			const accountId = await brandNewUser.mutation(api.users.syncUser, {
+				displayName: "新規太郎",
+				photoURL: "https://example.com/taro.png",
+			});
+			expect(accountId).toBeDefined();
+
+			await t.run(async (ctx) => {
+				const created = await ctx.db.get(accountId);
+				expect(created).not.toBeNull();
+				expect(created?.userId).toBe("brand_new_uid");
+				expect(created?.email).toBe("brandnew@example.com");
+				expect(created?.displayName).toBe("新規太郎");
+			});
+
+			// 2. 返された accountId で recordLogin を実行（新規端末）
+			const loginRes1 = await brandNewUser.mutation(api.users.recordLogin, {
+				deviceId: "new_device_uuid_1",
+				accountId,
+				deviceName: "MacBook Pro",
+				browser: "Chrome",
+				os: "macOS",
+				ipAddress: "198.51.100.1",
+				location: "Tokyo, Japan",
+			});
+			expect(loginRes1.success).toBe(true);
+			expect(loginRes1.isNewDevice).toBe(true);
+
+			// loginEvents に正常に記録されていることを確認
+			await t.run(async (ctx) => {
+				const events = await ctx.db
+					.query("loginEvents")
+					.withIndex("by_accountId", (q) => q.eq("accountId", accountId))
+					.collect();
+				expect(events).toHaveLength(1);
+				expect(events[0].deviceId).toBe("new_device_uuid_1");
+				expect(events[0].accountId).toBe(accountId);
+				expect(events[0].userId).toBe("brand_new_uid");
+				expect(events[0].isNewDevice).toBe(true);
+			});
+
+			// 3. 同じ端末から再度 recordLogin（既存端末判定）
+			const loginRes2 = await brandNewUser.mutation(api.users.recordLogin, {
+				deviceId: "new_device_uuid_1",
+				accountId,
+			});
+			expect(loginRes2.success).toBe(true);
+			expect(loginRes2.isNewDevice).toBe(false);
+
+			// 4. 別の端末から recordLogin（新規端末判定）
+			const loginRes3 = await brandNewUser.mutation(api.users.recordLogin, {
+				deviceId: "another_device_uuid_2",
+				accountId,
+			});
+			expect(loginRes3.success).toBe(true);
+			expect(loginRes3.isNewDevice).toBe(true);
 		});
 	});
 

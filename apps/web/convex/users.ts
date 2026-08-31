@@ -55,7 +55,7 @@ export const syncUser = identityVerifiedMutation({
         }
         await ctx.db.patch(account._id, patchData);
       }
-      return existingAccounts[0].userId;
+      return existingAccounts[0]._id;
     }
 
     // UIDが一致しない → 同じemailの古いレコードがないか確認
@@ -117,12 +117,12 @@ export const syncUser = identityVerifiedMutation({
         }
       }
 
-      return uid;
+      return existingByEmail[0]._id;
     }
 
     // 完全に新規のユーザー（デフォルトアカウント作成）
     const now = Date.now();
-    await ctx.db.insert("users", {
+    const accountId = await ctx.db.insert("users", {
       userId: uid,
       email,
       displayName,
@@ -131,7 +131,7 @@ export const syncUser = identityVerifiedMutation({
       updatedAt: now,
     });
 
-    return uid;
+    return accountId;
   },
 });
 

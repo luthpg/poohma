@@ -40,6 +40,11 @@ interface AbstractGeoIpResponse {
 	city?: string | null;
 	region?: string | null;
 	country?: string | null;
+	location?: {
+		city?: string | null;
+		region?: string | null;
+		country?: string | null;
+	} | null;
 }
 
 /**
@@ -81,11 +86,15 @@ export async function fetchGeoLocation(
 			}
 
 			const data = (await response.json()) as AbstractGeoIpResponse;
+			const city = data.location?.city ?? data.city;
+			const region = data.location?.region ?? data.region;
+			const country = data.location?.country ?? data.country;
+
 			const parts: string[] = [];
 
-			if (data.city) parts.push(data.city);
-			if (data.region && data.region !== data.city) parts.push(data.region);
-			if (data.country) parts.push(data.country);
+			if (city) parts.push(city);
+			if (region && region !== city) parts.push(region);
+			if (country) parts.push(country);
 
 			if (parts.length === 0) return undefined;
 			return parts.join(", ");
