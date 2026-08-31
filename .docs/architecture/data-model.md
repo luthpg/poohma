@@ -6,7 +6,7 @@
 
 ## ER Diagram
 
-````mermaid
+```mermaid
 erDiagram
     FAMILIES ||--o{ USERS : "has members"
     FAMILIES ||--o{ SERVICE_RECORDS : "owns (family-shared)"
@@ -20,6 +20,7 @@ erDiagram
     USERS ||--o{ JOIN_REQUESTS : "submits"
     USERS ||--o{ FAMILY_MIGRATIONS : "initiates"
     USERS ||--o{ RECOVERY_OTPS : "requests"
+    USERS ||--o{ FAMILIES : "issues recovery kit for"
     SERVICE_RECORDS ||--o{ CREDENTIALS : "embeds"
     FAMILY_INVITES ||--o{ JOIN_REQUESTS : "is referenced by"
 
@@ -36,6 +37,8 @@ erDiagram
         string recoveryCodeHash
         number recoveryKdfIterations
         number recoveryCryptoVersion
+        number recoveryIssuedAt
+        id recoveryIssuedByAccountId
         number updatedAt
     }
     USERS {
@@ -49,11 +52,15 @@ erDiagram
     }
     SERVICE_RECORDS {
         string title
+        string titleReading
         string url
+        string ogpImage
+        string ogpDescription
         string memo
         string userId
         id accountId
         id familyId
+        string visibility
         string ownerType
         id ownerFamilyId
         array admins
@@ -122,7 +129,7 @@ erDiagram
         boolean isNewDevice
         number loginAt
     }
-````
+```
 
 ## エンティティ補足
 
@@ -130,6 +137,7 @@ erDiagram
 
 - 家族グループ単位のレコードで、E2EEの鍵材料（マスターキー・リカバリーマスターキーの暗号化済み値、ソルト、反復回数、暗号化スキームバージョン）を保持する。
 - `kdfIterations` / `cryptoVersion` をレコード単位で保持することで、将来 PBKDF2 の反復回数を引き上げた場合でも、旧パラメータで作成された既存データを後方互換的に復号できる（Issue #140）。
+- `recoveryIssuedAt` / `recoveryIssuedByAccountId` は、リカバリーキットを最後に発行したメンバーと日時を記録する。家族設定画面で「誰がいつリカバリーキットを発行したか」を他メンバーに表示するために用いられる。
 
 ### USERS
 
@@ -138,6 +146,8 @@ erDiagram
 ### SERVICE_RECORDS
 
 - クレデンシャル管理の中心となるエンティティ。`ownerType`（`"user"` | `"family"`）により個人所有か家族共有かを切り替え、`ownerFamilyId` と `admins` は共有時のみ意味を持つ（Drive型ACLモデル、Issue #137）。
+- `titleReading` はサービス名のふりがな（自動取得または手動編集）で、ダッシュボードの五十音順ソートに利用される（Issue #118「nameソートに読み仮名が使われていない」の修正で追加）。`ogpImage` / `ogpDescription` は登録時に自動取得したOGPメタデータのキャッシュで、いずれも平文で保存される（暗号化対象外のメタデータ）。
+- `visibility`（`"PRIVATE"` | `"SHARED"`）は、`ownerType` / `ownerFamilyId` / `admins` による所有権モデル（Issue #137）導入前の**レガシーフィールド**である。新規作成・更新時は明示的に未設定へ戻され、`rls.ts` 側では `ownerType` が存在しない旧データのみを対象にした後方互換フォールバック（`legacy.visibility === "SHARED"`）としてのみ参照される。新規実装では参照しないこと。
 - `credentials` は独立したテーブルではなく、`serviceRecords` 内の埋め込み配列（オブジェクト配列）フィールドとして保持される。1レコードあたり最大10件（`MAX_CREDENTIALS_PER_RECORD`）。この埋め込み配列を独立テーブルへ分離する変更（Issue #139）は本稿執筆時点で open（計画段階）であり、実現した場合は本ER図の見直しが必要になる。
 - インデックス：`by_userId`, `by_accountId`, `by_family_sortKey`（家族内の並び順取得）, `by_ownerType_accountId`, `by_ownerType_ownerFamilyId`（フルテーブルスキャンを避けた効率的な取得に利用）。
 
@@ -164,4 +174,3 @@ erDiagram
 - [E2EE Design](../security/e2ee.md)
 - [Threat Model](../security/threat-model.md)
 - [Security Model](../security/security-model.md)
-
