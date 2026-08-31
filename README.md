@@ -75,6 +75,7 @@ PoohMaの暗号化は、次の3層構造になっています。
 | [要件定義書](.docs/requirements.md) | 機能要件・非機能要件、画面一覧、制約事項 |
 | [詳細設計書](.docs/code-design.md) | アーキテクチャ、DBスキーマ、API設計、主要シーケンス |
 | [アーキテクチャ概要](.docs/architecture.md) | コンポーネント構成、データフロー、外部連携の全体像 |
+| [データモデル](.docs/architecture/data-model.md) | 主要エンティティとリレーション（ER図） |
 | [セキュリティモデル](.docs/security/security-model.md) | 認証・認可・E2EE境界、セッション、WebAuthn仕様 |
 | [E2EE 設計書](.docs/security/e2ee.md) | 鍵階層（Key Hierarchy）、暗号化・復号・ローテーションの詳細 |
 | [脅威モデル](.docs/security/threat-model.md) | 保護対象資産、信頼境界、攻撃者モデルと防御・残存リスク |
