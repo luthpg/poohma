@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { api } from "@/../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -21,8 +22,9 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
+import { env } from "@/env/client";
 import { useAccount } from "@/hooks/useAccount";
-import { api } from "../../../convex/_generated/api";
+import { getGoogleDriveAccessToken } from "@/utils/firebase";
 import {
 	deriveKeyFromRecoveryCode,
 	generateRecoveryCode,
@@ -33,8 +35,8 @@ import {
 	wrapMasterKeyWithRecovery,
 } from "../../lib/crypto";
 import {
-	getGoogleAccessToken,
-	loadGoogleScripts,
+	loadGooglePickerScript,
+	showGoogleDrivePicker,
 	uploadFileToGoogleDrive,
 } from "../../lib/google-drive";
 import { generateRecoveryKitPdf } from "../../lib/recovery-kit";
@@ -72,22 +74,32 @@ export function RecoveryKitDialog({
 	const [hasSavedDrive, setHasSavedDrive] = useState(false);
 	const [hasShared, setHasShared] = useState(false);
 	const [isDriveUploading, setIsDriveUploading] = useState(false);
+	const [isMobile, setIsMobile] = useState(false);
 	const [canShareFile, setCanShareFile] = useState(false);
 
-	// Web Share API でファイル共有が可能か判定
+	// モバイル端末判定および Web Share API によるファイル共有可否判定
 	useEffect(() => {
-		if (
-			typeof navigator !== "undefined" &&
-			typeof navigator.share === "function" &&
-			typeof navigator.canShare === "function"
-		) {
-			try {
-				const testFile = new File(["test"], "test.pdf", {
-					type: "application/pdf",
-				});
-				setCanShareFile(navigator.canShare({ files: [testFile] }));
-			} catch {
-				setCanShareFile(false);
+		if (typeof navigator !== "undefined") {
+			const mobileCheck =
+				/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+					navigator.userAgent,
+				) ||
+				(navigator.maxTouchPoints > 0 &&
+					/Macintosh/i.test(navigator.userAgent));
+			setIsMobile(mobileCheck);
+
+			if (
+				typeof navigator.share === "function" &&
+				typeof navigator.canShare === "function"
+			) {
+				try {
+					const testFile = new File(["test"], "test.pdf", {
+						type: "application/pdf",
+					});
+					setCanShareFile(navigator.canShare({ files: [testFile] }));
+				} catch {
+					setCanShareFile(false);
+				}
 			}
 		}
 	}, []);
@@ -256,49 +268,70 @@ export function RecoveryKitDialog({
 		}
 	};
 
-	// Google Drive に保存（モバイルは共有シート優先、PCはAPI連携）
+	// Google Drive に保存（PCは Google Picker & Drive API 連携）
 	const handleSaveToDrive = async () => {
 		if (!pdfBlob) return;
-
-		// モバイル等で Web Share API が利用可能な場合は、OAuthブロックを回避して共有シート（Googleドライブアプリ等）を起動
-		if (canShareFile) {
-			await handleShare();
-			return;
-		}
 
 		setIsDriveUploading(true);
 
 		try {
-			const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-			if (!clientId) {
-				toast.info(
-					"Google Drive 連携の Client ID が未設定です。ローカル保存をご利用ください。",
-				);
-				handleDownload();
-				setIsDriveUploading(false);
-				return;
-			}
+			const apiKey = env.VITE_GOOGLE_PICKER_API_KEY;
+			const appId = env.VITE_GOOGLE_CLOUD_PROJECT_NUMBER;
 
-			const loaded = await loadGoogleScripts();
+			// 1. Google Picker スクリプトの読み込み
+			const loaded = await loadGooglePickerScript();
 			if (!loaded) {
-				toast.error("Google Drive スクリプトの読み込みに失敗しました");
+				toast.error("Google Picker の読み込みに失敗しました");
 				setIsDriveUploading(false);
 				return;
 			}
 
-			const accessToken = await getGoogleAccessToken(clientId);
+			// 2. Firebase Auth による Google Drive (drive.file) スコープの追加認証
+			let accessToken: string | null = null;
+			try {
+				accessToken = await getGoogleDriveAccessToken();
+			} catch (authErr) {
+				console.error("Google Drive auth error:", authErr);
+				toast.error("Google 認証に失敗しました");
+				setIsDriveUploading(false);
+				return;
+			}
+
+			// ユーザーが認証ポップアップを閉じた場合は安全に中断
 			if (!accessToken) {
-				toast.error("Google 認証がキャンセルされたか、失敗しました");
 				setIsDriveUploading(false);
 				return;
 			}
 
+			// 3. Google Picker を表示して保存先フォルダを選択
+			let pickerResult: { folderId?: string } | null = null;
+			try {
+				pickerResult = await showGoogleDrivePicker({
+					accessToken,
+					apiKey,
+					appId,
+				});
+			} catch (pickerErr) {
+				console.error("Google Picker error:", pickerErr);
+				toast.error("フォルダ選択画面の表示に失敗しました");
+				setIsDriveUploading(false);
+				return;
+			}
+
+			// ユーザーがフォルダ選択をキャンセルした場合は安全に中断
+			if (pickerResult == null) {
+				setIsDriveUploading(false);
+				return;
+			}
+
+			// 4. 選択されたフォルダへファイルをアップロード
 			const fileName = `PoohMa-RecoveryKit-${familyName}-${new Date().toISOString().slice(0, 10)}.pdf`;
 			const uploadRes = await uploadFileToGoogleDrive({
 				accessToken,
 				fileName,
 				mimeType: "application/pdf",
 				data: pdfBlob,
+				parentFolderId: pickerResult.folderId,
 			});
 
 			if (uploadRes) {
@@ -443,7 +476,7 @@ export function RecoveryKitDialog({
 									{hasPrinted ? "印刷済" : "印刷する"}
 								</span>
 							</button>
-							{canShareFile ? (
+							{isMobile && canShareFile ? (
 								<button
 									type="button"
 									onClick={handleShare}
@@ -455,7 +488,7 @@ export function RecoveryKitDialog({
 								>
 									<Share2 className="h-5 w-5 text-primary" />
 									<span className="text-xs font-semibold">
-										{hasShared ? "共有・保存済" : "アプリ・Driveへ共有"}
+										{hasShared ? "共有済" : "アプリへ共有"}
 									</span>
 								</button>
 							) : (

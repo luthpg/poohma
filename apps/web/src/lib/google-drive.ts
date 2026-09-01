@@ -1,16 +1,7 @@
 /**
  * Google Drive / Google Picker 連携ユーティリティ
- * ユーザー主導で Google Drive 内の保存先フォルダまたはファイルを選択・操作する
+ * ユーザー主導で Google Drive 内の保存先フォルダを選択し、ファイルをアップロードする
  */
-
-interface GoogleTokenResponse {
-	access_token?: string;
-	error?: string;
-}
-
-interface GoogleTokenClient {
-	requestAccessToken: (options?: { prompt?: string }) => void;
-}
 
 declare global {
 	interface Window {
@@ -18,28 +9,69 @@ declare global {
 			load: (apiName: string, callback: () => void) => void;
 		};
 		google?: {
-			accounts?: {
-				oauth2?: {
-					initTokenClient: (config: {
-						client_id: string;
-						scope: string;
-						callback: (response: GoogleTokenResponse) => void;
-					}) => GoogleTokenClient;
+			picker?: {
+				PickerBuilder: new () => GooglePickerBuilder;
+				DocsView: new (viewId?: string) => GoogleDocsView;
+				ViewId: {
+					FOLDERS: string;
+					DOCS: string;
+				};
+				Action: {
+					PICKED: string;
+					CANCEL: string;
 				};
 			};
 		};
 	}
 }
 
+export interface GooglePickerDocument {
+	id: string;
+	name: string;
+	mimeType: string;
+	url?: string;
+	[key: string]: unknown;
+}
+
+export interface GooglePickerResponse {
+	action: string;
+	docs?: GooglePickerDocument[];
+	[key: string]: unknown;
+}
+
+export interface GoogleDocsView {
+	setIncludeFolders: (include: boolean) => GoogleDocsView;
+	setSelectFolderEnabled: (enabled: boolean) => GoogleDocsView;
+	setMimeTypes: (mimeTypes: string) => GoogleDocsView;
+}
+
+export interface GooglePicker {
+	setVisible: (visible: boolean) => void;
+}
+
+export interface GooglePickerBuilder {
+	addView: (view: GoogleDocsView | string) => GooglePickerBuilder;
+	setOAuthToken: (token: string) => GooglePickerBuilder;
+	setDeveloperKey: (key: string) => GooglePickerBuilder;
+	setAppId: (appId: string) => GooglePickerBuilder;
+	setTitle: (title: string) => GooglePickerBuilder;
+	setCallback: (
+		callback: (data: GooglePickerResponse) => void,
+	) => GooglePickerBuilder;
+	build: () => GooglePicker;
+}
+
 const GOOGLE_PICKER_SCRIPT_URL = "https://apis.google.com/js/api.js";
-const GOOGLE_GIS_SCRIPT_URL = "https://accounts.google.com/gsi/client";
-const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 
 /**
- * Google API スクリプトの動的読み込み
+ * Google Picker API スクリプト（gapi + picker）の動的読み込み
  */
-export async function loadGoogleScripts(): Promise<boolean> {
+export async function loadGooglePickerScript(): Promise<boolean> {
 	if (typeof window === "undefined") return false;
+
+	if (window.google?.picker) {
+		return true;
+	}
 
 	const loadScript = (src: string) => {
 		return new Promise<boolean>((resolve) => {
@@ -57,12 +89,8 @@ export async function loadGoogleScripts(): Promise<boolean> {
 		});
 	};
 
-	const [gapiLoaded, gisLoaded] = await Promise.all([
-		loadScript(GOOGLE_PICKER_SCRIPT_URL),
-		loadScript(GOOGLE_GIS_SCRIPT_URL),
-	]);
-
-	if (!gapiLoaded || !gisLoaded || !window.gapi) return false;
+	const gapiLoaded = await loadScript(GOOGLE_PICKER_SCRIPT_URL);
+	if (!gapiLoaded || !window.gapi) return false;
 
 	return new Promise<boolean>((resolve) => {
 		const timeoutId = setTimeout(() => {
@@ -72,7 +100,7 @@ export async function loadGoogleScripts(): Promise<boolean> {
 		try {
 			window.gapi?.load("picker", () => {
 				clearTimeout(timeoutId);
-				resolve(true);
+				resolve(typeof window.google?.picker !== "undefined");
 			});
 		} catch (error) {
 			clearTimeout(timeoutId);
@@ -83,39 +111,57 @@ export async function loadGoogleScripts(): Promise<boolean> {
 }
 
 /**
- * Google OAuth2 Access Token を取得（Google Identity Services / Drive.file スコープ）
+ * Google Picker を起動して保存先フォルダを選択させる
+ * フォルダが選択された場合はその folderId を返し、キャンセルの場合は null を返す
  */
-export async function getGoogleAccessToken(
-	clientId: string,
-): Promise<string | null> {
-	if (typeof window === "undefined" || !window.google?.accounts?.oauth2) {
-		return null;
+export async function showGoogleDrivePicker({
+	accessToken,
+	apiKey,
+	appId,
+}: {
+	accessToken: string;
+	apiKey: string;
+	appId?: string;
+}): Promise<{ folderId?: string } | null> {
+	if (typeof window === "undefined" || !window.google?.picker) {
+		throw new Error(
+			"Google Picker library is not loaded. Call loadGooglePickerScript first.",
+		);
 	}
 
-	return new Promise((resolve) => {
-		const timeoutId = setTimeout(() => {
-			resolve(null);
-		}, 60000); // 60秒でタイムアウト
+	const pickerApi = window.google.picker;
 
+	return new Promise((resolve, reject) => {
 		try {
-			const tokenClient = window.google?.accounts?.oauth2?.initTokenClient({
-				client_id: clientId,
-				scope: DRIVE_SCOPE,
-				callback: (response: GoogleTokenResponse) => {
-					clearTimeout(timeoutId);
-					if (response.error || !response.access_token) {
-						resolve(null);
-					} else {
-						resolve(response.access_token);
-					}
-				},
-			});
+			const { DocsView, PickerBuilder, ViewId, Action } = pickerApi;
 
-			tokenClient?.requestAccessToken({ prompt: "consent" });
-		} catch (error) {
-			clearTimeout(timeoutId);
-			console.error("Failed to initialize Google token client:", error);
-			resolve(null);
+			const view = new DocsView(ViewId.FOLDERS)
+				.setIncludeFolders(true)
+				.setSelectFolderEnabled(true)
+				.setMimeTypes("application/vnd.google-apps.folder");
+
+			const pickerBuilder = new PickerBuilder()
+				.addView(view)
+				.setOAuthToken(accessToken)
+				.setDeveloperKey(apiKey)
+				.setTitle("保存先フォルダを選択")
+				.setCallback((data: GooglePickerResponse) => {
+					if (data.action === Action.PICKED) {
+						const doc = data.docs?.[0];
+						resolve({ folderId: doc?.id });
+					} else if (data.action === Action.CANCEL) {
+						resolve(null);
+					}
+				});
+
+			if (appId) {
+				pickerBuilder.setAppId(appId);
+			}
+
+			const picker = pickerBuilder.build();
+			picker.setVisible(true);
+		} catch (err) {
+			reject(err);
 		}
 	});
 }

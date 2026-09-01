@@ -41,7 +41,7 @@
 - サーバー内部のみで完結すべき通信（`getUserByFirebaseUid`）は、共有シークレット（`CONVEX_INTERNAL_SECRET`）をヘッダーで検証する内部専用エンドポイントとして分離している。
 - CSP（Content Security Policy）は `apps/web/src/start.ts` のサーバーミドルウェアで全GETリクエストに適用済み（Issue #128、closed）。`default-src 'none'` を基本に、`script-src` はリクエストごとに発行されるnonceと `strict-dynamic` のみを許可し、`frame-ancestors 'none'` でクリックジャッキングを防止する。あわせて `X-Content-Type-Options: nosniff`、`Referrer-Policy: strict-origin-when-cross-origin`、カメラ・マイク・位置情報を無効化しWebAuthn関連APIのみ自オリジンで許可する `Permissions-Policy` も同時に設定される。環境変数 `CSP_MODE` により、強制モードとレポートのみモード（`Content-Security-Policy-Report-Only`）を切り替えられる。
 - XSS が成立しブラウザ内で任意コードが実行可能になった場合、展開済みのマスターキーや画面表示中の平文ヒントは保護できない（クライアント実行環境の健全性を前提とするため）。上記のCSPはこのリスクを軽減する主要な対策の一つだが、完全な防御を保証するものではない。
-- **Google Identity Services / Google Drive（オプトイン機能）**：リカバリーキットPDFの保存先としてユーザーが任意で選択できる。ブラウザからGoogleのOAuth同意画面・Drive APIへ直接アクセスし、PoohMaのサーバーはこの通信を一切中継しない。付与されるスコープは `drive.file`（アプリが作成したファイルのみにアクセス可能）に限定され、ユーザーの既存Driveファイルへのアクセス権は要求しない。この機能を利用しない場合、Googleとの通信は一切発生しない。
+- **Google Drive / Google Picker（オプトイン機能）**：リカバリーキットPDFの保存先としてユーザーが任意で選択できる。Firebase Authentication を通じて `drive.file` スコープ（アプリが作成したファイルのみにアクセス可能）の追加同意を取得し、Google Picker で選択したフォルダへクライアントから直接アップロードする。PoohMa のサーバーはこの通信を一切中継せず、ユーザーの既存Driveファイルへのアクセス権は要求しない。この機能を利用しない場合、Google Drive との通信は一切発生しない。
 
 ## Recovery
 

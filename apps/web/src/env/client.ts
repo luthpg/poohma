@@ -16,6 +16,8 @@ export const env = createEnv({
 		VITE_FIREBASE_STORAGE_BUCKET: z.string().min(1),
 		VITE_CONVEX_URL: z.string().url(),
 		VITE_GITHUB_REPO_URL: z.string().url().optional(),
+		VITE_GOOGLE_PICKER_API_KEY: z.string().min(1),
+		VITE_GOOGLE_CLOUD_PROJECT_NUMBER: z.string().min(1),
 	},
 
 	/**
