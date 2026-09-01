@@ -304,8 +304,13 @@ export function RecoveryKitDialog({
 			}
 
 			// 3. Google Picker を表示して保存先フォルダを選択
+			// Radix Dialog のモーダルオーバーレイが body の pointer-events を制御しており、
+			// Google Picker iframe へのマウスイベントをブロックしてしまうため、
+			// Picker 表示中は一時的に pointer-events 制御を解除する
+			const savedPointerEvents = document.body.style.pointerEvents;
 			let pickerResult: { folderId?: string } | null = null;
 			try {
+				document.body.style.pointerEvents = "";
 				pickerResult = await showGoogleDrivePicker({
 					accessToken,
 					apiKey,
@@ -316,6 +321,8 @@ export function RecoveryKitDialog({
 				toast.error("フォルダ選択画面の表示に失敗しました");
 				setIsDriveUploading(false);
 				return;
+			} finally {
+				document.body.style.pointerEvents = savedPointerEvents;
 			}
 
 			// ユーザーがフォルダ選択をキャンセルした場合は安全に中断

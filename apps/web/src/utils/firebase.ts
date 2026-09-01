@@ -25,11 +25,20 @@ if (isBrowser) {
 
 export const GOOGLE_DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 
+/** メモリ上のキャッシュ（セッション内で1回だけ同意ポップアップを表示するため） */
+let cachedDriveAccessToken: string | null = null;
+
 /**
  * 現在の Firebase ユーザーを再認証し、Google Drive スコープ（drive.file）を持つ
- * 一時 Access Token を取得
+ * 一時 Access Token を取得。
+ * 取得済みトークンはメモリにキャッシュし、同一セッション中は再利用する。
  */
 export async function getGoogleDriveAccessToken(): Promise<string | null> {
+	// キャッシュ済みトークンがあればそのまま返す
+	if (cachedDriveAccessToken) {
+		return cachedDriveAccessToken;
+	}
+
 	if (!auth) {
 		console.error("Firebase auth is not initialized");
 		return null;
@@ -51,7 +60,9 @@ export async function getGoogleDriveAccessToken(): Promise<string | null> {
 	try {
 		const result = await reauthenticateWithPopup(currentUser, provider);
 		const credential = GoogleAuthProvider.credentialFromResult(result);
-		return credential?.accessToken ?? null;
+		const token = credential?.accessToken ?? null;
+		cachedDriveAccessToken = token;
+		return token;
 	} catch (error) {
 		const err = error as { code?: string; message?: string };
 		if (
@@ -66,3 +77,8 @@ export async function getGoogleDriveAccessToken(): Promise<string | null> {
 }
 
 export { auth, googleProvider };
+
+/** テスト用: キャッシュ済みの Drive アクセストークンをクリアする */
+export function resetDriveTokenCache() {
+	cachedDriveAccessToken = null;
+}

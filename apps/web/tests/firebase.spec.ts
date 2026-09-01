@@ -45,11 +45,13 @@ vi.mock("firebase/auth", () => {
 import {
 	GOOGLE_DRIVE_SCOPE,
 	getGoogleDriveAccessToken,
+	resetDriveTokenCache,
 } from "@/utils/firebase";
 
 describe("getGoogleDriveAccessToken", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		resetDriveTokenCache();
 		mockAuth.currentUser = { uid: "firebase-user" };
 		reauthenticateWithPopup.mockResolvedValue({ user: mockAuth.currentUser });
 		credentialFromResult.mockReturnValue({ accessToken: "drive-token" });
