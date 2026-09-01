@@ -551,6 +551,11 @@ export const createCredential = familyBoundMutation({
     }
 
     const now = Date.now();
+    const defaultOrder =
+      existingCreds.length > 0
+        ? Math.max(...existingCreds.map((c) => c.order ?? 0)) + 1
+        : 0;
+
     const credId = await ctx.db.insert("credentials", {
       recordId: args.recordId,
       label: args.label,
@@ -559,7 +564,7 @@ export const createCredential = familyBoundMutation({
       passwordHintIv: args.passwordHintIv,
       passwordHintDekEncrypted: args.passwordHintDekEncrypted,
       passwordHintDekIv: args.passwordHintDekIv,
-      order: args.order ?? existingCreds.length,
+      order: args.order ?? defaultOrder,
       updatedAt: now,
     });
 

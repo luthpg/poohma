@@ -1,10 +1,10 @@
-import { mutation } from "./_generated/server";
+import { internalMutation } from "./_generated/server";
 
 /**
  * サービスレコードの埋め込み credentials 配列を独立した credentials テーブルへ移行するワンショットマイグレーション
- * Convex WebUI またはスクリプトからワンショットで実行可能
+ * Convex CLI (npx convex run migrations:migrateCredentialsToTable) または内部スクリプトからワンショットで実行可能
  */
-export const migrateCredentialsToTable = mutation({
+export const migrateCredentialsToTable = internalMutation({
   args: {},
   handler: async (ctx) => {
     const records = await ctx.db.query("serviceRecords").collect();

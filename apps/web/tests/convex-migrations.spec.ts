@@ -1,6 +1,6 @@
 import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
-import { api } from "../convex/_generated/api";
+import { internal } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import schema from "../convex/schema";
 
@@ -72,8 +72,11 @@ describe("マイグレーションの動作検証 (migrateCredentialsToTable)", 
 			});
 		});
 
-		// マイグレーション mutation の実行
-		const res = await t.mutation(api.migrations.migrateCredentialsToTable, {});
+		// マイグレーション internal mutation の実行
+		const res = await t.mutation(
+			internal.migrations.migrateCredentialsToTable,
+			{},
+		);
 		expect(res.totalRecords).toBe(2);
 		expect(res.migratedRecords).toBe(2);
 		expect(res.migratedCredentials).toBe(2);
