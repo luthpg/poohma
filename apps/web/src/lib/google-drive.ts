@@ -19,6 +19,7 @@ declare global {
 				Action: {
 					PICKED: string;
 					CANCEL: string;
+					ERROR: string;
 				};
 			};
 		};
@@ -151,6 +152,8 @@ export async function showGoogleDrivePicker({
 						resolve({ folderId: doc?.id });
 					} else if (data.action === Action.CANCEL) {
 						resolve(null);
+					} else if (data.action === Action.ERROR) {
+						reject(data);
 					}
 				});
 

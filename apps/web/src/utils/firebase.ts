@@ -26,7 +26,8 @@ if (isBrowser) {
 export const GOOGLE_DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 
 /**
- * Google Drive スコープ（drive.file）を持つ一時 Access Token を Firebase Auth 経由で取得
+ * 現在の Firebase ユーザーを再認証し、Google Drive スコープ（drive.file）を持つ
+ * 一時 Access Token を取得
  */
 export async function getGoogleDriveAccessToken(): Promise<string | null> {
 	if (!auth) {
@@ -34,7 +35,13 @@ export async function getGoogleDriveAccessToken(): Promise<string | null> {
 		return null;
 	}
 
-	const { signInWithPopup } = await import("firebase/auth");
+	const currentUser = auth.currentUser;
+	if (!currentUser) {
+		console.error("Firebase user is not signed in");
+		return null;
+	}
+
+	const { reauthenticateWithPopup } = await import("firebase/auth");
 	const provider = new GoogleAuthProvider();
 	provider.addScope(GOOGLE_DRIVE_SCOPE);
 	provider.setCustomParameters({
@@ -42,7 +49,7 @@ export async function getGoogleDriveAccessToken(): Promise<string | null> {
 	});
 
 	try {
-		const result = await signInWithPopup(auth, provider);
+		const result = await reauthenticateWithPopup(currentUser, provider);
 		const credential = GoogleAuthProvider.credentialFromResult(result);
 		return credential?.accessToken ?? null;
 	} catch (error) {

@@ -218,6 +218,65 @@ describe("Google Drive / Google Picker 連携 (src/lib/google-drive.ts)", () => 
 			const result = await pickerPromise;
 			expect(result).toBeNull();
 		});
+
+		it("エラー (ERROR) 時に受信したエラー情報で reject すること", async () => {
+			let capturedCallback: (data: unknown) => void = () => {};
+
+			class MockDocsView {
+				setIncludeFolders() {
+					return this;
+				}
+				setSelectFolderEnabled() {
+					return this;
+				}
+				setMimeTypes() {
+					return this;
+				}
+			}
+			class MockPickerBuilder {
+				addView() {
+					return this;
+				}
+				setOAuthToken() {
+					return this;
+				}
+				setDeveloperKey() {
+					return this;
+				}
+				setAppId() {
+					return this;
+				}
+				setTitle() {
+					return this;
+				}
+				setCallback(callback: (data: unknown) => void) {
+					capturedCallback = callback;
+					return this;
+				}
+				build() {
+					return { setVisible: vi.fn() };
+				}
+			}
+
+			(window as unknown as { google: unknown }).google = {
+				picker: {
+					DocsView: MockDocsView,
+					PickerBuilder: MockPickerBuilder,
+					ViewId: { FOLDERS: "folders", DOCS: "docs" },
+					Action: { PICKED: "picked", CANCEL: "cancel", ERROR: "error" },
+				},
+			};
+
+			const pickerPromise = showGoogleDrivePicker({
+				accessToken: "test-token",
+				apiKey: "test-key",
+			});
+			const errorResponse = { action: "error", message: "Picker failed" };
+
+			capturedCallback(errorResponse);
+
+			await expect(pickerPromise).rejects.toEqual(errorResponse);
+		});
 	});
 
 	describe("uploadFileToGoogleDrive", () => {
