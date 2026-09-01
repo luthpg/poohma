@@ -88,3 +88,11 @@ AI Agent が誤りやすい点、過去に問題となった点、実装上の�
 - **問題**: `apps/web/src/env/client.ts` や `server.ts` に必須環境変数を追加・変更した際、ローカルの `.env` のみ更新して `.github/workflows/ci.yml` の `env` を更新し忘れると、GitHub Actions CI の Test / Build ステップで `@t3-oss/env-core` の Zod バリデーションエラーが発生して CI が失敗する。
 - **回避法**: 環境変数を追加・変更・削除した際は、必ず `.github/workflows/ci.yml`（`check-and-test` ジョブの `env`）に対応するダミー環境変数を追記・修正する。
 
+### 外部 UI / API 連携追加時の CSP（Content Security Policy）設定漏れ
+
+- **問題**: Google Picker などの iframe 埋め込み型 UI や外部 API をクライアントに追加した際、`apps/web/src/start.ts` の CSP ミドルウェアで許可していないと、ブラウザにより iframe や通信がブロックされ、白背景エラー（`Framing 'https://docs.google.com/' violates frame-src 'self'` 等）や通信失敗が発生する。
+- **回避法**:
+  - iframe を使用する外部機能を追加する場合は、`apps/web/src/start.ts` の `frame-src` に許可対象ドメイン（例: `https://docs.google.com https://drive.google.com`）を明示的に追加する。
+  - クライアントから直接呼び出す外部 API がある場合は、`connect-src` に対象ドメイン（例: `https://www.googleapis.com https://apis.google.com`）を追加する。
+
+

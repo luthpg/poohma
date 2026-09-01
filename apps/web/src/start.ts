@@ -30,7 +30,7 @@ const cspMiddleware = createMiddleware().server(({ next, request }) => {
 		"style-src-attr 'unsafe-inline'",
 		"img-src 'self' data: https:",
 		"font-src 'self' data:",
-		"frame-src 'self'",
+		"frame-src 'self' https://docs.google.com https://drive.google.com",
 		"object-src 'none'",
 		"manifest-src 'self'",
 		"worker-src 'self'",
@@ -40,13 +40,13 @@ const cspMiddleware = createMiddleware().server(({ next, request }) => {
 					`script-src 'strict-dynamic' 'nonce-${nonce}' https://vercel.live`,
 					"connect-src 'self' https://vercel.live wss://ws-us3.pusher.com" +
 						(convexHost ? ` wss://${convexHost} https://${convexHost}` : "") +
-						" https://securetoken.googleapis.com https://identitytoolkit.googleapis.com",
+						" https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://www.googleapis.com https://apis.google.com",
 				]
 			: [
 					`script-src 'strict-dynamic' 'nonce-${nonce}'`,
 					"connect-src 'self'" +
 						(convexHost ? ` wss://${convexHost} https://${convexHost}` : "") +
-						" https://securetoken.googleapis.com https://identitytoolkit.googleapis.com",
+						" https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://www.googleapis.com https://apis.google.com",
 				]),
 	].join("; ");
 
