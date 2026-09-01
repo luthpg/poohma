@@ -6,8 +6,13 @@ import viteReact from "@vitejs/plugin-react";
 import { nitro } from "nitro/vite";
 import { defineConfig, loadEnv } from "vite";
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(async ({ mode }) => {
 	const env = loadEnv(mode, process.cwd(), "");
+	Object.assign(process.env, env);
+
+	// ビルド時に必須環境変数（client / server）の存在を検証
+	await import("./src/env/client.ts");
+	await import("./src/env/server.ts");
 
 	return {
 		resolve: {
