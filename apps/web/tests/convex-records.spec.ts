@@ -1,4 +1,4 @@
-﻿import { EventEmitter } from "node:events";
+import { EventEmitter } from "node:events";
 import type http from "node:http";
 import https from "node:https";
 import { convexTest } from "convex-test";
@@ -80,7 +80,6 @@ describe("2.2.1 閲覧権限（ownerType）の境界値テスト (Convex版)", (
 				sortKey: computeSortKey("Private Record A"),
 				ownerType: "user",
 				admins: [],
-				credentials: [],
 				tags: [],
 				updatedAt: Date.now(),
 			});
@@ -95,7 +94,6 @@ describe("2.2.1 閲覧権限（ownerType）の境界値テスト (Convex版)", (
 				sortKey: computeSortKey("Shared Record A"),
 				ownerType: "family",
 				admins: [userAId],
-				credentials: [],
 				tags: [],
 				updatedAt: Date.now(),
 			});
@@ -357,7 +355,6 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
 				sortKey: computeSortKey("A's Private"),
 				ownerType: "user",
 				admins: [],
-				credentials: [],
 				tags: [],
 				updatedAt: Date.now(),
 			});
@@ -372,7 +369,6 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
 				sortKey: computeSortKey("B's Shared"),
 				ownerType: "family",
 				admins: [userBId],
-				credentials: [],
 				tags: [],
 				updatedAt: Date.now(),
 			});
@@ -425,7 +421,6 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
 				sortKey: computeSortKey("Record To Share"),
 				ownerType: "user",
 				admins: [],
-				credentials: [],
 				tags: [],
 				updatedAt: Date.now(),
 			});
@@ -498,7 +493,6 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
 				sortKey: computeSortKey("Shared Record"),
 				ownerType: "family",
 				admins: [userAId],
-				credentials: [],
 				tags: [],
 				updatedAt: Date.now(),
 			});
@@ -558,7 +552,6 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
 				sortKey: computeSortKey("R1"),
 				ownerType: "user",
 				admins: [],
-				credentials: [],
 				tags: [],
 				updatedAt: Date.now(),
 			});
@@ -571,7 +564,6 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
 				sortKey: computeSortKey("R2"),
 				ownerType: "user",
 				admins: [],
-				credentials: [],
 				tags: [],
 				updatedAt: Date.now(),
 			});
@@ -686,7 +678,6 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
 				sortKey: computeSortKey("Amazon", "あまぞん"),
 				ownerType: "user",
 				admins: [],
-				credentials: [],
 				tags: [],
 				updatedAt: Date.now(),
 			});

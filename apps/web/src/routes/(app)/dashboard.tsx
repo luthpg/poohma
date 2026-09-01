@@ -1,4 +1,4 @@
-﻿import {
+import {
 	createFileRoute,
 	getRouteApi,
 	Link,
@@ -16,7 +16,7 @@ import {
 import { toast } from "sonner";
 import { z } from "zod";
 import { api } from "@/../convex/_generated/api";
-import type { Doc, Id } from "@/../convex/_generated/dataModel";
+import type { Id } from "@/../convex/_generated/dataModel";
 import { IndexScrollBar } from "@/components/IndexScrollBar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TagInput } from "@/components/ui/tag-input";
@@ -593,15 +593,12 @@ function RecordListSection({
 	onSelectAll: (ids: string[]) => void;
 }) {
 	const { activeAccountId } = useAccount();
-	const records = usePersistentQuery<Doc<"serviceRecords">[]>(
-		api.records.getRecords,
-		{
-			accountId: activeAccountId || undefined,
-			q: searchParams.q,
-			tag: searchParams.tag,
-			sort: sortParam,
-		},
-	);
+	const records = usePersistentQuery<RecordType[]>(api.records.getRecords, {
+		accountId: activeAccountId || undefined,
+		q: searchParams.q,
+		tag: searchParams.tag,
+		sort: sortParam,
+	});
 
 	const groupedRecords = useMemo(() => {
 		return groupRecordsByIndex(records || []);
@@ -798,7 +795,9 @@ function RecordListSection({
 	);
 }
 
-type RecordType = Doc<"serviceRecords">;
+type RecordType = NonNullable<
+	(typeof api.records.getRecords)["_returnType"]
+>[number];
 
 // リスト表示用コンポーネント
 function ServiceListItem({

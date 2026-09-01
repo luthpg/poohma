@@ -8,7 +8,7 @@ import {
 } from "../src/utils/schemas";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import type { QueryCtx } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import {
   authenticatedMutation,
   authenticatedQuery,
@@ -23,7 +23,7 @@ import {
 } from "./rls";
 
 const ConvexCredentialInputSchema = CredentialInputSchema.extend({
-  id: z.string(),
+  id: z.string().optional(),
 });
 
 const ConvexRecordInputSchema = RecordInputSchema.extend({
@@ -34,6 +34,36 @@ const ConvexRecordInputSchema = RecordInputSchema.extend({
       `アカウント情報は${MAX_CREDENTIALS_PER_RECORD}件まで登録できます`,
     ),
 });
+
+/**
+ * レコードに紐づくクレデンシャル一覧を取得するヘルパー
+ */
+export async function getCredentialsForRecord(
+  ctx: { db: QueryCtx["db"] | MutationCtx["db"] },
+  recordId: Id<"serviceRecords">,
+): Promise<Doc<"credentials">[]> {
+  const creds = await ctx.db
+    .query("credentials")
+    .withIndex("by_recordId", (i) => i.eq("recordId", recordId))
+    .collect();
+  return creds.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+
+/**
+ * レコードに紐づく全クレデンシャルをカスケード削除するヘルパー
+ */
+export async function deleteCredentialsForRecord(
+  ctx: { db: MutationCtx["db"] },
+  recordId: Id<"serviceRecords">,
+) {
+  const creds = await ctx.db
+    .query("credentials")
+    .withIndex("by_recordId", (i) => i.eq("recordId", recordId))
+    .collect();
+  for (const c of creds) {
+    await ctx.db.delete(c._id);
+  }
+}
 
 /**
  * ユーザーがアクセス可能な可視レコード（または所有レコード）を取得するヘルパー
@@ -54,7 +84,7 @@ async function collectVisibleRecords(
       return familyRecords.filter((r) => {
         const ownerType = getEffectiveOwnerType(r);
         const ownerFamilyId = getEffectiveOwnerFamilyId(r);
-        const admins = getEffectiveAdmins(r) ?? [];
+        const admins = getEffectiveAdmins(r);
         return (
           (ownerType === "user" && r.accountId === user._id) ||
           (ownerType === "family" &&
@@ -79,11 +109,7 @@ async function collectVisibleRecords(
     .withIndex("by_accountId", (i) => i.eq("accountId", user._id))
     .collect();
 
-  return personalRecords.filter(
-    (r) =>
-      getEffectiveOwnerType(r) === "user" ||
-      (!r.ownerType && (r as Record<string, unknown>).visibility !== "SHARED"),
-  );
+  return personalRecords.filter((r) => getEffectiveOwnerType(r) === "user");
 }
 
 // === Queries ===
@@ -103,9 +129,32 @@ export const getRecords = authenticatedQuery({
       records = records.filter((r) => r.tags.includes(args.tag as string));
     }
 
+    // 各レコードに紐づく credentials を一括取得
+    const recordsWithCredentials = await Promise.all(
+      records.map(async (record) => {
+        const creds = await getCredentialsForRecord(ctx, record._id);
+        const mappedCreds = creds.map((c) => ({
+          _id: c._id,
+          id: c._id,
+          label: c.label,
+          loginId: c.loginId,
+          passwordHint: c.passwordHint,
+          passwordHintIv: c.passwordHintIv,
+          passwordHintDekEncrypted: c.passwordHintDekEncrypted,
+          passwordHintDekIv: c.passwordHintDekIv,
+        }));
+        return {
+          ...record,
+          credentials: mappedCreds,
+        };
+      }),
+    );
+
+    let filtered = recordsWithCredentials;
+
     if (args.q) {
       const q = args.q.toLowerCase();
-      records = records.filter(
+      filtered = filtered.filter(
         (r) =>
           r.title.toLowerCase().includes(q) ||
           r.memo?.toLowerCase().includes(q) ||
@@ -118,7 +167,7 @@ export const getRecords = authenticatedQuery({
     }
 
     // ソート（args.sort 未指定時も sortKey による既定ソートを適用）
-    records.sort((a, b) => {
+    filtered.sort((a, b) => {
       if (args.sort === "name-asc")
         return (a.titleReading || a.title).localeCompare(
           b.titleReading || b.title,
@@ -138,7 +187,7 @@ export const getRecords = authenticatedQuery({
       return (a.sortKey || a.title).localeCompare(b.sortKey || b.title);
     });
 
-    return records;
+    return filtered;
   },
 });
 
@@ -167,8 +216,22 @@ export const getRecordDetail = authenticatedQuery({
         email: u.email,
       }));
 
+    // credentialsテーブルからクレデンシャル一覧を取得
+    const creds = await getCredentialsForRecord(ctx, record._id);
+    const mappedCredentials = creds.map((c) => ({
+      _id: c._id,
+      id: c._id,
+      label: c.label,
+      loginId: c.loginId,
+      passwordHint: c.passwordHint,
+      passwordHintIv: c.passwordHintIv,
+      passwordHintDekEncrypted: c.passwordHintDekEncrypted,
+      passwordHintDekIv: c.passwordHintDekIv,
+    }));
+
     return {
       ...record,
+      credentials: mappedCredentials,
       user: recordOwner
         ? {
             displayName: recordOwner.displayName,
@@ -212,16 +275,29 @@ export const getOwnedRecords = authenticatedQuery({
       : [user];
     const emailById = new Map(members.map((m) => [m._id, m.email]));
 
-    // 各レコードの管理者メールアドレスを付与
-    return records.map((r) => {
-      const admins = getEffectiveAdmins(r) ?? [];
-      return {
-        ...r,
-        adminEmails: admins
-          .map((id) => emailById.get(id))
-          .filter((email): email is string => !!email),
-      };
-    });
+    // 各レコードの管理者メールアドレスとクレデンシャルを付与
+    return Promise.all(
+      records.map(async (r) => {
+        const admins = getEffectiveAdmins(r);
+        const creds = await getCredentialsForRecord(ctx, r._id);
+        return {
+          ...r,
+          credentials: creds.map((c) => ({
+            _id: c._id,
+            id: c._id,
+            label: c.label,
+            loginId: c.loginId,
+            passwordHint: c.passwordHint,
+            passwordHintIv: c.passwordHintIv,
+            passwordHintDekEncrypted: c.passwordHintDekEncrypted,
+            passwordHintDekIv: c.passwordHintDekIv,
+          })),
+          adminEmails: admins
+            .map((id) => emailById.get(id))
+            .filter((email): email is string => !!email),
+        };
+      }),
+    );
   },
 });
 
@@ -238,7 +314,7 @@ export const createRecord = familyBoundMutation({
     ownerType: v.optional(v.union(v.literal("user"), v.literal("family"))),
     credentials: v.array(
       v.object({
-        id: v.string(),
+        id: v.optional(v.string()),
         label: v.optional(v.string()),
         loginId: v.optional(v.string()),
         passwordHint: v.optional(v.string()),
@@ -263,6 +339,7 @@ export const createRecord = familyBoundMutation({
       titleReading: args.titleReading,
       title: args.title,
     });
+    const now = Date.now();
 
     const recordId = await ctx.db.insert("serviceRecords", {
       title: args.title,
@@ -278,10 +355,25 @@ export const createRecord = familyBoundMutation({
       ownerType: isFamily ? "family" : "user",
       ownerFamilyId: isFamily ? user.familyId : undefined,
       admins: isFamily ? [user._id] : [],
-      credentials: args.credentials,
       tags: args.tags,
-      updatedAt: Date.now(),
+      updatedAt: now,
     });
+
+    // credentials テーブルへ挿入
+    for (let i = 0; i < args.credentials.length; i++) {
+      const c = args.credentials[i];
+      await ctx.db.insert("credentials", {
+        recordId,
+        label: c.label,
+        loginId: c.loginId,
+        passwordHint: c.passwordHint,
+        passwordHintIv: c.passwordHintIv,
+        passwordHintDekEncrypted: c.passwordHintDekEncrypted,
+        passwordHintDekIv: c.passwordHintDekIv,
+        order: i,
+        updatedAt: now,
+      });
+    }
 
     return recordId;
   },
@@ -300,7 +392,7 @@ export const updateRecord = familyBoundMutation({
       ownerType: v.optional(v.union(v.literal("user"), v.literal("family"))),
       credentials: v.array(
         v.object({
-          id: v.string(),
+          id: v.optional(v.string()),
           label: v.optional(v.string()),
           loginId: v.optional(v.string()),
           passwordHint: v.optional(v.string()),
@@ -326,6 +418,7 @@ export const updateRecord = familyBoundMutation({
     // コンテンツ編集権限の確認
     requireContentAccess(ctx.user, record);
 
+    const now = Date.now();
     const patchData: Partial<Doc<"serviceRecords">> = {
       title: args.data.title,
       titleReading:
@@ -336,9 +429,8 @@ export const updateRecord = familyBoundMutation({
       ogpImage: args.data.ogpImage,
       ogpDescription: args.data.ogpDescription,
       memo: args.data.memo,
-      credentials: args.data.credentials,
       tags: args.data.tags,
-      updatedAt: Date.now(),
+      updatedAt: now,
     };
 
     // ソートキーの更新
@@ -374,6 +466,155 @@ export const updateRecord = familyBoundMutation({
     }
 
     await ctx.db.patch(args.id, patchData);
+
+    // credentials の同期
+    const existingCreds = await ctx.db
+      .query("credentials")
+      .withIndex("by_recordId", (i) => i.eq("recordId", args.id))
+      .collect();
+
+    const existingMap = new Map(existingCreds.map((c) => [c._id as string, c]));
+    const retainedIds = new Set<string>();
+
+    for (let i = 0; i < args.data.credentials.length; i++) {
+      const c = args.data.credentials[i];
+      const normalizedId = c.id
+        ? ctx.db.normalizeId("credentials", c.id)
+        : null;
+
+      if (normalizedId && existingMap.has(normalizedId)) {
+        // 既存クレデンシャルの更新
+        retainedIds.add(normalizedId);
+        await ctx.db.patch(normalizedId, {
+          label: c.label,
+          loginId: c.loginId,
+          passwordHint: c.passwordHint,
+          passwordHintIv: c.passwordHintIv,
+          passwordHintDekEncrypted: c.passwordHintDekEncrypted,
+          passwordHintDekIv: c.passwordHintDekIv,
+          order: i,
+          updatedAt: now,
+        });
+      } else {
+        // 新規クレデンシャルの作成
+        const newId = await ctx.db.insert("credentials", {
+          recordId: args.id,
+          label: c.label,
+          loginId: c.loginId,
+          passwordHint: c.passwordHint,
+          passwordHintIv: c.passwordHintIv,
+          passwordHintDekEncrypted: c.passwordHintDekEncrypted,
+          passwordHintDekIv: c.passwordHintDekIv,
+          order: i,
+          updatedAt: now,
+        });
+        retainedIds.add(newId);
+      }
+    }
+
+    // 削除されたクレデンシャルを物理削除
+    for (const cred of existingCreds) {
+      if (!retainedIds.has(cred._id)) {
+        await ctx.db.delete(cred._id);
+      }
+    }
+  },
+});
+
+// === クレデンシャル単位の個別CRUD ===
+
+export const createCredential = familyBoundMutation({
+  args: {
+    recordId: v.id("serviceRecords"),
+    label: v.optional(v.string()),
+    loginId: v.optional(v.string()),
+    passwordHint: v.optional(v.string()),
+    passwordHintIv: v.optional(v.string()),
+    passwordHintDekEncrypted: v.optional(v.string()),
+    passwordHintDekIv: v.optional(v.string()),
+    order: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const record = await ctx.db.get(args.recordId);
+    if (!record) throw new Error("Record not found");
+    requireContentAccess(ctx.user, record);
+
+    const existingCreds = await ctx.db
+      .query("credentials")
+      .withIndex("by_recordId", (i) => i.eq("recordId", args.recordId))
+      .collect();
+
+    if (existingCreds.length >= MAX_CREDENTIALS_PER_RECORD) {
+      throw new Error(
+        `アカウント情報は${MAX_CREDENTIALS_PER_RECORD}件まで登録できます`,
+      );
+    }
+
+    const now = Date.now();
+    const credId = await ctx.db.insert("credentials", {
+      recordId: args.recordId,
+      label: args.label,
+      loginId: args.loginId,
+      passwordHint: args.passwordHint,
+      passwordHintIv: args.passwordHintIv,
+      passwordHintDekEncrypted: args.passwordHintDekEncrypted,
+      passwordHintDekIv: args.passwordHintDekIv,
+      order: args.order ?? existingCreds.length,
+      updatedAt: now,
+    });
+
+    await ctx.db.patch(args.recordId, { updatedAt: now });
+    return credId;
+  },
+});
+
+export const updateCredential = familyBoundMutation({
+  args: {
+    id: v.id("credentials"),
+    label: v.optional(v.string()),
+    loginId: v.optional(v.string()),
+    passwordHint: v.optional(v.string()),
+    passwordHintIv: v.optional(v.string()),
+    passwordHintDekEncrypted: v.optional(v.string()),
+    passwordHintDekIv: v.optional(v.string()),
+    order: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const cred = await ctx.db.get(args.id);
+    if (!cred) throw new Error("Credential not found");
+
+    const record = await ctx.db.get(cred.recordId);
+    if (!record) throw new Error("Record not found");
+    requireContentAccess(ctx.user, record);
+
+    const now = Date.now();
+    await ctx.db.patch(args.id, {
+      label: args.label,
+      loginId: args.loginId,
+      passwordHint: args.passwordHint,
+      passwordHintIv: args.passwordHintIv,
+      passwordHintDekEncrypted: args.passwordHintDekEncrypted,
+      passwordHintDekIv: args.passwordHintDekIv,
+      order: args.order !== undefined ? args.order : cred.order,
+      updatedAt: now,
+    });
+
+    await ctx.db.patch(record._id, { updatedAt: now });
+  },
+});
+
+export const deleteCredential = familyBoundMutation({
+  args: { id: v.id("credentials") },
+  handler: async (ctx, args) => {
+    const cred = await ctx.db.get(args.id);
+    if (!cred) throw new Error("Credential not found");
+
+    const record = await ctx.db.get(cred.recordId);
+    if (!record) throw new Error("Record not found");
+    requireContentAccess(ctx.user, record);
+
+    await ctx.db.delete(args.id);
+    await ctx.db.patch(record._id, { updatedAt: Date.now() });
   },
 });
 
@@ -386,6 +627,8 @@ export const deleteRecord = familyBoundMutation({
     // 個人所有者または家族管理者のみ削除可能
     requireAdminAccess(ctx.user, record);
 
+    // カスケード削除
+    await deleteCredentialsForRecord(ctx, args.id);
     await ctx.db.delete(args.id);
   },
 });
@@ -398,6 +641,7 @@ export const deleteRecords = familyBoundMutation({
       if (!record) continue;
 
       requireAdminAccess(ctx.user, record);
+      await deleteCredentialsForRecord(ctx, id);
       await ctx.db.delete(id);
     }
   },
@@ -784,15 +1028,28 @@ export const fetchRecordsForExport = authenticatedMutation({
       },
     );
 
-    return records.map((r) => {
-      const admins = getEffectiveAdmins(r) ?? [];
-      return {
-        ...r,
-        adminEmails: admins
-          .map((id) => emailById.get(id))
-          .filter((email): email is string => !!email),
-      };
-    });
+    return Promise.all(
+      records.map(async (r) => {
+        const admins = getEffectiveAdmins(r);
+        const creds = await getCredentialsForRecord(ctx, r._id);
+        return {
+          ...r,
+          credentials: creds.map((c) => ({
+            _id: c._id,
+            id: c._id,
+            label: c.label,
+            loginId: c.loginId,
+            passwordHint: c.passwordHint,
+            passwordHintIv: c.passwordHintIv,
+            passwordHintDekEncrypted: c.passwordHintDekEncrypted,
+            passwordHintDekIv: c.passwordHintDekIv,
+          })),
+          adminEmails: (admins ?? [])
+            .map((id) => emailById.get(id))
+            .filter((email): email is string => !!email),
+        };
+      }),
+    );
   },
 });
 
@@ -811,7 +1068,7 @@ export const importRecords = familyBoundMutation({
         adminEmails: v.optional(v.array(v.string())),
         credentials: v.array(
           v.object({
-            id: v.string(),
+            id: v.optional(v.string()),
             label: v.optional(v.string()),
             loginId: v.optional(v.string()),
             passwordHint: v.optional(v.string()),
@@ -894,7 +1151,8 @@ export const importRecords = familyBoundMutation({
           resolvedAdmins = Array.from(resolvedSet);
         }
 
-        await ctx.db.insert("serviceRecords", {
+        const now = Date.now();
+        const recordId = await ctx.db.insert("serviceRecords", {
           title: record.title,
           titleReading: record.titleReading,
           url: record.url,
@@ -908,10 +1166,25 @@ export const importRecords = familyBoundMutation({
           ownerType: isFamily ? "family" : "user",
           ownerFamilyId: isFamily ? user.familyId : undefined,
           admins: resolvedAdmins,
-          credentials: record.credentials,
           tags: record.tags,
-          updatedAt: Date.now(),
+          updatedAt: now,
         });
+
+        for (let j = 0; j < record.credentials.length; j++) {
+          const cred = record.credentials[j];
+          await ctx.db.insert("credentials", {
+            recordId,
+            label: cred.label,
+            loginId: cred.loginId,
+            passwordHint: cred.passwordHint,
+            passwordHintIv: cred.passwordHintIv,
+            passwordHintDekEncrypted: cred.passwordHintDekEncrypted,
+            passwordHintDekIv: cred.passwordHintDekIv,
+            order: j,
+            updatedAt: now,
+          });
+        }
+
         successes++;
       } catch (_err) {
         failures.push({
@@ -951,3 +1224,4 @@ export const bulkUpdateRecords = familyBoundMutation({
     }
   },
 });
+

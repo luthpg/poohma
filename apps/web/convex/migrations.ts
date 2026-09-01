@@ -1,70 +1,62 @@
-import { computeSortKey } from "../src/utils/index-group";
 import { mutation } from "./_generated/server";
 
 /**
- * サービスレコードの Drive 型 ACL 所有権モデル（ownerType, admins, sortKey, ownerFamilyId）へのバックフィル用マイグレーション
- * Convex WebUI または内部スクリプトから実行可能
+ * サービスレコードの埋め込み credentials 配列を独立した credentials テーブルへ移行するワンショットマイグレーション
+ * Convex WebUI またはスクリプトからワンショットで実行可能
  */
-export const backfillOwnershipModel = mutation({
+export const migrateCredentialsToTable = mutation({
   args: {},
   handler: async (ctx) => {
     const records = await ctx.db.query("serviceRecords").collect();
-    let patchedCount = 0;
+    let migratedRecordsCount = 0;
+    let migratedCredentialsCount = 0;
 
     for (const record of records) {
       const recordAny = record as Record<string, unknown>;
-      const updates: Record<string, unknown> = {};
+      const embeddedCredentials = recordAny.credentials;
 
-      if (!record.sortKey) {
-        updates.sortKey = computeSortKey({
-          titleReading: record.titleReading,
-          title: record.title,
-        });
-      }
+      if (
+        Array.isArray(embeddedCredentials) &&
+        embeddedCredentials.length > 0
+      ) {
+        // 既に credentials テーブルにデータが存在するか確認
+        const existingCredentials = await ctx.db
+          .query("credentials")
+          .withIndex("by_recordId", (q) => q.eq("recordId", record._id))
+          .collect();
 
-      if (!record.ownerType) {
-        const oldVisibility = recordAny.visibility;
-        if (oldVisibility === "SHARED") {
-          updates.ownerType = "family";
-          updates.ownerFamilyId = record.familyId;
-
-          // 作成者が現在も該当家族に所属しているか検証
-          const creator = await ctx.db.get(record.accountId);
-          if (creator && creator.familyId === record.familyId) {
-            updates.admins = [record.accountId];
-          } else if (record.familyId) {
-            // 離脱済みの場合はその家族の現存メンバーを管理者として割り当て
-            const famId = record.familyId;
-            const currentMembers = await ctx.db
-              .query("users")
-              .withIndex("by_familyId", (q) => q.eq("familyId", famId))
-              .collect();
-            updates.admins =
-              currentMembers.length > 0 ? [currentMembers[0]._id] : [];
-          } else {
-            updates.admins = [];
+        if (existingCredentials.length === 0) {
+          for (let i = 0; i < embeddedCredentials.length; i++) {
+            const c = embeddedCredentials[i];
+            await ctx.db.insert("credentials", {
+              recordId: record._id,
+              label: c.label || undefined,
+              loginId: c.loginId || undefined,
+              passwordHint: c.passwordHint || undefined,
+              passwordHintIv: c.passwordHintIv || undefined,
+              passwordHintDekEncrypted: c.passwordHintDekEncrypted || undefined,
+              passwordHintDekIv: c.passwordHintDekIv || undefined,
+              order: i,
+              updatedAt: record.updatedAt || Date.now(),
+            });
+            migratedCredentialsCount++;
           }
-        } else {
-          updates.ownerType = "user";
-          updates.ownerFamilyId = undefined;
-          updates.admins = [];
         }
       }
 
-      // 旧フィールド visibility をドキュメントから物理削除
-      if (recordAny.visibility !== undefined) {
-        updates.visibility = undefined;
-      }
-
-      if (Object.keys(updates).length > 0) {
-        await ctx.db.patch(record._id, updates);
-        patchedCount++;
+      // serviceRecords から旧 credentials フィールドを物理削除
+      if (recordAny.credentials !== undefined) {
+        await ctx.db.patch(record._id, {
+          credentials: undefined,
+        } as Record<string, unknown>);
+        migratedRecordsCount++;
       }
     }
 
     return {
-      total: records.length,
-      patched: patchedCount,
+      totalRecords: records.length,
+      migratedRecords: migratedRecordsCount,
+      migratedCredentials: migratedCredentialsCount,
     };
   },
 });

@@ -8,6 +8,7 @@ import {
   identityVerifiedQuery,
 } from "./customBuilders";
 import { deleteFamilyInvites, reconcileAdminsOnLeave } from "./families";
+import { deleteCredentialsForRecord } from "./records";
 
 /**
  * ユーザー同期（ログイン時に呼ばれる）
@@ -299,6 +300,7 @@ export const deleteAllAccounts = identityVerifiedMutation({
             .withIndex("by_family_sortKey", (q) => q.eq("familyId", familyId))
             .collect();
           for (const record of familyRecords) {
+            await deleteCredentialsForRecord(ctx, record._id);
             await ctx.db.delete(record._id);
           }
 
@@ -319,12 +321,10 @@ export const deleteAllAccounts = identityVerifiedMutation({
             .withIndex("by_accountId", (q) => q.eq("accountId", account._id))
             .collect();
           const personalRecords = allUserRecords.filter(
-            (r) =>
-              r.ownerType === "user" ||
-              (!r.ownerType &&
-                (r as Record<string, unknown>).visibility !== "SHARED"),
+            (r) => r.ownerType === "user",
           );
           for (const record of personalRecords) {
+            await deleteCredentialsForRecord(ctx, record._id);
             await ctx.db.delete(record._id);
           }
 
@@ -338,6 +338,7 @@ export const deleteAllAccounts = identityVerifiedMutation({
           .collect();
         for (const record of records) {
           if (!record.familyId) {
+            await deleteCredentialsForRecord(ctx, record._id);
             await ctx.db.delete(record._id);
           }
         }
@@ -397,6 +398,7 @@ export const deleteAccount = authenticatedMutation({
           .withIndex("by_family_sortKey", (q) => q.eq("familyId", familyId))
           .collect();
         for (const record of familyRecords) {
+          await deleteCredentialsForRecord(ctx, record._id);
           await ctx.db.delete(record._id);
         }
 
@@ -417,12 +419,10 @@ export const deleteAccount = authenticatedMutation({
           .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
           .collect();
         const personalRecords = allUserRecords.filter(
-          (r) =>
-            r.ownerType === "user" ||
-            (!r.ownerType &&
-              (r as Record<string, unknown>).visibility !== "SHARED"),
+          (r) => r.ownerType === "user",
         );
         for (const record of personalRecords) {
+          await deleteCredentialsForRecord(ctx, record._id);
           await ctx.db.delete(record._id);
         }
 
@@ -436,6 +436,7 @@ export const deleteAccount = authenticatedMutation({
         .collect();
       for (const record of records) {
         if (!record.familyId) {
+          await deleteCredentialsForRecord(ctx, record._id);
           await ctx.db.delete(record._id);
         }
       }

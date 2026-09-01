@@ -55,8 +55,8 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 			let family1Id!: Id<"families">;
 			let userAId!: Id<"users">;
 			let userBId!: Id<"users">;
-			const credAId = "cred_a";
-			const credBId = "cred_b";
+			let credADocId!: Id<"credentials">;
+			let credBDocId!: Id<"credentials">;
 
 			// 1. 初期シードデータのインサート
 			await t.run(async (ctx) => {
@@ -85,7 +85,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 				});
 
 				// ユーザーAのサービスレコードとクレデンシャル
-				await ctx.db.insert("serviceRecords", {
+				const recA = await ctx.db.insert("serviceRecords", {
 					userId: "ua",
 					accountId: userAId,
 					familyId: family1Id,
@@ -93,21 +93,22 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 					sortKey: computeSortKey("RA"),
 					ownerType: "user",
 					admins: [],
-					credentials: [
-						{
-							id: credAId,
-							label: "LabelA",
-							loginId: "LoginA",
-							passwordHint: "SGVsbG9Xb3JsZA==",
-							passwordHintIv: "SGVsbG9Xb3JsZA==",
-						},
-					],
 					tags: [],
 					updatedAt: Date.now(),
 				});
 
+				credADocId = await ctx.db.insert("credentials", {
+					recordId: recA,
+					label: "LabelA",
+					loginId: "LoginA",
+					passwordHint: "SGVsbG9Xb3JsZA==",
+					passwordHintIv: "SGVsbG9Xb3JsZA==",
+					order: 0,
+					updatedAt: Date.now(),
+				});
+
 				// ユーザーBのサービスレコードとクレデンシャル
-				await ctx.db.insert("serviceRecords", {
+				const recB = await ctx.db.insert("serviceRecords", {
 					userId: "ub",
 					accountId: userBId,
 					familyId: family1Id,
@@ -115,16 +116,17 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 					sortKey: computeSortKey("RB"),
 					ownerType: "user",
 					admins: [],
-					credentials: [
-						{
-							id: credBId,
-							label: "LabelB",
-							loginId: "LoginB",
-							passwordHint: "SGVsbG9Xb3JsZA==",
-							passwordHintIv: "SGVsbG9Xb3JsZA==",
-						},
-					],
 					tags: [],
+					updatedAt: Date.now(),
+				});
+
+				credBDocId = await ctx.db.insert("credentials", {
+					recordId: recB,
+					label: "LabelB",
+					loginId: "LoginB",
+					passwordHint: "SGVsbG9Xb3JsZA==",
+					passwordHintIv: "SGVsbG9Xb3JsZA==",
+					order: 0,
 					updatedAt: Date.now(),
 				});
 			});
@@ -143,12 +145,12 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 				masterKeySalt: "SGVsbG9Xb3JsZA==",
 				credentials: [
 					{
-						id: credAId,
+						id: credADocId,
 						passwordHint: "TmV3SGludEE=",
 						passwordHintIv: "SGVsbG9Xb3JsZA==",
 					},
 					{
-						id: credBId,
+						id: credBDocId,
 						passwordHint: "TmV3SGludEI=",
 						passwordHintIv: "SGVsbG9Xb3JsZA==",
 					},
@@ -173,18 +175,12 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 				expect(updatedUserA?.familyId).toBe(result.familyId);
 
 				// Aのクレデンシャルは新しいものに更新されていること
-				const recordA = await ctx.db
-					.query("serviceRecords")
-					.withIndex("by_userId", (q) => q.eq("userId", "ua"))
-					.unique();
-				expect(recordA?.credentials[0].passwordHint).toBe("TmV3SGludEE=");
+				const credA = await ctx.db.get(credADocId);
+				expect(credA?.passwordHint).toBe("TmV3SGludEE=");
 
 				// Bのクレデンシャルは影響を受けず、古いまま(B64_VALID)であること
-				const recordB = await ctx.db
-					.query("serviceRecords")
-					.withIndex("by_userId", (q) => q.eq("userId", "ub"))
-					.unique();
-				expect(recordB?.credentials[0].passwordHint).toBe("SGVsbG9Xb3JsZA==");
+				const credB = await ctx.db.get(credBDocId);
+				expect(credB?.passwordHint).toBe("SGVsbG9Xb3JsZA==");
 			});
 		});
 	});
@@ -769,9 +765,15 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 					expiresAt: thirtyOneDaysAgo,
 					useCount: 1,
 				});
+				const applicantAccId = await ctx.db.insert("users", {
+					userId: "applicant",
+					email: "applicant@example.com",
+					updatedAt: thirtyOneDaysAgo,
+				});
 				await ctx.db.insert("joinRequests", {
 					familyId,
 					userId: "applicant",
+					accountId: applicantAccId,
 					invitedByCode: referencedOldExpiredId,
 					status: "approved",
 					createdAt: thirtyOneDaysAgo,
@@ -841,7 +843,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 					updatedAt: Date.now(),
 				});
 
-				await ctx.db.insert("serviceRecords", {
+				const rSolo = await ctx.db.insert("serviceRecords", {
 					userId: "user_solo",
 					accountId: userSoloId,
 					familyId: oldFamilyId,
@@ -849,14 +851,15 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 					sortKey: computeSortKey("Solo's Record"),
 					ownerType: "user",
 					admins: [],
-					credentials: [
-						{
-							id: "cred_solo",
-							passwordHint: "old_hint",
-							passwordHintIv: "old_iv",
-						},
-					],
 					tags: [],
+					updatedAt: Date.now(),
+				});
+
+				await ctx.db.insert("credentials", {
+					recordId: rSolo,
+					passwordHint: "old_hint",
+					passwordHintIv: "old_iv",
+					order: 0,
 					updatedAt: Date.now(),
 				});
 			});
@@ -881,8 +884,8 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 			expect(prepareRes.migrationId).toBeDefined();
 
 			// この時点ではまだユーザーの familyId もレコードの familyId も更新されていない
-			const { userBeforeCommit, recordBeforeCommit } = await t.run(
-				async (ctx) => {
+			const { userBeforeCommit, recordBeforeCommit, credBeforeCommit } =
+				await t.run(async (ctx) => {
 					const user = await ctx.db
 						.query("users")
 						.withIndex("by_userId", (q) => q.eq("userId", "user_solo"))
@@ -891,13 +894,22 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 						.query("serviceRecords")
 						.withIndex("by_userId", (q) => q.eq("userId", "user_solo"))
 						.unique();
-					return { userBeforeCommit: user, recordBeforeCommit: record };
-				},
-			);
+					const cred = record
+						? await ctx.db
+								.query("credentials")
+								.withIndex("by_recordId", (q) => q.eq("recordId", record._id))
+								.first()
+						: null;
+					return {
+						userBeforeCommit: user,
+						recordBeforeCommit: record,
+						credBeforeCommit: cred,
+					};
+				});
 			expect(userBeforeCommit?.familyId).toBe(oldFamilyId);
 			expect(recordBeforeCommit?.familyId).toBe(oldFamilyId);
-			expect(recordBeforeCommit?.credentials[0].passwordHint).toBe("old_hint");
-			expect(recordBeforeCommit?.credentials[0].passwordHintIv).toBe("old_iv");
+			expect(credBeforeCommit?.passwordHint).toBe("old_hint");
+			expect(credBeforeCommit?.passwordHintIv).toBe("old_iv");
 
 			// 2. getMigrationForEncryption で暗号化対象を取得
 			const migrationData = await userSolo.query(
@@ -906,6 +918,8 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 			);
 			expect(migrationData.records.length).toBe(1);
 
+			const targetCredId = migrationData.records[0].credentials[0].id;
+
 			// 3. commit
 			const commitRes = await userSolo.mutation(
 				api.families.commitFamilyMigration,
@@ -913,7 +927,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 					migrationId: prepareRes.migrationId,
 					credentials: [
 						{
-							id: "cred_solo",
+							id: targetCredId,
 							passwordHint: "new_hint",
 							passwordHintIv: "new_iv",
 						},
@@ -939,8 +953,16 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 					.withIndex("by_userId", (q) => q.eq("userId", "user_solo"))
 					.unique();
 				expect(record?.familyId).toBe(prepareRes.targetFamilyId);
-				expect(record?.credentials[0].passwordHint).toBe("new_hint");
-				expect(record?.credentials[0].passwordHintIv).toBe("new_iv");
+
+				expect(record).not.toBeNull();
+				if (!record) throw new Error("Record not found");
+
+				const cred = await ctx.db
+					.query("credentials")
+					.withIndex("by_recordId", (q) => q.eq("recordId", record._id))
+					.first();
+				expect(cred?.passwordHint).toBe("new_hint");
+				expect(cred?.passwordHintIv).toBe("new_iv");
 
 				// 旧Familyはメンバー0人になったので削除されていること
 				const deletedOldFamily = await ctx.db.get(oldFamilyId);
@@ -952,6 +974,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 			const t = convexTest(schema, modules);
 			let oldFamilyId!: Id<"families">;
 			let userOmitId!: Id<"users">;
+			let credADocId!: Id<"credentials">;
 
 			await t.run(async (ctx) => {
 				oldFamilyId = await ctx.db.insert("families", {
@@ -967,7 +990,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 					familyId: oldFamilyId,
 					updatedAt: Date.now(),
 				});
-				await ctx.db.insert("serviceRecords", {
+				const rOmit = await ctx.db.insert("serviceRecords", {
 					title: "省略テストレコード",
 					sortKey: computeSortKey("省略テストレコード"),
 					tags: [],
@@ -976,18 +999,21 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 					familyId: oldFamilyId,
 					ownerType: "user",
 					admins: [],
-					credentials: [
-						{
-							id: "cred_a",
-							passwordHint: "hint_a",
-							passwordHintIv: "iv_a",
-						},
-						{
-							id: "cred_b",
-							passwordHint: "hint_b",
-							passwordHintIv: "iv_b",
-						},
-					],
+					updatedAt: Date.now(),
+				});
+
+				credADocId = await ctx.db.insert("credentials", {
+					recordId: rOmit,
+					passwordHint: "hint_a",
+					passwordHintIv: "iv_a",
+					order: 0,
+					updatedAt: Date.now(),
+				});
+				await ctx.db.insert("credentials", {
+					recordId: rOmit,
+					passwordHint: "hint_b",
+					passwordHintIv: "iv_b",
+					order: 1,
 					updatedAt: Date.now(),
 				});
 			});
@@ -1014,7 +1040,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 					migrationId: prepareRes.migrationId,
 					credentials: [
 						{
-							id: "cred_a",
+							id: credADocId,
 							passwordHint: "new_hint_a",
 							passwordHintIv: "new_iv_a",
 						},
@@ -1139,14 +1165,14 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 					sortKey: computeSortKey("Service 1"),
 					ownerType: "user",
 					admins: [],
-					credentials: [
-						{
-							id: "same_cred_id",
-							passwordHint: "r1_hint_old",
-							passwordHintIv: "iv1",
-						},
-					],
 					tags: [],
+					updatedAt: Date.now(),
+				});
+				await ctx.db.insert("credentials", {
+					recordId: record1Id,
+					passwordHint: "r1_hint_old",
+					passwordHintIv: "iv1",
+					order: 0,
 					updatedAt: Date.now(),
 				});
 
@@ -1158,14 +1184,14 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 					sortKey: computeSortKey("Service 2"),
 					ownerType: "user",
 					admins: [],
-					credentials: [
-						{
-							id: "same_cred_id",
-							passwordHint: "r2_hint_old",
-							passwordHintIv: "iv2",
-						},
-					],
 					tags: [],
+					updatedAt: Date.now(),
+				});
+				await ctx.db.insert("credentials", {
+					recordId: record2Id,
+					passwordHint: "r2_hint_old",
+					passwordHintIv: "iv2",
+					order: 0,
 					updatedAt: Date.now(),
 				});
 			});
@@ -1186,19 +1212,29 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 				},
 			);
 
+			const migrationData = await userDup.query(
+				api.families.getMigrationForEncryption,
+				{ migrationId: prepareRes.migrationId },
+			);
+			const r1 = migrationData.records.find((r) => r._id === record1Id);
+			const r2 = migrationData.records.find((r) => r._id === record2Id);
+			if (!r1 || !r2) throw new Error("Records not found in migration data");
+			const r1CredId = r1.credentials[0].id;
+			const r2CredId = r2.credentials[0].id;
+
 			// recordId を付与してコミット
 			await userDup.mutation(api.families.commitFamilyMigration, {
 				migrationId: prepareRes.migrationId,
 				credentials: [
 					{
 						recordId: record1Id,
-						id: "same_cred_id",
+						id: r1CredId,
 						passwordHint: "r1_hint_new",
 						passwordHintIv: "iv1_new",
 					},
 					{
 						recordId: record2Id,
-						id: "same_cred_id",
+						id: r2CredId,
 						passwordHint: "r2_hint_new",
 						passwordHintIv: "iv2_new",
 					},
@@ -1206,11 +1242,11 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 			});
 
 			await t.run(async (ctx) => {
-				const r1 = await ctx.db.get(record1Id);
-				const r2 = await ctx.db.get(record2Id);
+				const cred1 = await ctx.db.get(r1CredId as Id<"credentials">);
+				const cred2 = await ctx.db.get(r2CredId as Id<"credentials">);
 
-				expect(r1?.credentials[0].passwordHint).toBe("r1_hint_new");
-				expect(r2?.credentials[0].passwordHint).toBe("r2_hint_new");
+				expect(cred1?.passwordHint).toBe("r1_hint_new");
+				expect(cred2?.passwordHint).toBe("r2_hint_new");
 			});
 		});
 
@@ -1275,7 +1311,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 			let expiredMigrationId!: Id<"familyMigrations">;
 
 			await t.run(async (ctx) => {
-				await ctx.db.insert("users", {
+				const userAccId = await ctx.db.insert("users", {
 					userId: "user_cron_test",
 					email: "cron@example.com",
 					updatedAt: Date.now(),
@@ -1289,6 +1325,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 				// 過去の期限切れ PREPARED レコードをダミー挿入
 				expiredMigrationId = await ctx.db.insert("familyMigrations", {
 					userId: "user_cron_test",
+					accountId: userAccId,
 					targetFamilyId: expiredFamilyId,
 					serviceRecordIds: [],
 					status: "PREPARED",
@@ -1338,13 +1375,13 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 					familyId: oldFamilyId,
 					ownerType: "user",
 					admins: [],
-					credentials: [
-						{
-							id: "cred_before",
-							passwordHint: "before_hint",
-							passwordHintIv: "before_iv",
-						},
-					],
+					updatedAt: Date.now(),
+				});
+				await ctx.db.insert("credentials", {
+					recordId: recordBeforeId,
+					passwordHint: "before_hint",
+					passwordHintIv: "before_iv",
+					order: 0,
 					updatedAt: Date.now(),
 				});
 			});
@@ -1378,13 +1415,13 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 					familyId: oldFamilyId,
 					ownerType: "user",
 					admins: [],
-					credentials: [
-						{
-							id: "cred_after",
-							passwordHint: "after_hint",
-							passwordHintIv: "after_iv",
-						},
-					],
+					updatedAt: Date.now(),
+				});
+				await ctx.db.insert("credentials", {
+					recordId: newRecordId,
+					passwordHint: "after_hint",
+					passwordHintIv: "after_iv",
+					order: 0,
 					updatedAt: Date.now(),
 				});
 			});
@@ -1418,11 +1455,27 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
 				const recordBefore = await ctx.db.get(recordBeforeId);
 				expect(recordBefore?.familyId).toBe(oldFamilyId);
-				expect(recordBefore?.credentials[0].passwordHint).toBe("before_hint");
+
+				const credBefore = recordBefore
+					? await ctx.db
+							.query("credentials")
+							.withIndex("by_recordId", (q) =>
+								q.eq("recordId", recordBefore._id),
+							)
+							.first()
+					: null;
+				expect(credBefore?.passwordHint).toBe("before_hint");
 
 				const newRecord = await ctx.db.get(newRecordId);
 				expect(newRecord?.familyId).toBe(oldFamilyId);
-				expect(newRecord?.credentials[0].passwordHint).toBe("after_hint");
+
+				const credAfter = newRecord
+					? await ctx.db
+							.query("credentials")
+							.withIndex("by_recordId", (q) => q.eq("recordId", newRecord._id))
+							.first()
+					: null;
+				expect(credAfter?.passwordHint).toBe("after_hint");
 
 				// 旧Familyも残っていること
 				const oldFamily = await ctx.db.get(oldFamilyId);
@@ -1488,7 +1541,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 					familyId: oldFamilyId,
 					updatedAt: Date.now(),
 				});
-				await ctx.db.insert("serviceRecords", {
+				const existRecId = await ctx.db.insert("serviceRecords", {
 					userId: "user_solo2",
 					accountId: userSoloId,
 					familyId: oldFamilyId,
@@ -1496,14 +1549,14 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 					sortKey: computeSortKey("既存レコード"),
 					ownerType: "user",
 					admins: [],
-					credentials: [
-						{
-							id: "cred_a",
-							passwordHint: "old_hint",
-							passwordHintIv: "old_iv",
-						},
-					],
 					tags: [],
+					updatedAt: Date.now(),
+				});
+				await ctx.db.insert("credentials", {
+					recordId: existRecId,
+					passwordHint: "old_hint",
+					passwordHintIv: "old_iv",
+					order: 0,
 					updatedAt: Date.now(),
 				});
 			});
@@ -1533,7 +1586,6 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 					sortKey: computeSortKey("並行操作で追加されたレコード"),
 					ownerType: "user",
 					admins: [],
-					credentials: [],
 					tags: [],
 					updatedAt: Date.now(),
 				});
@@ -1565,7 +1617,16 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 					.filter((q) => q.eq(q.field("title"), "既存レコード"))
 					.unique();
 				expect(existingRecord?.familyId).toBe(oldFamilyId);
-				expect(existingRecord?.credentials[0].passwordHint).toBe("old_hint");
+
+				const credExisting = existingRecord
+					? await ctx.db
+							.query("credentials")
+							.withIndex("by_recordId", (q) =>
+								q.eq("recordId", existingRecord._id),
+							)
+							.first()
+					: null;
+				expect(credExisting?.passwordHint).toBe("old_hint");
 			});
 		});
 
@@ -1599,7 +1660,6 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 					sortKey: computeSortKey("旧ファミリーの共有レコード"),
 					ownerType: "family",
 					admins: [stayingId],
-					credentials: [],
 					tags: [],
 					updatedAt: Date.now(),
 				});
@@ -1897,7 +1957,6 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 					sortKey: computeSortKey("Shared Record"),
 					ownerType: "family",
 					admins: [userLeaveId], // userLeave is the only admin
-					credentials: [],
 					tags: [],
 					updatedAt: Date.now(),
 				});
@@ -1964,7 +2023,6 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 					sortKey: computeSortKey("孤立する共有レコード"),
 					ownerType: "family",
 					admins: [userSoloId],
-					credentials: [],
 					tags: [],
 					updatedAt: Date.now(),
 				});
@@ -2255,7 +2313,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 					updatedAt: 1000,
 				});
 
-				await ctx.db.insert("serviceRecords", {
+				const r1 = await ctx.db.insert("serviceRecords", {
 					userId: "ua",
 					accountId: userAId,
 					familyId,
@@ -2263,16 +2321,16 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 					sortKey: computeSortKey("R1"),
 					ownerType: "user",
 					admins: [],
-					credentials: [
-						{
-							id: "c1",
-							passwordHint: "SGVsbG8gV29ybGQgYXV0aGVudGljYXRlZCBhZWFk",
-							passwordHintIv: "dGVzdGl2MTIzNDU2",
-							passwordHintDekEncrypted: "ZGVrRGF0YUF1dGhlbnRpY2F0ZWQ=",
-							passwordHintDekIv: "ZGVraXZkZWtpdjEyMzQ=",
-						},
-					],
 					tags: [],
+					updatedAt: 2000,
+				});
+				await ctx.db.insert("credentials", {
+					recordId: r1,
+					passwordHint: "SGVsbG8gV29ybGQgYXV0aGVudGljYXRlZCBhZWFk",
+					passwordHintIv: "dGVzdGl2MTIzNDU2",
+					passwordHintDekEncrypted: "ZGVrRGF0YUF1dGhlbnRpY2F0ZWQ=",
+					passwordHintDekIv: "ZGVraXZkZWtpdjEyMzQ=",
+					order: 0,
 					updatedAt: 2000,
 				});
 			});
@@ -2306,7 +2364,16 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 					.first(),
 			);
 			expect(record?.updatedAt).toBe(2000);
-			expect(record?.credentials[0]?.passwordHintDekEncrypted).toBe(
+
+			const cred = await t.run(async (ctx) =>
+				record
+					? ctx.db
+							.query("credentials")
+							.withIndex("by_recordId", (q) => q.eq("recordId", record._id))
+							.first()
+					: null,
+			);
+			expect(cred?.passwordHintDekEncrypted).toBe(
 				"ZGVrRGF0YUF1dGhlbnRpY2F0ZWQ=",
 			);
 

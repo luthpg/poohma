@@ -21,7 +21,7 @@ erDiagram
     USERS ||--o{ FAMILY_MIGRATIONS : "initiates"
     USERS ||--o{ RECOVERY_OTPS : "requests"
     USERS ||--o{ FAMILIES : "issues recovery kit for"
-    SERVICE_RECORDS ||--o{ CREDENTIALS : "embeds"
+    SERVICE_RECORDS ||--o{ CREDENTIALS : "has"
     FAMILY_INVITES ||--o{ JOIN_REQUESTS : "is referenced by"
 
     FAMILIES {
@@ -60,22 +60,22 @@ erDiagram
         string userId
         id accountId
         id familyId
-        string visibility
         string ownerType
         id ownerFamilyId
         array admins
-        array credentials
         array tags
         number updatedAt
     }
     CREDENTIALS {
-        string id
+        id recordId
         string label
         string loginId
         string passwordHint
         string passwordHintIv
         string passwordHintDekEncrypted
         string passwordHintDekIv
+        number order
+        number updatedAt
     }
     FAMILY_INVITES {
         id familyId
@@ -147,9 +147,14 @@ erDiagram
 
 - クレデンシャル管理の中心となるエンティティ。`ownerType`（`"user"` | `"family"`）により個人所有か家族共有かを切り替え、`ownerFamilyId` と `admins` は共有時のみ意味を持つ（Drive型ACLモデル、Issue #137）。
 - `titleReading` はサービス名のふりがな（自動取得または手動編集）で、ダッシュボードの五十音順ソートに利用される（Issue #118「nameソートに読み仮名が使われていない」の修正で追加）。`ogpImage` / `ogpDescription` は登録時に自動取得したOGPメタデータのキャッシュで、いずれも平文で保存される（暗号化対象外のメタデータ）。
-- `visibility`（`"PRIVATE"` | `"SHARED"`）は、`ownerType` / `ownerFamilyId` / `admins` による所有権モデル（Issue #137）導入前の**レガシーフィールド**である。新規作成・更新時は明示的に未設定へ戻され、`rls.ts` 側では `ownerType` が存在しない旧データのみを対象にした後方互換フォールバック（`legacy.visibility === "SHARED"`）としてのみ参照される。新規実装では参照しないこと。
-- `credentials` は独立したテーブルではなく、`serviceRecords` 内の埋め込み配列（オブジェクト配列）フィールドとして保持される。1レコードあたり最大10件（`MAX_CREDENTIALS_PER_RECORD`）。この埋め込み配列を独立テーブルへ分離する変更（Issue #139）は本稿執筆時点で open（計画段階）であり、実現した場合は本ER図の見直しが必要になる。
 - インデックス：`by_userId`, `by_accountId`, `by_family_sortKey`（家族内の並び順取得）, `by_ownerType_accountId`, `by_ownerType_ownerFamilyId`（フルテーブルスキャンを避けた効率的な取得に利用）。
+
+### CREDENTIALS
+
+- 各サービスレコードに紐づく認証情報（ログインID、パスワードヒント等）を管理する独立テーブル（Issue #139）。
+- `recordId` によるインデックス（`by_recordId`）を持ち、`order` によって表示順序を制御する。
+- パスワードヒント等の暗号化データ（`passwordHint` / `passwordHintIv` / `passwordHintDekEncrypted` / `passwordHintDekIv`）を保持する。
+- 1レコードあたり最大10件（`MAX_CREDENTIALS_PER_RECORD`）。親レコード削除時やアカウント削除時はカスケード削除される。
 
 ### FAMILY_INVITES / JOIN_REQUESTS
 
