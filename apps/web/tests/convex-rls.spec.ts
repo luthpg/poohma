@@ -1,4 +1,4 @@
-﻿import { convexTest } from "convex-test";
+import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
 import { api } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
@@ -34,7 +34,6 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
 					sortKey: computeSortKey("Dummy"),
 					ownerType: "user",
 					admins: [],
-					credentials: [],
 					tags: [],
 					updatedAt: Date.now(),
 				});
@@ -74,7 +73,6 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
 					sortKey: computeSortKey("My Private Record"),
 					ownerType: "user",
 					admins: [],
-					credentials: [],
 					tags: [],
 					updatedAt: Date.now(),
 				});
@@ -118,7 +116,6 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
 					sortKey: computeSortKey("User A Private"),
 					ownerType: "user",
 					admins: [],
-					credentials: [],
 					tags: [],
 					updatedAt: Date.now(),
 				});
@@ -167,7 +164,6 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
 					sortKey: computeSortKey("User A Record"),
 					ownerType: "user",
 					admins: [],
-					credentials: [],
 					tags: [],
 					updatedAt: Date.now(),
 				});
@@ -224,7 +220,6 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
 					sortKey: computeSortKey("User A Record"),
 					ownerType: "user",
 					admins: [],
-					credentials: [],
 					tags: [],
 					updatedAt: Date.now(),
 				});
@@ -273,7 +268,6 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
 					sortKey: computeSortKey("Shared Record"),
 					ownerType: "family",
 					admins: [userAId],
-					credentials: [],
 					tags: [],
 					updatedAt: Date.now(),
 				});
@@ -327,7 +321,6 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
 					sortKey: computeSortKey("Family 1 Secret"),
 					ownerType: "family",
 					admins: [userF1Id],
-					credentials: [],
 					tags: [],
 					updatedAt: Date.now(),
 				});
@@ -366,7 +359,7 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
 					familyId: family2,
 					updatedAt: Date.now(),
 				});
-				await ctx.db.insert("serviceRecords", {
+				const leakRecId = await ctx.db.insert("serviceRecords", {
 					userId: "user_leak_f1",
 					accountId: userF1Id,
 					familyId: family1,
@@ -375,15 +368,15 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
 					sortKey: computeSortKey("Family1の秘密レコード"),
 					ownerType: "family",
 					admins: [userF1Id],
-					credentials: [
-						{
-							id: "cred_secret",
-							label: "secret label",
-							passwordHint: "encrypted_hint_blob",
-							passwordHintIv: "encrypted_iv_blob",
-						},
-					],
 					tags: [],
+					updatedAt: Date.now(),
+				});
+				await ctx.db.insert("credentials", {
+					recordId: leakRecId,
+					label: "secret label",
+					passwordHint: "encrypted_hint_blob",
+					passwordHintIv: "encrypted_iv_blob",
+					order: 0,
 					updatedAt: Date.now(),
 				});
 			});
@@ -428,7 +421,6 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
 					sortKey: computeSortKey("Bの自分のレコード"),
 					ownerType: "user",
 					admins: [],
-					credentials: [],
 					tags: [],
 					updatedAt: Date.now(),
 				});
@@ -440,7 +432,6 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
 					sortKey: computeSortKey("Aの個人レコード"),
 					ownerType: "user",
 					admins: [],
-					credentials: [],
 					tags: [],
 					updatedAt: Date.now(),
 				});
@@ -491,7 +482,6 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
 					sortKey: computeSortKey("共有レコード"),
 					ownerType: "family",
 					admins: [userAId],
-					credentials: [],
 					tags: [],
 					updatedAt: Date.now(),
 				});
@@ -535,7 +525,6 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
 					sortKey: computeSortKey("共有レコード"),
 					ownerType: "family",
 					admins: [userAId],
-					credentials: [],
 					tags: [],
 					updatedAt: Date.now(),
 				});
@@ -581,35 +570,35 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
 				const user1 = await ctx.db.get(user1Id);
 				const user2 = await ctx.db.get(user2Id);
 
-				// 未移行の旧SHAREDレコード
-				const legacySharedRecordId = await ctx.db.insert("serviceRecords", {
+				// 家族共有レコード
+				const sharedRecordId = await ctx.db.insert("serviceRecords", {
 					userId: "u1",
 					accountId: user1Id,
 					familyId: family1Id,
-					title: "Legacy Shared",
-					sortKey: computeSortKey("Legacy Shared"),
-					visibility: "SHARED",
-					credentials: [],
+					title: "Shared Record",
+					sortKey: computeSortKey("Shared Record"),
+					ownerType: "family",
+					ownerFamilyId: family1Id,
+					admins: [user1Id],
 					tags: [],
 					updatedAt: Date.now(),
 				});
-				const legacySharedRecord = await ctx.db.get(legacySharedRecordId);
+				const sharedRecord = await ctx.db.get(sharedRecordId);
 
-				// 未移行の旧PRIVATEレコード
-				const legacyPrivateRecordId = await ctx.db.insert("serviceRecords", {
+				// 個人レコード
+				const privateRecordId = await ctx.db.insert("serviceRecords", {
 					userId: "u1",
 					accountId: user1Id,
 					familyId: family1Id,
-					title: "Legacy Private",
-					sortKey: computeSortKey("Legacy Private"),
-					visibility: "PRIVATE",
-					credentials: [],
+					title: "Private Record",
+					sortKey: computeSortKey("Private Record"),
+					ownerType: "user",
 					tags: [],
 					updatedAt: Date.now(),
 				});
-				const legacyPrivateRecord = await ctx.db.get(legacyPrivateRecordId);
+				const privateRecord = await ctx.db.get(privateRecordId);
 
-				if (!user1 || !user2 || !legacySharedRecord || !legacyPrivateRecord) {
+				if (!user1 || !user2 || !sharedRecord || !privateRecord) {
 					throw new Error("Fixture not found");
 				}
 
@@ -622,27 +611,23 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
 				} = await import("../convex/rls");
 
 				// ヘルパー動作検証
-				expect(getEffectiveOwnerType(legacySharedRecord)).toBe("family");
-				expect(getEffectiveOwnerFamilyId(legacySharedRecord)).toBe(family1Id);
-				expect(getEffectiveAdmins(legacySharedRecord)).toEqual([user1Id]);
+				expect(getEffectiveOwnerType(sharedRecord)).toBe("family");
+				expect(getEffectiveOwnerFamilyId(sharedRecord)).toBe(family1Id);
+				expect(getEffectiveAdmins(sharedRecord)).toEqual([user1Id]);
 
-				expect(getEffectiveOwnerType(legacyPrivateRecord)).toBe("user");
-				expect(getEffectiveOwnerFamilyId(legacyPrivateRecord)).toBeUndefined();
-				expect(getEffectiveAdmins(legacyPrivateRecord)).toEqual([]);
+				expect(getEffectiveOwnerType(privateRecord)).toBe("user");
+				expect(getEffectiveOwnerFamilyId(privateRecord)).toBeUndefined();
+				expect(getEffectiveAdmins(privateRecord)).toEqual([]);
 
 				// requireContentAccess / requireAdminAccess 正常系
-				expect(() =>
-					requireContentAccess(user1, legacySharedRecord),
-				).not.toThrow();
-				expect(() =>
-					requireAdminAccess(user1, legacySharedRecord),
-				).not.toThrow();
+				expect(() => requireContentAccess(user1, sharedRecord)).not.toThrow();
+				expect(() => requireAdminAccess(user1, sharedRecord)).not.toThrow();
 
 				// 家族境界チェック（他家族からのアクセス拒否）
-				expect(() => requireContentAccess(user2, legacySharedRecord)).toThrow(
+				expect(() => requireContentAccess(user2, sharedRecord)).toThrow(
 					"Access denied",
 				);
-				expect(() => requireAdminAccess(user2, legacySharedRecord)).toThrow(
+				expect(() => requireAdminAccess(user2, sharedRecord)).toThrow(
 					"Access denied",
 				);
 			});

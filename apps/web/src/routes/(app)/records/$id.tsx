@@ -124,13 +124,7 @@ function RecordDetailComponent({
 	activeAccountId,
 	familyMembers,
 }: {
-	record: Doc<"serviceRecords"> & {
-		user: {
-			displayName?: string;
-			email: string;
-		} | null;
-		adminUsers?: { _id: Id<"users">; displayName?: string; email?: string }[];
-	};
+	record: NonNullable<(typeof api.records.getRecordDetail)["_returnType"]>;
 	availableTags: string[];
 	activeAccountId?: Id<"users"> | null;
 	familyMembers: {

@@ -263,10 +263,9 @@ export function UserMenu({
 								? String(row.ogpDescription)
 								: undefined,
 							memo: row.Memo ? String(row.Memo) : undefined,
-							ownerType: (row.OwnerType === "family" ||
-							row.Visibility === "SHARED"
-								? "family"
-								: "user") as "user" | "family",
+							ownerType: (row.OwnerType === "family" ? "family" : "user") as
+								| "user"
+								| "family",
 							adminEmails:
 								typeof row.Admins === "string" && row.Admins.trim()
 									? row.Admins.split(",")

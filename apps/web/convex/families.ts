@@ -14,6 +14,10 @@ import {
   familyBoundMutation,
   familyBoundQuery,
 } from "./customBuilders";
+import {
+  deleteCredentialsForRecord,
+  getCredentialsForRecord,
+} from "./records";
 
 /**
  * メンバーが家族を離脱または削除された際、共有レコードの管理者リストを調停
@@ -42,6 +46,7 @@ export async function reconcileAdminsOnLeave(
   // 残存メンバーがいない場合、管理者不在・メンバー不在となった孤立共有レコードをクリーンアップ
   if (remainingAccountIds.length === 0) {
     for (const record of sharedRecords) {
+      await deleteCredentialsForRecord(ctx, record._id);
       await ctx.db.delete(record._id);
     }
     return;
@@ -88,7 +93,7 @@ export async function deleteFamilyInvites(
 }
 
 /**
- * 移行前（ownerType未設定）データも考慮してユーザーの個人レコードを取得するヘルパー
+ * ユーザーの個人レコードを取得するヘルパー
  */
 async function getPersonalRecordsForUser(
   ctx: { db: MutationCtx["db"] | QueryCtx["db"] },
@@ -98,11 +103,7 @@ async function getPersonalRecordsForUser(
     .query("serviceRecords")
     .withIndex("by_accountId", (q) => q.eq("accountId", accountId))
     .collect();
-  return records.filter(
-    (r) =>
-      r.ownerType === "user" ||
-      (!r.ownerType && (r as Record<string, unknown>).visibility !== "SHARED"),
-  );
+  return records.filter((r) => r.ownerType === "user");
 }
 
 export const getFamilyMembersByFamilyId = async (
@@ -611,11 +612,7 @@ export const getMigrationForEncryption = authenticatedQuery({
     const { user } = ctx;
 
     const migration = await ctx.db.get(args.migrationId);
-    const isOwner = migration
-      ? migration.accountId
-        ? migration.accountId === user._id
-        : migration.userId === user.userId
-      : false;
+    const isOwner = migration ? migration.accountId === user._id : false;
     if (!migration || !isOwner) {
       throw new Error("Migration not found or access denied");
     }
@@ -631,25 +628,31 @@ export const getMigrationForEncryption = authenticatedQuery({
     // prepare 後に作成されたレコードも含めるためリアルタイムで全件取得
     const currentRecords = await getPersonalRecordsForUser(ctx, user._id);
 
-    const records = currentRecords.map((record) => ({
-      _id: record._id,
-      id: record._id,
-      credentials: record.credentials
-        .filter((c) => c.passwordHint && c.passwordHintIv)
-        .map((c) => ({
-          id: c.id,
-          passwordHint: c.passwordHint,
-          passwordHintIv: c.passwordHintIv,
-          passwordHintDekEncrypted: c.passwordHintDekEncrypted,
-          passwordHintDekIv: c.passwordHintDekIv,
-        })),
-    }));
+    const recordsWithCreds = await Promise.all(
+      currentRecords.map(async (record) => {
+        const creds = await getCredentialsForRecord(ctx, record._id);
+        const filtered = creds
+          .filter((c) => c.passwordHint && c.passwordHintIv)
+          .map((c) => ({
+            id: c._id as string,
+            passwordHint: c.passwordHint as string,
+            passwordHintIv: c.passwordHintIv as string,
+            passwordHintDekEncrypted: c.passwordHintDekEncrypted,
+            passwordHintDekIv: c.passwordHintDekIv,
+          }));
+        return {
+          _id: record._id,
+          id: record._id,
+          credentials: filtered,
+        };
+      }),
+    );
 
     return {
       migrationId: migration._id,
       sourceFamilyId: migration.sourceFamilyId,
       targetFamilyId: migration.targetFamilyId,
-      records: records.filter((r) => r.credentials.length > 0),
+      records: recordsWithCreds.filter((r) => r.credentials.length > 0),
     };
   },
 });
@@ -672,11 +675,7 @@ export const commitFamilyMigration = authenticatedMutation({
     const { user } = ctx;
 
     const migration = await ctx.db.get(args.migrationId);
-    const isOwner = migration
-      ? migration.accountId
-        ? migration.accountId === user._id
-        : migration.userId === user.userId
-      : false;
+    const isOwner = migration ? migration.accountId === user._id : false;
     if (!migration || !isOwner) {
       throw new Error("Migration not found or access denied");
     }
@@ -718,68 +717,44 @@ export const commitFamilyMigration = authenticatedMutation({
       );
     }
 
-    // 再暗号化対象の全 credential に対して更新情報が存在するか事前に検証
+    const now = Date.now();
     for (const record of currentRecords) {
-      for (const cred of record.credentials) {
+      const creds = await getCredentialsForRecord(ctx, record._id);
+      for (const cred of creds) {
         if (cred.passwordHint && cred.passwordHintIv) {
-          const hasUpdate =
-            credUpdates.has(`${record._id}:${cred.id}`) ||
-            credUpdates.has(cred.id);
-          if (!hasUpdate) {
+          const update =
+            credUpdates.get(`${record._id}:${cred._id}`) ??
+            credUpdates.get(cred._id);
+          if (!update) {
             throw new Error(
-              `Missing re-encrypted credential update for record ${record._id}, credential ${cred.id}`,
+              `Missing re-encrypted credential update for record ${record._id}, credential ${cred._id}`,
             );
           }
-        }
-      }
-    }
-
-    for (const record of currentRecords) {
-      const newCredentials = record.credentials.map((cred) => {
-        const update =
-          credUpdates.get(`${record._id}:${cred.id}`) ??
-          credUpdates.get(cred.id);
-        if (update) {
-          return {
-            ...cred,
+          await ctx.db.patch(cred._id, {
             passwordHint: update.passwordHint,
             passwordHintIv: update.passwordHintIv,
             passwordHintDekEncrypted: update.passwordHintDekEncrypted,
             passwordHintDekIv: update.passwordHintDekIv,
-          };
+            updatedAt: now,
+          });
         }
-        return cred;
-      });
+      }
 
       await ctx.db.patch(record._id, {
         familyId: migration.targetFamilyId,
-        credentials: newCredentials,
-        updatedAt: Date.now(),
+        updatedAt: now,
       });
     }
 
     await ctx.db.patch(user._id, { familyId: migration.targetFamilyId });
 
-    const approvedRequest =
-      (await ctx.db
-        .query("joinRequests")
-        .withIndex("by_familyId_accountId", (q) =>
-          q.eq("familyId", migration.targetFamilyId).eq("accountId", user._id),
-        )
-        .filter((q) => q.eq(q.field("status"), "approved"))
-        .first()) ||
-      (await ctx.db
-        .query("joinRequests")
-        .withIndex("by_familyId_userId", (q) =>
-          q.eq("familyId", migration.targetFamilyId).eq("userId", user.userId),
-        )
-        .filter((q) =>
-          q.and(
-            q.eq(q.field("status"), "approved"),
-            q.eq(q.field("accountId"), undefined),
-          ),
-        )
-        .first());
+    const approvedRequest = await ctx.db
+      .query("joinRequests")
+      .withIndex("by_familyId_accountId", (q) =>
+        q.eq("familyId", migration.targetFamilyId).eq("accountId", user._id),
+      )
+      .filter((q) => q.eq(q.field("status"), "approved"))
+      .first();
 
     if (approvedRequest) {
       await ctx.db.delete(approvedRequest._id);
@@ -843,21 +818,26 @@ export const getRecordsForReEncryption = familyBoundQuery({
 
     const records = await getPersonalRecordsForUser(ctx, user._id);
 
-    return records
-      .map((record) => ({
-        _id: record._id,
-        id: record._id,
-        credentials: record.credentials
-          .filter((c) => c.passwordHint && c.passwordHintIv)
-          .map((c) => ({
-            id: c.id,
-            passwordHint: c.passwordHint,
-            passwordHintIv: c.passwordHintIv,
-            passwordHintDekEncrypted: c.passwordHintDekEncrypted,
-            passwordHintDekIv: c.passwordHintDekIv,
-          })),
-      }))
-      .filter((record) => record.credentials.length > 0);
+    const recordsWithCreds = await Promise.all(
+      records.map(async (record) => {
+        const creds = await getCredentialsForRecord(ctx, record._id);
+        return {
+          _id: record._id,
+          id: record._id,
+          credentials: creds
+            .filter((c) => c.passwordHint && c.passwordHintIv)
+            .map((c) => ({
+              id: c._id as string,
+              passwordHint: c.passwordHint as string,
+              passwordHintIv: c.passwordHintIv as string,
+              passwordHintDekEncrypted: c.passwordHintDekEncrypted,
+              passwordHintDekIv: c.passwordHintDekIv,
+            })),
+        };
+      }),
+    );
+
+    return recordsWithCreds.filter((record) => record.credentials.length > 0);
   },
 });
 
@@ -913,26 +893,13 @@ export const changeFamily = authenticatedMutation({
       const family = await ctx.db.get(args.familyId);
       if (!family) throw new Error("Invalid family ID");
 
-      const approvedRequest =
-        (await ctx.db
-          .query("joinRequests")
-          .withIndex("by_familyId_accountId", (q) =>
-            q.eq("familyId", family._id).eq("accountId", user._id),
-          )
-          .filter((q) => q.eq(q.field("status"), "approved"))
-          .first()) ||
-        (await ctx.db
-          .query("joinRequests")
-          .withIndex("by_familyId_userId", (q) =>
-            q.eq("familyId", family._id).eq("userId", user.userId),
-          )
-          .filter((q) =>
-            q.and(
-              q.eq(q.field("status"), "approved"),
-              q.eq(q.field("accountId"), undefined),
-            ),
-          )
-          .first());
+      const approvedRequest = await ctx.db
+        .query("joinRequests")
+        .withIndex("by_familyId_accountId", (q) =>
+          q.eq("familyId", family._id).eq("accountId", user._id),
+        )
+        .filter((q) => q.eq(q.field("status"), "approved"))
+        .first();
 
       if (!approvedRequest) {
         throw new Error(
@@ -963,56 +930,41 @@ export const changeFamily = authenticatedMutation({
       ]),
     );
 
+    const now = Date.now();
     for (const record of userRecords) {
-      let needsUpdate = false;
-      const newCredentials = record.credentials.map((cred) => {
+      const creds = await getCredentialsForRecord(ctx, record._id);
+      for (const cred of creds) {
         const update =
-          credUpdates.get(`${record._id}:${cred.id}`) ??
-          credUpdates.get(cred.id);
+          credUpdates.get(`${record._id}:${cred._id}`) ??
+          credUpdates.get(cred._id);
         if (update) {
-          needsUpdate = true;
-          return {
-            ...cred,
+          await ctx.db.patch(cred._id, {
             passwordHint: update.passwordHint,
             passwordHintIv: update.passwordHintIv,
             passwordHintDekEncrypted: update.passwordHintDekEncrypted,
             passwordHintDekIv: update.passwordHintDekIv,
-          };
+            updatedAt: now,
+          });
         }
-        return cred;
-      });
+      }
 
-      if (record.familyId !== targetFamilyId || needsUpdate) {
+      if (record.familyId !== targetFamilyId) {
         await ctx.db.patch(record._id, {
           familyId: targetFamilyId,
-          credentials: newCredentials,
-          updatedAt: Date.now(),
+          updatedAt: now,
         });
       }
     }
 
     await ctx.db.patch(user._id, { familyId: targetFamilyId });
 
-    const approvedReq =
-      (await ctx.db
-        .query("joinRequests")
-        .withIndex("by_familyId_accountId", (q) =>
-          q.eq("familyId", targetFamilyId).eq("accountId", user._id),
-        )
-        .filter((q) => q.eq(q.field("status"), "approved"))
-        .first()) ||
-      (await ctx.db
-        .query("joinRequests")
-        .withIndex("by_familyId_userId", (q) =>
-          q.eq("familyId", targetFamilyId).eq("userId", user.userId),
-        )
-        .filter((q) =>
-          q.and(
-            q.eq(q.field("status"), "approved"),
-            q.eq(q.field("accountId"), undefined),
-          ),
-        )
-        .first());
+    const approvedReq = await ctx.db
+      .query("joinRequests")
+      .withIndex("by_familyId_accountId", (q) =>
+        q.eq("familyId", targetFamilyId).eq("accountId", user._id),
+      )
+      .filter((q) => q.eq(q.field("status"), "approved"))
+      .first();
 
     if (approvedReq) {
       await ctx.db.delete(approvedReq._id);

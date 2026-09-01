@@ -73,7 +73,7 @@ export default defineSchema({
 
   familyMigrations: defineTable({
     userId: v.string(), // Firebase UID
-    accountId: v.optional(v.id("users")), // 作成元 PoohMa アカウント ID
+    accountId: v.id("users"), // 作成元 PoohMa アカウント ID
     sourceFamilyId: v.optional(v.id("families")),
     targetFamilyId: v.id("families"),
     serviceRecordIds: v.array(v.id("serviceRecords")),
@@ -105,7 +105,7 @@ export default defineSchema({
   joinRequests: defineTable({
     familyId: v.id("families"),
     userId: v.string(), // 申請者の Firebase UID
-    accountId: v.optional(v.id("users")), // 申請元 PoohMa Account ID
+    accountId: v.id("users"), // 申請元 PoohMa Account ID
     invitedByCode: v.optional(v.id("familyInvites")),
     status: v.union(
       v.literal("pending"),
@@ -133,29 +133,16 @@ export default defineSchema({
     accountId: v.id("users"), // 作成元 / 個人オーナーの PoohMa アカウント ID (主識別子)
     familyId: v.optional(v.id("families")), // 暗号化スコープ / 所属家族 ID
 
-    // 移行互換用（旧データ読み取りおよび backfill 完了までの安全策）
-    visibility: v.optional(v.union(v.literal("PRIVATE"), v.literal("SHARED"))),
-
     sortKey: v.optional(v.string()), // 五十音・アルファベット順位プレフィックス付きソートキー
     ownerType: v.optional(v.union(v.literal("user"), v.literal("family"))),
     ownerFamilyId: v.optional(v.id("families")), // ownerType === "family" のとき
     admins: v.optional(v.array(v.id("users"))), // ownerType === "family" のときの管理者 PoohMa アカウント ID 配列
 
-    // 子エンティティ（アカウント情報）をドキュメント内に埋め込み
-    credentials: v.array(
-      v.object({
-        id: v.string(), // Reactのkey用や更新時の識別用
-        label: v.optional(v.string()),
-        loginId: v.optional(v.string()),
-        passwordHint: v.optional(v.string()),
-        passwordHintIv: v.optional(v.string()),
-        passwordHintDekEncrypted: v.optional(v.string()),
-        passwordHintDekIv: v.optional(v.string()),
-      }),
-    ),
-
     // タグを配列として埋め込み
     tags: v.array(v.string()),
+
+    // マイグレーション用（旧スキーマ移行中の一時的互換性許容）
+    credentials: v.optional(v.array(v.any())),
 
     updatedAt: v.number(),
   })
@@ -164,4 +151,16 @@ export default defineSchema({
     .index("by_family_sortKey", ["familyId", "sortKey"])
     .index("by_ownerType_accountId", ["ownerType", "accountId"])
     .index("by_ownerType_ownerFamilyId", ["ownerType", "ownerFamilyId"]),
+
+  credentials: defineTable({
+    recordId: v.id("serviceRecords"),
+    label: v.optional(v.string()),
+    loginId: v.optional(v.string()),
+    passwordHint: v.optional(v.string()),
+    passwordHintIv: v.optional(v.string()),
+    passwordHintDekEncrypted: v.optional(v.string()),
+    passwordHintDekIv: v.optional(v.string()),
+    order: v.optional(v.number()),
+    updatedAt: v.number(),
+  }).index("by_recordId", ["recordId"]),
 });

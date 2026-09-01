@@ -14,6 +14,9 @@ flowchart TD
     PoohMaAccount -->|"1:N owner"| RecUser["serviceRecords (ownerType: user)"]
     PoohMaAccount -.->|"1:N admin"| RecFamily["serviceRecords (ownerType: family)"]
     
+    RecUser -->|"1:N"| CredsUser["credentials (by_recordId)"]
+    RecFamily -->|"1:N"| CredsFamily["credentials (by_recordId)"]
+    
     Family -->|"1:N scope"| RecFamily
     Family -->|"1:N"| Invites["familyInvites"]
     Family -->|"1:N"| JoinReqs["joinRequests"]
@@ -96,9 +99,11 @@ flowchart TD
 
 ## 4. データ整合性・カスケード削除ルール
 
+- **レコード削除時**:
+  - 親レコード（`serviceRecords`）削除時、または一括削除（`deleteRecords`）時、紐づくすべての `credentials` が `deleteCredentialsForRecord` ヘルパーによりカスケード削除される。
 - **ユーザー退会時**:
-  - 家族に残存メンバーがいる場合、退会者の個人レコード（`ownerType: "user"`）のみを削除する。共有レコード（`ownerType: "family"`）は元の家族に残し、`reconcileAdminsOnLeave` により残存メンバーへ管理権限を調整する。
-  - 退会者が家族グループの最後の 1 人である場合、その家族に紐づく全 `serviceRecords`、参加申請（`joinRequests`）、招待（`familyInvites`）、および `families` レコードを削除する。
+  - 家族に残存メンバーがいる場合、退会者の個人レコード（`ownerType: "user"`）およびその配下の `credentials` のみを削除する。共有レコード（`ownerType: "family"`）は元の家族に残し、`reconcileAdminsOnLeave` により残存メンバーへ管理権限を調整する。
+  - 退会者が家族グループの最後の 1 人である場合、その家族に紐づく全 `serviceRecords`、配下の全 `credentials`、参加申請（`joinRequests`）、招待（`familyInvites`）、および `families` レコードを削除する。
 - **家族離脱時**:
-  - 家族移行トランザクションの対象となる個人レコード（`ownerType: "user"`）は、新マスターキーで再暗号化されて移行先へ引き継がれる。
+  - 家族移行トランザクションの対象となる個人レコード（`ownerType: "user"`）とその `credentials` は、新マスターキーで再暗号化されて移行先へ引き継がれる。
   - 共有レコード（`ownerType: "family"`）は元の家族グループに残留する。離脱者がレコード管理者である場合、`reconcileAdminsOnLeave` が残存する家族メンバーの管理権限を調整する。

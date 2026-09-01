@@ -1,42 +1,31 @@
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 
 /**
- * 移行期間中のレコードから実効的な所有種別を取得するヘルパー
+ * レコードの実効的な所有種別を取得するヘルパー
  */
 export function getEffectiveOwnerType(
   record: Doc<"serviceRecords">,
 ): "user" | "family" {
-  if (record.ownerType) return record.ownerType;
-  const legacy = record as Record<string, unknown>;
-  return legacy.visibility === "SHARED" ? "family" : "user";
+  return record.ownerType ?? "user";
 }
 
 /**
- * 移行期間中のレコードから実効的な所有家族IDを取得するヘルパー
+ * レコードの実効的な所有家族IDを取得するヘルパー
  */
 export function getEffectiveOwnerFamilyId(
   record: Doc<"serviceRecords">,
 ): typeof record.ownerFamilyId {
   if (record.ownerType === "family") return record.ownerFamilyId;
-  if (!record.ownerType) {
-    const legacy = record as Record<string, unknown>;
-    if (legacy.visibility === "SHARED") return record.familyId;
-  }
   return undefined;
 }
 
 /**
- * 移行期間中のレコードから実効的な管理者アカウントID配列を取得するヘルパー
+ * レコードの実効的な管理者アカウントID配列を取得するヘルパー
  */
 export function getEffectiveAdmins(
   record: Doc<"serviceRecords">,
-): typeof record.admins {
-  if (record.admins) return record.admins;
-  if (!record.ownerType) {
-    const legacy = record as Record<string, unknown>;
-    if (legacy.visibility === "SHARED") return [record.accountId];
-  }
-  return [];
+): Id<"users">[] {
+  return record.admins ?? [];
 }
 
 /**

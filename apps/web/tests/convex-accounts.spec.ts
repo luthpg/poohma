@@ -265,6 +265,12 @@ describe("PoohMa Multi-Account & Authorization Tests", () => {
 		await oldUser.mutation(api.users.syncUser, { displayName: "旧アカウント" });
 
 		await t.run(async (ctx) => {
+			const oldUserDoc = await ctx.db
+				.query("users")
+				.withIndex("by_userId", (q) => q.eq("userId", "old_uid"))
+				.first();
+			if (!oldUserDoc) throw new Error("oldUserDoc not found");
+
 			familyId = await ctx.db.insert("families", {
 				name: "Target Family",
 				updatedAt: Date.now(),
@@ -272,12 +278,14 @@ describe("PoohMa Multi-Account & Authorization Tests", () => {
 			joinRequestId = await ctx.db.insert("joinRequests", {
 				familyId,
 				userId: "old_uid",
+				accountId: oldUserDoc._id,
 				status: "pending",
 				createdAt: Date.now(),
 				updatedAt: Date.now(),
 			});
 			migrationId = await ctx.db.insert("familyMigrations", {
 				userId: "old_uid",
+				accountId: oldUserDoc._id,
 				targetFamilyId: familyId,
 				serviceRecordIds: [],
 				status: "PREPARED",

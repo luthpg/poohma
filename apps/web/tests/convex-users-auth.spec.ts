@@ -185,19 +185,20 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 					userId: "old_firebase_uid",
 					accountId: oldAccId1,
 					title: "旧レコード",
-					credentials: [],
 					tags: [],
 					updatedAt: 1000,
 				});
 				joinReqId = await ctx.db.insert("joinRequests", {
 					familyId,
 					userId: "old_firebase_uid",
+					accountId: oldAccId1,
 					status: "pending",
 					createdAt: 1000,
 					updatedAt: 1000,
 				});
 				migrationId = await ctx.db.insert("familyMigrations", {
 					userId: "old_firebase_uid",
+					accountId: oldAccId1,
 					targetFamilyId: familyId,
 					serviceRecordIds: [recordId],
 					status: "PREPARED",
@@ -516,13 +517,18 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 					accountId: userAccId,
 					familyId,
 					title: "家族レコード",
-					credentials: [],
 					tags: [],
+					updatedAt: Date.now(),
+				});
+				const otherUserAccId = await ctx.db.insert("users", {
+					userId: "other_req_user",
+					email: "other@example.com",
 					updatedAt: Date.now(),
 				});
 				joinReqId = await ctx.db.insert("joinRequests", {
 					familyId,
 					userId: "other_req_user",
+					accountId: otherUserAccId,
 					status: "pending",
 					createdAt: Date.now(),
 					updatedAt: Date.now(),
@@ -577,7 +583,6 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 					familyId,
 					ownerType: "user",
 					title: "脱退者の個人レコード",
-					credentials: [],
 					tags: [],
 					updatedAt: Date.now(),
 				});
@@ -587,7 +592,6 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 					familyId,
 					ownerType: "family",
 					title: "脱退者が作った共有レコード",
-					credentials: [],
 					tags: [],
 					updatedAt: Date.now(),
 				});
@@ -632,7 +636,6 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 					userId: "no_family_user",
 					accountId: userAccId,
 					title: "個人レコード",
-					credentials: [],
 					tags: [],
 					updatedAt: Date.now(),
 				});
@@ -641,7 +644,6 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 					accountId: userAccId,
 					familyId: otherFamilyId,
 					title: "家族付きレコード",
-					credentials: [],
 					tags: [],
 					updatedAt: Date.now(),
 				});
@@ -702,7 +704,6 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 					familyId: sharedFamilyId,
 					ownerType: "user",
 					title: "個人レコード",
-					credentials: [],
 					tags: [],
 					updatedAt: Date.now(),
 				});
@@ -712,7 +713,6 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 					familyId: sharedFamilyId,
 					ownerType: "family",
 					title: "共有レコード",
-					credentials: [],
 					tags: [],
 					updatedAt: Date.now(),
 				});
@@ -720,7 +720,6 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 					userId: "delete_all_multi_user",
 					accountId: myAcc2,
 					title: "家族なしレコード",
-					credentials: [],
 					tags: [],
 					updatedAt: Date.now(),
 				});
