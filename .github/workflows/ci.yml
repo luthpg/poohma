@@ -21,6 +21,8 @@ jobs:
       VITE_FIREBASE_STORAGE_BUCKET: "dummy.appspot.com"
       VITE_CONVEX_URL: "https://dummy.convex.cloud"
       VITE_CONVEX_SITE_URL: "https://dummy.convex.site"
+      VITE_GOOGLE_PICKER_API_KEY: "dummy"
+      VITE_GOOGLE_CLOUD_PROJECT_NUMBER: "dummy"
       MICROCMS_SERVICE_DOMAIN: "dummy"
       MICROCMS_API_KEY: "dummy"
       CONVEX_INTERNAL_SECRET: "dummy"
