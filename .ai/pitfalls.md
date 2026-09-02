@@ -95,4 +95,12 @@ AI Agent が誤りやすい点、過去に問題となった点、実装上の�
   - iframe を使用する外部機能を追加する場合は、`apps/web/src/start.ts` の `frame-src` に許可対象ドメイン（例: `https://docs.google.com https://drive.google.com`）を明示的に追加する。
   - クライアントから直接呼び出す外部 API がある場合は、`connect-src` に対象ドメイン（例: `https://www.googleapis.com https://apis.google.com`）を追加する。
 
+### Google Picker API の `setEnableDrives(true)` とルートフォルダ選択の制約
+
+- **問題**: `DocsView(ViewId.FOLDERS)` に `setEnableDrives(true)` を設定すると、そのビューは共有ドライブ専用フィルターとなり「マイドライブ」が表示・選択できなくなる。また、Google Picker は一覧内のフォルダアイテムを選択する UI であるため、「マイドライブ直下（root）」そのものを選択状態にできず、Picker 内でのフォルダ新規作成機能も提供されていない。
+- **回避法**:
+  - マイドライブと共有ドライブを両立させる場合は、マイドライブ用（`setParent("root")`）と共有ドライブ用（`setEnableDrives(true)`）の 2 つの独立した `DocsView` を `PickerBuilder` に登録する。
+  - ルート直下保存やフォルダ作成が必要な場合は、Picker だけに依存せず、Google Drive API（`createGoogleDriveFolder` や `parentFolderId: undefined` でのアップロード）をアプリ側 UI（ドロップダウンメニュー等）で選択肢として提供する。
+
+
 

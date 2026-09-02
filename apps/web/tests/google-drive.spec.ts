@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+	createGoogleDriveFolder,
 	downloadFileFromGoogleDrive,
 	loadGooglePickerScript,
 	showGoogleDrivePicker,
@@ -406,6 +407,53 @@ describe("Google Drive / Google Picker 連携 (src/lib/google-drive.ts)", () => 
 			const result = await downloadFileFromGoogleDrive({
 				accessToken: "valid-token",
 				fileId: "not-existing-file",
+			});
+
+			expect(result).toBeNull();
+		});
+	});
+
+	describe("createGoogleDriveFolder", () => {
+		it("指定したフォルダ名とparentFolderIdで新規フォルダを作成できること", async () => {
+			const mockResponse = { id: "created-folder-id-123" };
+			global.fetch = vi.fn().mockResolvedValue({
+				ok: true,
+				json: async () => mockResponse,
+			} as Response);
+
+			const result = await createGoogleDriveFolder({
+				accessToken: "valid-token",
+				folderName: "PoohMa",
+				parentFolderId: "parent-folder-456",
+			});
+
+			expect(result).toEqual({ folderId: "created-folder-id-123" });
+			expect(global.fetch).toHaveBeenCalledWith(
+				"https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id",
+				expect.objectContaining({
+					method: "POST",
+					headers: {
+						Authorization: "Bearer valid-token",
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify({
+						name: "PoohMa",
+						mimeType: "application/vnd.google-apps.folder",
+						parents: ["parent-folder-456"],
+					}),
+				}),
+			);
+		});
+
+		it("フォルダ作成 API 失敗時に null を返すこと", async () => {
+			global.fetch = vi.fn().mockResolvedValue({
+				ok: false,
+				statusText: "Internal Server Error",
+			} as Response);
+
+			const result = await createGoogleDriveFolder({
+				accessToken: "valid-token",
+				folderName: "PoohMa",
 			});
 
 			expect(result).toBeNull();

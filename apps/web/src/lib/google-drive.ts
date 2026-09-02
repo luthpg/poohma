@@ -283,3 +283,50 @@ export async function downloadFileFromGoogleDrive({
 		return null;
 	}
 }
+
+/**
+ * Google Drive 内に新規フォルダを作成
+ */
+export async function createGoogleDriveFolder({
+	accessToken,
+	folderName,
+	parentFolderId,
+}: {
+	accessToken: string;
+	folderName: string;
+	parentFolderId?: string;
+}): Promise<{ folderId: string } | null> {
+	const metadata: Record<string, string | string[]> = {
+		name: folderName,
+		mimeType: "application/vnd.google-apps.folder",
+	};
+
+	if (parentFolderId) {
+		metadata.parents = [parentFolderId];
+	}
+
+	try {
+		const res = await fetch(
+			"https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id",
+			{
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${accessToken}`,
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify(metadata),
+			},
+		);
+
+		if (!res.ok) {
+			console.error("Failed to create folder on Google Drive:", res.statusText);
+			return null;
+		}
+
+		const result = await res.json();
+		return { folderId: result.id };
+	} catch (err) {
+		console.error("Google Drive create folder error:", err);
+		return null;
+	}
+}
