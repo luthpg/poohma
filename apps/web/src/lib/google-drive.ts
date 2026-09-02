@@ -1,16 +1,7 @@
 /**
  * Google Drive / Google Picker 連携ユーティリティ
- * ユーザー主導で Google Drive 内の保存先フォルダまたはファイルを選択・操作する
+ * ユーザー主導で Google Drive 内の保存先フォルダを選択し、ファイルをアップロードする
  */
-
-interface GoogleTokenResponse {
-	access_token?: string;
-	error?: string;
-}
-
-interface GoogleTokenClient {
-	requestAccessToken: (options?: { prompt?: string }) => void;
-}
 
 declare global {
 	interface Window {
@@ -18,28 +9,77 @@ declare global {
 			load: (apiName: string, callback: () => void) => void;
 		};
 		google?: {
-			accounts?: {
-				oauth2?: {
-					initTokenClient: (config: {
-						client_id: string;
-						scope: string;
-						callback: (response: GoogleTokenResponse) => void;
-					}) => GoogleTokenClient;
+			picker?: {
+				PickerBuilder: new () => GooglePickerBuilder;
+				DocsView: new (viewId?: string) => GoogleDocsView;
+				ViewId: {
+					FOLDERS: string;
+					DOCS: string;
+				};
+				Feature: {
+					SUPPORT_DRIVES: string;
+					SUPPORT_TEAM_DRIVES: string;
+				};
+				Action: {
+					PICKED: string;
+					CANCEL: string;
+					ERROR: string;
 				};
 			};
 		};
 	}
 }
 
+export interface GooglePickerDocument {
+	id: string;
+	name: string;
+	mimeType: string;
+	url?: string;
+	[key: string]: unknown;
+}
+
+export interface GooglePickerResponse {
+	action: string;
+	docs?: GooglePickerDocument[];
+	[key: string]: unknown;
+}
+
+export interface GoogleDocsView {
+	setIncludeFolders: (include: boolean) => GoogleDocsView;
+	setSelectFolderEnabled: (enabled: boolean) => GoogleDocsView;
+	setEnableDrives: (enable: boolean) => GoogleDocsView;
+	setMimeTypes: (mimeTypes: string) => GoogleDocsView;
+	setParent: (parent: string) => GoogleDocsView;
+}
+
+export interface GooglePicker {
+	setVisible: (visible: boolean) => void;
+}
+
+export interface GooglePickerBuilder {
+	addView: (view: GoogleDocsView | string) => GooglePickerBuilder;
+	enableFeature: (feature: string) => GooglePickerBuilder;
+	setOAuthToken: (token: string) => GooglePickerBuilder;
+	setDeveloperKey: (key: string) => GooglePickerBuilder;
+	setAppId: (appId: string) => GooglePickerBuilder;
+	setTitle: (title: string) => GooglePickerBuilder;
+	setCallback: (
+		callback: (data: GooglePickerResponse) => void,
+	) => GooglePickerBuilder;
+	build: () => GooglePicker;
+}
+
 const GOOGLE_PICKER_SCRIPT_URL = "https://apis.google.com/js/api.js";
-const GOOGLE_GIS_SCRIPT_URL = "https://accounts.google.com/gsi/client";
-const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 
 /**
- * Google API スクリプトの動的読み込み
+ * Google Picker API スクリプト（gapi + picker）の動的読み込み
  */
-export async function loadGoogleScripts(): Promise<boolean> {
+export async function loadGooglePickerScript(): Promise<boolean> {
 	if (typeof window === "undefined") return false;
+
+	if (window.google?.picker) {
+		return true;
+	}
 
 	const loadScript = (src: string) => {
 		return new Promise<boolean>((resolve) => {
@@ -57,12 +97,8 @@ export async function loadGoogleScripts(): Promise<boolean> {
 		});
 	};
 
-	const [gapiLoaded, gisLoaded] = await Promise.all([
-		loadScript(GOOGLE_PICKER_SCRIPT_URL),
-		loadScript(GOOGLE_GIS_SCRIPT_URL),
-	]);
-
-	if (!gapiLoaded || !gisLoaded || !window.gapi) return false;
+	const gapiLoaded = await loadScript(GOOGLE_PICKER_SCRIPT_URL);
+	if (!gapiLoaded || !window.gapi) return false;
 
 	return new Promise<boolean>((resolve) => {
 		const timeoutId = setTimeout(() => {
@@ -72,7 +108,7 @@ export async function loadGoogleScripts(): Promise<boolean> {
 		try {
 			window.gapi?.load("picker", () => {
 				clearTimeout(timeoutId);
-				resolve(true);
+				resolve(typeof window.google?.picker !== "undefined");
 			});
 		} catch (error) {
 			clearTimeout(timeoutId);
@@ -83,39 +119,73 @@ export async function loadGoogleScripts(): Promise<boolean> {
 }
 
 /**
- * Google OAuth2 Access Token を取得（Google Identity Services / Drive.file スコープ）
+ * Google Picker を起動して保存先フォルダを選択させる
+ * フォルダが選択された場合はその folderId を返し、キャンセルの場合は null を返す
  */
-export async function getGoogleAccessToken(
-	clientId: string,
-): Promise<string | null> {
-	if (typeof window === "undefined" || !window.google?.accounts?.oauth2) {
-		return null;
+export async function showGoogleDrivePicker({
+	accessToken,
+	apiKey,
+	appId,
+}: {
+	accessToken: string;
+	apiKey: string;
+	appId?: string;
+}): Promise<{ folderId?: string } | null> {
+	if (typeof window === "undefined" || !window.google?.picker) {
+		throw new Error(
+			"Google Picker library is not loaded. Call loadGooglePickerScript first.",
+		);
 	}
 
-	return new Promise((resolve) => {
-		const timeoutId = setTimeout(() => {
-			resolve(null);
-		}, 60000); // 60秒でタイムアウト
+	const pickerApi = window.google.picker;
 
+	return new Promise((resolve, reject) => {
 		try {
-			const tokenClient = window.google?.accounts?.oauth2?.initTokenClient({
-				client_id: clientId,
-				scope: DRIVE_SCOPE,
-				callback: (response: GoogleTokenResponse) => {
-					clearTimeout(timeoutId);
-					if (response.error || !response.access_token) {
-						resolve(null);
-					} else {
-						resolve(response.access_token);
-					}
-				},
-			});
+			const { DocsView, PickerBuilder, ViewId, Action, Feature } = pickerApi;
 
-			tokenClient?.requestAccessToken({ prompt: "consent" });
-		} catch (error) {
-			clearTimeout(timeoutId);
-			console.error("Failed to initialize Google token client:", error);
-			resolve(null);
+			// 1. マイドライブ用ビュー（root階層を初期表示）
+			const myDriveView = new DocsView(ViewId.FOLDERS)
+				.setIncludeFolders(true)
+				.setSelectFolderEnabled(true)
+				.setParent("root")
+				.setMimeTypes("application/vnd.google-apps.folder");
+
+			// 2. 共有ドライブ用ビュー（setEnableDrives(true) を設定した独立ビュー）
+			const sharedDrivesView = new DocsView(ViewId.FOLDERS)
+				.setIncludeFolders(true)
+				.setSelectFolderEnabled(true)
+				.setEnableDrives(true)
+				.setMimeTypes("application/vnd.google-apps.folder");
+
+			const pickerBuilder = new PickerBuilder()
+				.addView(myDriveView)
+				.addView(sharedDrivesView)
+				.setOAuthToken(accessToken)
+				.setDeveloperKey(apiKey)
+				.setTitle("保存先を選択（マイドライブ / 共有ドライブ / フォルダ）")
+				.setCallback((data: GooglePickerResponse) => {
+					if (data.action === Action.PICKED) {
+						const doc = data.docs?.[0];
+						resolve({ folderId: doc?.id });
+					} else if (data.action === Action.CANCEL) {
+						resolve(null);
+					} else if (data.action === Action.ERROR) {
+						reject(data);
+					}
+				});
+
+			if (Feature?.SUPPORT_DRIVES) {
+				pickerBuilder.enableFeature(Feature.SUPPORT_DRIVES);
+			}
+
+			if (appId) {
+				pickerBuilder.setAppId(appId);
+			}
+
+			const picker = pickerBuilder.build();
+			picker.setVisible(true);
+		} catch (err) {
+			reject(err);
 		}
 	});
 }
@@ -159,7 +229,7 @@ export async function uploadFileToGoogleDrive({
 
 	try {
 		const res = await fetch(
-			"https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink",
+			"https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,webViewLink",
 			{
 				method: "POST",
 				headers: {
@@ -210,6 +280,53 @@ export async function downloadFileFromGoogleDrive({
 		return await res.blob();
 	} catch (err) {
 		console.error("Google Drive download error:", err);
+		return null;
+	}
+}
+
+/**
+ * Google Drive 内に新規フォルダを作成
+ */
+export async function createGoogleDriveFolder({
+	accessToken,
+	folderName,
+	parentFolderId,
+}: {
+	accessToken: string;
+	folderName: string;
+	parentFolderId?: string;
+}): Promise<{ folderId: string } | null> {
+	const metadata: Record<string, string | string[]> = {
+		name: folderName,
+		mimeType: "application/vnd.google-apps.folder",
+	};
+
+	if (parentFolderId) {
+		metadata.parents = [parentFolderId];
+	}
+
+	try {
+		const res = await fetch(
+			"https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id",
+			{
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${accessToken}`,
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify(metadata),
+			},
+		);
+
+		if (!res.ok) {
+			console.error("Failed to create folder on Google Drive:", res.statusText);
+			return null;
+		}
+
+		const result = await res.json();
+		return { folderId: result.id };
+	} catch (err) {
+		console.error("Google Drive create folder error:", err);
 		return null;
 	}
 }

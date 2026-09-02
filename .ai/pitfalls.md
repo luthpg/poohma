@@ -82,3 +82,25 @@ AI Agent が誤りやすい点、過去に問題となった点、実装上の�
 
 - **問題**: DB スキーマ、API 仕様、E2EE 方式、脅威モデルに関わるコード変更を行った後、`.docs/` や `.docs/security/threat-model.md` の更新を忘れてコミットしてしまう。
 - **回避法**: 実装計画時およびコミット前に必ずドキュメント更新要否を確認する（GEMINI.md Rule 6）。
+
+### 環境変数の追加・変更時の CI 設定（`.github/workflows/ci.yml`）更新漏れ
+
+- **問題**: `apps/web/src/env/client.ts` や `server.ts` に必須環境変数を追加・変更した際、ローカルの `.env` のみ更新して `.github/workflows/ci.yml` の `env` を更新し忘れると、GitHub Actions CI の Test / Build ステップで `@t3-oss/env-core` の Zod バリデーションエラーが発生して CI が失敗する。
+- **回避法**: 環境変数を追加・変更・削除した際は、必ず `.github/workflows/ci.yml`（`check-and-test` ジョブの `env`）に対応するダミー環境変数を追記・修正する。
+
+### 外部 UI / API 連携追加時の CSP（Content Security Policy）設定漏れ
+
+- **問題**: Google Picker などの iframe 埋め込み型 UI や外部 API をクライアントに追加した際、`apps/web/src/start.ts` の CSP ミドルウェアで許可していないと、ブラウザにより iframe や通信がブロックされ、白背景エラー（`Framing 'https://docs.google.com/' violates frame-src 'self'` 等）や通信失敗が発生する。
+- **回避法**:
+  - iframe を使用する外部機能を追加する場合は、`apps/web/src/start.ts` の `frame-src` に許可対象ドメイン（例: `https://docs.google.com https://drive.google.com`）を明示的に追加する。
+  - クライアントから直接呼び出す外部 API がある場合は、`connect-src` に対象ドメイン（例: `https://www.googleapis.com https://apis.google.com`）を追加する。
+
+### Google Picker API の `setEnableDrives(true)` とルートフォルダ選択の制約
+
+- **問題**: `DocsView(ViewId.FOLDERS)` に `setEnableDrives(true)` を設定すると、そのビューは共有ドライブ専用フィルターとなり「マイドライブ」が表示・選択できなくなる。また、Google Picker は一覧内のフォルダアイテムを選択する UI であるため、「マイドライブ直下（root）」そのものを選択状態にできず、Picker 内でのフォルダ新規作成機能も提供されていない。
+- **回避法**:
+  - マイドライブと共有ドライブを両立させる場合は、マイドライブ用（`setParent("root")`）と共有ドライブ用（`setEnableDrives(true)`）の 2 つの独立した `DocsView` を `PickerBuilder` に登録する。
+  - ルート直下保存やフォルダ作成が必要な場合は、Picker だけに依存せず、Google Drive API（`createGoogleDriveFolder` や `parentFolderId: undefined` でのアップロード）をアプリ側 UI（ドロップダウンメニュー等）で選択肢として提供する。
+
+
+

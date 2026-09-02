@@ -3,6 +3,8 @@ import {
 	AlertTriangle,
 	CheckCircle2,
 	Download,
+	FolderPlus,
+	FolderSearch,
 	HardDrive,
 	KeyRound,
 	Printer,
@@ -11,6 +13,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { api } from "@/../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -20,9 +23,19 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
+import { env } from "@/env/client";
 import { useAccount } from "@/hooks/useAccount";
-import { api } from "../../../convex/_generated/api";
+import {
+	getGoogleDriveAccessToken,
+	hasCachedDriveAccessToken,
+} from "@/utils/firebase";
 import {
 	deriveKeyFromRecoveryCode,
 	generateRecoveryCode,
@@ -33,8 +46,9 @@ import {
 	wrapMasterKeyWithRecovery,
 } from "../../lib/crypto";
 import {
-	getGoogleAccessToken,
-	loadGoogleScripts,
+	createGoogleDriveFolder,
+	loadGooglePickerScript,
+	showGoogleDrivePicker,
 	uploadFileToGoogleDrive,
 } from "../../lib/google-drive";
 import { generateRecoveryKitPdf } from "../../lib/recovery-kit";
@@ -72,22 +86,32 @@ export function RecoveryKitDialog({
 	const [hasSavedDrive, setHasSavedDrive] = useState(false);
 	const [hasShared, setHasShared] = useState(false);
 	const [isDriveUploading, setIsDriveUploading] = useState(false);
+	const [isMobile, setIsMobile] = useState(false);
 	const [canShareFile, setCanShareFile] = useState(false);
 
-	// Web Share API でファイル共有が可能か判定
+	// モバイル端末判定および Web Share API によるファイル共有可否判定
 	useEffect(() => {
-		if (
-			typeof navigator !== "undefined" &&
-			typeof navigator.share === "function" &&
-			typeof navigator.canShare === "function"
-		) {
-			try {
-				const testFile = new File(["test"], "test.pdf", {
-					type: "application/pdf",
-				});
-				setCanShareFile(navigator.canShare({ files: [testFile] }));
-			} catch {
-				setCanShareFile(false);
+		if (typeof navigator !== "undefined") {
+			const mobileCheck =
+				/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+					navigator.userAgent,
+				) ||
+				(navigator.maxTouchPoints > 0 &&
+					/Macintosh/i.test(navigator.userAgent));
+			setIsMobile(mobileCheck);
+
+			if (
+				typeof navigator.share === "function" &&
+				typeof navigator.canShare === "function"
+			) {
+				try {
+					const testFile = new File(["test"], "test.pdf", {
+						type: "application/pdf",
+					});
+					setCanShareFile(navigator.canShare({ files: [testFile] }));
+				} catch {
+					setCanShareFile(false);
+				}
 			}
 		}
 	}, []);
@@ -256,54 +280,112 @@ export function RecoveryKitDialog({
 		}
 	};
 
-	// Google Drive に保存（モバイルは共有シート優先、PCはAPI連携）
-	const handleSaveToDrive = async () => {
+	// Google Drive に保存（mode: "root" = マイドライブ直下, "new_folder" = 「PoohMa」フォルダ作成, "picker" = フォルダ選択）
+	const handleSaveToDrive = async (
+		mode: "root" | "new_folder" | "picker" = "picker",
+	) => {
 		if (!pdfBlob) return;
-
-		// モバイル等で Web Share API が利用可能な場合は、OAuthブロックを回避して共有シート（Googleドライブアプリ等）を起動
-		if (canShareFile) {
-			await handleShare();
-			return;
-		}
 
 		setIsDriveUploading(true);
 
 		try {
-			const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-			if (!clientId) {
-				toast.info(
-					"Google Drive 連携の Client ID が未設定です。ローカル保存をご利用ください。",
-				);
-				handleDownload();
+			const apiKey = env.VITE_GOOGLE_PICKER_API_KEY;
+			const appId = env.VITE_GOOGLE_CLOUD_PROJECT_NUMBER;
+
+			// 1. Firebase Auth による Google Drive (drive.file) スコープの追加認証
+			let accessToken: string | null = null;
+			try {
+				if (!hasCachedDriveAccessToken()) {
+					toast.info(
+						"Google Driveへのアクセス権を追加する必要があります。\nポップアップで再度アカウントを選択し、認証してください。",
+						{ duration: 6000 },
+					);
+				}
+				accessToken = await getGoogleDriveAccessToken();
+			} catch (authErr) {
+				console.error("Google Drive auth error:", authErr);
+				toast.error("Google 認証に失敗しました");
 				setIsDriveUploading(false);
 				return;
 			}
 
-			const loaded = await loadGoogleScripts();
-			if (!loaded) {
-				toast.error("Google Drive スクリプトの読み込みに失敗しました");
-				setIsDriveUploading(false);
-				return;
-			}
-
-			const accessToken = await getGoogleAccessToken(clientId);
+			// ユーザーが認証ポップアップを閉じた場合は安全に中断
 			if (!accessToken) {
-				toast.error("Google 認証がキャンセルされたか、失敗しました");
 				setIsDriveUploading(false);
 				return;
 			}
 
+			let targetFolderId: string | undefined;
+
+			if (mode === "new_folder") {
+				// 新規「PoohMa」フォルダを作成してその中に保存
+				const created = await createGoogleDriveFolder({
+					accessToken,
+					folderName: "PoohMa",
+				});
+				if (!created) {
+					toast.error("「PoohMa」フォルダの作成に失敗しました");
+					setIsDriveUploading(false);
+					return;
+				}
+				targetFolderId = created.folderId;
+			} else if (mode === "picker") {
+				// Google Picker スクリプトの読み込み
+				const loaded = await loadGooglePickerScript();
+				if (!loaded) {
+					toast.error("Google Picker の読み込みに失敗しました");
+					setIsDriveUploading(false);
+					return;
+				}
+
+				// Google Picker を表示して保存先フォルダを選択
+				const savedPointerEvents = document.body.style.pointerEvents;
+				let pickerResult: { folderId?: string } | null = null;
+				try {
+					document.body.style.pointerEvents = "";
+					pickerResult = await showGoogleDrivePicker({
+						accessToken,
+						apiKey,
+						appId,
+					});
+				} catch (pickerErr) {
+					console.error("Google Picker error:", pickerErr);
+					toast.error("フォルダ選択画面の表示に失敗しました");
+					setIsDriveUploading(false);
+					return;
+				} finally {
+					document.body.style.pointerEvents = savedPointerEvents;
+				}
+
+				// ユーザーがフォルダ選択をキャンセルした場合は安全に中断
+				if (pickerResult == null) {
+					setIsDriveUploading(false);
+					return;
+				}
+
+				targetFolderId = pickerResult.folderId;
+			}
+			// mode === "root" の場合は targetFolderId = undefined（マイドライブ直下）
+
+			// 選択・作成されたフォルダ（またはルート）へファイルをアップロード
 			const fileName = `PoohMa-RecoveryKit-${familyName}-${new Date().toISOString().slice(0, 10)}.pdf`;
 			const uploadRes = await uploadFileToGoogleDrive({
 				accessToken,
 				fileName,
 				mimeType: "application/pdf",
 				data: pdfBlob,
+				parentFolderId: targetFolderId,
 			});
 
 			if (uploadRes) {
 				setHasSavedDrive(true);
-				toast.success("Google Drive にリカバリーキットを保存しました");
+				const destinationMsg =
+					mode === "new_folder"
+						? "Google Drive（「PoohMa」フォルダ）"
+						: mode === "root"
+							? "Google Drive（マイドライブ直下）"
+							: "Google Drive";
+				toast.success(`${destinationMsg} にリカバリーキットを保存しました`);
 			} else {
 				toast.error("Google Drive へのアップロードに失敗しました");
 			}
@@ -443,7 +525,7 @@ export function RecoveryKitDialog({
 									{hasPrinted ? "印刷済" : "印刷する"}
 								</span>
 							</button>
-							{canShareFile ? (
+							{isMobile && canShareFile ? (
 								<button
 									type="button"
 									onClick={handleShare}
@@ -455,29 +537,76 @@ export function RecoveryKitDialog({
 								>
 									<Share2 className="h-5 w-5 text-primary" />
 									<span className="text-xs font-semibold">
-										{hasShared ? "共有・保存済" : "アプリ・Driveへ共有"}
+										{hasShared ? "共有済" : "アプリへ共有"}
 									</span>
 								</button>
 							) : (
-								<button
-									type="button"
-									onClick={handleSaveToDrive}
-									disabled={isDriveUploading}
-									className={`flex flex-col items-center justify-center gap-2 p-3.5 rounded-lg border text-center transition-all disabled:opacity-50 ${
-										hasSavedDrive
-											? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-											: "border-border bg-card hover:bg-muted text-foreground"
-									}`}
-								>
-									{isDriveUploading ? (
-										<Spinner className="h-5 w-5" />
-									) : (
-										<HardDrive className="h-5 w-5" />
-									)}
-									<span className="text-xs font-semibold">
-										{hasSavedDrive ? "Drive保存済" : "Google Drive"}
-									</span>
-								</button>
+								<DropdownMenu>
+									<DropdownMenuTrigger asChild>
+										<button
+											type="button"
+											disabled={isDriveUploading}
+											className={`flex flex-col items-center justify-center gap-2 p-3.5 rounded-lg border text-center transition-all disabled:opacity-50 ${
+												hasSavedDrive
+													? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+													: "border-border bg-card hover:bg-muted text-foreground"
+											}`}
+										>
+											{isDriveUploading ? (
+												<Spinner className="h-5 w-5" />
+											) : (
+												<HardDrive className="h-5 w-5" />
+											)}
+											<span className="text-xs font-semibold">
+												{hasSavedDrive ? "Drive保存済" : "Google Drive"}
+											</span>
+										</button>
+									</DropdownMenuTrigger>
+									<DropdownMenuContent align="end" className="w-60">
+										<DropdownMenuItem
+											onClick={() => handleSaveToDrive("root")}
+											className="cursor-pointer py-2"
+										>
+											<HardDrive className="h-4 w-4 mr-2 text-primary" />
+											<div>
+												<div className="text-xs font-medium">
+													マイドライブ直下に保存
+												</div>
+												<div className="text-[10px] text-muted-foreground">
+													ルート階層に直接保存します
+												</div>
+											</div>
+										</DropdownMenuItem>
+										<DropdownMenuItem
+											onClick={() => handleSaveToDrive("new_folder")}
+											className="cursor-pointer py-2"
+										>
+											<FolderPlus className="h-4 w-4 mr-2 text-primary" />
+											<div>
+												<div className="text-xs font-medium">
+													「PoohMa」フォルダに保存
+												</div>
+												<div className="text-[10px] text-muted-foreground">
+													専用フォルダを作成して保存します
+												</div>
+											</div>
+										</DropdownMenuItem>
+										<DropdownMenuItem
+											onClick={() => handleSaveToDrive("picker")}
+											className="cursor-pointer py-2"
+										>
+											<FolderSearch className="h-4 w-4 mr-2 text-primary" />
+											<div>
+												<div className="text-xs font-medium">
+													フォルダを選択して保存...
+												</div>
+												<div className="text-[10px] text-muted-foreground">
+													共有ドライブや既存フォルダを選択
+												</div>
+											</div>
+										</DropdownMenuItem>
+									</DropdownMenuContent>
+								</DropdownMenu>
 							)}
 						</div>
 
