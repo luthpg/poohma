@@ -1,7 +1,7 @@
 import { Link, useRouteContext } from "@tanstack/react-router";
+import { useMutation } from "convex/react";
 import { Eye, EyeOff, Fingerprint, RotateCcw } from "lucide-react";
 import type React from "react";
-
 import {
 	createContext,
 	useCallback,
@@ -11,6 +11,7 @@ import {
 	useState,
 } from "react";
 import { toast } from "sonner";
+import { api } from "@/../convex/_generated/api";
 import {
 	Dialog,
 	DialogContent,
@@ -45,7 +46,7 @@ import {
 	unwrapMasterKey,
 	wrapDEK,
 } from "@/lib/crypto";
-import { notifyBiometricEventServerFn } from "@/services/security.functions";
+import { getClientRequestContext } from "@/services/security.functions";
 
 interface PasscodeContextType {
 	masterKey: CryptoKey | null;
@@ -262,6 +263,8 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
 		});
 	}, [isLocked, currentAccount]);
 
+	const notifyBiometricEventMut = useMutation(api.users.notifyBiometricEvent);
+
 	const disableBiometric = useCallback(async () => {
 		if (!targetUserId) return;
 		await disableBiometricUnlock(targetUserId);
@@ -271,13 +274,17 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
 		masterKeyRef.current = null;
 
 		// 解除通知メール送信（バックグラウンド）
-		notifyBiometricEventServerFn({
-			data: {
-				event: "removed",
-				accountId: currentAccount?._id,
-			},
-		}).catch((e) => console.warn("Failed to send biometric removed email:", e));
-	}, [targetUserId, currentAccount]);
+		getClientRequestContext()
+			.catch(() => ({}))
+			.then((context) =>
+				notifyBiometricEventMut({
+					event: "removed",
+					accountId: currentAccount?._id,
+					...context,
+				}),
+			)
+			.catch((e) => console.warn("Failed to send biometric removed email:", e));
+	}, [targetUserId, currentAccount, notifyBiometricEventMut]);
 
 	const handleUnlockSubmit = async (e: React.SubmitEvent) => {
 		e.preventDefault();
@@ -301,14 +308,18 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
 					toast.success("指紋/FaceIDでのロック解除を有効にしました。");
 
 					// 登録通知メール送信（バックグラウンド）
-					notifyBiometricEventServerFn({
-						data: {
-							event: "registered",
-							accountId: currentAccount._id,
-						},
-					}).catch((e) =>
-						console.warn("Failed to send biometric registered email:", e),
-					);
+					getClientRequestContext()
+						.catch(() => ({}))
+						.then((context) =>
+							notifyBiometricEventMut({
+								event: "registered",
+								accountId: currentAccount._id,
+								...context,
+							}),
+						)
+						.catch((e) =>
+							console.warn("Failed to send biometric registered email:", e),
+						);
 				} catch (error) {
 					console.error("Biometric registration failed:", error);
 					if (error instanceof Error) {

@@ -71,6 +71,14 @@ vi.mock("@/lib/crypto", async (importOriginal) => {
 	};
 });
 
+vi.mock("convex/react", () => ({
+	useMutation: () => vi.fn().mockResolvedValue({ success: true }),
+}));
+
+vi.mock("@/services/security.functions", () => ({
+	getClientRequestContext: vi.fn().mockResolvedValue({}),
+}));
+
 describe("PasscodeProvider E2EE State Management", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
