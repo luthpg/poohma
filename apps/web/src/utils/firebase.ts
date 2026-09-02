@@ -78,6 +78,11 @@ export async function getGoogleDriveAccessToken(): Promise<string | null> {
 
 export { auth, googleProvider };
 
+/** キャッシュされた Drive アクセストークンが存在するか判定 */
+export function hasCachedDriveAccessToken(): boolean {
+	return Boolean(cachedDriveAccessToken);
+}
+
 /** テスト用: キャッシュ済みの Drive アクセストークンをクリアする */
 export function resetDriveTokenCache() {
 	cachedDriveAccessToken = null;

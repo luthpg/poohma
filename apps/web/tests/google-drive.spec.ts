@@ -80,12 +80,13 @@ describe("Google Drive / Google Picker 連携 (src/lib/google-drive.ts)", () => 
 			).rejects.toThrow("Google Picker library is not loaded");
 		});
 
-		it("フォルダ選択 (PICKED) 時に選択された folderId を返すこと", async () => {
+		it("Picker を構築・表示し、選択された folderId を解決すること", async () => {
 			let capturedCallback: (data: unknown) => void = () => {};
 
 			const mockDocsView = {
 				setIncludeFolders: vi.fn().mockReturnThis(),
 				setSelectFolderEnabled: vi.fn().mockReturnThis(),
+				setEnableDrives: vi.fn().mockReturnThis(),
 				setMimeTypes: vi.fn().mockReturnThis(),
 			};
 
@@ -95,6 +96,7 @@ describe("Google Drive / Google Picker 連携 (src/lib/google-drive.ts)", () => 
 
 			const mockPickerBuilder = {
 				addView: vi.fn().mockReturnThis(),
+				enableFeature: vi.fn().mockReturnThis(),
 				setOAuthToken: vi.fn().mockReturnThis(),
 				setDeveloperKey: vi.fn().mockReturnThis(),
 				setAppId: vi.fn().mockReturnThis(),
@@ -109,10 +111,12 @@ describe("Google Drive / Google Picker 連携 (src/lib/google-drive.ts)", () => 
 			class MockDocsView {
 				setIncludeFolders = mockDocsView.setIncludeFolders;
 				setSelectFolderEnabled = mockDocsView.setSelectFolderEnabled;
+				setEnableDrives = mockDocsView.setEnableDrives;
 				setMimeTypes = mockDocsView.setMimeTypes;
 			}
 			class MockPickerBuilder {
 				addView = mockPickerBuilder.addView;
+				enableFeature = mockPickerBuilder.enableFeature;
 				setOAuthToken = mockPickerBuilder.setOAuthToken;
 				setDeveloperKey = mockPickerBuilder.setDeveloperKey;
 				setAppId = mockPickerBuilder.setAppId;
@@ -126,6 +130,10 @@ describe("Google Drive / Google Picker 連携 (src/lib/google-drive.ts)", () => 
 					DocsView: MockDocsView,
 					PickerBuilder: MockPickerBuilder,
 					ViewId: { FOLDERS: "folders", DOCS: "docs" },
+					Feature: {
+						SUPPORT_DRIVES: "support_drives",
+						SUPPORT_TEAM_DRIVES: "support_team_drives",
+					},
 					Action: { PICKED: "picked", CANCEL: "cancel" },
 				},
 			};
@@ -136,6 +144,10 @@ describe("Google Drive / Google Picker 連携 (src/lib/google-drive.ts)", () => 
 				appId: "test-app-id",
 			});
 
+			expect(mockDocsView.setEnableDrives).toHaveBeenCalledWith(true);
+			expect(mockPickerBuilder.enableFeature).toHaveBeenCalledWith(
+				"support_drives",
+			);
 			expect(mockPickerBuilder.setOAuthToken).toHaveBeenCalledWith(
 				"test-access-token",
 			);
@@ -161,6 +173,7 @@ describe("Google Drive / Google Picker 連携 (src/lib/google-drive.ts)", () => 
 			const mockDocsView = {
 				setIncludeFolders: vi.fn().mockReturnThis(),
 				setSelectFolderEnabled: vi.fn().mockReturnThis(),
+				setEnableDrives: vi.fn().mockReturnThis(),
 				setMimeTypes: vi.fn().mockReturnThis(),
 			};
 
@@ -170,6 +183,7 @@ describe("Google Drive / Google Picker 連携 (src/lib/google-drive.ts)", () => 
 
 			const mockPickerBuilder = {
 				addView: vi.fn().mockReturnThis(),
+				enableFeature: vi.fn().mockReturnThis(),
 				setOAuthToken: vi.fn().mockReturnThis(),
 				setDeveloperKey: vi.fn().mockReturnThis(),
 				setAppId: vi.fn().mockReturnThis(),
@@ -184,10 +198,12 @@ describe("Google Drive / Google Picker 連携 (src/lib/google-drive.ts)", () => 
 			class MockDocsView {
 				setIncludeFolders = mockDocsView.setIncludeFolders;
 				setSelectFolderEnabled = mockDocsView.setSelectFolderEnabled;
+				setEnableDrives = mockDocsView.setEnableDrives;
 				setMimeTypes = mockDocsView.setMimeTypes;
 			}
 			class MockPickerBuilder {
 				addView = mockPickerBuilder.addView;
+				enableFeature = mockPickerBuilder.enableFeature;
 				setOAuthToken = mockPickerBuilder.setOAuthToken;
 				setDeveloperKey = mockPickerBuilder.setDeveloperKey;
 				setAppId = mockPickerBuilder.setAppId;
@@ -201,6 +217,10 @@ describe("Google Drive / Google Picker 連携 (src/lib/google-drive.ts)", () => 
 					DocsView: MockDocsView,
 					PickerBuilder: MockPickerBuilder,
 					ViewId: { FOLDERS: "folders", DOCS: "docs" },
+					Feature: {
+						SUPPORT_DRIVES: "support_drives",
+						SUPPORT_TEAM_DRIVES: "support_team_drives",
+					},
 					Action: { PICKED: "picked", CANCEL: "cancel" },
 				},
 			};
@@ -229,12 +249,18 @@ describe("Google Drive / Google Picker 連携 (src/lib/google-drive.ts)", () => 
 				setSelectFolderEnabled() {
 					return this;
 				}
+				setEnableDrives() {
+					return this;
+				}
 				setMimeTypes() {
 					return this;
 				}
 			}
 			class MockPickerBuilder {
 				addView() {
+					return this;
+				}
+				enableFeature() {
 					return this;
 				}
 				setOAuthToken() {
@@ -263,6 +289,10 @@ describe("Google Drive / Google Picker 連携 (src/lib/google-drive.ts)", () => 
 					DocsView: MockDocsView,
 					PickerBuilder: MockPickerBuilder,
 					ViewId: { FOLDERS: "folders", DOCS: "docs" },
+					Feature: {
+						SUPPORT_DRIVES: "support_drives",
+						SUPPORT_TEAM_DRIVES: "support_team_drives",
+					},
 					Action: { PICKED: "picked", CANCEL: "cancel", ERROR: "error" },
 				},
 			};
@@ -306,7 +336,7 @@ describe("Google Drive / Google Picker 連携 (src/lib/google-drive.ts)", () => 
 			});
 
 			expect(global.fetch).toHaveBeenCalledWith(
-				"https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink",
+				"https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,webViewLink",
 				expect.objectContaining({
 					method: "POST",
 					headers: {

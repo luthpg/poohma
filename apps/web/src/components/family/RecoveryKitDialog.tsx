@@ -24,7 +24,10 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { env } from "@/env/client";
 import { useAccount } from "@/hooks/useAccount";
-import { getGoogleDriveAccessToken } from "@/utils/firebase";
+import {
+	getGoogleDriveAccessToken,
+	hasCachedDriveAccessToken,
+} from "@/utils/firebase";
 import {
 	deriveKeyFromRecoveryCode,
 	generateRecoveryCode,
@@ -289,6 +292,12 @@ export function RecoveryKitDialog({
 			// 2. Firebase Auth による Google Drive (drive.file) スコープの追加認証
 			let accessToken: string | null = null;
 			try {
+				if (!hasCachedDriveAccessToken()) {
+					toast.info(
+						"Google Driveへのアクセス権を追加する必要があります。\nポップアップで再度アカウントを選択し、認証してください。",
+						{ duration: 6000 },
+					);
+				}
 				accessToken = await getGoogleDriveAccessToken();
 			} catch (authErr) {
 				console.error("Google Drive auth error:", authErr);

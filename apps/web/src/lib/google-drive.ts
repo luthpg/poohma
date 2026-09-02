@@ -16,6 +16,10 @@ declare global {
 					FOLDERS: string;
 					DOCS: string;
 				};
+				Feature: {
+					SUPPORT_DRIVES: string;
+					SUPPORT_TEAM_DRIVES: string;
+				};
 				Action: {
 					PICKED: string;
 					CANCEL: string;
@@ -43,7 +47,9 @@ export interface GooglePickerResponse {
 export interface GoogleDocsView {
 	setIncludeFolders: (include: boolean) => GoogleDocsView;
 	setSelectFolderEnabled: (enabled: boolean) => GoogleDocsView;
+	setEnableDrives: (enable: boolean) => GoogleDocsView;
 	setMimeTypes: (mimeTypes: string) => GoogleDocsView;
+	setParent?: (parent: string) => GoogleDocsView;
 }
 
 export interface GooglePicker {
@@ -52,6 +58,7 @@ export interface GooglePicker {
 
 export interface GooglePickerBuilder {
 	addView: (view: GoogleDocsView | string) => GooglePickerBuilder;
+	enableFeature: (feature: string) => GooglePickerBuilder;
 	setOAuthToken: (token: string) => GooglePickerBuilder;
 	setDeveloperKey: (key: string) => GooglePickerBuilder;
 	setAppId: (appId: string) => GooglePickerBuilder;
@@ -134,18 +141,19 @@ export async function showGoogleDrivePicker({
 
 	return new Promise((resolve, reject) => {
 		try {
-			const { DocsView, PickerBuilder, ViewId, Action } = pickerApi;
+			const { DocsView, PickerBuilder, ViewId, Action, Feature } = pickerApi;
 
 			const view = new DocsView(ViewId.FOLDERS)
 				.setIncludeFolders(true)
 				.setSelectFolderEnabled(true)
+				.setEnableDrives(true)
 				.setMimeTypes("application/vnd.google-apps.folder");
 
 			const pickerBuilder = new PickerBuilder()
 				.addView(view)
 				.setOAuthToken(accessToken)
 				.setDeveloperKey(apiKey)
-				.setTitle("保存先フォルダを選択")
+				.setTitle("保存先を選択（マイドライブ / 共有ドライブ / フォルダ）")
 				.setCallback((data: GooglePickerResponse) => {
 					if (data.action === Action.PICKED) {
 						const doc = data.docs?.[0];
@@ -156,6 +164,10 @@ export async function showGoogleDrivePicker({
 						reject(data);
 					}
 				});
+
+			if (Feature?.SUPPORT_DRIVES) {
+				pickerBuilder.enableFeature(Feature.SUPPORT_DRIVES);
+			}
 
 			if (appId) {
 				pickerBuilder.setAppId(appId);
@@ -208,7 +220,7 @@ export async function uploadFileToGoogleDrive({
 
 	try {
 		const res = await fetch(
-			"https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink",
+			"https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,webViewLink",
 			{
 				method: "POST",
 				headers: {
