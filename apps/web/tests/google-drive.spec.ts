@@ -87,6 +87,7 @@ describe("Google Drive / Google Picker 連携 (src/lib/google-drive.ts)", () => 
 				setIncludeFolders: vi.fn().mockReturnThis(),
 				setSelectFolderEnabled: vi.fn().mockReturnThis(),
 				setEnableDrives: vi.fn().mockReturnThis(),
+				setParent: vi.fn().mockReturnThis(),
 				setMimeTypes: vi.fn().mockReturnThis(),
 			};
 
@@ -112,6 +113,7 @@ describe("Google Drive / Google Picker 連携 (src/lib/google-drive.ts)", () => 
 				setIncludeFolders = mockDocsView.setIncludeFolders;
 				setSelectFolderEnabled = mockDocsView.setSelectFolderEnabled;
 				setEnableDrives = mockDocsView.setEnableDrives;
+				setParent = mockDocsView.setParent;
 				setMimeTypes = mockDocsView.setMimeTypes;
 			}
 			class MockPickerBuilder {
@@ -144,7 +146,9 @@ describe("Google Drive / Google Picker 連携 (src/lib/google-drive.ts)", () => 
 				appId: "test-app-id",
 			});
 
+			expect(mockDocsView.setParent).toHaveBeenCalledWith("root");
 			expect(mockDocsView.setEnableDrives).toHaveBeenCalledWith(true);
+			expect(mockPickerBuilder.addView).toHaveBeenCalledTimes(2);
 			expect(mockPickerBuilder.enableFeature).toHaveBeenCalledWith(
 				"support_drives",
 			);
@@ -174,6 +178,7 @@ describe("Google Drive / Google Picker 連携 (src/lib/google-drive.ts)", () => 
 				setIncludeFolders: vi.fn().mockReturnThis(),
 				setSelectFolderEnabled: vi.fn().mockReturnThis(),
 				setEnableDrives: vi.fn().mockReturnThis(),
+				setParent: vi.fn().mockReturnThis(),
 				setMimeTypes: vi.fn().mockReturnThis(),
 			};
 
@@ -199,6 +204,7 @@ describe("Google Drive / Google Picker 連携 (src/lib/google-drive.ts)", () => 
 				setIncludeFolders = mockDocsView.setIncludeFolders;
 				setSelectFolderEnabled = mockDocsView.setSelectFolderEnabled;
 				setEnableDrives = mockDocsView.setEnableDrives;
+				setParent = mockDocsView.setParent;
 				setMimeTypes = mockDocsView.setMimeTypes;
 			}
 			class MockPickerBuilder {
@@ -250,6 +256,9 @@ describe("Google Drive / Google Picker 連携 (src/lib/google-drive.ts)", () => 
 					return this;
 				}
 				setEnableDrives() {
+					return this;
+				}
+				setParent() {
 					return this;
 				}
 				setMimeTypes() {

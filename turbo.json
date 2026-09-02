@@ -1,11 +1,10 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "globalDependencies": ["**/.env*"],
-  "globalPassThroughEnv": [
+  "globalEnv": [
     "NODE_ENV",
-    "CI",
-    "VERCEL",
     "VERCEL_ENV",
+    "CSP_MODE",
     "VITE_*",
     "MICROCMS_*",
     "CONVEX_*",
@@ -14,18 +13,17 @@
     "SERVER_URL",
     "RESEND_*"
   ],
+  "globalPassThroughEnv": ["CI", "VERCEL"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".vercel/**", ".output/**", "storybook-static/**"],
-      "passThroughEnv": ["*"]
+      "outputs": ["dist/**", ".vercel/**", ".output/**", "storybook-static/**"]
     },
     "typecheck": {
       "dependsOn": ["^build"]
     },
     "test": {
-      "dependsOn": ["^build"],
-      "passThroughEnv": ["*"]
+      "dependsOn": ["^build"]
     },
     "dev": {
       "cache": false,

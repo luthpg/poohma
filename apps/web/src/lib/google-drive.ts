@@ -49,7 +49,7 @@ export interface GoogleDocsView {
 	setSelectFolderEnabled: (enabled: boolean) => GoogleDocsView;
 	setEnableDrives: (enable: boolean) => GoogleDocsView;
 	setMimeTypes: (mimeTypes: string) => GoogleDocsView;
-	setParent?: (parent: string) => GoogleDocsView;
+	setParent: (parent: string) => GoogleDocsView;
 }
 
 export interface GooglePicker {
@@ -143,14 +143,23 @@ export async function showGoogleDrivePicker({
 		try {
 			const { DocsView, PickerBuilder, ViewId, Action, Feature } = pickerApi;
 
-			const view = new DocsView(ViewId.FOLDERS)
+			// 1. マイドライブ用ビュー（root階層を初期表示）
+			const myDriveView = new DocsView(ViewId.FOLDERS)
+				.setIncludeFolders(true)
+				.setSelectFolderEnabled(true)
+				.setParent("root")
+				.setMimeTypes("application/vnd.google-apps.folder");
+
+			// 2. 共有ドライブ用ビュー（setEnableDrives(true) を設定した独立ビュー）
+			const sharedDrivesView = new DocsView(ViewId.FOLDERS)
 				.setIncludeFolders(true)
 				.setSelectFolderEnabled(true)
 				.setEnableDrives(true)
 				.setMimeTypes("application/vnd.google-apps.folder");
 
 			const pickerBuilder = new PickerBuilder()
-				.addView(view)
+				.addView(myDriveView)
+				.addView(sharedDrivesView)
 				.setOAuthToken(accessToken)
 				.setDeveloperKey(apiKey)
 				.setTitle("保存先を選択（マイドライブ / 共有ドライブ / フォルダ）")
