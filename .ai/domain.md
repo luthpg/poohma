@@ -109,4 +109,4 @@ flowchart TD
   - 共有レコード（`ownerType: "family"`）は元の家族グループに残留する。離脱者がレコード管理者である場合、`reconcileAdminsOnLeave` が残存する家族メンバーの管理権限を調整する。
 - **同一 email アカウント再作成時のデータ引き継ぎ（`users.syncUser`）**:
   - メールアドレス未確認（`emailVerified: false`）の場合はエラーを送出して同期を拒否する。
-  - 同一 email かつ別 UID の既存データが存在する場合、旧 UID が所有していたすべての個人レコード（`serviceRecords`）、家族参加申請（`joinRequests`）、および家族移行データ（`familyMigrations`）の `userId` を新 UID へ一括付け替えて引き継ぐ。
+  - 同一 email かつ別 UID の既存データが存在する場合、旧 UID の `serviceRecords.userId`、家族参加申請（`joinRequests`）、および家族移行データ（`familyMigrations`）を新 UID へ一括付け替えて引き継ぐ（所有権を示す `serviceRecords.accountId` は維持される）。

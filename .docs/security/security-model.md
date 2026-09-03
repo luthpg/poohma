@@ -7,10 +7,10 @@
 ## Authentication
 
 - ログイン手段は Firebase Authentication（Google OAuth）のみ。クライアントは `signInWithRedirect` でログインし、取得した Firebase ID トークンをサーバー関数 `syncUser` に送信する。
-- サーバー側（`firebase-admin.server.ts`）が `verifyIdToken` で ID トークンを検証したうえで Convex の `users.syncUser` にユーザー情報を同期する。別UIDへの引き継ぎ時に `joinRequests` / `familyMigrations` が孤児化する不具合はIssue #188で修正済み。
+- サーバー側（`firebase-admin.server.ts`）が `verifyIdToken` で ID トークンを検証したうえで Convex の `users.syncUser` にユーザー情報を同期する。別UIDへの引き継ぎ時に `serviceRecords.userId`、`joinRequests`、`familyMigrations` が孤児化する不具合はIssue #188で修正済み（所有権を示す `serviceRecords.accountId` は維持）。
 - 検証後、`createSessionCookie` により httpOnly セッション Cookie（有効期限14日、本番では secure、SameSite=Lax）を発行する。セッション Cookie は SSR 初期表示用キャッシュおよびサーバー処理用の補助セッションであり、以後のページロードでは `__root.tsx` の `beforeLoad` がこの Cookie をローカル公開鍵検証（`checkRevoked: false`）して初期ユーザー情報を取得する。Cookie が失効していてもブラウザの Firebase Auth 永続セッションが生きていれば自動で再同期・ローリング延長（`refreshSessionCookie` 内で失効検証を実施）され、意図しないログアウトを防止する。
 - クライアントから Convex への認証済みアクセスは、`useConvexFirebaseAuth` が現在の Firebase ID トークンをそのまま供給し、Convex 側は `auth.config.ts` の Issuer 設定（`securetoken.google.com/poohma`）でこれを直接信頼・検証する仕組みであり、Convex 独自のセッション機構は持たない。
-- ログアウト時は、Firebase Admin SDK の `revokeRefreshTokens` によりリフレッシュトークンを即時失効させたうえでセッション Cookie を削除し、TanStack Query / `usePersistentQuery` のキャッシュを全クリアする。またクライアント側でも `signOut` とログアウトフラグ設定により再認証を確実に遮断する。
+- ログアウト時は、Firebase Admin SDK の `revokeRefreshTokens` によりリフレッシュトークンを即時失効させたうえでセッション Cookie を削除し、TanStack Query / `usePersistentQuery` のキャッシュを全クリアする。またクライアント側でも `signOut` と、`localStorage` / `sessionStorage` 双方へのログアウトフラグ（`LOGOUT_FLAG_KEY`）設定・クロス多タブ通知により、他タブでの再認証やリカバリー処理（`getCustomTokenFromSession` における `checkRevoked: true` 検証）による意図しないセッション復元を確実に遮断する。
 
 ## Authorization
 

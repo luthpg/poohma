@@ -158,9 +158,9 @@ families 1 ── * joinRequests       (joinRequests.familyId → families._id)
 families 1 ── * familyInvites       (familyInvites.familyId → families._id)
 families 1 ── * familyMigrations    (familyMigrations.targetFamilyId / sourceFamilyId → families._id)
 familyInvites 1 ── * joinRequests   (joinRequests.invitedByCode → familyInvites._id, optional)
-users     1 ── * serviceRecords      (serviceRecords.userId = users.userId, 文字列参照)
+users     1 ── * serviceRecords      (serviceRecords.accountId → users._id, serviceRecords.userId = users.userId)
 users     1 ── * joinRequests         (joinRequests.userId = users.userId, 文字列参照)
-serviceRecords 1 ── * credentials(内包配列)
+serviceRecords 1 ── * credentials    (credentials.recordId → serviceRecords._id)
 ```
 
 ### 4.2 テーブル定義
@@ -352,12 +352,12 @@ PoohMa では、セッションの長期維持と安全なアクセス制御を�
 ```
 1. ユーザーが /login で「Googleでログイン」をクリック
 2. Firebase Authentication (signInWithRedirect) によりGoogle認証画面へ遷移
-3. リダイレクト復帰後、onAuthStateChanged で Firebase User を検知
+3. リダイレクト復帰後、onAuthStateChanged で初期サインイン状態を検知。以後のトークン更新やセッション維持は onIdTokenChanged が検知し、バックグラウンドで syncSessionCookieInBackground(user)（refreshSessionCookie）を呼び出して Cookie をローリング延長する
 4. ID トークンを取得し、Server Function `syncUser` へ送信
 5. サーバー側 (firebase-admin.server.ts) がIDトークンを検証 (adminAuth().verifyIdToken)
 6. Convex Mutation `users.syncUser` によりConvex usersテーブルへユーザー情報を同期
    (メールアドレス未確認(emailVerifiedがfalse)の場合はエラーを送出して同期を拒否する。
-    同一UIDが無く同一emailが既存の場合に限り、旧UIDのデータ（serviceRecords, joinRequests, familyMigrations）のuserIdを新UIDへ一括付け替える)
+    同一UIDが無く同一emailが既存の場合に限り、旧UIDのデータ（serviceRecords, joinRequests, familyMigrations）のuserIdを新UIDへ一括付け替える。所有権を示す serviceRecords.accountId は維持される)
 7. `createSessionCookie` によりFirebaseセッションCookie(14日間, httpOnly, secure(本番), SameSite=Lax) を発行
 8. 以後の各ページロード時：
    - SSR時: `__root.tsx` の beforeLoad が `getAuthUser` を呼び出し、セッションCookieがあれば初期ユーザー情報を取得（SSRキャッシュ）。
@@ -663,7 +663,7 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
 
 | 関数                   | 種別            | 認可               | 概要                                                                                                    |
 | -------------------- | ------------- | ---------------- | ----------------------------------------------------------------------------------------------------- |
-| syncUser             | Mutation      | identityVerified | ログイン時のユーザー情報同期（新規作成／UID引き継ぎ／プロフィール更新）。別UID引き継ぎ時は `joinRequests` や `familyMigrations` も新UIDへ付け替えて孤児化を防止する。新規ログイン時はIP・位置情報等をもとにログイン通知メールをスケジュール送信 |
+| syncUser             | Mutation      | identityVerified | ログイン時のユーザー情報同期（新規作成／UID引き継ぎ／プロフィール更新）。別UID引き継ぎ時は `serviceRecords.userId`、`joinRequests`、`familyMigrations` も新UIDへ付け替えて孤児化を防止する（所有権を示す `serviceRecords.accountId` は維持）。新規ログイン時はIP・位置情報等をもとにログイン通知メールをスケジュール送信 |
 | updateProfile        | Mutation      | authenticated    | 表示名の更新                                                                                                |
 | notifyBiometricEvent | Mutation      | authenticated    | 生体認証の登録・解除イベントを検知し、セキュリティ通知メールをスケジュール送信                                              |
 | deleteAccount        | Mutation      | authenticated    | 退会処理（所有レコード削除、家族最終メンバー時は家族も削除）。退会完了通知メールを送信                                      |
@@ -804,7 +804,8 @@ TanStack QueryとConvexは双方がキャッシュ機構を持つため、責務
 
 | 領域              | 担当技術             | 対象データ                                            | 役割                                              |
 | --------------- | ---------------- | ------------------------------------------------ | ----------------------------------------------- |
-| 認証状態・ルーティング・CMS | TanStack Query   | authUser、UI設定（Cookieベース）、CMSデータ（FAQ・規約等の静的コンテンツ） | セッション監視、SSR時の初期データ解決、低頻度更新の外部コンテンツのキャッシュ        |
+| 認証状態・ルート保護 | Firebase Auth（useAuth / AuthGuard） | 認証状態、Firebase User、IDトークン | 長期ログイン状態の本体（Single Source of Truth）、ルート保護 |
+| 初期スナップショット・CMS | TanStack Query   | SSR初期スナップショット（Cookieベース）、UI設定、CMSデータ（FAQ・規約等の静的コンテンツ） | SSR時の初期データ解決、低頻度更新の外部コンテンツのキャッシュ        |
 | アプリケーションデータ     | Convex（useQuery） | serviceRecords、家族情報、参加申請状態など                     | リアルタイムデータ同期。信頼できる唯一の情報源（Single Source of Truth） |
 
 基本原則：

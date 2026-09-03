@@ -150,8 +150,9 @@ function FamilyComponent() {
 		try {
 			try {
 				sessionStorage.setItem(LOGOUT_FLAG_KEY, "1");
+				localStorage.setItem(LOGOUT_FLAG_KEY, String(Date.now()));
 			} catch (e) {
-				console.warn("Failed to set logout flag in sessionStorage", e);
+				console.warn("Failed to set logout flag in storage", e);
 			}
 			if (auth) await signOut(auth);
 			await logout();

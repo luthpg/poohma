@@ -89,6 +89,7 @@ export function useConvexFirebaseAuth() {
 					// ログイン状態になったらログアウトフラグをクリア
 					try {
 						sessionStorage.removeItem(LOGOUT_FLAG_KEY);
+						localStorage.removeItem(LOGOUT_FLAG_KEY);
 					} catch {
 						// ignore storage errors
 					}
@@ -99,10 +100,12 @@ export function useConvexFirebaseAuth() {
 					return;
 				}
 
-				// ログアウト状態中はセッション復元をスキップ
+				// ログアウト状態中はセッション復元をスキップ（他タブでのログアウトも検知）
 				let isLoggedOut = false;
 				try {
-					isLoggedOut = !!sessionStorage.getItem(LOGOUT_FLAG_KEY);
+					isLoggedOut =
+						!!sessionStorage.getItem(LOGOUT_FLAG_KEY) ||
+						!!localStorage.getItem(LOGOUT_FLAG_KEY);
 				} catch {
 					// ignore storage errors
 				}
@@ -124,9 +127,18 @@ export function useConvexFirebaseAuth() {
 			},
 		);
 
+		// 他タブでのログアウトを即時検知
+		const handleStorageChange = (e: StorageEvent) => {
+			if (e.key === LOGOUT_FLAG_KEY && e.newValue) {
+				setIsAuthenticated(false);
+			}
+		};
+		window.addEventListener("storage", handleStorageChange);
+
 		return () => {
 			isCleanedUp = true;
 			unsubscribe();
+			window.removeEventListener("storage", handleStorageChange);
 		};
 	}, [recoverSession]);
 

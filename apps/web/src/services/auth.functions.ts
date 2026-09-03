@@ -224,7 +224,8 @@ export const getCustomTokenFromSession = createServerFn({
 	const sessionCookie = getCookie("session");
 	if (!sessionCookie) return null;
 	try {
-		const { uid } = await verifySessionCookie(sessionCookie);
+		// リカバリー用のカスタムトークン発行時は、失効済みセッションからの不正復旧を防ぐため checkRevoked=true で検証する
+		const { uid } = await verifySessionCookie(sessionCookie, true);
 		const customToken = await adminAuth().createCustomToken(uid);
 		return { customToken };
 	} catch (error) {
