@@ -121,8 +121,31 @@ AI Agent が誤りやすい点、過去に問題となった点、実装上の�
 ### `verifySessionCookie(..., true)` の `checkRevoked` 誤用によるセッション消失
 
 - **問題**: 通常のセッション検証で `verifySessionCookie(sessionCookie, true)`（`checkRevoked = true`）を指定すると、リクエストごとに Google Auth サーバーへの外部通信が発生し、ネットワークの揺らぎやタイミング差で `session-cookie-revoked` が誤検知され、セッションが突然切れる。
-- **回避法**: 通常のセッション Cookie 検証は `checkRevoked = false`（公開鍵によるローカル検証）で行い、明示的なログアウト時や権限剥奪時のみ revoke を確認・実行する。セッションCookieのローリング延長時（`refreshSessionCookie`）は、短命なIDトークン側で `verifyIdToken(idToken, true)` を検証することで安全性を担保する。
 
+### バックグラウンド非同期処理におけるユーザー・ログアウトのレースコンディション
 
+- **問題**: `syncSessionCookieInBackground` 等のバックグラウンド非同期処理において、`await user.getIdToken()` などの非同期呼び出しの合間にユーザーがログアウトしたり別ユーザーへ切り替わった場合、遅れて返ってきた古いレスポンスが共有の `session` Cookie を上書きし、失効したセッションが復活してしまう。
+- **回避法**: 非同期処理の「開始前」と「完了直前（Cookie書き込み前）」の双方で、`auth?.currentUser?.uid === user.uid` かつ `!localStorage.getItem(LOGOUT_FLAG_KEY)` を検証し、状態変化が起きていれば即座に処理を破棄（no-op）する。
 
+### リカバリー用 Custom Token 発行時のセッション失効検証漏れ
 
+- **問題**: セッションCookieからCustom Tokenを再発行するリカバリー関数（`getCustomTokenFromSession`）で `verifySessionCookie(cookie, false)`（失効検査オフ）を使うと、別端末や他タブでログアウト（`revokeRefreshTokens`）済みとなった古いCookieからでもCustom Tokenが再発行され、再ログインに成功してしまう。
+- **回避法**: 通常のSSR検証（`getAuthUser`）ではパフォーマンス・遅延防止のため `checkRevoked: false` を用いるが、**セッションの再生産・リカバリーを行う `getCustomTokenFromSession` では必ず `checkRevoked: true` を明示**して失効済みセッションを遮断する。
+
+### ログアウト状態のタブローカル管理（sessionStorage の誤用）
+
+- **問題**: ログアウトフラグを `sessionStorage` だけで保持すると、他タブにログアウトが伝播せず、他タブ側のサイレント再認証が古いCookieを使ってセッションを復活させてしまう。
+- **回避法**: オリジン全体で共有すべき認証状態・ログアウトフラグは `localStorage` に一本化し、`window.addEventListener("storage", ...)` で他タブのログアウトを即時検知して全タブを未認証状態へ同期させる。
+
+---
+
+## 6. ドキュメント管理・仕様整合
+
+### 部分的・局所的修正によるドキュメント間の不整合（セルフレビューの落とし穴）
+
+- **問題**: コード修正時に該当箇所のドキュメント（例: フロー図や要件定義）のみを更新し、設計書（`code-design.md`）内の他セクション（ER概要、API一覧、状態管理責務表、シーケンス）や `.docs/security/`、`.ai/` に古い仕様（例: 削除されたServer Function、変更前のテーブル参照関係、古いCookie検証方針）が残骸として残り、CodeRabbit等の静的レビューで指摘される。
+- **回避法（セルフレビューのチェックリスト）**:
+  仕様やコードの変更を行った際は、必ず以下の関連セクションを横断検索して漏れなく同期する:
+  1. **スキーマ・データモデル**: テーブル構成や外部キー（`accountId` vs `userId`）を変更したら、`code-design.md` の「4.1 ER概要」「4.2 テーブル定義」と `.ai/domain.md` を確認。
+  2. **API・関数**: Server Function や Convex 関数を追加・削除・改名したら、`code-design.md` の「7. API設計」「7.6 Server Functions」表と `.ai/architecture.md` を確認。
+  3. **認証・セッション**: 認証イベント（`onAuthStateChanged` / `onIdTokenChanged`）やストレージ（`localStorage`）を変更したら、`code-design.md` の「5.2 認証フロー」「5.6 ログアウトフロー」「8.4 状態管理表」「security-model.md」を確認。
