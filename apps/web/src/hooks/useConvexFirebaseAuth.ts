@@ -57,6 +57,13 @@ export function useConvexFirebaseAuth() {
 					if (!result?.customToken) {
 						return false;
 					}
+					try {
+						if (localStorage.getItem(LOGOUT_FLAG_KEY)) {
+							return false;
+						}
+					} catch {
+						// ignore storage errors
+					}
 					await signInWithCustomToken(firebaseAuth, result.customToken);
 					return true;
 				} catch (error) {

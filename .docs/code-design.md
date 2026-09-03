@@ -275,7 +275,7 @@ serviceRecords 1 ── * credentials    (credentials.recordId → serviceRecord
 | userId                      | string                              | 作成者の Firebase UID                                                                                                                                |
 | accountId                   | Id<users>                           | 作成者の PoohMa Account ID（所有権・個人レコード境界）                                                                                                     |
 | familyId                    | Id<families>(optional)              | 暗号化スコープ・所属家族ID                                                                                                                          |
-| credentials                 | object\[]                           | 認証情報配列（下記、最大10件）                                                                                                                                 |
+| credentials                 | object\[](optional)                 | 旧埋め込み形式から独立 `credentials` テーブルへ移行するためだけに一時許容する互換フィールド。`migrateCredentialsToTable` の移行元としてのみ参照し、通常の作成・更新・取得では使用しない。移行後は物理削除する |
 | tags                        | string\[]                           | タグ                                                                                                                                               |
 | isPinned                    | boolean                             | ピン留め状態（デフォルトfalse、FR-REC-18）                                                                                                                     |
 | isArchived                  | boolean                             | アーカイブ（非表示）状態（デフォルトfalse、FR-REC-23）                                                                                                               |
@@ -287,17 +287,23 @@ serviceRecords 1 ── * credentials    (credentials.recordId → serviceRecord
 
 インデックス: by\_family\_sortKey, by\_ownerType\_accountId, by\_ownerType\_ownerFamilyId, by\_userId, by\_accountId
 
-credentials要素：
+#### credentials
 
-| フィールド                    | 型                | 説明                                       |
-| ------------------------ | ---------------- | ---------------------------------------- |
-| id                       | string           | UUID                                     |
-| label                    | string(optional) | 認証情報ラベル（平文）                              |
-| loginId                  | string(optional) | ログインID（平文でサーバーに保存される）                   |
-| passwordHint             | string(optional) | 暗号化済みパスワードヒント（Base64、E2EE暗号化対象）          |
-| passwordHintIv           | string(optional) | 上記暗号化のIV                                |
-| passwordHintDekEncrypted | string(optional) | マスターキーでラップされたDEK                         |
-| passwordHintDekIv        | string(optional) | DEKラップ処理のIV                             |
+認証情報の正式な保存先。`recordId` で `serviceRecords` を参照し、1レコードあたり最大10件の上限は作成・更新Mutationで検証する。
+
+| フィールド                    | 型                     | 説明                                      |
+| ------------------------ | ---------------------- | ----------------------------------------- |
+| recordId                 | Id<serviceRecords>     | 対象サービスレコード。`serviceRecords._id` を参照する         |
+| label                    | string(optional)       | 認証情報ラベル（平文）                             |
+| loginId                  | string(optional)       | ログインID（平文でサーバーに保存される）                  |
+| passwordHint             | string(optional)       | 暗号化済みパスワードヒント（Base64、E2EE暗号化対象）         |
+| passwordHintIv           | string(optional)       | 上記暗号化のIV                               |
+| passwordHintDekEncrypted | string(optional)       | マスターキーでラップされたDEK                        |
+| passwordHintDekIv        | string(optional)       | DEKラップ処理のIV                            |
+| order                    | number(optional)       | 同一サービスレコード内での表示順                       |
+| updatedAt                | number                 | 更新日時                                    |
+
+インデックス: by\_recordId
 
 #### recordAccessLog（新設、FR-REC-16）
 
@@ -493,10 +499,10 @@ ConvexReactClient / TanStack Query の Mutation実行を共通ラッパーでイ
 DEK（Data Encryption Key, 認証情報1件ごと, AES-GCM 256）
   │  encrypt(passwordHint, DEK)
   ▼
-暗号化済みパスワードヒント（serviceRecords.credentials[].passwordHint / passwordHintIv として保存）
+暗号化済みパスワードヒント（credentials.passwordHint / passwordHintIv として保存）
 
 マスターキー自体は families.masterKeyEncrypted / masterKeyIv として保存され、
-DEKは serviceRecords.credentials[].passwordHintDekEncrypted / passwordHintDekIv として保存される
+DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存される
 （封筒暗号化 / Envelope Encryption 方式）。
 
 【リカバリー経路（FR-CRYPT-06）】
@@ -613,7 +619,7 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
    アンロックを先に要求する）を、新しい導出鍵で再wrap
 4. Mutation families.rotatePasscode を呼び出し、以下のみを更新する：
    masterKeyEncrypted / masterKeyIv / masterKeySalt / kdfIterations / cryptoVersion
-   （各レコードのcredentials・DEK・passwordHintは一切変更しない。
+   （各レコードに `credentials.recordId` で紐づく認証情報・DEK・passwordHintは一切変更しない。
    DEKはマスターキーでラップされており、マスターキー自体は不変であるため、
    パスコード由来鍵の変更はDEKに影響しない。O(1)で完了する軽量な操作。
    Compare-And-Swapにより他端末・他メンバーとの同時更新時の競合を防止する）
