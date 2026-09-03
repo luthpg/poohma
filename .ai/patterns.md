@@ -95,20 +95,31 @@ export const syncUser = createServerFn({ method: "POST" })
 
 ---
 
-## 5. ログアウト制御とサイレント再認証防止パターン (`useConvexFirebaseAuth.ts`)
+## 5. ログアウト制御とクロス多タブ同期パターン (`useConvexFirebaseAuth.ts`)
 
-ログアウト時は `sessionStorage` に `LOGOUT_FLAG_KEY` をセットし、Cookie による自動セッション復元（サイレント再認証）が即座に再発動するのを防ぐ。
+ログアウト時は `localStorage` に `LOGOUT_FLAG_KEY` をセットし、Cookie による自動セッション復元（サイレント再認証）が即座に再発動するのを防ぐ。さらに `storage` イベントを監視して別タブでのログアウトも即時同期する。
 
 ```typescript
-// ログアウト時
-sessionStorage.setItem("poohma_logout", "true");
+// ログアウト時（他タブへは storage イベントで即座に伝播）
+localStorage.setItem("poohma_logout", String(Date.now()));
+if (auth) await signOut(auth);
 await logout(); // Server Function で Cookie 削除 & Firebase トークン失効
 
 // 認証監視時
-if (sessionStorage.getItem("poohma_logout")) {
+if (localStorage.getItem("poohma_logout")) {
   // サイレント再認証をスキップして未認証状態を確定
+  setIsAuthenticated(false);
+  setIsLoading(false);
   return;
 }
+
+// 他タブログアウトのリアルタイム検知
+window.addEventListener("storage", (e) => {
+  if (e.key === "poohma_logout" && e.newValue) {
+    setIsAuthenticated(false);
+    setIsLoading(false);
+  }
+});
 ```
 
 ---
@@ -119,7 +130,6 @@ if (sessionStorage.getItem("poohma_logout")) {
 
 1. `PasscodeProvider`: `accountId` の変更を検知して `masterKey` を `null` にリセット（再ロック）。
 2. `AccountProvider`: 切り替え時にローカルメモリキャッシュの破棄（`clearQueryCache()`）と TanStack Query の無効化・再取得（`await queryClient.invalidateQueries()`）を実行。
-
 
 ---
 
@@ -157,4 +167,38 @@ test("authenticated user can create record", async () => {
   });
   expect(recordId).toBeDefined();
 });
+```
+
+---
+
+## 9. ドキュメント横断セルフレビュー・パターン（CodeRabbit 指摘防止）
+
+PoohMa の仕様書（`code-design.md`, `security-model.md`, `requirements.md`）は多面的な構成（データモデル、フロー、API一覧、状態管理、セキュリティ境界）になっているため、コード変更時は以下のチェックリストでドキュメント全体を横断検索して整合性を確認する。
+
+1. **データモデル変更時**:
+   - `accountId` vs `userId` の所有関係やテーブル構造を変更した際は、`code-design.md` の「4.1 ER概要」「4.2 テーブル定義」と `.ai/domain.md` を更新する。
+2. **API・関数変更時**:
+   - Server Function や Convex 関数を追加・修正・削除した際は、`code-design.md` の「7. API設計」「7.6 Server Functions」表を更新する。
+3. **認証・セッション・ストレージ変更時**:
+   - 認証イベント（`onAuthStateChanged` / `onIdTokenChanged`）やストレージ（`localStorage` vs `sessionStorage`）を変更した際は、`code-design.md` の「5.2 認証フロー」「5.6 ログアウトフロー」「8.4 状態管理表」「security-model.md」を更新する。
+
+---
+
+## 10. バックグラウンド非同期処理の競合防止パターン（UID・状態ガード）
+
+バックグラウンドでセッション更新やCookie書き込みを行う非同期処理は、非同期呼び出しの合間にユーザーがログアウトしたり別アカウントに切り替わる可能性がある。古いレスポンスによる状態汚染を防ぐため、**非同期処理の前後でユーザーUIDとログアウトフラグを二重検証**する。
+
+```typescript
+async function syncSessionCookieInBackground(user: FirebaseUser) {
+  // 1. 開始前ガード
+  if (!auth?.currentUser || auth.currentUser.uid !== user.uid || localStorage.getItem(LOGOUT_FLAG_KEY)) {
+    return;
+  }
+  const idToken = await user.getIdToken();
+  // 2. 非同期処理完了後（書き込み直前）の再ガード
+  if (!auth?.currentUser || auth.currentUser.uid !== user.uid || localStorage.getItem(LOGOUT_FLAG_KEY)) {
+    return;
+  }
+  await refreshSessionCookie({ data: { idToken } });
+}
 ```

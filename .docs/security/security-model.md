@@ -7,10 +7,10 @@
 ## Authentication
 
 - ログイン手段は Firebase Authentication（Google OAuth）のみ。クライアントは `signInWithRedirect` でログインし、取得した Firebase ID トークンをサーバー関数 `syncUser` に送信する。
-- サーバー側（`firebase-admin.server.ts`）が `verifyIdToken` で ID トークンを検証したうえで Convex の `users.syncUser` にユーザー情報を同期する。別UIDへの引き継ぎ時に `joinRequests` / `familyMigrations` が孤児化する不具合はIssue #188で修正済み。
-- 検証後、`createSessionCookie` により httpOnly セッション Cookie（有効期限14日、本番では secure、SameSite=Lax）を発行する。以後のページロードでは `__root.tsx` の `beforeLoad` がこの Cookie を毎回検証する。この検証は `checkRevoked: true` を指定して行われ、`revokeRefreshTokens` によって失効済みとなったセッションは、Cookie自体の有効期限内であっても即座に拒否される（Issue #187）。
+- サーバー側（`firebase-admin.server.ts`）が `verifyIdToken` で ID トークンを検証したうえで Convex の `users.syncUser` にユーザー情報を同期する。別UIDへの引き継ぎ時に `serviceRecords.userId`、`joinRequests`、`familyMigrations` が孤児化する不具合はIssue #188で修正済み（所有権を示す `serviceRecords.accountId` は維持）。
+- 検証後、`createSessionCookie` により httpOnly セッション Cookie（有効期限14日、本番では secure、SameSite=Lax）を発行する。セッション Cookie は SSR 初期表示用キャッシュおよびサーバー処理用の補助セッションであり、以後のページロードでは `__root.tsx` の `beforeLoad` がこの Cookie をローカル公開鍵検証（`checkRevoked: false`）して初期ユーザー情報を取得する。Cookie が失効していてもブラウザの Firebase Auth 永続セッションが生きていれば自動で再同期・ローリング延長（`refreshSessionCookie` 内で失効検証を実施）され、意図しないログアウトを防止する。
 - クライアントから Convex への認証済みアクセスは、`useConvexFirebaseAuth` が現在の Firebase ID トークンをそのまま供給し、Convex 側は `auth.config.ts` の Issuer 設定（`securetoken.google.com/poohma`）でこれを直接信頼・検証する仕組みであり、Convex 独自のセッション機構は持たない。
-- ログアウト時は、Firebase Admin SDK の `revokeRefreshTokens` によりリフレッシュトークンを即時失効させたうえでセッション Cookie を削除し、TanStack Query / `usePersistentQuery` のキャッシュを全クリアする。
+- ログアウト時は、Firebase Admin SDK の `revokeRefreshTokens` によりリフレッシュトークンを即時失効させたうえでセッション Cookie を削除し、TanStack Query / `usePersistentQuery` のキャッシュを全クリアする。またクライアント側でも `signOut` と、`localStorage` へのログアウトフラグ（`LOGOUT_FLAG_KEY`）設定・クロス多タブ通知（`storage` イベント）により、他タブでの再認証やリカバリー処理（`getCustomTokenFromSession` における `checkRevoked: true` 検証）による意図しないセッション復元を確実に遮断する。
 
 ## Authorization
 
@@ -53,7 +53,8 @@
 
 ## Session
 
-- クライアントは Firebase ID トークンとサーバー発行のセッション Cookie という2種類の認証情報を持つ。
+- 長期ログイン状態の本体（Single Source of Truth）はブラウザ側の Firebase Auth（LOCAL 永続性）であり、ユーザーが明示的にログアウトしない限り数ヶ月単位で維持される。
+- サーバー発行のセッション Cookie は SSR キャッシュおよびサーバー処理用の補助セッションであり、14 日間有効。利用中のトークン更新時に自動ローリング延長される。
 - 無操作タイムアウトが発生すると、展開済みのマスターキーと画面上に表示中のパスワードヒントの両方を自動的にクリアする（Issue #122）。タイムアウト時間はユーザーが変更可能（既定5分、0を指定すると無効化）。
 - セッション失効を検知した書き込み系操作は、フォーム入力を保持したまま再ログインモーダルを表示し、同一の idempotency key で自動再実行することで、二重送信や入力ロストを防ぐ（`FR-AUTH-07`）。
 - アカウント切り替え時は、展開済みのマスターキーを揮発性メモリから即時破棄し、TanStack Query / IndexedDB キャッシュを連動してクリアすることで、アカウント間のデータ混用を防止する。

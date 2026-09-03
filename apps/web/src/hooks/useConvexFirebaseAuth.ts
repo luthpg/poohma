@@ -4,16 +4,60 @@ import {
 	signInWithCustomToken,
 } from "firebase/auth";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getCustomTokenFromSession } from "@/services/auth.functions";
+import {
+	getCustomTokenFromSession,
+	refreshSessionCookie,
+} from "@/services/auth.functions";
 import { auth } from "@/utils/firebase";
 import { isPwaFirstLaunch, markPwaAsInitialized } from "@/utils/pwa";
 
 /**
- * ログアウト直後の SPA 遷移でセッション復元が発動するのを防ぐためのフラグキー。
- * ログアウト処理側で sessionStorage にこのキーをセットし、
- * 復元ロジック側でフラグが立っていればスキップする。
+ * ログアウト後のセッション復元誤爆を防ぎ、クロス多タブでログアウト状態を同期するためのフラグキー。
+ * ログアウト処理側で localStorage にこのキーをセットし、復元ロジック側でフラグが立っていればスキップする。
  */
 export const LOGOUT_FLAG_KEY = "poohma_logout";
+
+let lastSessionSyncTime = 0;
+const SESSION_SYNC_INTERVAL_MS = 1000 * 60 * 60; // 1時間ごとにセッションCookieをローリング延長
+
+/** テスト用または明示的ログアウト時のセッション同期間隔リセット */
+export function resetSessionSyncTime() {
+	lastSessionSyncTime = 0;
+}
+
+async function syncSessionCookieInBackground(user: FirebaseUser) {
+	const now = Date.now();
+	if (now - lastSessionSyncTime < SESSION_SYNC_INTERVAL_MS) {
+		return;
+	}
+	lastSessionSyncTime = now;
+	try {
+		// ログアウト済みまたはユーザー切り替え時はCookie延長を中止
+		if (
+			!auth?.currentUser ||
+			auth.currentUser.uid !== user.uid ||
+			localStorage.getItem(LOGOUT_FLAG_KEY)
+		) {
+			return;
+		}
+
+		const idToken = await user.getIdToken();
+
+		// 非同期のトークン取得中にユーザー状態が変化していないか再確認
+		if (
+			!auth?.currentUser ||
+			auth.currentUser.uid !== user.uid ||
+			localStorage.getItem(LOGOUT_FLAG_KEY)
+		) {
+			return;
+		}
+
+		await refreshSessionCookie({ data: { idToken } });
+	} catch (e) {
+		lastSessionSyncTime = 0;
+		console.warn("Background session cookie sync failed:", e);
+	}
+}
 
 export function useConvexFirebaseAuth() {
 	const [isLoading, setIsLoading] = useState(true);
@@ -31,6 +75,13 @@ export function useConvexFirebaseAuth() {
 					const result = await getCustomTokenFromSession();
 					if (!result?.customToken) {
 						return false;
+					}
+					try {
+						if (localStorage.getItem(LOGOUT_FLAG_KEY)) {
+							return false;
+						}
+					} catch {
+						// ignore storage errors
 					}
 					await signInWithCustomToken(firebaseAuth, result.customToken);
 					return true;
@@ -62,19 +113,21 @@ export function useConvexFirebaseAuth() {
 				if (user) {
 					// ログイン状態になったらログアウトフラグをクリア
 					try {
-						sessionStorage.removeItem(LOGOUT_FLAG_KEY);
+						localStorage.removeItem(LOGOUT_FLAG_KEY);
 					} catch {
 						// ignore storage errors
 					}
 					setIsAuthenticated(true);
 					setIsLoading(false);
+					// バックグラウンドで session Cookie をローリング延長
+					syncSessionCookieInBackground(user);
 					return;
 				}
 
-				// ログアウト状態中はセッション復元をスキップ
+				// ログアウト状態中はセッション復元をスキップ（他タブでのログアウトも検知）
 				let isLoggedOut = false;
 				try {
-					isLoggedOut = !!sessionStorage.getItem(LOGOUT_FLAG_KEY);
+					isLoggedOut = !!localStorage.getItem(LOGOUT_FLAG_KEY);
 				} catch {
 					// ignore storage errors
 				}
@@ -96,9 +149,19 @@ export function useConvexFirebaseAuth() {
 			},
 		);
 
+		// 他タブでのログアウトを即時検知
+		const handleStorageChange = (e: StorageEvent) => {
+			if (e.key === LOGOUT_FLAG_KEY && e.newValue) {
+				setIsAuthenticated(false);
+				setIsLoading(false);
+			}
+		};
+		window.addEventListener("storage", handleStorageChange);
+
 		return () => {
 			isCleanedUp = true;
 			unsubscribe();
+			window.removeEventListener("storage", handleStorageChange);
 		};
 	}, [recoverSession]);
 

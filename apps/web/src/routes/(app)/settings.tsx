@@ -1,4 +1,4 @@
-﻿import {
+import {
 	createFileRoute,
 	getRouteApi,
 	useRouter,
@@ -30,8 +30,7 @@ import { auth } from "@/utils/firebase";
 
 export const Route = createFileRoute("/(app)/settings")({
 	loader: ({ context }) => {
-		// biome-ignore lint/style/noNonNullAssertion: user is guaranteed to be non-null at this point
-		return { user: context.user! };
+		return { user: context.user ?? null };
 	},
 	component: SettingsComponent,
 });
@@ -57,14 +56,16 @@ function SettingsComponent() {
 
 	const currentAccount = activeAccount || user;
 	const [displayName, setDisplayName] = useState(
-		currentAccount.displayName || "",
+		currentAccount?.displayName || "",
 	);
 	const [hasBiometric, setHasBiometric] = useState(false);
 
 	useEffect(() => {
-		const targetId = activeAccount?.id || user.id;
-		isBiometricEnabledForUser(targetId).then(setHasBiometric);
-	}, [activeAccount?.id, user.id]);
+		const targetId = activeAccount?.id || user?.id;
+		if (targetId) {
+			isBiometricEnabledForUser(targetId).then(setHasBiometric);
+		}
+	}, [activeAccount?.id, user?.id]);
 
 	const handleClearBiometric = async () => {
 		try {
@@ -79,8 +80,9 @@ function SettingsComponent() {
 
 	// アクティブアカウントが変わった場合にフォームの値を同期
 	useEffect(() => {
-		setDisplayName(currentAccount.displayName || "");
-	}, [currentAccount.displayName]);
+		setDisplayName(currentAccount?.displayName ?? "");
+	}, [currentAccount?.displayName]);
+
 	const [isSaving, setIsSaving] = useState(false);
 	const [isDeleting, setIsDeleting] = useState(false);
 	const [isDeletingSubAccount, setIsDeletingSubAccount] = useState(false);
@@ -89,6 +91,14 @@ function SettingsComponent() {
 
 	const updateProfile = useMutation(api.users.updateProfile);
 	const deleteAllAccountsConvex = useMutation(api.users.deleteAllAccounts);
+
+	if (!currentAccount) {
+		return (
+			<div className="flex min-h-[60vh] items-center justify-center">
+				<Spinner className="h-8 w-8 text-orange-500" />
+			</div>
+		);
+	}
 
 	const handleSubmit = async (e: SubmitEvent) => {
 		e.preventDefault();
@@ -220,7 +230,7 @@ function SettingsComponent() {
 						<input
 							id="email-input"
 							type="text"
-							value={user.email}
+							value={currentAccount.email}
 							disabled
 							className="w-full rounded-md bg-muted p-2.5 text-base md:text-[14px] text-muted-foreground shadow-sm focus:outline-none opacity-80 cursor-not-allowed"
 						/>

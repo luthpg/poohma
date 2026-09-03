@@ -66,8 +66,11 @@ export const getSessionCookie = async (idToken: string, expiresIn: number) => {
 	return adminAuth().createSessionCookie(idToken, { expiresIn });
 };
 
-export const verifySessionCookie = async (sessionCookie: string) => {
-	return adminAuth().verifySessionCookie(sessionCookie, true);
+export const verifySessionCookie = async (
+	sessionCookie: string,
+	checkRevoked = false,
+) => {
+	return adminAuth().verifySessionCookie(sessionCookie, checkRevoked);
 };
 
 export const revokeRefreshTokens = async (uid: string) => {

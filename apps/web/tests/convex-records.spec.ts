@@ -828,3 +828,167 @@ describe("件数境界値テスト", () => {
 		});
 	});
 });
+
+describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整合性検証", () => {
+	it("未認証時に Unauthenticated エラーをスローすること", async () => {
+		const t = convexTest(schema, modules);
+		await expect(
+			t.mutation(api.records.fetchRecordsForExport, {}),
+		).rejects.toThrow("Unauthenticated");
+	});
+
+	it("自身の所有レコード（個人・自身が管理者の家族レコード）のみ取得され、クレデンシャルと管理者メールが付与されること", async () => {
+		const t = convexTest(schema, modules);
+
+		let familyId!: Id<"families">;
+		let userAId!: Id<"users">;
+		let userBId!: Id<"users">;
+		let personalRecAId!: Id<"serviceRecords">;
+
+		await t.run(async (ctx) => {
+			familyId = await ctx.db.insert("families", {
+				name: "Export Family",
+				updatedAt: Date.now(),
+			});
+
+			userAId = await ctx.db.insert("users", {
+				userId: "user_export_a",
+				email: "export_a@example.com",
+				displayName: "エクスポートA",
+				familyId,
+				updatedAt: Date.now(),
+			});
+
+			userBId = await ctx.db.insert("users", {
+				userId: "user_export_b",
+				email: "export_b@example.com",
+				displayName: "エクスポートB",
+				familyId,
+				updatedAt: Date.now(),
+			});
+
+			// Aの個人レコード
+			personalRecAId = await ctx.db.insert("serviceRecords", {
+				title: "A Personal Record",
+				userId: "user_export_a",
+				accountId: userAId,
+				familyId,
+				ownerType: "user",
+				tags: [],
+				updatedAt: Date.now(),
+			});
+
+			// Aが管理者の家族共有レコード
+			await ctx.db.insert("serviceRecords", {
+				title: "Shared Admin A Record",
+				userId: "user_export_a",
+				accountId: userAId,
+				familyId,
+				ownerType: "family",
+				ownerFamilyId: familyId,
+				admins: [userAId],
+				tags: [],
+				updatedAt: Date.now(),
+			});
+
+			// Bが管理者の家族共有レコード（Aは管理者ではない）
+			await ctx.db.insert("serviceRecords", {
+				title: "Shared Admin B Record",
+				userId: "user_export_b",
+				accountId: userBId,
+				familyId,
+				ownerType: "family",
+				ownerFamilyId: familyId,
+				admins: [userBId],
+				tags: [],
+				updatedAt: Date.now(),
+			});
+
+			// Bの個人レコード
+			await ctx.db.insert("serviceRecords", {
+				title: "B Personal Record",
+				userId: "user_export_b",
+				accountId: userBId,
+				familyId,
+				ownerType: "user",
+				tags: [],
+				updatedAt: Date.now(),
+			});
+
+			// Aの個人レコードにクレデンシャルを追加
+			await ctx.db.insert("credentials", {
+				recordId: personalRecAId,
+				label: "Main Login",
+				loginId: "a_login_id",
+				passwordHint: "hint_text",
+				passwordHintIv: "iv_text",
+				order: 0,
+				updatedAt: Date.now(),
+			});
+		});
+
+		const userAClient = t.withIdentity({
+			subject: "user_export_a",
+			email: "export_a@example.com",
+		});
+
+		// ユーザーAでエクスポート実行
+		const results = await userAClient.mutation(
+			api.records.fetchRecordsForExport,
+			{
+				accountId: userAId,
+				deviceName: "Test Device",
+				browser: "Chrome",
+				os: "Windows",
+			},
+		);
+
+		// Aの個人レコードとAが管理者の家族レコードの2件のみ取得されること
+		expect(results).toHaveLength(2);
+		const titles = results.map((r) => r.title);
+		expect(titles).toContain("A Personal Record");
+		expect(titles).toContain("Shared Admin A Record");
+		expect(titles).not.toContain("Shared Admin B Record");
+		expect(titles).not.toContain("B Personal Record");
+
+		// クレデンシャルと管理者メールの検証
+		const personalRec = results.find((r) => r.title === "A Personal Record");
+		expect(personalRec?.credentials).toHaveLength(1);
+		expect(personalRec?.credentials[0].loginId).toBe("a_login_id");
+
+		const sharedRec = results.find((r) => r.title === "Shared Admin A Record");
+		expect(sharedRec?.adminEmails).toEqual(["export_a@example.com"]);
+	});
+
+	it("他人の accountId を指定した場合は Unauthorized で拒否されること", async () => {
+		const t = convexTest(schema, modules);
+
+		let userBId!: Id<"users">;
+
+		await t.run(async (ctx) => {
+			await ctx.db.insert("users", {
+				userId: "user_legit_a",
+				email: "legit_a@example.com",
+				updatedAt: Date.now(),
+			});
+
+			userBId = await ctx.db.insert("users", {
+				userId: "user_victim_b",
+				email: "victim_b@example.com",
+				updatedAt: Date.now(),
+			});
+		});
+
+		const userAClient = t.withIdentity({
+			subject: "user_legit_a",
+			email: "legit_a@example.com",
+		});
+
+		// ユーザーAがユーザーBの accountId を指定してエクスポートを試みる
+		await expect(
+			userAClient.mutation(api.records.fetchRecordsForExport, {
+				accountId: userBId,
+			}),
+		).rejects.toThrow("Unauthorized");
+	});
+});

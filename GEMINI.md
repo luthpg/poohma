@@ -121,13 +121,29 @@ try {
   - 詳細設計書（`.docs/code-design.md`）
   - デザイン仕様書（`.docs/DESIGN.md`, `.docs/lp-design.md`）
   - 脅威モデル（`.docs/security/threat-model.md`）
+  - セキュリティモデル（`.docs/security/security-model.md`）
   - セキュリティポリシー（`SECURITY.md`）
-
   - プロジェクト概要・セットアップ（`README.md`）
+  - AI Knowledge Base（`.ai/`）
 - **運用フロー**:
   1. 計画段階で変更内容に関連するドキュメントの更新要否（機能要件の追加、DBスキーマ・API仕様・環境変数の変更、脅威モデルの更新等）を確認し、コミット前にもコード変更差分を精査して再確認する。
   2. ドキュメントの更新が必要な場合は、変更箇所・更新方針をユーザーに確認し、許諾を得た上でドキュメントの更新を行う。
   3. ドキュメント更新を含めた状態で品質検証コマンドを実行し、コミットを行う。
+
+### ドキュメント横断整合性チェック（セルフレビュー）
+
+PoohMa の設計書は多面的な構成（データモデル、認証フロー、API一覧、状態管理責務表、セキュリティ境界）になっているため、**1箇所の変更が複数セクション・複数ファイルに波及する**。コード変更時は、変更対象の直近ドキュメントだけでなく、以下のマトリクスに従って関連セクションを横断検索し、古い仕様の残骸を漏れなく是正すること。
+
+| 変更の種類 | 確認すべきドキュメント箇所 |
+| :--- | :--- |
+| **スキーマ・テーブル構成** | `code-design.md`「4.1 ER概要」「4.2 テーブル定義」、`.ai/domain.md` |
+| **Server Function / Convex 関数の追加・削除・改名** | `code-design.md`「7. API設計」「7.6 Server Functions」表、`.ai/architecture.md` |
+| **認証イベント・フロー** | `code-design.md`「5.2 認証フロー」「5.6 ログアウトフロー」、`security-model.md`、`.ai/invariants.md` |
+| **状態管理・ストレージ** | `code-design.md`「8.4 状態管理表」、`security-model.md`、`.ai/patterns.md` |
+| **セキュリティ境界・脅威** | `security-model.md`、`threat-model.md`、`.ai/invariants.md` |
+| **データ移行・UID引き継ぎ** | `code-design.md`「4.1 ER概要」「5.2 フロー」「7.1 API表」、`security-model.md`、`.ai/domain.md` |
+
+> **Note**: 設計書の「ある1セクションだけ更新して他のセクションに古い記述が残る」ことが、外部レビュー（CodeRabbit等）で最も頻繁に指摘されるパターンである。変更対象のキーワード（関数名、テーブル名、ストレージ種別等）で設計書全体を `grep` し、関連する全箇所を同時に更新すること。
 
 ## 7. Monorepo Structure
 
@@ -315,7 +331,6 @@ commit / PR
 7. `.ai/` の既存情報
 
 脅威モデルおよびセキュリティ境界に関する判断では、`.docs/security/threat-model.md` を Source of Truth とし、セキュリティ要件が現在の実装や `.ai/` の情報と矛盾する場合も `.docs/security/threat-model.md` を優先してください。
-
 
 既存の `.ai/` が上記と矛盾する場合、既存の `.ai/` を修正してください。
 

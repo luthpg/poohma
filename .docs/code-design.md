@@ -158,9 +158,9 @@ families 1 ── * joinRequests       (joinRequests.familyId → families._id)
 families 1 ── * familyInvites       (familyInvites.familyId → families._id)
 families 1 ── * familyMigrations    (familyMigrations.targetFamilyId / sourceFamilyId → families._id)
 familyInvites 1 ── * joinRequests   (joinRequests.invitedByCode → familyInvites._id, optional)
-users     1 ── * serviceRecords      (serviceRecords.userId = users.userId, 文字列参照)
+users     1 ── * serviceRecords      (serviceRecords.accountId → users._id, serviceRecords.userId = users.userId)
 users     1 ── * joinRequests         (joinRequests.userId = users.userId, 文字列参照)
-serviceRecords 1 ── * credentials(内包配列)
+serviceRecords 1 ── * credentials    (credentials.recordId → serviceRecords._id)
 ```
 
 ### 4.2 テーブル定義
@@ -275,7 +275,7 @@ serviceRecords 1 ── * credentials(内包配列)
 | userId                      | string                              | 作成者の Firebase UID                                                                                                                                |
 | accountId                   | Id<users>                           | 作成者の PoohMa Account ID（所有権・個人レコード境界）                                                                                                     |
 | familyId                    | Id<families>(optional)              | 暗号化スコープ・所属家族ID                                                                                                                          |
-| credentials                 | object\[]                           | 認証情報配列（下記、最大10件）                                                                                                                                 |
+| credentials                 | object\[](optional)                 | 旧埋め込み形式から独立 `credentials` テーブルへ移行するためだけに一時許容する互換フィールド。`migrateCredentialsToTable` の移行元としてのみ参照し、通常の作成・更新・取得では使用しない。移行後は物理削除する |
 | tags                        | string\[]                           | タグ                                                                                                                                               |
 | isPinned                    | boolean                             | ピン留め状態（デフォルトfalse、FR-REC-18）                                                                                                                     |
 | isArchived                  | boolean                             | アーカイブ（非表示）状態（デフォルトfalse、FR-REC-23）                                                                                                               |
@@ -287,17 +287,23 @@ serviceRecords 1 ── * credentials(内包配列)
 
 インデックス: by\_family\_sortKey, by\_ownerType\_accountId, by\_ownerType\_ownerFamilyId, by\_userId, by\_accountId
 
-credentials要素：
+#### credentials
 
-| フィールド                    | 型                | 説明                                       |
-| ------------------------ | ---------------- | ---------------------------------------- |
-| id                       | string           | UUID                                     |
-| label                    | string(optional) | 認証情報ラベル（平文）                              |
-| loginId                  | string(optional) | ログインID（平文でサーバーに保存される）                   |
-| passwordHint             | string(optional) | 暗号化済みパスワードヒント（Base64、E2EE暗号化対象）          |
-| passwordHintIv           | string(optional) | 上記暗号化のIV                                |
-| passwordHintDekEncrypted | string(optional) | マスターキーでラップされたDEK                         |
-| passwordHintDekIv        | string(optional) | DEKラップ処理のIV                             |
+認証情報の正式な保存先。`recordId` で `serviceRecords` を参照し、1レコードあたり最大10件の上限は作成・更新Mutationで検証する。
+
+| フィールド                    | 型                     | 説明                                      |
+| ------------------------ | ---------------------- | ----------------------------------------- |
+| recordId                 | Id<serviceRecords>     | 対象サービスレコード。`serviceRecords._id` を参照する         |
+| label                    | string(optional)       | 認証情報ラベル（平文）                             |
+| loginId                  | string(optional)       | ログインID（平文でサーバーに保存される）                  |
+| passwordHint             | string(optional)       | 暗号化済みパスワードヒント（Base64、E2EE暗号化対象）         |
+| passwordHintIv           | string(optional)       | 上記暗号化のIV                               |
+| passwordHintDekEncrypted | string(optional)       | マスターキーでラップされたDEK                        |
+| passwordHintDekIv        | string(optional)       | DEKラップ処理のIV                            |
+| order                    | number(optional)       | 同一サービスレコード内での表示順                       |
+| updatedAt                | number                 | 更新日時                                    |
+
+インデックス: by\_recordId
 
 #### recordAccessLog（新設、FR-REC-16）
 
@@ -336,25 +342,37 @@ credentials要素：
 
 ## 5. 認証・認可設計
 
-### 5.1 ログイン〜セッション確立フロー
+### 5.1 認証要素の責務分離（4層モデル）
+
+PoohMa では、セッションの長期維持と安全なアクセス制御を両立するため、認証要素の責務を以下の4層に明確に分離します。
+
+| 認証要素 | 役割 | 保持期間 | 責務と位置付け |
+| --- | --- | --- | --- |
+| **Firebase Auth** | 長期ログイン状態の本体 | 数ヶ月単位（無期限） | **Single Source of Truth**。IndexedDB + LocalStorage 永続化によりブラウザ側で長期間維持。 |
+| **Firebase ID Token** | Convex バックエンドへの通信認証 | 1時間（SDK自動更新） | Convex への WebSocket/HTTP 通信時に付与され、Convex 側 OIDC 検証で直接認証。 |
+| **session Cookie** | SSR初期表示・Server Function用キャッシュ | 14日間（自動ローリング延長） | サーバー側補助セッション。Cookie の期限切れのみでログアウト扱いにしてはならない。 |
+| **Custom Token** | Client Auth 消失時のリカバリ | 一時発行（1回限り） | ブラウザストレージの揮発時に session Cookie から Client Auth を復旧するための非常用経路。 |
+
+### 5.2 ログイン〜セッション確立・維持フロー
 
 ```
 1. ユーザーが /login で「Googleでログイン」をクリック
 2. Firebase Authentication (signInWithRedirect) によりGoogle認証画面へ遷移
-3. リダイレクト復帰後、onAuthStateChangedでFirebase Userを検知
+3. リダイレクト復帰後、`onIdTokenChanged` で初期サインイン状態と以後のトークン更新を検知し、認証済みの場合はバックグラウンドで `syncSessionCookieInBackground(user)`（`refreshSessionCookie`）を呼び出して Cookie をローリング延長する
 4. ID トークンを取得し、Server Function `syncUser` へ送信
 5. サーバー側 (firebase-admin.server.ts) がIDトークンを検証 (adminAuth().verifyIdToken)
 6. Convex Mutation `users.syncUser` によりConvex usersテーブルへユーザー情報を同期
-   (同一UIDが無く同一emailが既存の場合、かつそのメールアドレスが確認済み(emailVerified)の場合に限り、
-    旧UIDのserviceRecordsのuserIdを新UIDへ一括付け替える。emailVerifiedがfalseの場合はマージせず、
-    新規ユーザーとして作成する)
+   (メールアドレス未確認(emailVerifiedがfalse)の場合はエラーを送出して同期を拒否する。
+    同一UIDが無く同一emailが既存の場合に限り、旧UIDのデータ（serviceRecords, joinRequests, familyMigrations）のuserIdを新UIDへ一括付け替える。所有権を示す serviceRecords.accountId は維持される)
 7. `createSessionCookie` によりFirebaseセッションCookie(14日間, httpOnly, secure(本番), SameSite=Lax) を発行
-8. 以後の各ページロード時、__root.tsx の beforeLoad が Server Function `getAuthUser` を呼び出し、
-   セッションCookieの検証 → Convex HTTP Action `getUserByFirebaseUid` (内部シークレット認証) で
-   最新のユーザー情報・所属家族情報を取得し、ルーターコンテキストへ格納する。
-```
+8. 以後の各ページロード時：
+   - SSR時: `__root.tsx` の beforeLoad が `getAuthUser` を呼び出し、セッションCookieがあれば初期ユーザー情報を取得（SSRキャッシュ）。
+   - クライアント側: `(app)/route.tsx` 内の `AuthGuard` が `useAuth()`（Firebase Auth）の状態を監視。
+     - 認証初期化中: ローディングスピナーを表示し、未認証と誤認して `/login` へリダイレクトしない。
+     - 認証済み: 通常通り画面を描画。セッションCookieが失効または更新時期の場合は、バックグラウンドで `refreshSessionCookie` を実行し Cookie を自動ローリング延長（DB書き込みやログイン通知は行わない）。
+     - 未認証確定時: `/login` へ安全にリダイレクト。
 
-### 5.2 クライアント→Convexの認証連携
+### 5.3 クライアント→Convexの認証連携
 
 ```
 ConvexReactClient は ConvexProviderWithAuth でラップされ、
@@ -448,7 +466,7 @@ ConvexReactClient / TanStack Query の Mutation実行を共通ラッパーでイ
 
 ```
 ログアウトフロー：
-  1. クライアント側（UserMenu / FamilyComponent 等）で sessionStorage にログアウトフラグ（LOGOUT_FLAG_KEY = "poohma_logout"）を設定
+  1. クライアント側（UserMenu / FamilyComponent 等）で localStorage にログアウトフラグ（LOGOUT_FLAG_KEY = "poohma_logout"）を設定（他タブへは storage イベントで即時通知）
   2. Firebase Auth の signOut(auth) を実行
   3. サーバー関数 logout() を呼び出し：
      - 現在のセッションCookieから uid を検証し、Firebase Admin SDK の revokeRefreshTokens(uid) でリフレッシュトークンを即時失効
@@ -456,8 +474,8 @@ ConvexReactClient / TanStack Query の Mutation実行を共通ラッパーでイ
   4. クエリキャッシュ（clearQueryCache / queryClient）を全クリア
 
 サイレント再認証・セッション復元制御（useConvexFirebaseAuth）：
-  - 認証状態の監視において、未認証時にサーバー側セッションCookieを用いたサイレント再認証（getCustomTokenFromSession）を行う
-  - ただし sessionStorage に LOGOUT_FLAG_KEY が存在する場合はログアウト状態と判定し、サイレント再認証をスキップして即時未認証状態（isAuthenticated=false）に確定させる
+  - 認証状態の監視において、未認証時にサーバー側セッションCookieを用いたサイレント再認証（getCustomTokenFromSession）を行う（checkRevoked: true で検証）
+  - ただし localStorage に LOGOUT_FLAG_KEY が存在する場合、または storage イベントで他タブのログアウトを検知した場合はログアウト状態と判定し、サイレント再認証をスキップして即時未認証状態（isAuthenticated=false）に確定させる
   - ユーザーが明示的に再ログインに成功した時点で LOGOUT_FLAG_KEY を削除する
 ```
 
@@ -481,10 +499,10 @@ ConvexReactClient / TanStack Query の Mutation実行を共通ラッパーでイ
 DEK（Data Encryption Key, 認証情報1件ごと, AES-GCM 256）
   │  encrypt(passwordHint, DEK)
   ▼
-暗号化済みパスワードヒント（serviceRecords.credentials[].passwordHint / passwordHintIv として保存）
+暗号化済みパスワードヒント（credentials.passwordHint / passwordHintIv として保存）
 
 マスターキー自体は families.masterKeyEncrypted / masterKeyIv として保存され、
-DEKは serviceRecords.credentials[].passwordHintDekEncrypted / passwordHintDekIv として保存される
+DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存される
 （封筒暗号化 / Envelope Encryption 方式）。
 
 【リカバリー経路（FR-CRYPT-06）】
@@ -601,7 +619,7 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
    アンロックを先に要求する）を、新しい導出鍵で再wrap
 4. Mutation families.rotatePasscode を呼び出し、以下のみを更新する：
    masterKeyEncrypted / masterKeyIv / masterKeySalt / kdfIterations / cryptoVersion
-   （各レコードのcredentials・DEK・passwordHintは一切変更しない。
+   （各レコードに `credentials.recordId` で紐づく認証情報・DEK・passwordHintは一切変更しない。
    DEKはマスターキーでラップされており、マスターキー自体は不変であるため、
    パスコード由来鍵の変更はDEKに影響しない。O(1)で完了する軽量な操作。
    Compare-And-Swapにより他端末・他メンバーとの同時更新時の競合を防止する）
@@ -651,7 +669,7 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
 
 | 関数                   | 種別            | 認可               | 概要                                                                                                    |
 | -------------------- | ------------- | ---------------- | ----------------------------------------------------------------------------------------------------- |
-| syncUser             | Mutation      | identityVerified | ログイン時のユーザー情報同期（新規作成／UID引き継ぎ／プロフィール更新）。別UID引き継ぎ時は `joinRequests` や `familyMigrations` も新UIDへ付け替えて孤児化を防止する。新規ログイン時はIP・位置情報等をもとにログイン通知メールをスケジュール送信 |
+| syncUser             | Mutation      | identityVerified | ログイン時のユーザー情報同期（新規作成／UID引き継ぎ／プロフィール更新）。別UID引き継ぎ時は `serviceRecords.userId`、`joinRequests`、`familyMigrations` も新UIDへ付け替えて孤児化を防止する（所有権を示す `serviceRecords.accountId` は維持）。新規ログイン時はIP・位置情報等をもとにログイン通知メールをスケジュール送信 |
 | updateProfile        | Mutation      | authenticated    | 表示名の更新                                                                                                |
 | notifyBiometricEvent | Mutation      | authenticated    | 生体認証の登録・解除イベントを検知し、セキュリティ通知メールをスケジュール送信                                              |
 | deleteAccount        | Mutation      | authenticated    | 退会処理（所有レコード削除、家族最終メンバー時は家族も削除）。退会完了通知メールを送信                                      |
@@ -733,14 +751,13 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
 
 ### 7.6 Server Functions (src/services/)
 
-| 関数                           | ファイル                  | メソッド | 認可・検証                     | 概要                                                      |
+| 関数                        | ファイル              | メソッド | 認可・検証                     | 概要                                                      |
 | ---------------------------- | --------------------- | ---- | ------------------------- | ------------------------------------------------------- |
 | syncUser                     | auth.functions.ts     | POST | Firebase IDトークン検証      | ログイン時のユーザー同期・セッションCookie発行・ログイン通知送信トリガー |
+| refreshSessionCookie         | auth.functions.ts     | POST | Firebase IDトークン検証（失効検証含む） | セッションCookieの自動ローリング延長（DB書き込み・ログイン通知は行わない） |
 | getAuthUser                  | auth.functions.ts     | GET  | セッションCookie検証            | 現在ログイン中のユーザーおよび所属家族情報取得          |
 | getCustomTokenFromSession    | auth.functions.ts     | POST | セッションCookie検証            | セッションCookieからFirebaseカスタムトークンを再発行（セッション復旧用） |
 | logout                       | auth.functions.ts     | POST | セッションCookie失効            | ログアウト処理（Cookie削除＋トークン失効）              |
-| fetchRecordsForExportServerFn | security.functions.ts | POST | セッションCookie検証            | CSVエクスポート用レコード取得＋監査通知メール送信トリガー |
-| notifyBiometricEventServerFn | security.functions.ts | POST | セッションCookie検証            | 生体認証登録／解除イベントの監査通知メール送信トリガー  |
 | getClientRequestContext      | security.functions.ts | GET  | なし                      | 接続元のIPアドレス・User-Agent・GeoIP位置情報の取得     |
 
 
@@ -753,7 +770,7 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
   index.tsx, usage.tsx, faq.tsx, login.tsx,
   terms-of-service.tsx, privacy-policy.tsx
 
-(app)/     … 認証必須。beforeLoadで未ログイン時は /login へリダイレクト、
+(app)/     … 認証必須。Client-First AuthGuard（useAuth）により保護。未認証確定時は /login へリダイレクト、
               家族未所属時は /family 以外を /family へ強制リダイレクト。
               家族所属済みの場合のみ AppHeader を表示。
   dashboard.tsx, records/new.tsx, records/$id.tsx, family.tsx, settings.tsx
@@ -793,7 +810,8 @@ TanStack QueryとConvexは双方がキャッシュ機構を持つため、責務
 
 | 領域              | 担当技術             | 対象データ                                            | 役割                                              |
 | --------------- | ---------------- | ------------------------------------------------ | ----------------------------------------------- |
-| 認証状態・ルーティング・CMS | TanStack Query   | authUser、UI設定（Cookieベース）、CMSデータ（FAQ・規約等の静的コンテンツ） | セッション監視、SSR時の初期データ解決、低頻度更新の外部コンテンツのキャッシュ        |
+| 認証状態・ルート保護 | Firebase Auth（useAuth / AuthGuard） | 認証状態、Firebase User、IDトークン | 長期ログイン状態の本体（Single Source of Truth）、ルート保護 |
+| 初期スナップショット・CMS | TanStack Query   | SSR初期スナップショット（Cookieベース）、UI設定、CMSデータ（FAQ・規約等の静的コンテンツ） | SSR時の初期データ解決、低頻度更新の外部コンテンツのキャッシュ        |
 | アプリケーションデータ     | Convex（useQuery） | serviceRecords、家族情報、参加申請状態など                     | リアルタイムデータ同期。信頼できる唯一の情報源（Single Source of Truth） |
 
 基本原則：

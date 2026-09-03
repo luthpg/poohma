@@ -1,8 +1,10 @@
-﻿import { useState } from "react";
+import { useMutation } from "convex/react";
+import { useState } from "react";
 import { toast } from "sonner";
+import { api } from "@/../convex/_generated/api";
 import { usePasscode } from "@/components/PasscodeProvider";
 import { useAccount } from "@/hooks/useAccount";
-import { fetchRecordsForExportServerFn } from "@/services/security.functions";
+import { getClientRequestContext } from "@/services/security.functions";
 import { sanitizeCsvValue } from "@/utils/csv-sanitize";
 import { MAX_CREDENTIALS_PER_RECORD } from "@/utils/schemas";
 
@@ -10,14 +12,15 @@ export function useExportCsv() {
 	const [isExporting, setIsExporting] = useState(false);
 	const { masterKey, requireUnlock, decryptHint } = usePasscode();
 	const { activeAccountId } = useAccount();
+	const fetchRecordsForExport = useMutation(api.records.fetchRecordsForExport);
 
 	const handleExport = async () => {
 		setIsExporting(true);
 		try {
-			const records = await fetchRecordsForExportServerFn({
-				data: {
-					accountId: activeAccountId || undefined,
-				},
+			const context = await getClientRequestContext().catch(() => ({}));
+			const records = await fetchRecordsForExport({
+				accountId: activeAccountId || undefined,
+				...context,
 			});
 
 			// Convex レコードを CSV 行フォーマットに変換
