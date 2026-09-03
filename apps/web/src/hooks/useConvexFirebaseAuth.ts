@@ -12,9 +12,8 @@ import { auth } from "@/utils/firebase";
 import { isPwaFirstLaunch, markPwaAsInitialized } from "@/utils/pwa";
 
 /**
- * ログアウト直後の SPA 遷移でセッション復元が発動するのを防ぐためのフラグキー。
- * ログアウト処理側で sessionStorage にこのキーをセットし、
- * 復元ロジック側でフラグが立っていればスキップする。
+ * ログアウト後のセッション復元誤爆を防ぎ、クロス多タブでログアウト状態を同期するためのフラグキー。
+ * ログアウト処理側で localStorage にこのキーをセットし、復元ロジック側でフラグが立っていればスキップする。
  */
 export const LOGOUT_FLAG_KEY = "poohma_logout";
 
@@ -88,7 +87,6 @@ export function useConvexFirebaseAuth() {
 				if (user) {
 					// ログイン状態になったらログアウトフラグをクリア
 					try {
-						sessionStorage.removeItem(LOGOUT_FLAG_KEY);
 						localStorage.removeItem(LOGOUT_FLAG_KEY);
 					} catch {
 						// ignore storage errors
@@ -103,9 +101,7 @@ export function useConvexFirebaseAuth() {
 				// ログアウト状態中はセッション復元をスキップ（他タブでのログアウトも検知）
 				let isLoggedOut = false;
 				try {
-					isLoggedOut =
-						!!sessionStorage.getItem(LOGOUT_FLAG_KEY) ||
-						!!localStorage.getItem(LOGOUT_FLAG_KEY);
+					isLoggedOut = !!localStorage.getItem(LOGOUT_FLAG_KEY);
 				} catch {
 					// ignore storage errors
 				}
