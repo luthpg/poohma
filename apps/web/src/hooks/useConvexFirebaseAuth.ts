@@ -153,6 +153,7 @@ export function useConvexFirebaseAuth() {
 		const handleStorageChange = (e: StorageEvent) => {
 			if (e.key === LOGOUT_FLAG_KEY && e.newValue) {
 				setIsAuthenticated(false);
+				setIsLoading(false);
 			}
 		};
 		window.addEventListener("storage", handleStorageChange);

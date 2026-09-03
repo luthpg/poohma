@@ -100,6 +100,12 @@ describe("useConvexFirebaseAuth", () => {
 					newValue: "logged-out-in-another-tab",
 				}),
 			);
+		});
+
+		expect(result.current.isAuthenticated).toBe(false);
+		expect(result.current.isLoading).toBe(false);
+
+		act(() => {
 			resolveCustomToken?.({ customToken: "stale-custom-token" });
 		});
 

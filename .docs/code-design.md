@@ -358,7 +358,7 @@ PoohMa では、セッションの長期維持と安全なアクセス制御を�
 ```
 1. ユーザーが /login で「Googleでログイン」をクリック
 2. Firebase Authentication (signInWithRedirect) によりGoogle認証画面へ遷移
-3. リダイレクト復帰後、onAuthStateChanged で初期サインイン状態を検知。以後のトークン更新やセッション維持は onIdTokenChanged が検知し、バックグラウンドで syncSessionCookieInBackground(user)（refreshSessionCookie）を呼び出して Cookie をローリング延長する
+3. リダイレクト復帰後、`onIdTokenChanged` で初期サインイン状態と以後のトークン更新を検知し、認証済みの場合はバックグラウンドで `syncSessionCookieInBackground(user)`（`refreshSessionCookie`）を呼び出して Cookie をローリング延長する
 4. ID トークンを取得し、Server Function `syncUser` へ送信
 5. サーバー側 (firebase-admin.server.ts) がIDトークンを検証 (adminAuth().verifyIdToken)
 6. Convex Mutation `users.syncUser` によりConvex usersテーブルへユーザー情報を同期
