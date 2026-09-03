@@ -356,15 +356,14 @@ PoohMa では、セッションの長期維持と安全なアクセス制御を�
 4. ID トークンを取得し、Server Function `syncUser` へ送信
 5. サーバー側 (firebase-admin.server.ts) がIDトークンを検証 (adminAuth().verifyIdToken)
 6. Convex Mutation `users.syncUser` によりConvex usersテーブルへユーザー情報を同期
-   (同一UIDが無く同一emailが既存の場合、かつそのメールアドレスが確認済み(emailVerified)の場合に限り、
-    旧UIDのserviceRecordsのuserIdを新UIDへ一括付け替える。emailVerifiedがfalseの場合はマージせず、
-    新規ユーザーとして作成する)
+   (メールアドレス未確認(emailVerifiedがfalse)の場合はエラーを送出して同期を拒否する。
+    同一UIDが無く同一emailが既存の場合に限り、旧UIDのserviceRecordsのuserIdを新UIDへ一括付け替える)
 7. `createSessionCookie` によりFirebaseセッションCookie(14日間, httpOnly, secure(本番), SameSite=Lax) を発行
 8. 以後の各ページロード時：
    - SSR時: `__root.tsx` の beforeLoad が `getAuthUser` を呼び出し、セッションCookieがあれば初期ユーザー情報を取得（SSRキャッシュ）。
    - クライアント側: `(app)/route.tsx` 内の `AuthGuard` が `useAuth()`（Firebase Auth）の状態を監視。
      - 認証初期化中: ローディングスピナーを表示し、未認証と誤認して `/login` へリダイレクトしない。
-     - 認証済み: 通常通り画面を描画。セッションCookieが失効している場合は、バックグラウンドで `syncUser` を実行し Cookie を自動ローリング延長。
+     - 認証済み: 通常通り画面を描画。セッションCookieが失効または更新時期の場合は、バックグラウンドで `refreshSessionCookie` を実行し Cookie を自動ローリング延長（DB書き込みやログイン通知は行わない）。
      - 未認証確定時: `/login` へ安全にリダイレクト。
 
 ### 5.3 クライアント→Convexの認証連携

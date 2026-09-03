@@ -24,6 +24,7 @@ import { getRequestContext } from "@/utils/request-context.server";
 const SESSION_EXPIRES_IN_SECONDS = 60 * 60 * 24 * 14;
 const SESSION_EXPIRES_IN_MS = SESSION_EXPIRES_IN_SECONDS * 1000;
 const DEVICE_ID_EXPIRES_IN_SECONDS = 60 * 60 * 24 * 365; // 1年間
+const isProduction = process.env.NODE_ENV === "production";
 
 /**
  * リクエストごとに生成する
@@ -56,7 +57,6 @@ export const syncUser = createServerFn({ method: "POST" })
 
 			// デバイス識別用クッキーの取得または新規発行
 			let deviceId = getCookie("poohma_device_id");
-			const isProduction = process.env.NODE_ENV === "production";
 
 			if (!deviceId) {
 				deviceId = crypto.randomUUID();
@@ -99,6 +99,39 @@ export const syncUser = createServerFn({ method: "POST" })
 			return accountId;
 		} catch (error) {
 			console.error("syncUser failed:", error);
+			throw error;
+		}
+	});
+
+/**
+ * セッションCookieのローリング延長処理
+ * DB更新や新端末ログイン検知（recordLogin）をスキップし、Cookieの再発行・延長のみを軽量に行う
+ */
+export const refreshSessionCookie = createServerFn({ method: "POST" })
+	.validator((data: { idToken: string }) => data)
+	.handler(async ({ data: { idToken } }) => {
+		try {
+			// IDトークンの署名・有効性を検証
+			await adminAuth().verifyIdToken(idToken);
+
+			// セッションクッキーの作成 (expiresIn はミリ秒)
+			const sessionCookie = await getSessionCookie(
+				idToken,
+				SESSION_EXPIRES_IN_MS,
+			);
+
+			// クッキーの設定 (maxAge は秒)
+			setCookie("session", sessionCookie, {
+				httpOnly: true,
+				secure: isProduction,
+				sameSite: "lax",
+				path: "/",
+				maxAge: SESSION_EXPIRES_IN_SECONDS,
+			});
+
+			return { success: true };
+		} catch (error) {
+			console.error("refreshSessionCookie failed:", error);
 			throw error;
 		}
 	});

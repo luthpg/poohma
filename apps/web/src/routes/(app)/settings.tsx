@@ -80,9 +80,7 @@ function SettingsComponent() {
 
 	// アクティブアカウントが変わった場合にフォームの値を同期
 	useEffect(() => {
-		if (currentAccount?.displayName) {
-			setDisplayName(currentAccount.displayName);
-		}
+		setDisplayName(currentAccount?.displayName ?? "");
 	}, [currentAccount?.displayName]);
 
 	const [isSaving, setIsSaving] = useState(false);

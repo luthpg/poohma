@@ -4,7 +4,10 @@ import {
 	signInWithCustomToken,
 } from "firebase/auth";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getCustomTokenFromSession, syncUser } from "@/services/auth.functions";
+import {
+	getCustomTokenFromSession,
+	refreshSessionCookie,
+} from "@/services/auth.functions";
 import { auth } from "@/utils/firebase";
 import { isPwaFirstLaunch, markPwaAsInitialized } from "@/utils/pwa";
 
@@ -31,7 +34,7 @@ async function syncSessionCookieInBackground(user: FirebaseUser) {
 	lastSessionSyncTime = now;
 	try {
 		const idToken = await user.getIdToken();
-		await syncUser({ data: { idToken } });
+		await refreshSessionCookie({ data: { idToken } });
 	} catch (e) {
 		lastSessionSyncTime = 0;
 		console.warn("Background session cookie sync failed:", e);
