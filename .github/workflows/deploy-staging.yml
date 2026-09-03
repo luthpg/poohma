@@ -57,3 +57,10 @@ jobs:
           DEPLOY_URL=$(vercel deploy --prebuilt --archive=tgz --token=${{ secrets.VERCEL_TOKEN }})
           vercel alias set $DEPLOY_URL ${{ secrets.VERCEL_ALIAS_STAGING }} --token=${{ secrets.VERCEL_TOKEN }}
 
+  e2e:
+    name: Run Staging E2E
+    needs: deploy
+    uses: ./.github/workflows/e2e-staging.yml
+    secrets: inherit
+
+

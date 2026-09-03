@@ -17,3 +17,9 @@ coverage
 *storybook.log
 storybook-static
 .turbo
+**/e2e/.auth/
+**/e2e/.gen/
+.vitest-attachments
+__screenshots__/
+**/playwright-report/
+**/test-results/

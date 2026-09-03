@@ -11,6 +11,8 @@ PoohMa におけるテストアーキテクチャ、テスト作成パターン�
 | バックエンド関数 (Convex) | `convex-test` + `vitest` | Schema, customBuilders, RLS, DB トランザクション、スケジューラのインメモリ結合テスト |
 | 暗号化 / E2EE / ユーティリティ | `vitest` + Web Crypto API (Node 20+ 組み込み) | PBKDF2 鍵導出、DEK/MasterKey ラップ、ソートキー生成、バリデーション |
 | フロントエンド UI / Hooks | `@testing-library/react` + `vitest` | `PasscodeProvider`, `AccountProvider`, フォームバリデーション等のコンポーネントテスト |
+| 暗号・WebAuthn PRF サブシステム (Browser E2E) | `@vitest/browser-playwright` + Chromium (CDP) | 実ブラウザ Web Crypto API、CDP Virtual Authenticator (PRF拡張)、PasscodeProvider 実UI結合、再暗号化フロー |
+| ユーザー導線フルスタック E2E (Staging) | `@playwright/test` + Firebase Admin SDK カスタムトークン | ステージング実環境に対するログインブートストラップ、初期設定・レコード暗号化保存〜復号の貫通検証 |
 
 ---
 
@@ -140,7 +142,13 @@ Node.js 環境の `globalThis.crypto.subtle` を用いて、ブラウザと同�
 ---
 
 ## 5. テスト実行ルール
-
-- **単体・統合テスト実行**: `pnpm test`
+ 
+- **単体・統合・Browser E2E テスト一括実行**: `pnpm test`（Nodeユニット、Storybook、`browser-e2ee` プロジェクトが全件実行される）
+- **Browser E2E 単体実行**: `pnpm --filter @poohma/web test:browser`（Chromium 上で Web Crypto / WebAuthn PRF / PasscodeProvider / 再暗号化を高速実行）
+- **Full-Stack E2E 実行 (Playwright on Staging)**: `pnpm --filter @poohma/web test:e2e`（`build:e2e-bridge` 後に Playwright 実行）
 - **一括品質パイプライン**: `pnpm verify`（Typecheck → Lint/Format → Test → Build）
-- テスト追加時は `apps/web/tests/` 配下に配置し、ファイル名規則は、単体テスト系であれば `*.spec.ts` または統合テスト系であれば `*.test.ts` とする。
+- **ファイル配置規則**:
+  - 単体・サーバー統合テスト: `apps/web/tests/*.spec.ts` または `*.test.tsx`
+  - Browser E2E サブシステムテスト: `apps/web/tests/browser-e2e/*.browser.test.{ts,tsx}`
+  - Full-Stack E2E テスト: `apps/web/e2e/*.spec.ts`
+

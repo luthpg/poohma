@@ -4,6 +4,11 @@ import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
 import react from "@vitejs/plugin-react";
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
+import {
+	removeVirtualAuthenticator,
+	setPlatformAuthenticatorAvailable,
+	setupVirtualAuthenticator,
+} from "./tests/browser-e2e/setup/cdp-authenticator.ts";
 
 const dirname =
 	import.meta.dirname ?? path.dirname(fileURLToPath(import.meta.url));
@@ -11,8 +16,30 @@ const dirname =
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
 	plugins: [react()],
+	optimizeDeps: {
+		include: ["idb-keyval"],
+		exclude: ["@tanstack/react-start", "@tanstack/start-server-core"],
+	},
 	resolve: {
 		tsconfigPaths: true,
+		alias: {
+			"@/services/security.functions": path.resolve(
+				dirname,
+				"tests/browser-e2e/setup/mock-security.functions.ts",
+			),
+			"@/services/auth.functions": path.resolve(
+				dirname,
+				"tests/browser-e2e/setup/mock-auth.functions.ts",
+			),
+			"@/services/prefs.functions": path.resolve(
+				dirname,
+				"tests/browser-e2e/setup/mock-security.functions.ts",
+			),
+			"@/services/cms.functions": path.resolve(
+				dirname,
+				"tests/browser-e2e/setup/mock-security.functions.ts",
+			),
+		},
 	},
 	test: {
 		testTimeout: 15000,
@@ -75,6 +102,12 @@ export default defineConfig({
 				extends: true,
 				test: {
 					environment: "node",
+					exclude: [
+						"**/node_modules/**",
+						"**/dist/**",
+						"e2e/**",
+						"tests/browser-e2e/**",
+					],
 					server: {
 						deps: {
 							inline: ["convex-test"],
@@ -102,6 +135,28 @@ export default defineConfig({
 								browser: "chromium",
 							},
 						],
+					},
+				},
+			},
+			{
+				extends: true,
+				test: {
+					name: "browser-e2ee",
+					include: ["tests/browser-e2e/**/*.browser.test.{ts,tsx}"],
+					browser: {
+						enabled: true,
+						headless: true,
+						provider: playwright(),
+						instances: [
+							{
+								browser: "chromium",
+							},
+						],
+						commands: {
+							setupVirtualAuthenticator,
+							removeVirtualAuthenticator,
+							setPlatformAuthenticatorAvailable,
+						},
 					},
 				},
 			},
