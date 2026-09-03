@@ -62,7 +62,7 @@
 - **長期ログイン状態の本体はブラウザ側の Firebase Auth（LOCAL 永続性）**であり、ユーザーが明示的にログアウトしない限り数ヶ月単位で維持される。
 - **`session` Cookie は SSR 初期表示およびサーバー処理用の補助セッション・キャッシュ**に過ぎない。**Cookie の期限切れ（14日）のみを理由に未認証としてログアウトさせてはならない**。
 - `(app)` ルートの保護等の画面アクセス判定は、Cookie 由来のデータではなくクライアントの Firebase Auth 状態（`useAuth().isAuthenticated`）を判定基準としなければならない。
-- Session Cookie が未発行または失効している場合でも、Firebase Auth が認証中であればバックグラウンドで自動的に `syncUser` を呼び出し、Cookie をローリング延長・再同期しなければならない。
+- Session Cookie が未発行または失効している場合でも、Firebase Auth が認証中であればバックグラウンドで自動的に `refreshSessionCookie` を呼び出し、Cookie をローリング延長・再同期しなければならない（DB更新やログイン通知は行わない）。
 
 ---
 

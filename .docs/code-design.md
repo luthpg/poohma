@@ -357,7 +357,7 @@ PoohMa では、セッションの長期維持と安全なアクセス制御を�
 5. サーバー側 (firebase-admin.server.ts) がIDトークンを検証 (adminAuth().verifyIdToken)
 6. Convex Mutation `users.syncUser` によりConvex usersテーブルへユーザー情報を同期
    (メールアドレス未確認(emailVerifiedがfalse)の場合はエラーを送出して同期を拒否する。
-    同一UIDが無く同一emailが既存の場合に限り、旧UIDのserviceRecordsのuserIdを新UIDへ一括付け替える)
+    同一UIDが無く同一emailが既存の場合に限り、旧UIDのデータ（serviceRecords, joinRequests, familyMigrations）のuserIdを新UIDへ一括付け替える)
 7. `createSessionCookie` によりFirebaseセッションCookie(14日間, httpOnly, secure(本番), SameSite=Lax) を発行
 8. 以後の各ページロード時：
    - SSR時: `__root.tsx` の beforeLoad が `getAuthUser` を呼び出し、セッションCookieがあれば初期ユーザー情報を取得（SSRキャッシュ）。
@@ -745,14 +745,13 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
 
 ### 7.6 Server Functions (src/services/)
 
-| 関数                           | ファイル                  | メソッド | 認可・検証                     | 概要                                                      |
+| 関数                        | ファイル              | メソッド | 認可・検証                     | 概要                                                      |
 | ---------------------------- | --------------------- | ---- | ------------------------- | ------------------------------------------------------- |
 | syncUser                     | auth.functions.ts     | POST | Firebase IDトークン検証      | ログイン時のユーザー同期・セッションCookie発行・ログイン通知送信トリガー |
+| refreshSessionCookie         | auth.functions.ts     | POST | Firebase IDトークン検証（失効検証含む） | セッションCookieの自動ローリング延長（DB書き込み・ログイン通知は行わない） |
 | getAuthUser                  | auth.functions.ts     | GET  | セッションCookie検証            | 現在ログイン中のユーザーおよび所属家族情報取得          |
 | getCustomTokenFromSession    | auth.functions.ts     | POST | セッションCookie検証            | セッションCookieからFirebaseカスタムトークンを再発行（セッション復旧用） |
 | logout                       | auth.functions.ts     | POST | セッションCookie失効            | ログアウト処理（Cookie削除＋トークン失効）              |
-| fetchRecordsForExportServerFn | security.functions.ts | POST | セッションCookie検証            | CSVエクスポート用レコード取得＋監査通知メール送信トリガー |
-| notifyBiometricEventServerFn | security.functions.ts | POST | セッションCookie検証            | 生体認証登録／解除イベントの監査通知メール送信トリガー  |
 | getClientRequestContext      | security.functions.ts | GET  | なし                      | 接続元のIPアドレス・User-Agent・GeoIP位置情報の取得     |
 
 
@@ -765,7 +764,7 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
   index.tsx, usage.tsx, faq.tsx, login.tsx,
   terms-of-service.tsx, privacy-policy.tsx
 
-(app)/     … 認証必須。beforeLoadで未ログイン時は /login へリダイレクト、
+(app)/     … 認証必須。Client-First AuthGuard（useAuth）により保護。未認証確定時は /login へリダイレクト、
               家族未所属時は /family 以外を /family へ強制リダイレクト。
               家族所属済みの場合のみ AppHeader を表示。
   dashboard.tsx, records/new.tsx, records/$id.tsx, family.tsx, settings.tsx

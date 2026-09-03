@@ -111,8 +111,8 @@ export const refreshSessionCookie = createServerFn({ method: "POST" })
 	.validator((data: { idToken: string }) => data)
 	.handler(async ({ data: { idToken } }) => {
 		try {
-			// IDトークンの署名・有効性を検証
-			await adminAuth().verifyIdToken(idToken);
+			// IDトークンの署名・有効性および失効（revoke）状態を検証
+			await adminAuth().verifyIdToken(idToken, true);
 
 			// セッションクッキーの作成 (expiresIn はミリ秒)
 			const sessionCookie = await getSessionCookie(

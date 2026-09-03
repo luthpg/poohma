@@ -15,12 +15,13 @@ PoohMa における重要な設計判断（Decisions）と、その現在の意�
 ---
 
 ## 2. 認証方式: Firebase Authentication (Google OAuth) + セッション Cookie
-
-- **判断**: 自前のパスワード認証を持たず、Google アカウントによる Firebase Authentication（リダイレクト方式）に限定。サーバー側では httpOnly セッション Cookie（14日間）を発行。
-- **意味**:
-  - パスワード管理のリスクを完全に外部化し、家族ユーザーの手軽なログインを実現。
-  - TanStack Start による SSR / ルート遷移時に、セッション Cookie を通じてサーバー側（`getAuthUser`）で確実に認証ユーザーを特定可能。
-  - Convex 側も `auth.config.ts` で Firebase を信頼プロバイダとして直接 ID トークンを検証。
+ 
+ - **判断**: 自前のパスワード認証を持たず、Google アカウントによる Firebase Authentication（リダイレクト方式）に限定。サーバー側では httpOnly セッション Cookie（14日間）を発行。
+ - **意味**:
+   - パスワード管理のリスクを完全に外部化し、家族ユーザーの手軽なログインを実現。
+   - Firebase Auth（IndexedDB + LocalStorage永続化）を長期ログイン状態の本体（Single Source of Truth）とし、数ヶ月単位でログイン状態を維持。
+   - セッション Cookie は SSR 初期表示用キャッシュおよび補助セッションとして位置付け、利用中のトークン更新時に自動ローリング延長（`refreshSessionCookie`）。Cookie 切れのみによる強制ログアウトを防止。
+   - Convex 側も `auth.config.ts` で Firebase を信頼プロバイダとして直接 ID トークンを検証。
 
 ---
 

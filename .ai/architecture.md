@@ -43,7 +43,7 @@ poohma/
   - `AccountProvider`: 1 Firebase UID : N PoohMa Account のアクティブアカウント管理・切り替え
   - `PasscodeProvider`: E2EEマスターキーのインメモリ保持、ロック状態管理、誤入力バックオフ
 - **Services (Server Functions)**:
-  - `auth.functions.ts`: `syncUser`, `getAuthUser`, `logout`, `getCustomTokenFromSession`（Firebase Admin SDK とセッション Cookie 制御）
+  - `auth.functions.ts`: `syncUser`, `refreshSessionCookie`, `getAuthUser`, `logout`, `getCustomTokenFromSession`（Firebase Admin SDK とセッション Cookie 制御）
   - `firebase-admin.server.ts`: Firebase Admin 初期化・トークン検証
   - `cms.functions.ts` / `cms.server.ts`: microCMS 連携（FAQ/利用規約等）
 - **Lib & Utils**:

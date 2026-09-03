@@ -116,12 +116,12 @@ AI Agent が誤りやすい点、過去に問題となった点、実装上の�
 
 - **問題**: TanStack Router の `(app)` ルート保護（`beforeLoad`）で `context.user`（Session Cookie 由来）のみを見て未認証判定（`/login` へ強制リダイレクト）すると、Cookie の最大有効期限（14日）や iOS Safari の Cookie 制約で Cookie が切れた瞬間にユーザーが追い出される。
 - **原因**: 長期ログインの本体（Single Source of Truth）はブラウザの Firebase Auth（LOCAL 永続性）であり、Session Cookie は SSR 補助キャッシュに過ぎない。
-- **回避法**: ルート保護はクライアント側 `useAuth().isAuthenticated` を判定基準とし、Cookie が切れていても Firebase Auth が生きていればバックグラウンドで `syncUser` により Cookie を自動ローリング延長する。
+- **回避法**: ルート保護はクライアント側 `useAuth().isAuthenticated` を判定基準とし、Cookie が切れていても Firebase Auth が生きていればバックグラウンドで `refreshSessionCookie` により Cookie を自動ローリング延長する（DB更新やログイン通知は行わない）。また、`refreshSessionCookie` 内では `verifyIdToken(idToken, true)` で明示的に失効チェックを行い、失効済みアカウントによる不正なセッション延長を防ぐ。
 
 ### `verifySessionCookie(..., true)` の `checkRevoked` 誤用によるセッション消失
 
 - **問題**: 通常のセッション検証で `verifySessionCookie(sessionCookie, true)`（`checkRevoked = true`）を指定すると、リクエストごとに Google Auth サーバーへの外部通信が発生し、ネットワークの揺らぎやタイミング差で `session-cookie-revoked` が誤検知され、セッションが突然切れる。
-- **回避法**: 通常のセッション Cookie 検証は `checkRevoked = false`（公開鍵によるローカル検証）で行い、明示的なログアウト時や権限剥奪時のみ revoke を確認・実行する。
+- **回避法**: 通常のセッション Cookie 検証は `checkRevoked = false`（公開鍵によるローカル検証）で行い、明示的なログアウト時や権限剥奪時のみ revoke を確認・実行する。セッションCookieのローリング延長時（`refreshSessionCookie`）は、短命なIDトークン側で `verifyIdToken(idToken, true)` を検証することで安全性を担保する。
 
 
 
