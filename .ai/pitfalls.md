@@ -102,5 +102,27 @@ AI Agent が誤りやすい点、過去に問題となった点、実装上の�
   - マイドライブと共有ドライブを両立させる場合は、マイドライブ用（`setParent("root")`）と共有ドライブ用（`setEnableDrives(true)`）の 2 つの独立した `DocsView` を `PickerBuilder` に登録する。
   - ルート直下保存やフォルダ作成が必要な場合は、Picker だけに依存せず、Google Drive API（`createGoogleDriveFolder` や `parentFolderId: undefined` でのアップロード）をアプリ側 UI（ドロップダウンメニュー等）で選択肢として提供する。
 
+---
+
+## 5. 認証・セッション管理
+
+### Convex 認証への Firebase Custom Token の誤用
+
+- **問題**: Server Function 内などで `adminAuth().createCustomToken(uid)` を生成し、`ConvexHttpClient.setAuth(customToken)` に渡しても Convex 側で JWT 検証エラー（`Unauthenticated`）が発生する。
+- **原因**: Convex の OIDC 認証（`auth.config.ts`）は Google 発行の Firebase ID Token（`securetoken.google.com/poohma`）のみを受け付ける。Custom Token は Firebase サービスアカウントによる署名であり OIDC JWT ではない。
+- **回避法**: Convex の Mutation / Query 実行は、ブラウザの認証済みクライアント（`useMutation`, `useQuery`）から直接 Firebase ID Token を使って呼び出す。
+
+### Session Cookie への過剰依存による早期ログアウト（数ヶ月ログイン維持の破壊）
+
+- **問題**: TanStack Router の `(app)` ルート保護（`beforeLoad`）で `context.user`（Session Cookie 由来）のみを見て未認証判定（`/login` へ強制リダイレクト）すると、Cookie の最大有効期限（14日）や iOS Safari の Cookie 制約で Cookie が切れた瞬間にユーザーが追い出される。
+- **原因**: 長期ログインの本体（Single Source of Truth）はブラウザの Firebase Auth（LOCAL 永続性）であり、Session Cookie は SSR 補助キャッシュに過ぎない。
+- **回避法**: ルート保護はクライアント側 `useAuth().isAuthenticated` を判定基準とし、Cookie が切れていても Firebase Auth が生きていればバックグラウンドで `syncUser` により Cookie を自動ローリング延長する。
+
+### `verifySessionCookie(..., true)` の `checkRevoked` 誤用によるセッション消失
+
+- **問題**: 通常のセッション検証で `verifySessionCookie(sessionCookie, true)`（`checkRevoked = true`）を指定すると、リクエストごとに Google Auth サーバーへの外部通信が発生し、ネットワークの揺らぎやタイミング差で `session-cookie-revoked` が誤検知され、セッションが突然切れる。
+- **回避法**: 通常のセッション Cookie 検証は `checkRevoked = false`（公開鍵によるローカル検証）で行い、明示的なログアウト時や権限剥奪時のみ revoke を確認・実行する。
+
+
 
 

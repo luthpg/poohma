@@ -20,13 +20,27 @@ vi.mock("firebase-admin", () => {
 });
 
 describe("firebase-admin.server: verifySessionCookie", () => {
-	it("checkRevoked を有効化(true)した状態でFirebase Admin SDKを呼び出すこと", async () => {
+	it("デフォルトでは外部通信を防ぐため checkRevoked=false でFirebase Admin SDKを呼び出すこと", async () => {
 		verifySessionCookieMock.mockResolvedValue({ uid: "user_a" });
 		const { verifySessionCookie } = await import(
 			"../src/services/firebase-admin.server"
 		);
 
 		await verifySessionCookie("dummy-session-cookie");
+
+		expect(verifySessionCookieMock).toHaveBeenCalledWith(
+			"dummy-session-cookie",
+			false,
+		);
+	});
+
+	it("明示的に checkRevoked=true を指定した場合は true でFirebase Admin SDKを呼び出すこと", async () => {
+		verifySessionCookieMock.mockResolvedValue({ uid: "user_a" });
+		const { verifySessionCookie } = await import(
+			"../src/services/firebase-admin.server"
+		);
+
+		await verifySessionCookie("dummy-session-cookie", true);
 
 		expect(verifySessionCookieMock).toHaveBeenCalledWith(
 			"dummy-session-cookie",

@@ -336,12 +336,23 @@ credentials要素：
 
 ## 5. 認証・認可設計
 
-### 5.1 ログイン〜セッション確立フロー
+### 5.1 認証要素の責務分離（4層モデル）
+
+PoohMa では、セッションの長期維持と安全なアクセス制御を両立するため、認証要素の責務を以下の4層に明確に分離します。
+
+| 認証要素 | 役割 | 保持期間 | 責務と位置付け |
+| --- | --- | --- | --- |
+| **Firebase Auth** | 長期ログイン状態の本体 | 数ヶ月単位（無期限） | **Single Source of Truth**。IndexedDB + LocalStorage 永続化によりブラウザ側で長期間維持。 |
+| **Firebase ID Token** | Convex バックエンドへの通信認証 | 1時間（SDK自動更新） | Convex への WebSocket/HTTP 通信時に付与され、Convex 側 OIDC 検証で直接認証。 |
+| **session Cookie** | SSR初期表示・Server Function用キャッシュ | 14日間（自動ローリング延長） | サーバー側補助セッション。Cookie の期限切れのみでログアウト扱いにしてはならない。 |
+| **Custom Token** | Client Auth 消失時のリカバリ | 一時発行（1回限り） | ブラウザストレージの揮発時に session Cookie から Client Auth を復旧するための非常用経路。 |
+
+### 5.2 ログイン〜セッション確立・維持フロー
 
 ```
 1. ユーザーが /login で「Googleでログイン」をクリック
 2. Firebase Authentication (signInWithRedirect) によりGoogle認証画面へ遷移
-3. リダイレクト復帰後、onAuthStateChangedでFirebase Userを検知
+3. リダイレクト復帰後、onAuthStateChanged で Firebase User を検知
 4. ID トークンを取得し、Server Function `syncUser` へ送信
 5. サーバー側 (firebase-admin.server.ts) がIDトークンを検証 (adminAuth().verifyIdToken)
 6. Convex Mutation `users.syncUser` によりConvex usersテーブルへユーザー情報を同期
@@ -349,12 +360,14 @@ credentials要素：
     旧UIDのserviceRecordsのuserIdを新UIDへ一括付け替える。emailVerifiedがfalseの場合はマージせず、
     新規ユーザーとして作成する)
 7. `createSessionCookie` によりFirebaseセッションCookie(14日間, httpOnly, secure(本番), SameSite=Lax) を発行
-8. 以後の各ページロード時、__root.tsx の beforeLoad が Server Function `getAuthUser` を呼び出し、
-   セッションCookieの検証 → Convex HTTP Action `getUserByFirebaseUid` (内部シークレット認証) で
-   最新のユーザー情報・所属家族情報を取得し、ルーターコンテキストへ格納する。
-```
+8. 以後の各ページロード時：
+   - SSR時: `__root.tsx` の beforeLoad が `getAuthUser` を呼び出し、セッションCookieがあれば初期ユーザー情報を取得（SSRキャッシュ）。
+   - クライアント側: `(app)/route.tsx` 内の `AuthGuard` が `useAuth()`（Firebase Auth）の状態を監視。
+     - 認証初期化中: ローディングスピナーを表示し、未認証と誤認して `/login` へリダイレクトしない。
+     - 認証済み: 通常通り画面を描画。セッションCookieが失効している場合は、バックグラウンドで `syncUser` を実行し Cookie を自動ローリング延長。
+     - 未認証確定時: `/login` へ安全にリダイレクト。
 
-### 5.2 クライアント→Convexの認証連携
+### 5.3 クライアント→Convexの認証連携
 
 ```
 ConvexReactClient は ConvexProviderWithAuth でラップされ、

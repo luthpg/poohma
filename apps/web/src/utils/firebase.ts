@@ -1,5 +1,13 @@
 import { type FirebaseApp, getApps, initializeApp } from "firebase/app";
-import { type Auth, GoogleAuthProvider, getAuth } from "firebase/auth";
+import {
+	type Auth,
+	browserLocalPersistence,
+	browserPopupRedirectResolver,
+	GoogleAuthProvider,
+	getAuth,
+	indexedDBLocalPersistence,
+	initializeAuth,
+} from "firebase/auth";
 import { env } from "@/env/client";
 
 const isBrowser = typeof window !== "undefined";
@@ -15,8 +23,20 @@ if (isBrowser) {
 		projectId: env.VITE_FIREBASE_PROJECT_ID,
 	};
 
-	app = getApps()?.length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-	auth = getAuth(app);
+	if (getApps()?.length === 0) {
+		app = initializeApp(firebaseConfig);
+		try {
+			auth = initializeAuth(app, {
+				persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+				popupRedirectResolver: browserPopupRedirectResolver,
+			});
+		} catch {
+			auth = getAuth(app);
+		}
+	} else {
+		app = getApps()[0];
+		auth = getAuth(app);
+	}
 	googleProvider = new GoogleAuthProvider();
 	googleProvider.setCustomParameters({
 		prompt: "select_account",

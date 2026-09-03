@@ -56,8 +56,7 @@ export const Route = createFileRoute("/(app)/dashboard")({
 	loaderDeps: ({ search: { q, tag, sort, view } }) => ({ q, tag, sort, view }),
 	loader: async ({ context, deps: { q, tag, sort, view } }) => {
 		return {
-			// biome-ignore lint/style/noNonNullAssertion: user is guaranteed to be non-null at this point
-			user: context.user!,
+			user: context.user ?? null,
 			prefs: context.prefs,
 			searchParams: { q, tag, sort, view },
 		};

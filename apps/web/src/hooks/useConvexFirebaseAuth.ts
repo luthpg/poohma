@@ -4,7 +4,7 @@ import {
 	signInWithCustomToken,
 } from "firebase/auth";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getCustomTokenFromSession } from "@/services/auth.functions";
+import { getCustomTokenFromSession, syncUser } from "@/services/auth.functions";
 import { auth } from "@/utils/firebase";
 import { isPwaFirstLaunch, markPwaAsInitialized } from "@/utils/pwa";
 
@@ -14,6 +14,29 @@ import { isPwaFirstLaunch, markPwaAsInitialized } from "@/utils/pwa";
  * 復元ロジック側でフラグが立っていればスキップする。
  */
 export const LOGOUT_FLAG_KEY = "poohma_logout";
+
+let lastSessionSyncTime = 0;
+const SESSION_SYNC_INTERVAL_MS = 1000 * 60 * 60; // 1時間ごとにセッションCookieをローリング延長
+
+/** テスト用または明示的ログアウト時のセッション同期間隔リセット */
+export function resetSessionSyncTime() {
+	lastSessionSyncTime = 0;
+}
+
+async function syncSessionCookieInBackground(user: FirebaseUser) {
+	const now = Date.now();
+	if (now - lastSessionSyncTime < SESSION_SYNC_INTERVAL_MS) {
+		return;
+	}
+	lastSessionSyncTime = now;
+	try {
+		const idToken = await user.getIdToken();
+		await syncUser({ data: { idToken } });
+	} catch (e) {
+		lastSessionSyncTime = 0;
+		console.warn("Background session cookie sync failed:", e);
+	}
+}
 
 export function useConvexFirebaseAuth() {
 	const [isLoading, setIsLoading] = useState(true);
@@ -68,6 +91,8 @@ export function useConvexFirebaseAuth() {
 					}
 					setIsAuthenticated(true);
 					setIsLoading(false);
+					// バックグラウンドで session Cookie をローリング延長
+					syncSessionCookieInBackground(user);
 					return;
 				}
 

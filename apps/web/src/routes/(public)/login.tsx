@@ -97,7 +97,9 @@ function LoginPage() {
 					await router.invalidate();
 
 					const target =
-						localStorage.getItem("postLoginRedirect") || "/dashboard";
+						search.redirect ||
+						localStorage.getItem("postLoginRedirect") ||
+						"/dashboard";
 					localStorage.removeItem("postLoginRedirect");
 
 					try {
@@ -125,7 +127,7 @@ function LoginPage() {
 			isComponentMounted = false;
 			unsubscribe();
 		};
-	}, [router, queryClient]);
+	}, [router, queryClient, search.redirect]);
 
 	const handleGoogleLogin = async () => {
 		if (!auth || !googleProvider) {

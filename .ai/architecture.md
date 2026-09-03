@@ -68,6 +68,15 @@ poohma/
 
 ## 3. 認証・認可アーキテクチャ
 
+### 認証要素の責務分離（4層モデル）
+
+| 認証要素 | 役割 | 保持期間 | 責務と位置付け |
+| --- | --- | --- | --- |
+| **Firebase Auth** | 長期ログイン状態の本体 | 数ヶ月単位（無期限） | **Single Source of Truth**。IndexedDB + LocalStorage 永続化によりブラウザ側で長期間維持。 |
+| **Firebase ID Token** | Convex バックエンドへの通信認証 | 1時間（SDK自動更新） | Convex への WebSocket/HTTP 通信時に付与され、Convex 側 OIDC 検証で直接認証。 |
+| **session Cookie** | SSR初期表示・Server Function用キャッシュ | 14日間（自動ローリング延長） | サーバー側補助セッション。Cookie の期限切れのみでログアウト扱いにしてはならない。 |
+| **Custom Token** | Client Auth 消失時のリカバリ | 一時発行（1回限り） | ブラウザストレージの揮発時に session Cookie から Client Auth を復旧するための非常用経路。 |
+
 ### 認証フロー
 
 ```mermaid
@@ -77,18 +86,20 @@ flowchart TD
     classDef convexNode fill:#d97706,stroke:#b45309,stroke-width:2px,color:#ffffff;
     classDef authNode fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#ffffff;
 
-    Browser["💻 <b>ブラウザ (Client)</b>"]:::clientNode
-    FirebaseAuth["🔑 <b>Firebase Auth</b>"]:::authNode
+    Browser["💻 <b>ブラウザ (Client)</b><br/>Firebase Auth (LOCAL persistence)"]:::clientNode
+    FirebaseAuth["🔑 <b>Google OAuth / Firebase Auth</b>"]:::authNode
     ServerFn["⚙️ <b>Server Function: syncUser</b><br/>(TanStack Start / Node)"]:::serverNode
     Convex["🔥 <b>Convex Cloud</b>"]:::convexNode
 
     Browser -->|"1. Google ログイン (signInWithRedirect)"| FirebaseAuth
-    FirebaseAuth -->|"2. IDトークン取得"| ServerFn
-    ServerFn -->|"3. IDトークン検証 (Firebase Admin SDK)"| ServerFn
-    ServerFn -->|"4. users.syncUser 実行"| Convex
-    ServerFn -->|"5. httpOnly セッション Cookie (14日間) + デバイスID 発行"| Browser
-    Browser -->|"6. useConvexFirebaseAuth 経由で IDトークン送信"| Convex
-    Convex -->|"7. auth.config.ts に基づき IDトークンを直接検証"| Convex
+    FirebaseAuth -->|"2. IDトークン取得 & LOCAL永続化"| Browser
+    Browser -->|"3. syncUser へ IDトークン送信"| ServerFn
+    ServerFn -->|"4. IDトークン検証 (Firebase Admin SDK)"| ServerFn
+    ServerFn -->|"5. users.syncUser 実行"| Convex
+    ServerFn -->|"6. session Cookie (14日間) 発行"| Browser
+    Browser -->|"7. ConvexProviderWithAuth 経由で IDトークン送信"| Convex
+    Convex -->|"8. auth.config.ts に基づき IDトークンを直接検証"| Convex
+    Browser -.->|"9. トークン更新時に session Cookie を自動ローリング延長"| ServerFn
 ```
 
 ### 認可階層（Convex customBuilders）
