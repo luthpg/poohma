@@ -466,7 +466,7 @@ ConvexReactClient / TanStack Query の Mutation実行を共通ラッパーでイ
 
 ```
 ログアウトフロー：
-  1. クライアント側（UserMenu / FamilyComponent 等）で sessionStorage にログアウトフラグ（LOGOUT_FLAG_KEY = "poohma_logout"）を設定
+  1. クライアント側（UserMenu / FamilyComponent 等）で localStorage にログアウトフラグ（LOGOUT_FLAG_KEY = "poohma_logout"）を設定（他タブへは storage イベントで即時通知）
   2. Firebase Auth の signOut(auth) を実行
   3. サーバー関数 logout() を呼び出し：
      - 現在のセッションCookieから uid を検証し、Firebase Admin SDK の revokeRefreshTokens(uid) でリフレッシュトークンを即時失効
@@ -474,8 +474,8 @@ ConvexReactClient / TanStack Query の Mutation実行を共通ラッパーでイ
   4. クエリキャッシュ（clearQueryCache / queryClient）を全クリア
 
 サイレント再認証・セッション復元制御（useConvexFirebaseAuth）：
-  - 認証状態の監視において、未認証時にサーバー側セッションCookieを用いたサイレント再認証（getCustomTokenFromSession）を行う
-  - ただし sessionStorage に LOGOUT_FLAG_KEY が存在する場合はログアウト状態と判定し、サイレント再認証をスキップして即時未認証状態（isAuthenticated=false）に確定させる
+  - 認証状態の監視において、未認証時にサーバー側セッションCookieを用いたサイレント再認証（getCustomTokenFromSession）を行う（checkRevoked: true で検証）
+  - ただし localStorage に LOGOUT_FLAG_KEY が存在する場合、または storage イベントで他タブのログアウトを検知した場合はログアウト状態と判定し、サイレント再認証をスキップして即時未認証状態（isAuthenticated=false）に確定させる
   - ユーザーが明示的に再ログインに成功した時点で LOGOUT_FLAG_KEY を削除する
 ```
 

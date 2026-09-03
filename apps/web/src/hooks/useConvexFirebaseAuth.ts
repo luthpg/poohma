@@ -32,7 +32,26 @@ async function syncSessionCookieInBackground(user: FirebaseUser) {
 	}
 	lastSessionSyncTime = now;
 	try {
+		// ログアウト済みまたはユーザー切り替え時はCookie延長を中止
+		if (
+			!auth?.currentUser ||
+			auth.currentUser.uid !== user.uid ||
+			localStorage.getItem(LOGOUT_FLAG_KEY)
+		) {
+			return;
+		}
+
 		const idToken = await user.getIdToken();
+
+		// 非同期のトークン取得中にユーザー状態が変化していないか再確認
+		if (
+			!auth?.currentUser ||
+			auth.currentUser.uid !== user.uid ||
+			localStorage.getItem(LOGOUT_FLAG_KEY)
+		) {
+			return;
+		}
+
 		await refreshSessionCookie({ data: { idToken } });
 	} catch (e) {
 		lastSessionSyncTime = 0;

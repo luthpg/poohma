@@ -44,7 +44,7 @@ export const syncUser = createServerFn({ method: "POST" })
 	.validator((data: { idToken: string }) => data)
 	.handler(async ({ data: { idToken } }) => {
 		try {
-			const decodedToken = await adminAuth().verifyIdToken(idToken);
+			const decodedToken = await adminAuth().verifyIdToken(idToken, true);
 			const { email, name, picture } = decodedToken;
 			if (!email) throw new Error("Email is required");
 

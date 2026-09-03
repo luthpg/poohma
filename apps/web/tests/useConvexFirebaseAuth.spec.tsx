@@ -42,13 +42,29 @@ import {
 } from "@/hooks/useConvexFirebaseAuth";
 
 describe("useConvexFirebaseAuth", () => {
+	let store: Record<string, string> = {};
+	const localStorageMock = {
+		getItem: (key: string) => store[key] ?? null,
+		setItem: (key: string, value: string) => {
+			store[key] = value;
+		},
+		removeItem: (key: string) => {
+			delete store[key];
+		},
+		clear: () => {
+			store = {};
+		},
+	};
+
 	beforeEach(() => {
 		vi.clearAllMocks();
-		localStorage.clear();
+		store = {};
+		vi.stubGlobal("localStorage", localStorageMock);
 	});
 
 	afterEach(() => {
 		cleanup();
+		vi.unstubAllGlobals();
 	});
 
 	it("セッション復元中に別タブでログアウトした場合は Firebase Auth を未認証のまま維持すること", async () => {
