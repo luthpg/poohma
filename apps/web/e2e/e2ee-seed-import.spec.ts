@@ -10,9 +10,14 @@ const SEED_CSV_PATH = path.join(
 );
 
 test.describe("E2EE主要フローとCSVインポートSeed検証", () => {
+	// 家族作成→CSVインポート→E2EE復号→一括削除を一貫で実行する複合テスト。
+	// CI上のステージング環境ではネットワーク遅延・暗号化処理等で時間がかかるため
+	// テストタイムアウトを120秒に設定。
 	test("家族グループ作成、CSV暗号化インポート、詳細でのヒント復号、および安全な一括削除クリーンアップ", async ({
 		page,
 	}) => {
+		test.setTimeout(120_000);
+
 		// 家族パスコード環境変数の検証（デフォルト値なし。未設定なら即座にテストを落とす）
 		const passcode = process.env.E2E_FAMILY_PASSCODE;
 		if (!passcode) {
@@ -56,8 +61,18 @@ test.describe("E2EE主要フローとCSVインポートSeed検証", () => {
 		await page.goto("/dashboard");
 		await expect(page).toHaveURL(/.*\/dashboard/, { timeout: 20000 });
 
-		// CSVファイル入力要素（user-menu内の隠しinput[type="file"][accept=".csv"]）
-		const fileInput = page.locator('input[type="file"][accept=".csv"]').first();
+		// ダッシュボードのコンテンツがレンダリングされるまで待機
+		// UserMenu内のfile inputはページ完全描画後にDOMに追加される
+		await page
+			.locator("main, header, [role='main']")
+			.first()
+			.waitFor({ state: "visible", timeout: 15000 });
+
+		// CSVファイル入力要素（data-testidで安定的に取得）
+		const fileInput = page.locator('[data-testid="csv-file-input"]');
+
+		// 要素がDOMにアタッチされるまで待機（hidden要素のためvisibleではなくattachedを使う）
+		await fileInput.waitFor({ state: "attached", timeout: 15000 });
 		await fileInput.setInputFiles(SEED_CSV_PATH);
 
 		// アンロックプロンプトが表示された場合はパスコードを入力して解除

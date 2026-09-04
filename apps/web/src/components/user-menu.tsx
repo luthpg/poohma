@@ -338,6 +338,7 @@ export function UserMenu({
 				onChange={handleFileChange}
 				accept=".csv"
 				className="hidden"
+				data-testid="csv-file-input"
 			/>
 
 			{/* --- モバイル用 Bottom Sheet (sm未満) --- */}
