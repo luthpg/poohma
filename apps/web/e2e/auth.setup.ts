@@ -4,12 +4,17 @@ import { fileURLToPath } from "node:url";
 import { test as setup } from "@playwright/test";
 import { ensureTestUserCustomToken } from "./support/ensure-test-user";
 
+import { setupProtectionBypass } from "./support/test-fixtures";
+
 const dirname =
 	import.meta.dirname ?? path.dirname(fileURLToPath(import.meta.url));
 const STORAGE_STATE = path.join(dirname, ".auth/e2e-user.json");
 const BRIDGE_PATH = path.join(dirname, ".gen/firebase-bridge.iife.js");
 
-setup("authenticate as e2e test user", async ({ page }) => {
+setup("authenticate as e2e test user", async ({ page, context, baseURL }) => {
+	// 自社ドメイン限定で保護バイパスヘッダーを設定（Google等の外部APIには付与しない）
+	await setupProtectionBypass(context, baseURL);
+
 	// .auth ディレクトリの作成を保証
 	const authDir = path.dirname(STORAGE_STATE);
 	if (!fs.existsSync(authDir)) {

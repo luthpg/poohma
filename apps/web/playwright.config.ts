@@ -34,20 +34,6 @@ export default defineConfig({
 		baseURL: process.env.E2E_BASE_URL ?? "https://localhost:3000",
 		ignoreHTTPSErrors: true,
 		trace: "on-first-retry",
-		extraHTTPHeaders: {
-			...(process.env.CF_ACCESS_CLIENT_ID && process.env.CF_ACCESS_CLIENT_SECRET
-				? {
-						"CF-Access-Client-Id": process.env.CF_ACCESS_CLIENT_ID,
-						"CF-Access-Client-Secret": process.env.CF_ACCESS_CLIENT_SECRET,
-					}
-				: {}),
-			...(process.env.VERCEL_AUTOMATION_BYPASS_SECRET
-				? {
-						"x-vercel-protection-bypass":
-							process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
-					}
-				: {}),
-		},
 	},
 	webServer:
 		process.env.CI && process.env.E2E_BASE_URL
