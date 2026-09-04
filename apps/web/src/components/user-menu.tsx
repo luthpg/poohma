@@ -320,6 +320,7 @@ export function UserMenu({
 	const avatarButton = (
 		<button
 			type="button"
+			data-testid="user-menu-trigger"
 			className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary shadow-border outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50 transition-transform hover:scale-105 active:scale-95 cursor-pointer"
 		>
 			<Avatar className="h-8 w-8">

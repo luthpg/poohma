@@ -71,7 +71,9 @@ function RouteComponent() {
 	return (
 		<>
 			{currentAccount?.familyId && <AppHeader user={currentAccount} />}
-			<Outlet />
+			<main className="flex-1">
+				<Outlet />
+			</main>
 		</>
 	);
 }

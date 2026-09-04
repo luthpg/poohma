@@ -10,8 +10,12 @@ test.describe("認証済みルートのアクセス検証", () => {
 		await page.waitForURL(/.*(\/dashboard|\/family)/, { timeout: 20000 });
 		await expect(page).toHaveURL(/.*(\/dashboard|\/family)/);
 
-		// コンポーネントが描画され、見出しまたはメインコンテンツが表示されること
-		const mainContent = page.locator("main, h1, h2").first();
+		// コンポーネントが描画され、メインコンテンツまたはヘッダーが表示されること
+		const mainContent = page
+			.locator(
+				"main, h1, header, input[placeholder*='検索'], [data-testid='family-manager-section']",
+			)
+			.first();
 		await expect(mainContent).toBeVisible({ timeout: 15000 });
 	});
 

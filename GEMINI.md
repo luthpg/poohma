@@ -1,5 +1,16 @@
 # Project Rules & System Instructions
 
+## 0. Production Code Change Policy & Guardrails (最重要原則)
+
+- **独断でのプロダクションコード改変の絶対禁止**:
+  - `apps/web/src/` や `apps/web/convex/` 等の商用・プロダクションコードの変更は、ユーザーからの明示的な指示がある場合、または事前にユーザーへ**「事象・原因・修正案（影響範囲含む）」を報告し、明確な許諾を得た場合**にのみ実行すること。
+- **テスト・検証時の厳格な行動規範**:
+  - CI やテスト（E2E、ユニットテスト等）が失敗した際、**テストを通すためだけにプロダクションコードのタグ、DOM構造、挙動を独断で改変することは固く禁ずる**。
+  - テストが失敗した場合は、まずテスト自体のセレクタ、待機処理、前提データ（家族所属状態、認証状態など）の不備を疑い、テストコード側の改善で解決を試みること。
+  - プロダクションコード側に不具合や改善が必要（アクセシビリティ対応や `data-testid` 付与などを含む）と判断した場合でも、**手を動かす前に必ずユーザーへ確認・提案を行い、合意を得てから変更する**こと。
+- **`.ai/` Knowledge Base の事前確認の義務**:
+  - 実装・調査・テスト作業に着手する前に、必ず `.ai/pitfalls.md`（特に「テスト作成時の安易なプロダクションコード改変」等の過去の失敗事例）および `.ai/invariants.md` を確認し、同一の失敗を繰り返さないこと。
+
 ## 1. Environment & Shell Context
 
 - **OS / Shell**: Windows (PowerShell)
@@ -16,9 +27,10 @@
 
 1. **Type Check**: `pnpm typecheck`（Turborepo 経由で全ワークスペースの型チェックを実行）
 2. **Static Check / Lint/ Format**: `pnpm check`
-3. **Test**: `pnpm test`
+3. **Test (Unit / Integration)**: `pnpm test`（Turborepo 経由で全ワークスペースの Vitest を実行）
 4. **Build Check**: `pnpm build`（Turborepo 経由で全ワークスペースのビルドを実行）
-5. **Full Pipeline**: `pnpm verify`（上記1〜4を一括で順次実行し、エラー発生時に即時停止）
+5. **E2E Test**: `pnpm test:e2e`（Turborepo 経由で Playwright E2E テストを実行）
+6. **Full Pipeline**: `pnpm verify`（上記1〜5を一括で順次実行し、エラー発生時に即時停止）
 
 > **Note**: 一括検証を行う際は、ルートの `pnpm verify` を使用してください（個別のスクリプトが失敗した時点で確実に処理が中断されます）。
 

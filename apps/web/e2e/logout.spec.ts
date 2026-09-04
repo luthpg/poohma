@@ -8,18 +8,37 @@ test.describe("ログアウトフローの検証", () => {
 		await page.goto("/family");
 		await expect(page).toHaveURL(/.*(\/dashboard|\/family)/, { timeout: 20000 });
 
-		// 2. ログアウトボタンを待機してクリック
-		const logoutButton = page
-			.locator("button:has-text('ログアウト')")
-			.first();
-		await expect(logoutButton).toBeVisible({ timeout: 15000 });
-		await logoutButton.click();
+		// 2. ログアウト操作を実行（画面直下ボタン、またはUserMenuアバターからのドロップダウン）
+		const directLogout = page.locator("button:has-text('ログアウト')").first();
+		const hasDirectLogout = await directLogout
+			.isVisible({ timeout: 3000 })
+			.catch(() => false);
+
+		if (hasDirectLogout) {
+			await directLogout.click();
+		} else {
+			// 家族所属時など画面上に直接ボタンがない場合は AppHeader の UserMenu を開く
+			const userMenuTrigger = page
+				.locator('[data-testid="user-menu-trigger"]')
+				.filter({ visible: true })
+				.first();
+			await userMenuTrigger.waitFor({ state: "visible", timeout: 15000 });
+			await userMenuTrigger.click();
+
+			const menuLogout = page
+				.locator(
+					'[role="menuitem"]:has-text("ログアウト"), button:has-text("ログアウト")',
+				)
+				.first();
+			await menuLogout.waitFor({ state: "visible", timeout: 5000 });
+			await menuLogout.click();
+		}
 
 		// ダイアログが出た場合（UserMenu等の場合）は確認ボタンをクリック
 		const confirmDialogButton = page
 			.locator("[role='alertdialog'] button:has-text('ログアウト')")
 			.first();
-		if (await confirmDialogButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+		if (await confirmDialogButton.isVisible({ timeout: 3000 }).catch(() => false)) {
 			await confirmDialogButton.click();
 		}
 

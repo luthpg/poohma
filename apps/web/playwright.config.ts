@@ -59,12 +59,25 @@ export default defineConfig({
 		},
 		{
 			name: "authenticated",
-			testIgnore: [/.*public.*\.spec\.ts/, /auth\.setup\.ts/],
+			testIgnore: [
+				/.*public.*\.spec\.ts/,
+				/auth\.setup\.ts/,
+				/logout\.spec\.ts/,
+			],
 			use: {
 				...devices["Desktop Chrome"],
 				storageState: STORAGE_STATE,
 			},
 			dependencies: ["setup"],
+		},
+		{
+			name: "logout",
+			testMatch: /logout\.spec\.ts/,
+			use: {
+				...devices["Desktop Chrome"],
+				storageState: STORAGE_STATE,
+			},
+			dependencies: ["authenticated"],
 		},
 	],
 });
