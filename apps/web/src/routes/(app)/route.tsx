@@ -5,7 +5,7 @@ import {
 	useNavigate,
 	useRouterState,
 } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { useAuth } from "@/components/AuthProvider";
 import { Spinner } from "@/components/ui/spinner";
@@ -23,14 +23,20 @@ function RouteComponent() {
 	const location = useLocation();
 	const pathname = useRouterState({ select: (s) => s.location.pathname });
 
+	const hasRedirectedRef = useRef(false);
+
 	// 未認証確定時はログイン画面へリダイレクト
 	useEffect(() => {
-		if (!isAuthLoading && !isAuthenticated) {
+		if (!isAuthLoading && !isAuthenticated && !hasRedirectedRef.current) {
+			hasRedirectedRef.current = true;
 			navigate({
 				to: "/login",
 				search: { redirect: location.href },
 				replace: true,
 			});
+		}
+		if (isAuthenticated) {
+			hasRedirectedRef.current = false;
 		}
 	}, [isAuthLoading, isAuthenticated, navigate, location.href]);
 
@@ -65,7 +71,9 @@ function RouteComponent() {
 	return (
 		<>
 			{currentAccount?.familyId && <AppHeader user={currentAccount} />}
-			<Outlet />
+			<main className="flex-1">
+				<Outlet />
+			</main>
 		</>
 	);
 }

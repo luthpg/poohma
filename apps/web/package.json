@@ -16,7 +16,11 @@
     "email:export": "email export --dir src/emails/templates",
     "convex:dev": "convex dev",
     "convex:deploy": "convex deploy",
-    "convex:codegen": "convex codegen"
+    "convex:codegen": "convex codegen",
+    "test:browser": "vitest run --project=browser-e2ee",
+    "build:e2e-bridge": "tsx scripts/build-e2e-bridge.ts",
+    "test:e2e": "pnpm build:e2e-bridge && playwright test",
+    "test:e2e:ui": "pnpm build:e2e-bridge && playwright test --ui"
   },
   "dependencies": {
     "@fontsource/geist-mono": "^5.3.0",
@@ -76,6 +80,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.7",
     "@chromatic-com/storybook": "^5.3.0",
+    "@playwright/test": "^1.62.1",
     "@react-email/ui": "6.9.2",
     "@storybook/addon-a11y": "^10.5.6",
     "@storybook/addon-docs": "^10.5.6",
@@ -99,12 +104,15 @@
     "@vitest/coverage-v8": "4.1.10",
     "convex-test": "^0.0.54",
     "dotenv": "^17.4.2",
+    "esbuild": "^0.28.2",
     "jsdom": "^30.0.1",
     "playwright": "^1.62.1",
     "storybook": "^10.5.6",
+    "tsx": "^4.23.13",
     "typescript": "^7.0.2",
     "vite": "^8.2.1",
     "vitest": "^4.1.10",
+    "vitest-browser-react": "^2.2.0",
     "web-vitals": "^6.1.0"
   }
 }

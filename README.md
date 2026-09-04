@@ -192,9 +192,10 @@ workers/
 
 ## テスト
 
-- 単体・結合テスト： `pnpm test` （Vitest）
-- Convex関数のテスト：convex-testを使用
-- ブラウザE2E：Playwright（暗号化・WebAuthn等、実ブラウザ挙動に依存する部分）
+- 単体・結合・Browser E2Eテスト： `pnpm test` （Vitest / convex-test / Vitest Browser Mode）
+- 暗号・WebAuthn PRF サブシステムテスト： `pnpm --filter @poohma/web test:browser`
+- フルスタック E2Eテスト（ステージング連携）： `pnpm --filter @poohma/web test:e2e`（Playwright）
+- 一括品質パイプライン： `pnpm verify`（Typecheck → Lint/Format → Test → Build）
 - コンポーネントカタログ：Storybook（a11yアドオンを含む）
 
 暗号鍵の生成・ラップ／アンラップ処理など、セキュリティ上重要なロジックを変更した場合は、対応するテストの追加・更新を必須とします。

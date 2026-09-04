@@ -91,8 +91,8 @@ export function UserMenu({
 			} catch (e) {
 				console.warn("Failed to set logout flag in localStorage", e);
 			}
-			if (auth) await signOut(auth);
 			await logout();
+			if (auth) await signOut(auth);
 			clearQueryCache();
 			queryClient.clear();
 			window.location.href = "/";
@@ -155,6 +155,7 @@ export function UserMenu({
 					if (hasHintsToEncrypt && !masterKey) {
 						const unlocked = await requireUnlock();
 						if (!unlocked) {
+							toast.dismiss(toastId);
 							setIsImporting(false);
 							if (fileInputRef.current) fileInputRef.current.value = "";
 							return;
@@ -319,6 +320,7 @@ export function UserMenu({
 	const avatarButton = (
 		<button
 			type="button"
+			data-testid="user-menu-trigger"
 			className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary shadow-border outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50 transition-transform hover:scale-105 active:scale-95 cursor-pointer"
 		>
 			<Avatar className="h-8 w-8">
@@ -338,6 +340,7 @@ export function UserMenu({
 				onChange={handleFileChange}
 				accept=".csv"
 				className="hidden"
+				data-testid="csv-file-input"
 			/>
 
 			{/* --- モバイル用 Bottom Sheet (sm未満) --- */}

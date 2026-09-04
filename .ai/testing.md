@@ -11,6 +11,8 @@ PoohMa におけるテストアーキテクチャ、テスト作成パターン�
 | バックエンド関数 (Convex) | `convex-test` + `vitest` | Schema, customBuilders, RLS, DB トランザクション、スケジューラのインメモリ結合テスト |
 | 暗号化 / E2EE / ユーティリティ | `vitest` + Web Crypto API (Node 20+ 組み込み) | PBKDF2 鍵導出、DEK/MasterKey ラップ、ソートキー生成、バリデーション |
 | フロントエンド UI / Hooks | `@testing-library/react` + `vitest` | `PasscodeProvider`, `AccountProvider`, フォームバリデーション等のコンポーネントテスト |
+| 暗号・WebAuthn PRF サブシステム (Browser E2E) | `@vitest/browser-playwright` + Chromium (CDP) | 実ブラウザ Web Crypto API、CDP Virtual Authenticator (PRF拡張)、PasscodeProvider 実UI結合、再暗号化フロー |
+| ユーザー導線フルスタック E2E (Staging) | `@playwright/test` + Firebase Admin SDK カスタムトークン | ステージング実環境に対するログインブートストラップ、初期設定・レコード暗号化保存〜復号の貫通検証 |
 
 ---
 
@@ -140,7 +142,93 @@ Node.js 環境の `globalThis.crypto.subtle` を用いて、ブラウザと同�
 ---
 
 ## 5. テスト実行ルール
-
-- **単体・統合テスト実行**: `pnpm test`
+ 
+- **単体・統合・Browser E2E テスト一括実行**: `pnpm test`（Nodeユニット、Storybook、`browser-e2ee` プロジェクトが全件実行される）
+- **Browser E2E 単体実行**: `pnpm --filter @poohma/web test:browser`（Chromium 上で Web Crypto / WebAuthn PRF / PasscodeProvider / 再暗号化を高速実行）
+- **Full-Stack E2E 実行 (Playwright on Staging)**: `pnpm --filter @poohma/web test:e2e`（`build:e2e-bridge` 後に Playwright 実行）
 - **一括品質パイプライン**: `pnpm verify`（Typecheck → Lint/Format → Test → Build）
-- テスト追加時は `apps/web/tests/` 配下に配置し、ファイル名規則は、単体テスト系であれば `*.spec.ts` または統合テスト系であれば `*.test.ts` とする。
+- **ファイル配置規則**:
+  - 単体・サーバー統合テスト: `apps/web/tests/*.spec.ts` または `*.test.tsx`
+  - Browser E2E サブシステムテスト: `apps/web/tests/browser-e2e/*.browser.test.{ts,tsx}`
+  - Full-Stack E2E テスト: `apps/web/e2e/*.spec.ts`
+  - E2E 共通フィクスチャ・補助スクリプト: `apps/web/e2e/support/`
+
+---
+
+## 6. フルスタック E2E テストパターン (`@playwright/test`)
+
+### Origin-scoped 保護バイパスフィクスチャ
+ステージング環境（Vercel Deployment Protection、および将来的なデプロイ基盤移行に備えた事前対応としての Cloudflare Access）での自動テスト実行時、`playwright.config.ts` の `use.extraHTTPHeaders` にグローバルにバイパスヘッダーを設定してはならない（Google Identity Toolkit などの外部 API への fetch にも付与され、CORS プリフライト拒否で認証失敗となる）。
+
+必ず `apps/web/e2e/support/test-fixtures.ts` を経由し、対象オリジン（`baseURL`）宛ての通信のみにヘッダーを注入する:
+
+```typescript
+export const test = base.extend({
+  context: async ({ context, baseURL }, use) => {
+    const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+    const cfId = process.env.CF_ACCESS_CLIENT_ID;
+    const cfSecret = process.env.CF_ACCESS_CLIENT_SECRET;
+
+    if (!bypassSecret && (!cfId || !cfSecret)) {
+      await use(context);
+      return;
+    }
+
+    const targetOrigin = baseURL ? new URL(baseURL).origin : "";
+
+    await context.route("**/*", async (route) => {
+      const request = route.request();
+      const requestUrl = request.url();
+
+      if (targetOrigin && new URL(requestUrl).origin === targetOrigin) {
+        const headers = {
+          ...request.headers(),
+          ...(bypassSecret ? { "x-vercel-protection-bypass": bypassSecret } : {}),
+          ...(cfId && cfSecret
+            ? {
+                "CF-Access-Client-Id": cfId,
+                "CF-Access-Client-Secret": cfSecret,
+              }
+            : {}),
+        };
+        await route.continue({ headers });
+      } else {
+        await route.continue();
+      }
+    });
+
+    await use(context);
+  },
+});
+```
+
+### テストスイート構成
+- `public-routes.spec.ts`: LP、利用規約、プライバシーポリシー、未認証ガード（`/dashboard` / `/family` から `/login` へのリダイレクト）
+- `auth.setup.ts`: Firebase Admin SDK カスタムトークン発行と Bridge IIFE によるブラウザ `signInWithCustomToken`、認証ストレージ保存
+- `dashboard.spec.ts`: ログイン済みアクセス、認証済み状態での `/login` からの自動リダイレクト
+- `family.spec.ts`: 家族作成オンボーディング・管理画面の表示確認
+- `settings.spec.ts`: 家族未所属時の保護リダイレクト検証
+- `logout.spec.ts`: ログアウト処理実行後のセッション破棄・未認証状態遷移の検証
+- `e2ee-seed-import.spec.ts`: 家族作成（Master Key生成・KEK導出）、CSVインポートによる平文ヒントのクライアント暗号化Seed投入、詳細画面でのヒント復号検証、およびUI一括削除機能による他家族データを壊さない安全なクリーンアップ検証
+
+---
+
+## 7. テスト実装時のプロダクションコード変更原則
+
+テスト実装・E2E作成中にテストが失敗した場合や不具合が発生した際は、以下の原則を厳守すること:
+
+1. **安易なプロダクションコードの改変禁止**:
+   - 失敗が発生した際、プロダクションコードを即座に修正してはならない。まずテストコード側の待機処理、アサーション方法、フィクスチャの改善・調整で解決できないかを最優先で試みる。
+2. **プロダクションコード修正時の事前許可**:
+   - 明らかにプロダクションコードのバグである場合や、どうしてもプロダクション側の修正が不可欠な場合であっても、**AI Agentが独断でコードを変更・コミットしてはならない**。
+   - 必ず「発生している事象」「原因」「提案するプロダクションコードの修正内容とその影響」をユーザーに説明し、**明示的な許可・承認を得てから修正を実行する**。
+
+---
+
+## 8. テストデータのクリーンアップ設計（退会・家族削除による完全初期化思想）
+
+- **思想**:
+  - `vitest` の `beforeEach` でデータ作成、`afterEach` でレコード削除・退会（最後の1ユーザーなら家族グループも自動カスケード削除）を行い、各テストを完全に独立・冪等に保つのが本来の理想設計である。
+- **E2E テストにおける現状と方針**:
+  - 現状のステージング E2E では、CSV インポートに伴う暗号化処理や外部 OGP 取得のオーバーヘッドが大きいため、家族作成〜CSV 暗号化インポート〜復号〜一括削除を一連の複合シナリオ（`e2ee-seed-import.spec.ts`）として集約している。
+  - テスト間の副作用（例: 家族作成により後続の未所属前提テストやログアウトテストの画面構造が変化する問題）を防ぐため、テストスイートの最終ステップではレコード削除だけでなく「退会処理（`deleteAccount`）」まで完了させ、テストユーザーを完全に家族未所属の初期状態へ戻すクリーンアップを徹底する。
