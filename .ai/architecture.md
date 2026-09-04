@@ -57,12 +57,12 @@ poohma/
 - `customBuilders.ts`: 認可レベル別 Convex クエリ/ミューテーションビルダー（`identityVerified*`, `authenticated*`, `familyBound*`, `resolveAccount`）
 - `rls.ts`: レコード単位のアクセス制御関数（`requireContentAccess`, `requireAdminAccess`, レガシー互換ヘルパー）
 - `records.ts`: サービスレコード CRUD、検索、タグ、一括操作
-- `families.ts`: 家族グループ、家族招待（`familyInvites`）、参加申請（`joinRequests`）、家族移行（`familyMigrations`）、パスコードローテーション
+- `families.ts`: 家族グループ、家族招待（`familyInvites`）、参加申請（`joinRequests`）、家族移行（`familyMigrations`）、パスコードローテーション、メンバーキック・データ持ち出し（`pendingExportVaults`）
 - `users.ts`: ユーザー同期、アカウント作成・切り替え・削除、ログイン履歴記録、SSR用ユーザー/アカウント（family暗号化メタデータ含む）取得
 - `recovery.ts`: リカバリーキット検証、2段階復元（メールOTP発行・検証、マスターキー再ラップ）
 - `actions.ts`: Node.js ランタイムでの外部連携（OGP取得、ふりがなAPI、Resend メール送信）
 - `http.ts`: 内部 HTTP エンドポイント（`getUserByFirebaseUid`、内部共有シークレット認証）
-- `crons.ts`: 定期バッチジョブ（期限切れ移行データやセッションのクリーンアップ）
+- `crons.ts`: 定期バッチジョブ（期限切れ移行データやセッション、期限切れ Export Vault のクリーンアップ）
 
 ---
 

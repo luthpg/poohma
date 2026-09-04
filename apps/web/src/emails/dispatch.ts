@@ -8,6 +8,7 @@ import { familyWelcomeEmail } from "./templates/family/FamilyWelcomeEmail";
 import { joinApprovedEmail } from "./templates/family/JoinApprovedEmail";
 import { joinRequestReceivedEmail } from "./templates/family/JoinRequestReceivedEmail";
 import { joinRequestRejectedEmail } from "./templates/family/JoinRequestRejectedEmail";
+import { memberKickedEmail } from "./templates/family/MemberKickedEmail";
 import { newMemberJoinedEmail } from "./templates/family/NewMemberJoinedEmail";
 import { passcodeRotatedEmail } from "./templates/family/PasscodeRotatedEmail";
 import { biometricRegisteredEmail } from "./templates/security/BiometricRegisteredEmail";
@@ -42,6 +43,8 @@ export function resolveEmail(payload: EmailPayload) {
 			return resolve(joinApprovedEmail, payload.props);
 		case "joinRequestRejected":
 			return resolve(joinRequestRejectedEmail, payload.props);
+		case "memberKicked":
+			return resolve(memberKickedEmail, payload.props);
 		case "familyMigrationCompleted":
 			return resolve(familyMigrationCompletedEmail, payload.props);
 		case "passcodeRotated":

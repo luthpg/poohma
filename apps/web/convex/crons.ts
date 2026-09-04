@@ -10,6 +10,12 @@ crons.interval(
 );
 
 crons.interval(
+  "cleanup expired export vaults",
+  { hours: 1 },
+  internal.families.cleanupExpiredExportVaultsInternal,
+);
+
+crons.interval(
   "cleanup old login events",
   { hours: 24 },
   internal.users.cleanupOldLoginEventsInternal,

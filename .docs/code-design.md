@@ -157,9 +157,11 @@ families 1 ── * serviceRecords    (serviceRecords.familyId → families._id)
 families 1 ── * joinRequests       (joinRequests.familyId → families._id)
 families 1 ── * familyInvites       (familyInvites.familyId → families._id)
 families 1 ── * familyMigrations    (familyMigrations.targetFamilyId / sourceFamilyId → families._id)
+families 1 ── * pendingExportVaults (pendingExportVaults.oldFamilyId → families._id)
 familyInvites 1 ── * joinRequests   (joinRequests.invitedByCode → familyInvites._id, optional)
 users     1 ── * serviceRecords      (serviceRecords.accountId → users._id, serviceRecords.userId = users.userId)
 users     1 ── * joinRequests         (joinRequests.userId = users.userId, 文字列参照)
+users     1 ── * pendingExportVaults  (pendingExportVaults.accountId → users._id)
 serviceRecords 1 ── * credentials    (credentials.recordId → serviceRecords._id)
 ```
 
@@ -230,6 +232,26 @@ serviceRecords 1 ── * credentials    (credentials.recordId → serviceRecord
 | expiresAt               | number                                              | 有効期限（作成から30分後）                                                                                       |
 
 インデックス: by\_userId, by\_status
+
+#### pendingExportVaults
+
+キックされたユーザーの旧家族マスターキー情報を一時退避するテーブル。被キックユーザーは旧パスコードを用いて個人所有レコード（`ownerType: "user"`）のみを新家族へ持ち出すことができる。有効期限（30日）経過または持ち出し完了・明示的破棄により削除される。
+
+| フィールド           | 型                     | 説明                                                                                |
+| ------------------ | ---------------------- | ----------------------------------------------------------------------------------- |
+| accountId          | Id<"users">            | 被キックユーザーのアカウントID（users._id）                                         |
+| userId             | string                 | 被キックユーザーのFirebase UID（照会・監査用）                                      |
+| oldFamilyId        | Id<"families">         | キック元の家族ID                                                                    |
+| oldFamilyName      | string                 | キック元の家族名（表示用スナップショット）                                          |
+| masterKeyEncrypted | string                 | 旧家族パスコード由来鍵でラップされたマスターキー（Base64）                           |
+| masterKeyIv        | string                 | 上記ラップ処理のIV（Base64）                                                        |
+| masterKeySalt      | string                 | 旧パスコード鍵導出（PBKDF2）のソルト（Base64）                                       |
+| kdfIterations      | number(optional)       | 旧パスコード鍵導出（PBKDF2）の反復回数                                              |
+| cryptoVersion      | number(optional)       | 旧暗号化スキームのバージョン番号                                                    |
+| createdAt          | number                 | 作成日時（epoch ms）                                                                |
+| expiresAt          | number                 | 有効期限日時（作成から30日後）                                                      |
+
+インデックス: by\_accountId, by\_userId
 
 #### familyInvites
 
@@ -664,6 +686,41 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
     recoveryMasterKeyEncrypted 等を上書きする（過去に発行された旧コードは即座に完全失効する）
 ```
 
+### 6.7 メンバーキックとExport Vaultによる個人データ持ち出しフロー（FR-FAM-09）
+
+```txt
+キック実行フロー（家族メンバー側）：
+  1. 家族メンバー一覧画面で対象メンバーの「削除」ボタンを押下
+  2. 確認モーダル表示：
+     - 対象者の個人データ（ownerType: "user"）は本人が持ち出せること
+     - 共有データ（ownerType: "family"）は家族側に残ること
+     - 削除後はパスコード変更を推奨する旨
+  3. Mutation families.kickMember を呼び出し：
+     - 旧家族マスターキー情報を pendingExportVaults テーブルへ保存（TTL: 30日）
+     - 被キックユーザーがadminsに含まれる共有レコードの管理者リストを調停（reconcileAdminsOnLeave）
+     - 被キックユーザーの familyId を undefined に更新（個人所有レコードは変更せず維持）
+     - 被キックユーザー宛てにキック通知メール（memberKicked）をスケジュール送信
+  4. 完了モーダルでパスコード変更を推奨案内：
+     「今すぐパスコードを変更する」押下により既存のパスコードローテーションフォーム（6.5）を展開・スクロール
+
+データ持ち出し・移行フロー（被キックユーザー側）：
+  1. 家族未所属かつ有効な pendingExportVault を保有している場合、専用画面を表示：
+     - キックされた旨、旧家族名、データの持ち出し期限（残り日数）を表示
+     - 選択肢A: 「旧家族のパスコードを入力してデータを引き継ぐ」
+     - 選択肢B: 「データを持ち出さずに新しく家族を作成・参加する（データ破棄）」
+  2. 選択肢A（引き継ぎ）選択時：
+     - 旧家族パスコードを入力し、pendingExportVaults の暗号パラメータ・ラップ鍵をアンラップ検証
+     - 成功後、アンラップされた旧マスターキーを一時保持し、家族作成または参加申請承認待ちへ進む
+     - 家族作成（prepareFamilyMigration: create）または参加完了（handleCompleteTransfer）時、
+       一時保持した旧マスターキーを用いて個人レコードのDEKを新家族マスターキーで再wrap
+     - commitFamilyMigration 成功時に pendingExportVaults は自動削除される
+  3. 選択肢B（破棄）選択時：
+     - 警告確認後、Mutation families.abandonPendingExportVault でVaultを物理削除
+     - 通常の家族未所属ユーザー向け画面へスムーズに復帰
+  4. 定期クリーンアップ：
+     - 30日経過した失効Vaultは Cron（cleanupExpiredExportVaultsInternal）により自動削除
+```
+
 ## 7. API設計（Convex Functions一覧）
 
 ### 7.1 convex/users.ts
@@ -704,8 +761,12 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
 | createFamilyInvite                     | Mutation         | familyBound   | 有効期限付き招待コードの発行（TTL: 15分〜30日、デフォルト7日）                                                                                   |
 | revokeFamilyInvite                     | Mutation         | familyBound   | 自家族の招待コードの手動失効                                                                                                           |
 | getFamilyInvites                       | Query            | familyBound   | 自家族の招待コード一覧取得（ステータス: active/expired/revoked付き）                                                                           |
+| kickMember                             | Mutation         | familyBound   | メンバーのキック（強制削除）。Export Vaultへのマスターキー退避（TTL: 30日）、admins調停、所属解除、通知メール送信（6.7）                     |
+| getMyPendingExportVault                | Query            | authenticated | 被キックユーザーの有効なExport Vault取得（期限切れ時はnull）                                                                           |
+| abandonPendingExportVault              | Mutation         | authenticated | 被キックユーザーによるExport Vaultの明示的破棄（データ持ち出し放棄）                                                                   |
 | cleanupExpiredMigrationsInternal       | InternalMutation | 内部限定（Cron）    | 期限切れ移行データの自動クリーンアップ                                                                                                   |
 | cleanupExpiredFamilyInvitesInternal    | InternalMutation | 内部限定（Cron）    | 30日以上前の期限切れ・失効済み招待コードの自動削除                                                                                             |
+| cleanupExpiredExportVaultsInternal     | InternalMutation | 内部限定（Cron）    | 期限切れExport Vaultの自動クリーンアップ                                                                                               |
 
 ### 7.3 convex/records.ts
 

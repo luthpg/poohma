@@ -55,6 +55,16 @@ AI Agent が誤りやすい点、過去に問題となった点、実装上の�
 - **問題**: SSR 時に TanStack Start の `getAuthUser` から呼ばれる Convex 内部エンドポイント `getUserByFirebaseUid` は、ユーザーの `accounts` 配列を返す。この `accounts` の各アカウントに `family`（E2EE 暗号化メタデータ: `masterKeyEncrypted`, `masterKeyIv`, `masterKeySalt`, `kdfIterations`, `cryptoVersion` 等）が含まれていないと、クライアント側で CSR のリアクティブクエリ `getAccounts` が解決されるまでの間、`activeAccount.family` が欠落する。その結果、ページ読み込み直後の E2EE 操作（パスコードによるマスターキー解除や暗号化インポート）で `family` が見つからず暗号化・復号処理が失敗する。
 - **回避法**: `getUserByFirebaseUid` 内で `allAccounts` をマッピングする際、各アカウントの `familyId` に紐づく `family` ドキュメントを取得し、`getAccounts` と完全に一致するスキーマで `family` 情報を注入して返す。クライアント側の `AccountProvider` でもフォールバックのハックに頼らず各アカウント本来の `family` を保持する。
 
+### メンバーキックにおける被除名者検証と自己除名の防止
+
+- **問題**: PoohMa では 1 Firebase UID : N PoohMa Account のマルチアカウント構造をとっている。キック処理（`kickMember`）で単に `familyId` のみで対象を検索すると、誤って同一人物の別アカウントや自分自身を除名してしまい、家族グループが管理者不在または自己矛盾状態に陥る。
+- **回避法**: `kickMember` 引数には `targetAccountId`（`Id<"users">`）を受け取り、(1) 自分自身（`targetAccountId === user._id`）の除名禁止、(2) 同一ログインユーザー（`targetUser.userId === identity.subject`）の除名禁止、(3) 対象アカウントが同一家族に所属していることの確認を厳格に行う。
+
+### Export Vault 退避時の KDF 暗号パラメータ保存漏れ
+
+- **問題**: メンバーキック時に旧家族のマスターキー情報（`masterKeyEncrypted`, `masterKeyIv`, `masterKeySalt`）だけを退避し、`kdfIterations` や `cryptoVersion` を保存し忘れると、将来 KDF バージョン引き上げ等が行われた際に、被キックユーザーが旧パスコードを入力しても正しい反復回数で鍵導出できずアンラップに失敗する。
+- **回避法**: `pendingExportVaults` テーブルには必ず `kdfIterations` と `cryptoVersion` を含め、キック時点の `family.kdfIterations` / `family.cryptoVersion` をそのまま退避・保存する。クライアント側でのアンラップ時も、Vault レコードのこれらのパラメータを明示的に渡して `unwrapMasterKey` を実行する。
+
 ---
 
 ## 3. 暗号化 (E2EE) & WebAuthn

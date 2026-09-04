@@ -90,6 +90,22 @@ export default defineSchema({
     .index("by_accountId", ["accountId"])
     .index("by_status", ["status"]),
 
+  pendingExportVaults: defineTable({
+    accountId: v.id("users"), // 被キックユーザーのアカウント ID (users._id)
+    userId: v.string(), // Firebase UID (監査・照会用)
+    oldFamilyId: v.id("families"), // キック元の家族 ID
+    oldFamilyName: v.string(), // キック元の家族名（表示用スナップショット）
+    masterKeyEncrypted: v.string(), // 旧家族パスコード由来鍵でラップされた旧マスターキー
+    masterKeyIv: v.string(),
+    masterKeySalt: v.string(),
+    kdfIterations: v.optional(v.number()), // PBKDF2 反復回数
+    cryptoVersion: v.optional(v.number()), // 暗号化バージョン
+    createdAt: v.number(),
+    expiresAt: v.number(), // 有効期限（作成から30日）
+  })
+    .index("by_accountId", ["accountId"])
+    .index("by_userId", ["userId"]),
+
   familyInvites: defineTable({
     familyId: v.id("families"),
     code: v.string(), // crypto.randomUUID() 等の高エントロピー文字列

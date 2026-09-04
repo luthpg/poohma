@@ -84,6 +84,27 @@ flowchart TD
 
 ---
 
+### 2.4 メンバーキックと Export Vault (`pendingExportVaults`) のライフサイクル
+
+```mermaid
+flowchart TD
+    Kick["既存メンバーがメンバー除名実行 (kickMember)"] --> VaultCreated["pendingExportVaults 作成<br/>(旧MasterKey暗号文, TTL 30日)"]
+    Kick --> FamilyCleared["被除名者の familyId を未設定（undefined）にクリア<br/>+ 共有レコード管理者調停 (reconcileAdminsOnLeave)<br/>+ 通知メール送信"]
+    
+    VaultCreated -->|"被除名者が旧パスコード入力<br/>(クライアントで旧MasterKeyアンラップ)"| Unlocked["移行準備完了<br/>(vaultUnlockedKey 保持)"]
+    Unlocked -->|"新家族作成 / 参加時<br/>(commitFamilyMigration)"| Migrated["個人レコード (ownerType: user) のみDEK再ラップ<br/>+ pendingExportVaults 物理削除"]
+    
+    VaultCreated -->|"被除名者がデータ破棄を選択<br/>(abandonPendingExportVault)"| Abandoned["pendingExportVaults 物理削除<br/>(個人データは新家族へ持ち出さず破棄)"]
+    VaultCreated -->|"30日タイムアウト / クローンジョブ<br/>(cleanupExpiredExportVaultsInternal)"| ExpiredVault["EXPIRED (物理削除)"]
+```
+
+- **キック実行**: 家族メンバーが他メンバーを除名（`kickMember`）。自己キックや別アカウントの指定は拒否。
+- **データ分離**: 共有レコード（`ownerType: "family"`）は旧家族資産として残り、被キックユーザーの `familyId` を即時クリア。管理者であった場合は `reconcileAdminsOnLeave` で残存メンバーへ調停。
+- **Export Vault 退避**: 個人レコード（`ownerType: "user"`）の持ち出しを可能にするため、旧家族の `masterKeyEncrypted`, `masterKeyIv`, `masterKeySalt`, `kdfIterations`, `cryptoVersion` を `pendingExportVaults` へ原子的に退避。
+- **持ち出し完了または破棄**: 被キックユーザーが旧パスコードでアンラップして新家族へ持ち出し完了（`commitFamilyMigration`）するか、手動破棄（`abandonPendingExportVault`）、または 30日経過による自動クリーンアップ（1時間ごとの Cron）によって Vault は物理削除される。
+
+---
+
 ## 3. レコード所有権モデルとアクセス権マトリクス
 
 | 操作 | 個人レコード (`ownerType: "user"`) | 共有レコード (`ownerType: "family"`) |
@@ -107,6 +128,10 @@ flowchart TD
 - **家族離脱時**:
   - 家族移行トランザクションの対象となる個人レコード（`ownerType: "user"`）とその `credentials` は、新マスターキーで再暗号化されて移行先へ引き継がれる。
   - 共有レコード（`ownerType: "family"`）は元の家族グループに残留する。離脱者がレコード管理者である場合、`reconcileAdminsOnLeave` が残存する家族メンバーの管理権限を調整する。
+- **メンバーキック時**:
+  - 被キックユーザーの個人レコード（`ownerType: "user"`）は削除されず、旧家族の暗号化マスターキー情報が `pendingExportVaults`（30日TTL）に退避され、新家族への移行（再暗号化）に備える。
+  - 共有レコード（`ownerType: "family"`）は元の家族グループに残留し、被キックユーザーがレコード管理者である場合は `reconcileAdminsOnLeave` が残存メンバーの管理権限を自動調停する。
+  - 移行完了時（`commitFamilyMigration`）またはユーザーによる手動破棄（`abandonPendingExportVault`）時に、`pendingExportVaults` は物理削除される。
 - **同一 email アカウント再作成時のデータ引き継ぎ（`users.syncUser`）**:
   - メールアドレス未確認（`emailVerified: false`）の場合はエラーを送出して同期を拒否する。
   - 同一 email かつ別 UID の既存データが存在する場合、旧 UID の `serviceRecords.userId`、家族参加申請（`joinRequests`）、および家族移行データ（`familyMigrations`）を新 UID へ一括付け替えて引き継ぐ（所有権を示す `serviceRecords.accountId` は維持される）。
