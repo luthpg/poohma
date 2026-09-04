@@ -149,3 +149,27 @@ AI Agent が誤りやすい点、過去に問題となった点、実装上の�
   1. **スキーマ・データモデル**: テーブル構成や外部キー（`accountId` vs `userId`）を変更したら、`code-design.md` の「4.1 ER概要」「4.2 テーブル定義」と `.ai/domain.md` を確認。
   2. **API・関数**: Server Function や Convex 関数を追加・削除・改名したら、`code-design.md` の「7. API設計」「7.6 Server Functions」表と `.ai/architecture.md` を確認。
   3. **認証・セッション**: 認証イベント（`onAuthStateChanged` / `onIdTokenChanged`）やストレージ（`localStorage`）を変更したら、`code-design.md` の「5.2 認証フロー」「5.6 ログアウトフロー」「8.4 状態管理表」「security-model.md」を確認。
+
+---
+
+## 7. E2E テスト & クライアントルーティング
+
+### テスト作成時の安易なプロダクションコード改変
+
+- **問題**: テストコード作成中にテストが失敗した際、原因を精査せず安易にプロダクションコードを変更したり、プロダクションコードのバグを発見した際にユーザーの許可なく独断で修正を加えてしまう。
+- **回避法**: テスト実装時の不具合はまずテストコード自体の改善・待機処理の調整で解決できないかを試みる。どうしてもプロダクションコードの修正が必要、またはプロダクションコードの明らかなバグである場合は、独断で修正を実行せず、必ず事前にユーザーへ事象・原因・修正案を報告し、実行の許可を得てから対応する。
+
+### Playwright `extraHTTPHeaders` による外部 API の CORS プリフライト拒否
+
+- **問題**: `playwright.config.ts` の `use.extraHTTPHeaders` に `x-vercel-protection-bypass` や Cloudflare Access ヘッダーを指定すると、ブラウザが発行するすべてのリクエスト（Google Identity Toolkit `identitytoolkit.googleapis.com` 等の外部サードパーティ API を含む）に付与される。Google 等の API サーバーは非ホワイトリストのカスタムヘッダーを CORS OPTIONS プリフライトで拒否するため、`auth/network-request-failed` が発生してログインできなくなる。
+- **回避法**: `playwright.config.ts` でのグローバルヘッダー設定を廃止し、`e2e/support/test-fixtures.ts` 内で `context.route` を使って `baseURL`（自アプリのオリジン）宛て通信のみにバイパスヘッダーを注入する。
+
+### 未認証ルートガード（`(app)/route.tsx`）における `useEffect` ナビゲーションの無限ループ / Abort
+
+- **問題**: `(app)/route.tsx` で未認証時に `useEffect` 内で `navigate({ to: "/login", search: { redirect: location.href } })` を呼ぶ際、依存配列に `location.href` を含めていると、リダイレクト処理中の中間 URL 変化で再レンダリングが連鎖し、先行するナビゲーションが次々とキャンセル（Abort）されてローディングスピナーのまま遷移が完了しなくなる。
+- **回避法**: `useRef(false)`（`hasRedirectedRef`）を用いて、未認証遷移がトリガーされたら1度だけ `navigate` を実行するようにガードする。
+
+### ログアウト処理における Server Function と Client Auth の実行順序（Race Condition）
+
+- **問題**: ログアウト時に `await signOut(auth)` を先に実行し、その後に Server Function `await logout()` を呼ぶと、`signOut` 完了瞬間に `onAuthStateChanged` が発火してコンポーネントツリーがアンマウント / 未認証遷移を開始し、進行中の `logout()` fetch がブラウザによって中断（`TypeError: Failed to fetch`）される。その結果、サーバー側の Session Cookie が削除されずに残り、セッションが不整合となる。
+- **回避法**: 必ず **Server Function `await logout()`（Cookie 削除）を先に完了**させ、その後に `await signOut(auth)`（クライアント認証状態破棄）を呼び出す順序を徹底する。

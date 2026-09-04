@@ -91,8 +91,8 @@ export function UserMenu({
 			} catch (e) {
 				console.warn("Failed to set logout flag in localStorage", e);
 			}
-			if (auth) await signOut(auth);
 			await logout();
+			if (auth) await signOut(auth);
 			clearQueryCache();
 			queryClient.clear();
 			window.location.href = "/";

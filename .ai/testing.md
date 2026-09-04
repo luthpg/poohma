@@ -151,4 +151,53 @@ Node.js 環境の `globalThis.crypto.subtle` を用いて、ブラウザと同�
   - 単体・サーバー統合テスト: `apps/web/tests/*.spec.ts` または `*.test.tsx`
   - Browser E2E サブシステムテスト: `apps/web/tests/browser-e2e/*.browser.test.{ts,tsx}`
   - Full-Stack E2E テスト: `apps/web/e2e/*.spec.ts`
+  - E2E 共通フィクスチャ・補助スクリプト: `apps/web/e2e/support/`
+
+---
+
+## 6. フルスタック E2E テストパターン (`@playwright/test`)
+
+### Origin-scoped 保護バイパスフィクスチャ
+ステージング環境（Vercel Deployment Protection / Cloudflare Access）での自動テスト実行時、`playwright.config.ts` の `use.extraHTTPHeaders` にグローバルにバイパスヘッダーを設定してはならない（Google Identity Toolkit などの外部 API への fetch にも付与され、CORS プリフライト拒否で認証失敗となる）。
+
+必ず `apps/web/e2e/support/test-fixtures.ts` を経由し、対象オリジン（`baseURL`）宛ての通信のみにヘッダーを注入する:
+
+```typescript
+export const test = base.extend({
+  context: async ({ context, baseURL }, use) => {
+    const headers: Record<string, string> = {};
+    if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
+      headers["x-vercel-protection-bypass"] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+    }
+    if (Object.keys(headers).length > 0 && baseURL) {
+      const targetOrigin = new URL(baseURL).origin;
+      await context.route(
+        (url) => url.toString().startsWith(targetOrigin),
+        (route) => route.continue({ headers: { ...route.request().headers(), ...headers } }),
+      );
+    }
+    await use(context);
+  },
+});
+```
+
+### テストスイート構成
+- `public-routes.spec.ts`: LP、利用規約、プライバシーポリシー、未認証ガード（`/dashboard` / `/family` から `/login` へのリダイレクト）
+- `auth.setup.ts`: Firebase Admin SDK カスタムトークン発行と Bridge IIFE によるブラウザ `signInWithCustomToken`、認証ストレージ保存
+- `dashboard.spec.ts`: ログイン済みアクセス、認証済み状態での `/login` からの自動リダイレクト
+- `family.spec.ts`: 家族作成オンボーディング・管理画面の表示確認
+- `settings.spec.ts`: 家族未所属時の保護リダイレクト検証
+- `logout.spec.ts`: ログアウト処理実行後のセッション破棄・未認証状態遷移の検証
+
+---
+
+## 7. テスト実装時のプロダクションコード変更原則
+
+テスト実装・E2E作成中にテストが失敗した場合や不具合が発生した際は、以下の原則を厳守すること:
+
+1. **安易なプロダクションコードの改変禁止**:
+   - 失敗が発生した際、プロダクションコードを即座に修正してはならない。まずテストコード側の待機処理、アサーション方法、フィクスチャの改善・調整で解決できないかを最優先で試みる。
+2. **プロダクションコード修正時の事前許可**:
+   - 明らかにプロダクションコードのバグである場合や、どうしてもプロダクション側の修正が不可欠な場合であっても、**AI Agentが独断でコードを変更・コミットしてはならない**。
+   - 必ず「発生している事象」「原因」「提案するプロダクションコードの修正内容とその影響」をユーザーに説明し、**明示的な許可・承認を得てから修正を実行する**。
 
