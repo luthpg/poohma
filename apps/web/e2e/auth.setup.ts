@@ -45,13 +45,22 @@ setup("authenticate as e2e test user", async ({ page }) => {
 	);
 
 	// サインイン後、onAuthStateChanged の完了により /dashboard または /family へ自動遷移するのを待つ
-	// 始まらない場合はリロードしてアプリ側の初期化を起動
 	try {
-		await page.waitForURL(/.*(\/dashboard|\/family)/, { timeout: 10000 });
+		await page.waitForURL(/.*(\/dashboard|\/family)/, { timeout: 15000 });
 	} catch {
+		// 初回アクセス等で遅延した場合はリロードして再試行
 		await page.reload();
 		await page.waitForURL(/.*(\/dashboard|\/family)/, { timeout: 20000 });
 	}
+
+	// 画面のレンダリング完了を待機（main または header が表示されるまで）
+	await page
+		.locator("main, header, [role='main']")
+		.first()
+		.waitFor({ state: "visible", timeout: 15000 })
+		.catch(() => {
+			// 要素の探索がタイムアウトした場合でも続行
+		});
 
 	// Cookie と IndexedDB の双方を含めて storageState として保存
 	await page.context().storageState({ path: STORAGE_STATE, indexedDB: true });
