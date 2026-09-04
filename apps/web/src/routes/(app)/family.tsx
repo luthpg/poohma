@@ -35,6 +35,12 @@ import { RecoveryKitDialog } from "@/components/family/RecoveryKitDialog";
 import { usePasscode } from "@/components/PasscodeProvider";
 
 import { PasscodeStrengthMeter } from "@/components/PasscodeStrengthMeter";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
@@ -996,40 +1002,46 @@ function FamilyComponent() {
 				</div>
 
 				{/* 放棄確認モーダル */}
-				{showAbandonConfirm && (
-					<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-						<div className="w-full max-w-md rounded-lg bg-card p-6 shadow-card space-y-4">
-							<div className="flex items-center gap-3 text-red-500">
-								<AlertTriangle className="h-6 w-6" />
-								<h3 className="text-[18px] font-semibold text-foreground">
-									旧家族のデータを破棄しますか？
-								</h3>
-							</div>
-							<p className="text-[14px] text-muted-foreground leading-relaxed">
-								旧家族で登録していた「自分のみ」のデータは復号する手段がなくなり、実質的に二度と閲覧できなくなります。この操作は取り消せません。
-							</p>
-							<div className="flex justify-end gap-3 pt-2">
-								<button
-									type="button"
-									disabled={isAbandoningVault}
-									onClick={() => setShowAbandonConfirm(false)}
-									className="rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium text-foreground hover:bg-accent transition cursor-pointer"
-								>
-									キャンセル
-								</button>
-								<button
-									type="button"
-									disabled={isAbandoningVault}
-									onClick={handleAbandonVault}
-									className="flex items-center gap-2 rounded-md bg-red-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-red-700 transition disabled:opacity-50 cursor-pointer"
-								>
-									{isAbandoningVault && <Spinner className="h-4 w-4" />}
-									データを破棄して進む
-								</button>
-							</div>
+				<Dialog
+					open={showAbandonConfirm}
+					onOpenChange={(open) => {
+						if (!isAbandoningVault) setShowAbandonConfirm(open);
+					}}
+				>
+					<DialogContent
+						className="bg-card shadow-card sm:max-w-md"
+						showCloseButton={false}
+					>
+						<div className="flex items-center gap-3 text-red-500">
+							<AlertTriangle className="h-6 w-6" />
+							<DialogTitle className="text-[18px] text-foreground">
+								旧家族のデータを破棄しますか？
+							</DialogTitle>
 						</div>
-					</div>
-				)}
+						<DialogDescription className="text-[14px] leading-relaxed">
+							旧家族で登録していた「自分のみ」のデータは復号する手段がなくなり、実質的に二度と閲覧できなくなります。この操作は取り消せません。
+						</DialogDescription>
+						<div className="flex justify-end gap-3 pt-2">
+							<button
+								type="button"
+								disabled={isAbandoningVault}
+								onClick={() => setShowAbandonConfirm(false)}
+								className="rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium text-foreground hover:bg-accent transition cursor-pointer"
+							>
+								キャンセル
+							</button>
+							<button
+								type="button"
+								disabled={isAbandoningVault}
+								onClick={handleAbandonVault}
+								className="flex items-center gap-2 rounded-md bg-red-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-red-700 transition disabled:opacity-50 cursor-pointer"
+							>
+								{isAbandoningVault && <Spinner className="h-4 w-4" />}
+								データを破棄して進む
+							</button>
+						</div>
+					</DialogContent>
+				</Dialog>
 			</div>
 		);
 	}
@@ -2313,105 +2325,127 @@ function FamilyComponent() {
 			)}
 
 			{/* メンバーキック確認ダイアログ */}
-			{memberToKick && (
-				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-					<div className="w-full max-w-md rounded-lg bg-card p-6 shadow-card space-y-4">
-						<div className="flex items-center gap-3 text-red-500">
-							<AlertTriangle className="h-6 w-6 shrink-0" />
-							<h3 className="text-[18px] font-semibold text-foreground">
-								メンバーを家族グループから削除
-							</h3>
-						</div>
-						<div className="space-y-3 text-[13px] text-muted-foreground leading-relaxed">
-							<p>
-								「
-								<strong className="text-foreground">
-									{memberToKick.displayName}
-								</strong>
-								」（{memberToKick.email}）を家族グループから削除しますか？
-							</p>
-							<ul className="list-disc pl-5 space-y-1">
-								<li>
-									対象者が「自分のみ」として登録したデータは、本人が旧パスコードを用いて持ち出すことができます。
-								</li>
-								<li>
-									対象者が家族と「共有」していたデータは、家族グループ側に残ります。
-								</li>
-								<li className="text-orange-600 dark:text-orange-400 font-medium">
-									削除されたメンバーはこれまでのパスコードを記憶しているため、削除後はパスコードの変更を強く推奨します。
-								</li>
-							</ul>
-						</div>
-						<div className="flex justify-end gap-3 pt-2">
-							<button
-								type="button"
-								disabled={isKicking}
-								onClick={() => setMemberToKick(null)}
-								className="rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium text-foreground hover:bg-accent transition cursor-pointer"
-							>
-								キャンセル
-							</button>
-							<button
-								type="button"
-								disabled={isKicking}
-								onClick={handleKickMember}
-								className="flex items-center gap-2 rounded-md bg-red-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-red-700 transition disabled:opacity-50 cursor-pointer"
-								data-testid="confirm-kick-btn"
-							>
-								{isKicking && <Spinner className="h-4 w-4" />}
-								削除する
-							</button>
-						</div>
-					</div>
-				</div>
-			)}
+			<Dialog
+				open={memberToKick !== null}
+				onOpenChange={(open) => {
+					if (!open && !isKicking) setMemberToKick(null);
+				}}
+			>
+				<DialogContent
+					className="bg-card shadow-card sm:max-w-md"
+					showCloseButton={false}
+				>
+					{memberToKick && (
+						<>
+							<div className="flex items-center gap-3 text-red-500">
+								<AlertTriangle className="h-6 w-6 shrink-0" />
+								<DialogTitle className="text-[18px] text-foreground">
+									メンバーを家族グループから削除
+								</DialogTitle>
+							</div>
+							<DialogDescription asChild>
+								<div className="space-y-3 text-[13px] text-muted-foreground leading-relaxed">
+									<p>
+										「
+										<strong className="text-foreground">
+											{memberToKick.displayName}
+										</strong>
+										」（{memberToKick.email}）を家族グループから削除しますか？
+									</p>
+									<ul className="list-disc pl-5 space-y-1">
+										<li>
+											対象者が「自分のみ」として登録したデータは、本人が旧パスコードを用いて持ち出すことができます。
+										</li>
+										<li>
+											対象者が家族と「共有」していたデータは、家族グループ側に残ります。
+										</li>
+										<li className="text-orange-600 dark:text-orange-400 font-medium">
+											削除されたメンバーはこれまでのパスコードを記憶しているため、削除後はパスコードの変更を強く推奨します。
+										</li>
+									</ul>
+								</div>
+							</DialogDescription>
+							<div className="flex justify-end gap-3 pt-2">
+								<button
+									type="button"
+									disabled={isKicking}
+									onClick={() => setMemberToKick(null)}
+									className="rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium text-foreground hover:bg-accent transition cursor-pointer"
+								>
+									キャンセル
+								</button>
+								<button
+									type="button"
+									disabled={isKicking}
+									onClick={handleKickMember}
+									className="flex items-center gap-2 rounded-md bg-red-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-red-700 transition disabled:opacity-50 cursor-pointer"
+									data-testid="confirm-kick-btn"
+								>
+									{isKicking && <Spinner className="h-4 w-4" />}
+									削除する
+								</button>
+							</div>
+						</>
+					)}
+				</DialogContent>
+			</Dialog>
 
 			{/* キック後パスコード変更推奨モーダル */}
-			{kickSuccessNotice && (
-				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-					<div className="w-full max-w-md rounded-lg bg-card p-6 shadow-card space-y-4">
-						<div className="flex items-center gap-3 text-orange-500">
-							<KeyRound className="h-6 w-6 shrink-0" />
-							<h3 className="text-[18px] font-semibold text-foreground">
-								家族パスコードの変更を推奨します
-							</h3>
-						</div>
-						<p className="text-[13px] text-muted-foreground leading-relaxed">
-							メンバー「<strong>{kickSuccessNotice.memberName}</strong>
-							」を削除しました。
-							<br />
-							削除されたメンバーはこれまでの家族パスコードを記憶しているため、家族に残された共有データを確実に保護するには、
-							<strong>今すぐパスコードを変更（ローテーション）</strong>
-							することをお勧めします。
-						</p>
-						<div className="flex justify-end gap-3 pt-2">
-							<button
-								type="button"
-								onClick={() => setKickSuccessNotice(null)}
-								className="rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium text-foreground hover:bg-accent transition cursor-pointer"
-							>
-								あとで行う
-							</button>
-							<button
-								type="button"
-								onClick={() => {
-									setKickSuccessNotice(null);
-									setShowRotatePasscodeForm(true);
-									setTimeout(() => {
-										document
-											.getElementById("rotate-passcode-section")
-											?.scrollIntoView({ behavior: "smooth" });
-									}, 100);
-								}}
-								className="flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-[13px] font-medium text-white hover:bg-orange-600 transition cursor-pointer"
-							>
-								<KeyRound className="h-4 w-4" />
-								今すぐパスコードを変更
-							</button>
-						</div>
-					</div>
-				</div>
-			)}
+			<Dialog
+				open={kickSuccessNotice !== null}
+				onOpenChange={(open) => {
+					if (!open) setKickSuccessNotice(null);
+				}}
+			>
+				<DialogContent
+					className="bg-card shadow-card sm:max-w-md"
+					showCloseButton={false}
+				>
+					{kickSuccessNotice && (
+						<>
+							<div className="flex items-center gap-3 text-orange-500">
+								<KeyRound className="h-6 w-6 shrink-0" />
+								<DialogTitle className="text-[18px] text-foreground">
+									家族パスコードの変更を推奨します
+								</DialogTitle>
+							</div>
+							<DialogDescription className="text-[13px] leading-relaxed">
+								メンバー「<strong>{kickSuccessNotice.memberName}</strong>
+								」を削除しました。
+								<br />
+								削除されたメンバーはこれまでの家族パスコードを記憶しているため、家族に残された共有データを確実に保護するには、
+								<strong>今すぐパスコードを変更（ローテーション）</strong>
+								することをお勧めします。
+							</DialogDescription>
+							<div className="flex justify-end gap-3 pt-2">
+								<button
+									type="button"
+									onClick={() => setKickSuccessNotice(null)}
+									className="rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium text-foreground hover:bg-accent transition cursor-pointer"
+								>
+									あとで行う
+								</button>
+								<button
+									type="button"
+									onClick={() => {
+										setKickSuccessNotice(null);
+										setShowRotatePasscodeForm(true);
+										setTimeout(() => {
+											document
+												.getElementById("rotate-passcode-section")
+												?.scrollIntoView({ behavior: "smooth" });
+										}, 100);
+									}}
+									className="flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-[13px] font-medium text-white hover:bg-orange-600 transition cursor-pointer"
+								>
+									<KeyRound className="h-4 w-4" />
+									今すぐパスコードを変更
+								</button>
+							</div>
+						</>
+					)}
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }

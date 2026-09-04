@@ -89,7 +89,7 @@ flowchart TD
 ```mermaid
 flowchart TD
     Kick["既存メンバーがメンバー除名実行 (kickMember)"] --> VaultCreated["pendingExportVaults 作成<br/>(旧MasterKey暗号文, TTL 30日)"]
-    Kick --> FamilyCleared["被除名者の familyId を null にクリア<br/>+ 共有レコード管理者調停 (reconcileAdminsOnLeave)<br/>+ 通知メール送信"]
+    Kick --> FamilyCleared["被除名者の familyId を未設定（undefined）にクリア<br/>+ 共有レコード管理者調停 (reconcileAdminsOnLeave)<br/>+ 通知メール送信"]
     
     VaultCreated -->|"被除名者が旧パスコード入力<br/>(クライアントで旧MasterKeyアンラップ)"| Unlocked["移行準備完了<br/>(vaultUnlockedKey 保持)"]
     Unlocked -->|"新家族作成 / 参加時<br/>(commitFamilyMigration)"| Migrated["個人レコード (ownerType: user) のみDEK再ラップ<br/>+ pendingExportVaults 物理削除"]
