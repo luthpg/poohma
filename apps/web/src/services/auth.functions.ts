@@ -223,9 +223,30 @@ export const getCustomTokenFromSession = createServerFn({
 
 	const sessionCookie = getCookie("session");
 	if (!sessionCookie) return null;
+	let uid: string;
 	try {
 		// リカバリー用のカスタムトークン発行時は、失効済みセッションからの不正復旧を防ぐため checkRevoked=true で検証する
-		const { uid } = await verifySessionCookie(sessionCookie, true);
+		({ uid } = await verifySessionCookie(sessionCookie, true));
+	} catch (error) {
+		console.error("getCustomTokenFromSession failed:", error);
+		// 失効済みまたは無効なセッションCookieを削除し、サーバー側の認証状態を未認証に同期
+		deleteCookie("session", {
+			path: "/",
+			httpOnly: true,
+			secure: isProduction,
+			sameSite: "lax",
+		});
+		setCookie("session", "", {
+			httpOnly: true,
+			secure: isProduction,
+			sameSite: "lax",
+			path: "/",
+			maxAge: 0,
+		});
+		return null;
+	}
+
+	try {
 		const customToken = await adminAuth().createCustomToken(uid);
 		return { customToken };
 	} catch (error) {
