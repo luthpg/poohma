@@ -1,4 +1,4 @@
-﻿import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import type React from "react";
@@ -58,6 +58,7 @@ export function AccountProvider({
 	initialUser?: {
 		accountId?: Id<"users">;
 		familyId?: Id<"families">;
+		family?: Account["family"];
 		accounts?: {
 			_id: Id<"users">;
 			id: Id<"users">;
@@ -66,6 +67,7 @@ export function AccountProvider({
 			displayName?: string;
 			photoURL?: string;
 			familyId?: Id<"families">;
+			family?: Account["family"];
 		}[];
 	} | null;
 }) {
@@ -115,6 +117,7 @@ export function AccountProvider({
 				_id: a._id || a.id,
 				id: a.id || a._id,
 				name: a.displayName || "名無しアカウント",
+				family: a.family ?? null,
 				updatedAt: Date.now(),
 			}));
 		}

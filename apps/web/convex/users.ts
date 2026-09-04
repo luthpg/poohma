@@ -506,11 +506,51 @@ export const getUserByFirebaseUid = internalQuery({
       }
     }
 
-    // 関連する全アカウントも取得
+    // 関連する全アカウントも取得（各アカウントの family 情報を含める）
     const allAccounts = await ctx.db
       .query("users")
       .withIndex("by_userId", (q) => q.eq("userId", args.userId))
       .collect();
+
+    const accountsWithFamily = await Promise.all(
+      allAccounts.map(async (acc) => {
+        let accFamily: {
+          id: Id<"families">;
+          name: string;
+          masterKeyEncrypted?: string;
+          masterKeyIv?: string;
+          masterKeySalt?: string;
+          kdfIterations?: number;
+          cryptoVersion?: number;
+        } | null = null;
+
+        if (acc.familyId) {
+          const familyDoc = await ctx.db.get(acc.familyId);
+          if (familyDoc) {
+            accFamily = {
+              id: familyDoc._id,
+              name: familyDoc.name,
+              masterKeyEncrypted: familyDoc.masterKeyEncrypted,
+              masterKeyIv: familyDoc.masterKeyIv,
+              masterKeySalt: familyDoc.masterKeySalt,
+              kdfIterations: familyDoc.kdfIterations,
+              cryptoVersion: familyDoc.cryptoVersion,
+            };
+          }
+        }
+
+        return {
+          _id: acc._id,
+          id: acc._id,
+          userId: acc.userId,
+          email: acc.email,
+          displayName: acc.displayName,
+          photoURL: acc.photoURL,
+          familyId: acc.familyId,
+          family: accFamily,
+        };
+      }),
+    );
 
     return {
       _id: user._id,
@@ -522,15 +562,7 @@ export const getUserByFirebaseUid = internalQuery({
       photoURL: user.photoURL,
       familyId: user.familyId,
       family,
-      accounts: allAccounts.map((acc) => ({
-        _id: acc._id,
-        id: acc._id,
-        userId: acc.userId,
-        email: acc.email,
-        displayName: acc.displayName,
-        photoURL: acc.photoURL,
-        familyId: acc.familyId,
-      })),
+      accounts: accountsWithFamily,
     };
   },
 });

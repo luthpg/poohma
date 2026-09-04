@@ -673,7 +673,7 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
 | updateProfile        | Mutation      | authenticated    | 表示名の更新                                                                                                |
 | notifyBiometricEvent | Mutation      | authenticated    | 生体認証の登録・解除イベントを検知し、セキュリティ通知メールをスケジュール送信                                              |
 | deleteAccount        | Mutation      | authenticated    | 退会処理（所有レコード削除、家族最終メンバー時は家族も削除）。退会完了通知メールを送信                                      |
-| getUserByFirebaseUid | InternalQuery | 内部限定             | UIDからユーザー＋所属家族情報を取得（HTTP Action経由）                                                                    |
+| getUserByFirebaseUid | InternalQuery | 内部限定             | UIDからユーザー＋所属家族情報、および紐づく全アカウント（各アカウントの所属家族情報含む）を取得（HTTP Action経由）                                    |
 | getUserById          | InternalQuery | 内部限定             | Convex内部IDからユーザー＋家族情報を取得                                                                                |
 
 ### 7.2 convex/families.ts

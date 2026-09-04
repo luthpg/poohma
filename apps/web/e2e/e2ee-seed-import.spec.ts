@@ -11,12 +11,21 @@ const SEED_CSV_PATH = path.join(
 
 test.describe("E2EE主要フローとCSVインポートSeed検証", () => {
 	// 家族作成→CSVインポート→E2EE復号→一括削除を一貫で実行する複合テスト。
-	// CI上のステージング環境ではネットワーク遅延・暗号化処理等で時間がかかるため
-	// テストタイムアウトを120秒に設定。
+	// CI・ローカル問わず35件のOGPフェッチ・暗号化処理等で時間がかかるため
+	// テストタイムアウトを180秒に設定。
 	test("家族グループ作成、CSV暗号化インポート、詳細でのヒント復号、および安全な一括削除クリーンアップ", async ({
 		page,
 	}) => {
-		test.setTimeout(120_000);
+		test.setTimeout(180_000);
+
+		page.on("console", (msg) => {
+			if (msg.type() === "error") {
+				console.error("[Browser Console Error]", msg.text());
+			}
+		});
+		page.on("pageerror", (err) => {
+			console.error("[Browser Uncaught Error]", err);
+		});
 
 		// 家族パスコード環境変数の検証（デフォルト値なし。未設定なら即座にテストを落とす）
 		const passcode = process.env.E2E_FAMILY_PASSCODE;
@@ -32,15 +41,20 @@ test.describe("E2EE主要フローとCSVインポートSeed検証", () => {
 		await page.goto("/family");
 		await expect(page).toHaveURL(/.*\/family/, { timeout: 20000 });
 
-		// 家族グループが未作成（作成フォームが表示されている）かどうかを判定
-		const familyNameInput = page.locator("input#family-name-input");
-		const hasCreateForm = await familyNameInput
-			.isVisible({ timeout: 5000 })
-			.catch(() => false);
+		// 家族グループ作成フォームまたは既存家族管理セクションのいずれかが表示されるまで確実に待機
+		// （ページ読み込み中のスケルトン/ローディング完了を待つ）
+		const familyCreateInput = page.locator("input#family-name-input");
+		const familyManagerSection = page.locator(
+			'[data-testid="family-manager-section"]',
+		);
 
-		if (hasCreateForm) {
-			// 家族グループ作成（Master Key 生成 & wrap）
-			await familyNameInput.fill("PoohMa E2E Family");
+		await expect(
+			familyCreateInput.or(familyManagerSection),
+		).toBeVisible({ timeout: 25000 });
+
+		// 家族未作成（作成フォームが表示されている）の場合は家族を作成
+		if (await familyCreateInput.isVisible()) {
+			await familyCreateInput.fill("PoohMa E2E Family");
 			await page.locator("input#family-passcode-input").fill(passcode);
 			await page.locator("input#family-passcode-confirm-input").fill(passcode);
 
@@ -49,10 +63,8 @@ test.describe("E2EE主要フローとCSVインポートSeed検証", () => {
 				.filter({ hasText: "作成する" });
 			await submitCreateBtn.click();
 
-			// 作成成功トーストまたは画面更新（招待コード領域または家族名表示）を待機
-			await expect(
-				page.locator("text=家族グループを作成しました。"),
-			).toBeVisible({ timeout: 15000 });
+			// 家族作成後、家族管理セクションが表示されるまで待機してグループ作成完了を確定
+			await expect(familyManagerSection).toBeVisible({ timeout: 20000 });
 		}
 
 		// ==========================================
@@ -60,6 +72,11 @@ test.describe("E2EE主要フローとCSVインポートSeed検証", () => {
 		// ==========================================
 		await page.goto("/dashboard");
 		await expect(page).toHaveURL(/.*\/dashboard/, { timeout: 20000 });
+
+		// 家族グループ情報がロードされ、ヘッダーに反映されるまで待機（アカウント同期の完了を保証）
+		await expect(page.locator("text=PoohMa E2E Family")).toBeVisible({
+			timeout: 20000,
+		});
 
 		// CSVファイル入力要素（data-testidで安定的に取得）
 		const fileInput = page.locator('[data-testid="csv-file-input"]');
@@ -71,17 +88,22 @@ test.describe("E2EE主要フローとCSVインポートSeed検証", () => {
 
 		// アンロックプロンプトが表示された場合はパスコードを入力して解除
 		const unlockInput = page.locator('input[placeholder="パスコード"]');
-		const isPromptVisible = await unlockInput
-			.isVisible({ timeout: 4000 })
-			.catch(() => false);
-		if (isPromptVisible) {
+		try {
+			await unlockInput.waitFor({ state: "visible", timeout: 15000 });
 			await unlockInput.fill(passcode);
-			await page.keyboard.press("Enter");
+			const unlockBtn = page.locator('button:has-text("ロック解除")');
+			if (await unlockBtn.isVisible()) {
+				await unlockBtn.click();
+			} else {
+				await page.keyboard.press("Enter");
+			}
+		} catch {
+			// プロンプトが表示されなかった（既にアンロック状態）場合はスキップ
 		}
 
-		// クライアント側（Web Crypto API）暗号化とConvexへの一括保存完了トーストを待機（最大60秒）
+		// クライアント側（Web Crypto API）暗号化とConvexへの一括保存完了トーストを待機（最大120秒）
 		const successToast = page.locator("text=/\\d+件のデータをインポートしました/");
-		await expect(successToast).toBeVisible({ timeout: 60000 });
+		await expect(successToast).toBeVisible({ timeout: 120000 });
 
 		// レコード一覧の更新を待機
 		await page.waitForTimeout(2000);
@@ -99,26 +121,26 @@ test.describe("E2EE主要フローとCSVインポートSeed検証", () => {
 		await appleStoreCard.click();
 		await expect(page).toHaveURL(/.*\/records\/.+/, { timeout: 15000 });
 
-		// ヒント表示ボタン（🔒 クリックして表示）が存在するか確認
+		// ヒント表示ボタン（🔒 クリックして表示）が表示されるまで待機してクリック
 		const revealBtn = page
 			.locator('button:has-text("🔒 クリックして表示")')
 			.first();
-		const hasRevealBtn = await revealBtn
-			.isVisible({ timeout: 5000 })
-			.catch(() => false);
+		await revealBtn.waitFor({ state: "visible", timeout: 20000 });
+		await revealBtn.click();
 
-		if (hasRevealBtn) {
-			await revealBtn.click();
-
-			// 必要に応じてアンロックモーダルに対応
-			const modalUnlockInput = page.locator('input[placeholder="パスコード"]');
-			const isModalVisible = await modalUnlockInput
-				.isVisible({ timeout: 3000 })
-				.catch(() => false);
-			if (isModalVisible) {
-				await modalUnlockInput.fill(passcode);
+		// 必要に応じてアンロックモーダルに対応
+		const modalUnlockInput = page.locator('input[placeholder="パスコード"]');
+		try {
+			await modalUnlockInput.waitFor({ state: "visible", timeout: 3000 });
+			await modalUnlockInput.fill(passcode);
+			const unlockBtn = page.locator('button:has-text("ロック解除")');
+			if (await unlockBtn.isVisible()) {
+				await unlockBtn.click();
+			} else {
 				await page.keyboard.press("Enter");
 			}
+		} catch {
+			// アンロックモーダルが表示されなかった場合はスキップ
 		}
 
 		// 暗号化されていたパスワードヒントが平文に復号されて表示されていることを検証

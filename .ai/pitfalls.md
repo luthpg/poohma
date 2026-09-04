@@ -50,6 +50,11 @@ AI Agent が誤りやすい点、過去に問題となった点、実装上の�
 - **問題**: Firebase UID（文字列）と Convex の `users` テーブルのドキュメント ID（`Id<"users">`）は別物である。`userId as unknown as Id<"users">` のような安易な型アサーションを行うと、Convex の引数バリデーション（`v.id("users")`）で実行時エラーが発生し、`try-catch` で握りつぶされて障害が表面化しない原因になる。
 - **回避法**: `users.syncUser` は対象アカウントの `Id<"users">` を返す。Convex ID を要求する引数には必ず実在する `_id` を渡し、型アサーションで不正な文字列を渡さない。
 
+### SSR 初期データ（`getUserByFirebaseUid`）と CSR クエリ（`getAccounts`）のアカウント構造不整合
+
+- **問題**: SSR 時に TanStack Start の `getAuthUser` から呼ばれる Convex 内部エンドポイント `getUserByFirebaseUid` は、ユーザーの `accounts` 配列を返す。この `accounts` の各アカウントに `family`（E2EE 暗号化メタデータ: `masterKeyEncrypted`, `masterKeyIv`, `masterKeySalt`, `kdfIterations`, `cryptoVersion` 等）が含まれていないと、クライアント側で CSR のリアクティブクエリ `getAccounts` が解決されるまでの間、`activeAccount.family` が欠落する。その結果、ページ読み込み直後の E2EE 操作（パスコードによるマスターキー解除や暗号化インポート）で `family` が見つからず暗号化・復号処理が失敗する。
+- **回避法**: `getUserByFirebaseUid` 内で `allAccounts` をマッピングする際、各アカウントの `familyId` に紐づく `family` ドキュメントを取得し、`getAccounts` と完全に一致するスキーマで `family` 情報を注入して返す。クライアント側の `AccountProvider` でもフォールバックのハックに頼らず各アカウント本来の `family` を保持する。
+
 ---
 
 ## 3. 暗号化 (E2EE) & WebAuthn

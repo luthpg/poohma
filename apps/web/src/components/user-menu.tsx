@@ -155,6 +155,7 @@ export function UserMenu({
 					if (hasHintsToEncrypt && !masterKey) {
 						const unlocked = await requireUnlock();
 						if (!unlocked) {
+							toast.dismiss(toastId);
 							setIsImporting(false);
 							if (fileInputRef.current) fileInputRef.current.value = "";
 							return;
