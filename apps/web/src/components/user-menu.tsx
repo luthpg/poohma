@@ -4,6 +4,7 @@ import { useConvex, useMutation } from "convex/react";
 import { signOut } from "firebase/auth";
 import {
 	BookOpen,
+	ChevronDown,
 	Download,
 	Gavel,
 	HelpCircle,
@@ -34,7 +35,6 @@ import {
 	AlertDialogTitle,
 	AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -56,6 +56,7 @@ import { useExportCsv } from "@/hooks/use-export-csv";
 import { useAccount } from "@/hooks/useAccount";
 import { LOGOUT_FLAG_KEY } from "@/hooks/useConvexFirebaseAuth";
 import { clearQueryCache } from "@/hooks/usePersistentQuery";
+import { cn } from "@/lib/utils";
 import { logout } from "@/services/auth.functions";
 import { processInChunks } from "@/utils/chunk-processor";
 import { auth } from "@/utils/firebase";
@@ -80,6 +81,8 @@ export function UserMenu({
 	const { masterKey, requireUnlock, encryptHint } = usePasscode();
 	const { handleExport, isExporting } = useExportCsv();
 	const [isSheetOpen, setIsSheetOpen] = useState(false);
+	const [isMobileDataOpen, setIsMobileDataOpen] = useState(false);
+	const [isMobileThemeOpen, setIsMobileThemeOpen] = useState(false);
 
 	const displayName =
 		activeAccount?.displayName || user?.displayName || "ユーザー";
@@ -371,24 +374,19 @@ export function UserMenu({
 							</div>
 						</SheetHeader>
 
-						<div className="py-4 space-y-5">
-							{/* ダッシュボードへのメイン導線 */}
-							<Button
-								asChild
-								variant="outline"
-								className="w-full justify-start gap-3 py-3 h-auto text-sm font-medium border-border hover:bg-accent hover:border-orange-500/40 transition cursor-pointer"
-								onClick={() => setIsSheetOpen(false)}
-							>
-								<Link to="/dashboard">
+						<div className="py-1 space-y-4">
+							{/* メインナビゲーション */}
+							<div className="space-y-1">
+								<Link
+									to="/dashboard"
+									onClick={() => setIsSheetOpen(false)}
+									className="flex items-center gap-3 p-3 rounded-lg border border-border bg-accent/40 hover:bg-accent hover:border-orange-500/40 text-sm font-medium transition cursor-pointer"
+								>
 									<LayoutDashboard className="h-5 w-5 text-orange-500 shrink-0" />
 									<span className="font-semibold text-foreground">
 										ダッシュボードへ
 									</span>
 								</Link>
-							</Button>
-
-							{/* アカウント・家族管理 */}
-							<div className="space-y-1">
 								<Link
 									to="/settings"
 									onClick={() => setIsSheetOpen(false)}
@@ -409,105 +407,140 @@ export function UserMenu({
 
 							<div className="h-[1px] bg-border/50" />
 
-							{/* データ管理 */}
+							{/* データ管理 (折りたたみ) */}
 							<div className="space-y-2">
-								<p className="text-xs font-semibold text-muted-foreground px-1">
-									データ管理
-								</p>
-								<div className="grid grid-cols-2 gap-2">
-									<button
-										type="button"
-										onClick={() => {
-											setIsSheetOpen(false);
-											handleExport();
-										}}
-										disabled={isExporting}
-										className="flex items-center justify-center gap-2 p-3 rounded-lg border border-border bg-card hover:bg-accent text-xs font-medium transition cursor-pointer"
-									>
-										{isExporting ? (
-											<Spinner className="h-4 w-4" />
-										) : (
-											<Download className="h-4 w-4 text-blue-500" />
+								<button
+									type="button"
+									onClick={() => setIsMobileDataOpen(!isMobileDataOpen)}
+									className="flex w-full items-center justify-between px-1 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground transition cursor-pointer"
+								>
+									<span>データ管理 (CSV)</span>
+									<ChevronDown
+										className={cn(
+											"h-4 w-4 transition-transform duration-200",
+											isMobileDataOpen ? "rotate-180" : "",
 										)}
-										<span>
-											{isExporting ? "エクスポート中..." : "CSVエクスポート"}
-										</span>
-									</button>
-									<button
-										type="button"
-										onClick={() => {
-											setIsSheetOpen(false);
-											fileInputRef.current?.click();
-										}}
-										disabled={isImporting}
-										className="flex items-center justify-center gap-2 p-3 rounded-lg border border-border bg-card hover:bg-accent text-xs font-medium transition cursor-pointer"
-									>
-										{isImporting ? (
-											<Spinner className="h-4 w-4" />
-										) : (
-											<Upload className="h-4 w-4 text-green-500" />
-										)}
-										<span>
-											{isImporting ? "インポート中..." : "CSVインポート"}
-										</span>
-									</button>
-								</div>
+									/>
+								</button>
+								{isMobileDataOpen && (
+									<div className="grid grid-cols-2 gap-2 pt-1 animate-in fade-in-50 duration-200">
+										<button
+											type="button"
+											onClick={() => {
+												setIsSheetOpen(false);
+												handleExport();
+											}}
+											disabled={isExporting}
+											className="flex items-center justify-center gap-2 p-3 rounded-lg border border-border bg-card hover:bg-accent text-xs font-medium transition cursor-pointer"
+										>
+											{isExporting ? (
+												<Spinner className="h-4 w-4" />
+											) : (
+												<Download className="h-4 w-4 text-blue-500" />
+											)}
+											<span>
+												{isExporting ? "エクスポート中..." : "CSVエクスポート"}
+											</span>
+										</button>
+										<button
+											type="button"
+											onClick={() => {
+												setIsSheetOpen(false);
+												fileInputRef.current?.click();
+											}}
+											disabled={isImporting}
+											className="flex items-center justify-center gap-2 p-3 rounded-lg border border-border bg-card hover:bg-accent text-xs font-medium transition cursor-pointer"
+										>
+											{isImporting ? (
+												<Spinner className="h-4 w-4" />
+											) : (
+												<Upload className="h-4 w-4 text-green-500" />
+											)}
+											<span>
+												{isImporting ? "インポート中..." : "CSVインポート"}
+											</span>
+										</button>
+									</div>
+								)}
 							</div>
 
 							<div className="h-[1px] bg-border/50" />
 
-							{/* テーマ切り替え */}
+							{/* テーマ切り替え (折りたたみ) */}
 							<div className="space-y-2">
-								<p className="text-xs font-semibold text-muted-foreground px-1">
-									テーマ
-								</p>
-								<div className="grid grid-cols-3 gap-2 bg-muted/50 p-1 rounded-xl">
-									<button
-										type="button"
-										onClick={() => {
-											setTheme("light");
-											setIsSheetOpen(false);
-										}}
-										className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition ${
-											theme === "light"
-												? "bg-card text-foreground shadow-sm font-semibold"
-												: "text-muted-foreground hover:text-foreground"
-										}`}
-									>
-										<Sun className="h-4 w-4 text-amber-500" />
-										<span>ライト</span>
-									</button>
-									<button
-										type="button"
-										onClick={() => {
-											setTheme("dark");
-											setIsSheetOpen(false);
-										}}
-										className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition ${
-											theme === "dark"
-												? "bg-card text-foreground shadow-sm font-semibold"
-												: "text-muted-foreground hover:text-foreground"
-										}`}
-									>
-										<Moon className="h-4 w-4 text-indigo-400" />
-										<span>ダーク</span>
-									</button>
-									<button
-										type="button"
-										onClick={() => {
-											setTheme("system");
-											setIsSheetOpen(false);
-										}}
-										className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition ${
-											theme === "system"
-												? "bg-card text-foreground shadow-sm font-semibold"
-												: "text-muted-foreground hover:text-foreground"
-										}`}
-									>
-										<Laptop className="h-4 w-4 text-gray-400" />
-										<span>自動</span>
-									</button>
-								</div>
+								<button
+									type="button"
+									onClick={() => setIsMobileThemeOpen(!isMobileThemeOpen)}
+									className="flex w-full items-center justify-between px-1 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground transition cursor-pointer"
+								>
+									<div className="flex items-center gap-2">
+										<span>テーマ</span>
+										<span className="text-[11px] font-normal text-muted-foreground/80">
+											(
+											{theme === "light"
+												? "ライト"
+												: theme === "dark"
+													? "ダーク"
+													: "自動"}
+											)
+										</span>
+									</div>
+									<ChevronDown
+										className={cn(
+											"h-4 w-4 transition-transform duration-200",
+											isMobileThemeOpen ? "rotate-180" : "",
+										)}
+									/>
+								</button>
+								{isMobileThemeOpen && (
+									<div className="grid grid-cols-3 gap-2 bg-muted/50 p-1 rounded-xl pt-1 animate-in fade-in-50 duration-200">
+										<button
+											type="button"
+											onClick={() => {
+												setTheme("light");
+												setIsSheetOpen(false);
+											}}
+											className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition ${
+												theme === "light"
+													? "bg-card text-foreground shadow-sm font-semibold"
+													: "text-muted-foreground hover:text-foreground"
+											}`}
+										>
+											<Sun className="h-4 w-4 text-amber-500" />
+											<span>ライト</span>
+										</button>
+										<button
+											type="button"
+											onClick={() => {
+												setTheme("dark");
+												setIsSheetOpen(false);
+											}}
+											className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition ${
+												theme === "dark"
+													? "bg-card text-foreground shadow-sm font-semibold"
+													: "text-muted-foreground hover:text-foreground"
+											}`}
+										>
+											<Moon className="h-4 w-4 text-indigo-400" />
+											<span>ダーク</span>
+										</button>
+										<button
+											type="button"
+											onClick={() => {
+												setTheme("system");
+												setIsSheetOpen(false);
+											}}
+											className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition ${
+												theme === "system"
+													? "bg-card text-foreground shadow-sm font-semibold"
+													: "text-muted-foreground hover:text-foreground"
+											}`}
+										>
+											<Laptop className="h-4 w-4 text-gray-400" />
+											<span>自動</span>
+										</button>
+									</div>
+								)}
 							</div>
 
 							<div className="h-[1px] bg-border/50" />

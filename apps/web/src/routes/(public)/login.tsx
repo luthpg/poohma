@@ -1,9 +1,4 @@
-import {
-	createFileRoute,
-	Link,
-	redirect,
-	useRouter,
-} from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import {
 	getRedirectResult,
 	onAuthStateChanged,
@@ -20,11 +15,6 @@ export const Route = createFileRoute("/(public)/login")({
 		return {
 			redirect: search.redirect as string | undefined,
 		};
-	},
-	beforeLoad: ({ context }) => {
-		if (context.user) {
-			throw redirect({ to: "/dashboard", replace: true });
-		}
 	},
 	component: LoginPage,
 });

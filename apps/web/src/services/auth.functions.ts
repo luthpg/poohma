@@ -230,6 +230,20 @@ export const getCustomTokenFromSession = createServerFn({
 		return { customToken };
 	} catch (error) {
 		console.error("getCustomTokenFromSession failed:", error);
+		// 失効済みまたは無効なセッションCookieを削除し、サーバー側の認証状態を未認証に同期
+		deleteCookie("session", {
+			path: "/",
+			httpOnly: true,
+			secure: isProduction,
+			sameSite: "lax",
+		});
+		setCookie("session", "", {
+			httpOnly: true,
+			secure: isProduction,
+			sameSite: "lax",
+			path: "/",
+			maxAge: 0,
+		});
 		return null;
 	}
 });

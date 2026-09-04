@@ -152,6 +152,11 @@ AI Agent が誤りやすい点、過去に問題となった点、実装上の�
 - **問題**: ログアウトフラグを `sessionStorage` だけで保持すると、他タブにログアウトが伝播せず、他タブ側のサイレント再認証が古いCookieを使ってセッションを復活させてしまう。
 - **回避法**: オリジン全体で共有すべき認証状態・ログアウトフラグは `localStorage` に一本化し、`window.addEventListener("storage", ...)` で他タブのログアウトを即時検知して全タブを未認証状態へ同期させる。
 
+### `/(public)/login` の `beforeLoad` による逆リダイレクトと白画面バウンス
+
+- **問題**: クライアント側の Firebase Auth が未認証（トークン期限切れやリカバリー失敗等）になった際、再ログインのために `/login` へアクセスしたにもかかわらず、`login.tsx` の `beforeLoad` が古い Session Cookie（`context.user`）を見て `throw redirect({ to: "/dashboard" })` してしまうと、未認証のまま `/(app)` へ突き返され、`return null` で画面が真っ白にフリーズする。
+- **回避法**: `login.tsx` では `beforeLoad` による即時強制リダイレクトを行わず、ブラウザ側（`LoginPage` 内の `onAuthStateChanged`）で実際にログイン状態が確認できた場合にのみ `/dashboard` へナビゲートする。また、リカバリー失敗時（`getCustomTokenFromSession`）には無効な Session Cookie をサーバー側で即時クリアし、二重基準によるバウンスを防ぐ。
+
 ---
 
 ## 6. ドキュメント管理・仕様整合

@@ -53,18 +53,13 @@ function RouteComponent() {
 		}
 	}, [activeAccount, isAccountLoading, pathname, navigate]);
 
-	// 認証初期化・復元中はローディング表示
-	if (isAuthLoading) {
+	// 認証初期化・復元中、および未認証時（ログイン画面へのリダイレクト遷移中）はローディング表示
+	if (isAuthLoading || !isAuthenticated) {
 		return (
 			<div className="flex min-h-screen items-center justify-center bg-background">
 				<Spinner className="h-8 w-8 text-orange-500" />
 			</div>
 		);
-	}
-
-	// 未認証状態（リダイレクト遷移中）は何も描画しない
-	if (!isAuthenticated) {
-		return null;
 	}
 
 	// family ページは独自ヘッダーを持つため、共通ヘッダーを非表示にする

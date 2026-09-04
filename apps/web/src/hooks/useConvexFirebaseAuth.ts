@@ -41,7 +41,7 @@ async function syncSessionCookieInBackground(user: FirebaseUser) {
 			return;
 		}
 
-		const idToken = await user.getIdToken();
+		const idToken = await user.getIdToken(true);
 
 		// 非同期のトークン取得中にユーザー状態が変化していないか再確認
 		if (
