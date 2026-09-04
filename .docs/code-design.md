@@ -15,7 +15,7 @@
 PoohMaは、フロントエンドとサーバーサイド処理を単一のTanStack Startアプリケーションで統合しつつ、データベース・ビジネスロジックの大部分をConvex（BaaS）に委譲する構成である。
 認証はFirebase Authenticationを用い、コンテンツ管理はmicroCMS、メール送信はResendを利用する。
 
-```
+```txt
 [ブラウザ]
   │  E2EE暗号化/復号 (Web Crypto API)
   │  WebAuthn (生体認証)
@@ -48,7 +48,7 @@ PoohMaは、フロントエンドとサーバーサイド処理を単一のTanSt
 
 ### 1.1 オフライン対応（PWA, FR-PWA-03）
 
-```
+```txt
 Service Worker (Workbox等):
   - 静的アセット（JS/CSS/フォント）はCache Firstで配信
   - Convexへの getRecords / getRecordDetail 等の読み取り系レスポンスは、
@@ -101,7 +101,7 @@ Service Worker (Workbox等):
 
 本プロジェクトは pnpm workspace + Turborepo によるモノレポ構成を採用しています。
 
-```
+```txt
 poohma/                    … プロジェクトルート（Turborepo / pnpm workspace）
 ├── apps/
 │   └── web/               … @poohma/web（TanStack Start + Convex）
@@ -151,7 +151,7 @@ poohma/                    … プロジェクトルート（Turborepo / pnpm wo
 
 ### 4.1 ER概要（テキスト表現）
 
-```
+```txt
 families 1 ── * users            (users.familyId → families._id)
 families 1 ── * serviceRecords    (serviceRecords.familyId → families._id)
 families 1 ── * joinRequests       (joinRequests.familyId → families._id)
@@ -355,7 +355,7 @@ PoohMa では、セッションの長期維持と安全なアクセス制御を�
 
 ### 5.2 ログイン〜セッション確立・維持フロー
 
-```
+```txt
 1. ユーザーが /login で「Googleでログイン」をクリック
 2. Firebase Authentication (signInWithRedirect) によりGoogle認証画面へ遷移
 3. リダイレクト復帰後、`onIdTokenChanged` で初期サインイン状態と以後のトークン更新を検知し、認証済みの場合はバックグラウンドで `syncSessionCookieInBackground(user)`（`refreshSessionCookie`）を呼び出して Cookie をローリング延長する
@@ -371,10 +371,11 @@ PoohMa では、セッションの長期維持と安全なアクセス制御を�
      - 認証初期化中: ローディングスピナーを表示し、未認証と誤認して `/login` へリダイレクトしない。
      - 認証済み: 通常通り画面を描画。セッションCookieが失効または更新時期の場合は、バックグラウンドで `refreshSessionCookie` を実行し Cookie を自動ローリング延長（DB書き込みやログイン通知は行わない）。
      - 未認証確定時: `/login` へ安全にリダイレクト。
+```
 
 ### 5.3 クライアント→Convexの認証連携
 
-```
+```txt
 ConvexReactClient は ConvexProviderWithAuth でラップされ、
 useConvexFirebaseAuth フックが fetchAccessToken として Firebase の
 現在の IDトークン (auth.currentUser.getIdToken) を供給する。
@@ -400,7 +401,7 @@ Convex 側は auth.config.ts の Issuer 設定 (securetoken.google.com/poohma) �
 
 生のConvex `query` / `mutation` を直接エクスポートすることは禁止し、必ず上記のカスタムビルダーを経由する。実装例（ `convex/records.ts` の `updateRecord` ）：
 
-```
+```txt
 export const updateRecord = familyBoundMutation({
   args: { id: v.id("serviceRecords"), data: ConvexRecordInputSchema },
   handler: async (ctx, args) => {
@@ -418,7 +419,7 @@ export const updateRecord = familyBoundMutation({
 
 ### 5.4 レコード単位アクセス制御（convex/rls.ts）
 
-```
+```txt
 requireContentAccess(user, record):
   // 家族境界チェック（レコードが家族に属している場合、ユーザーも同一家族でなければならない）
   if record.familyId !== undefined && record.familyId !== user.familyId:
@@ -444,7 +445,7 @@ deleteRecord / deleteRecords / unshareRecord / addRecordAdmin / removeRecordAdmi
 
 ### 5.5 セッション失効時の入力保護（FR-AUTH-07）
 
-```
+```txt
 ConvexReactClient / TanStack Query の Mutation実行を共通ラッパーでインターセプトし、
 認証エラー（セッションCookie失効・IDトークン失効）を検知した場合：
   1. 実行しようとしていたMutationの引数（フォーム入力内容）とクライアント生成の
@@ -464,7 +465,7 @@ ConvexReactClient / TanStack Query の Mutation実行を共通ラッパーでイ
 
 ### 5.6 ログアウトとセッション復元制御（FR-AUTH-04）
 
-```
+```txt
 ログアウトフロー：
   1. クライアント側（UserMenu / FamilyComponent 等）で localStorage にログアウトフラグ（LOGOUT_FLAG_KEY = "poohma_logout"）を設定（他タブへは storage イベントで即時通知）
   2. Firebase Auth の signOut(auth) を実行
@@ -483,7 +484,7 @@ ConvexReactClient / TanStack Query の Mutation実行を共通ラッパーでイ
 
 ### 6.1 鍵階層
 
-```
+```txt
 家族パスコード（各メンバーが記憶する秘密情報。サーバー保存なし）
   │  PBKDF2 (SHA-256, iterations=families.kdfIterations（既定300,000。NFR-SEC-14により
   │           復号時は都度DBの値を動的に適用し、将来の反復回数引き上げ後も
@@ -545,7 +546,7 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
 
 登録フロー：
 
-```
+```txt
 1. isBiometricSupported() でプラットフォーム認証器の利用可否を確認
    （PublicKeyCredential.isConditionalMediationAvailable 等によるバックグラウンド判定を含み、
     実際にWebAuthnの儀式（顔・指紋スキャン）を開始する前に非対応を検知する。FR-BIO-05）
@@ -561,7 +562,7 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
 
 認証（ロック解除）フロー：
 
-```
+```txt
 1. navigator.credentials.get() を、登録時と同一のprfSaltを指定して実行
 2. 得られたPRF出力でAES-GCM鍵を復元
 3. 保存済み encryptedPasscode を復号し、平文パスコードを取得
@@ -570,7 +571,7 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
 
 ### 6.4 家族移行時の再暗号化フロー
 
-```
+```txt
 1. prepareFamilyMigration Mutation
    - 移行先家族ID (targetFamilyId) を確定 (新規作成 or 承認済み参加申請の家族)
    - 呼び出しユーザーの既存 serviceRecords ID一覧・各レコードの updatedAt をスナップショットし、
@@ -609,7 +610,7 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
 
 ### 6.5 パスコードのみのローテーション（FR-FAM-10）
 
-```
+```txt
 家族グループを変えずにパスコードだけを変更する場合、マスターキー自体は変更しない
 （6.4の家族移行のようにDEK・パスワードヒントの再暗号化は不要）。
 
@@ -631,7 +632,7 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
 
 ### 6.6 リカバリーキット（復元コード, FR-CRYPT-06, FR-CRYPT-07）
 
-```
+```txt
 発行フロー：
   1. crypto.getRandomValues により高エントロピーなリカバリーコード（32文字のCrockford's Base32、4文字×8ブロック）
      を生成し、画面上に表示する（サーバーには平文はもちろん、導出可能な形でも一切送信しない）
@@ -755,7 +756,7 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
 | ---------------------------- | --------------------- | ---- | ------------------------- | ------------------------------------------------------- |
 | syncUser                     | auth.functions.ts     | POST | Firebase IDトークン検証      | ログイン時のユーザー同期・セッションCookie発行・ログイン通知送信トリガー |
 | refreshSessionCookie         | auth.functions.ts     | POST | Firebase IDトークン検証（失効検証含む） | セッションCookieの自動ローリング延長（DB書き込み・ログイン通知は行わない） |
-| getAuthUser                  | auth.functions.ts     | GET  | セッションCookie検証            | 現在ログイン中のユーザーおよび所属家族情報取得          |
+| getAuthUser                  | auth.functions.ts     | GET  | セッションCookie検証            | 現在ログイン中のユーザーおよび所属家族情報取得（紐づくアカウントと各家族情報を含む） |
 | getCustomTokenFromSession    | auth.functions.ts     | POST | セッションCookie検証            | セッションCookieからFirebaseカスタムトークンを再発行（セッション復旧用） |
 | logout                       | auth.functions.ts     | POST | セッションCookie失効            | ログアウト処理（Cookie削除＋トークン失効）              |
 | getClientRequestContext      | security.functions.ts | GET  | なし                      | 接続元のIPアドレス・User-Agent・GeoIP位置情報の取得     |
@@ -765,7 +766,7 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
 
 ### 8.1 ルートグループ構成（TanStack Router）
 
-```
+```txt
 (public)/  … PublicLayout配下。ヘッダー・フッター共通、未ログインでも閲覧可
   index.tsx, usage.tsx, faq.tsx, login.tsx,
   terms-of-service.tsx, privacy-policy.tsx
@@ -780,14 +781,15 @@ __root.tsx … 全体のHTML/head/Provider階層を定義。
               context.user としてユーザー情報を共有する。
 ```
 
-### 8.2 グローバルProvider階層（\_\_root.tsx）
+### 8.2 グローバルProvider階層（__root.tsx）
 
-```
+```txt
 ConvexProviderWithAuth(useConvexFirebaseAuth)
   └ QueryClientProvider (TanStack Query)
       └ ThemeProvider (ライト/ダーク/システム)
-          └ PasscodeProvider (E2EE鍵管理・パスコードダイアログ)
-              └ 各ページコンポーネント + Analytics/SpeedInsights/Toaster
+          └ AccountProvider (複数アカウント管理・初期アカウント/family保持)
+              └ PasscodeProvider (E2EE鍵管理・パスコードダイアログ)
+                  └ 各ページコンポーネント + Analytics/SpeedInsights/Toaster
 ```
 
 ### 8.3 UI/UXガイドライン（NFR-UX-04〜07）
@@ -833,7 +835,7 @@ PoohMaのUIは、Vercelのデザインシステム（Geist）を参考にした�
 
 ### 9.1 サービスレコード新規登録
 
-```
+```txt
 1. ユーザーがURL欄入力→フォーカスアウト
    → Convex Action getOgpInfo 呼び出し → タイトル/画像/説明を自動反映
    → タイトルが確定した時点で Action getFurigana を呼び出し読み仮名を自動反映
@@ -846,7 +848,7 @@ PoohMaのUIは、Vercelのデザインシステム（Geist）を参考にした�
 
 ### 9.2 CSVインポート
 
-```
+```txt
 1. ユーザーがCSVファイルを選択 (user-menu.tsx)
 2. papaparseでパース（ヘッダー行あり）
 3. 行数（500件以下）・フィールド長（10,000文字以下）の早期バリデーション
@@ -859,7 +861,7 @@ PoohMaのUIは、Vercelのデザインシステム（Geist）を参考にした�
 
 ### 9.3 家族グループ新規作成
 
-```
+```txt
 1. 家族名・パスコード（8文字以上、確認一致）を入力
 2. クライアント側でソルト生成 → PBKDF2でパスコード導出鍵生成
    → マスターキー生成 → マスターキーをパスコード導出鍵でラップ
@@ -871,7 +873,7 @@ PoohMaのUIは、Vercelのデザインシステム（Geist）を参考にした�
 
 ### 9.4 パスコードのみのローテーション（FR-FAM-10）
 
-```
+```txt
 1. 家族管理画面で現在のパスコードによりロック解除（未解除の場合）
 2. 新パスコード・確認入力を送信
 3. クライアント側で6.5の手順によりマスターキーを新しい導出鍵で再wrap
@@ -881,7 +883,7 @@ PoohMaのUIは、Vercelのデザインシステム（Geist）を参考にした�
 
 ### 9.5 リカバリーキーの発行・復旧（FR-CRYPT-06）
 
-```
+```txt
 発行：
 1. 設定画面から「リカバリーキーを発行」を選択（マスターキー展開済みであること）
 2. クライアント側で6.6の手順によりリカバリーキーを生成しマスターキーを別経路でラップ
@@ -899,7 +901,7 @@ PoohMaのUIは、Vercelのデザインシステム（Geist）を参考にした�
 
 ### 9.6 同時編集の検知（FR-REC-15）
 
-```
+```txt
 1. ユーザーAがレコード編集画面を開く → Mutation startEditingSession
 2. 編集画面を開いている間、15秒間隔で Mutation heartbeatEditingSession を送信
 3. ユーザーBが同じレコードの編集画面を開く → Query getActiveEditors（リアクティブ）が
@@ -913,7 +915,7 @@ PoohMaのUIは、Vercelのデザインシステム（Geist）を参考にした�
 
 ### 9.7 CSVインポートのプレビュー（FR-CSV-07）
 
-```
+```txt
 1. CSVファイル選択・パース後、確定ボタンを押す前に Query/Action previewCsvImport を呼び出す
 2. サーバー側で、各行のURL＋タイトルを既存の自分のレコードと突合し、
    「新規／上書き／スキップ」を判定した結果を返す
@@ -925,7 +927,7 @@ PoohMaのUIは、Vercelのデザインシステム（Geist）を参考にした�
 
 ## 10. SSRF対策設計（OGP取得機能, src/utils/url-safety.ts）
 
-```
+```txt
 validateUrlSafety(url):
   1. URLスキームが http / https 以外なら拒否
   2. ホスト名が直接IPアドレス指定の場合、isPrivateIp()でプライベート/ループバック/
@@ -968,7 +970,7 @@ convex用にID型を拡張した上でそのまま再利用し、クライアン
 
 ## 12. バッチ・スケジューラ設計
 
-```
+```txt
 convex/crons.ts:
   cronJobs().interval("cleanup expired family migrations", { hours: 1 },
     internal.families.cleanupExpiredMigrationsInternal)
