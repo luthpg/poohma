@@ -6,8 +6,9 @@ export const Route = createFileRoute("/(public)")({
 });
 
 function RouteComponent() {
+	const { user } = Route.useRouteContext();
 	return (
-		<PublicLayout>
+		<PublicLayout user={user}>
 			<Outlet />
 		</PublicLayout>
 	);

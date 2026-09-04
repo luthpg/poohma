@@ -52,7 +52,7 @@ function RecordDetailPending() {
 
 	return (
 		<div className="mx-auto max-w-3xl p-6">
-			<div className="sticky top-0 z-20 -mx-6 -mt-6 mb-6 bg-background/95 px-6 pb-4 pt-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+			<div className="sticky top-16 z-10 -mx-6 -mt-6 mb-6 bg-background/95 px-6 pb-4 pt-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
 				<Skeleton className="h-5 w-32 rounded-md" />
 			</div>
 
@@ -333,7 +333,7 @@ function RecordDetailComponent({
 	return (
 		<div className="mx-auto max-w-3xl p-6">
 			{/* ヘッダーナビゲーション（戻るボタン & 共有ボタン） */}
-			<div className="sticky top-0 z-20 -mx-6 -mt-6 mb-6 bg-background/95 px-6 pb-4 pt-6 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between gap-4">
+			<div className="sticky top-16 z-10 -mx-6 -mt-6 mb-6 bg-background/95 px-6 pb-4 pt-6 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between gap-4 border-b border-border/40">
 				<button
 					type="button"
 					disabled={isNavigating}

@@ -1,4 +1,4 @@
-﻿import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import { TagInput } from "@/components/ui/tag-input";
@@ -31,8 +31,13 @@ export function RecordForm({
 
 	return (
 		<form onSubmit={onSubmit} className="space-y-8">
-			{/* URL・OGPセクション */}
+			{/* 基本情報セクション */}
 			<section className="rounded-lg bg-card p-6 shadow-card transition-shadow">
+				<div className="sticky top-16 z-10 -mx-6 -mt-6 mb-6 flex items-center justify-between rounded-t-lg border-b border-border/60 bg-card/95 px-6 py-3.5 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+					<h2 className="text-[16px] md:text-[18px] font-semibold text-foreground tracking-geist-ui">
+						基本情報
+					</h2>
+				</div>
 				<div className="space-y-4">
 					<div>
 						<label
@@ -145,15 +150,15 @@ export function RecordForm({
 
 			{/* アカウント情報セクション */}
 			<section className="rounded-lg bg-card p-6 shadow-card transition-shadow">
-				<div className="mb-6 flex items-center justify-between border-b border-border pb-4">
-					<h2 className="text-[18px] font-semibold text-foreground tracking-geist-ui">
+				<div className="sticky top-16 z-10 -mx-6 -mt-6 mb-6 flex items-center justify-between rounded-t-lg border-b border-border/60 bg-card/95 px-6 py-3.5 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+					<h2 className="text-[16px] md:text-[18px] font-semibold text-foreground tracking-geist-ui">
 						アカウント情報
 					</h2>
 					<button
 						type="button"
 						onClick={form.addCredential}
 						disabled={values.credentials.length >= MAX_CREDENTIALS_PER_RECORD}
-						className="text-[14px] font-medium text-orange-500 hover:text-orange-600 disabled:opacity-40 disabled:cursor-not-allowed transition"
+						className="text-[14px] font-medium text-orange-500 hover:text-orange-600 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
 					>
 						+ 追加する
 					</button>
@@ -175,6 +180,11 @@ export function RecordForm({
 
 			{/* 所有設定・タグ・メモ */}
 			<section className="rounded-lg bg-card p-6 shadow-card transition-shadow space-y-6">
+				<div className="sticky top-16 z-10 -mx-6 -mt-6 mb-6 flex items-center justify-between rounded-t-lg border-b border-border/60 bg-card/95 px-6 py-3.5 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+					<h2 className="text-[16px] md:text-[18px] font-semibold text-foreground tracking-geist-ui">
+						その他の設定
+					</h2>
+				</div>
 				<div>
 					<span
 						id="owner-type-label"

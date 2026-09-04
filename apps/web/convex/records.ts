@@ -4,6 +4,7 @@ import { computeSortKey } from "../src/utils/index-group";
 import {
   CredentialInputSchema,
   MAX_CREDENTIALS_PER_RECORD,
+  MAX_TAGS_PER_RECORD,
   RecordInputSchema,
 } from "../src/utils/schemas";
 import { internal } from "./_generated/api";
@@ -1221,6 +1222,11 @@ export const bulkUpdateRecords = familyBoundMutation({
         const newTags = Array.from(
           new Set([...record.tags, ...args.data.tags]),
         );
+        if (newTags.length > MAX_TAGS_PER_RECORD) {
+          throw new Error(
+            `タグは${MAX_TAGS_PER_RECORD}個まで登録できます (レコード「${record.title}」で超過)`,
+          );
+        }
         await ctx.db.patch(id, {
           tags: newTags,
           updatedAt: Date.now(),

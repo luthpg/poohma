@@ -1,10 +1,13 @@
-﻿import { useAction } from "convex/react";
+import { useAction } from "convex/react";
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import { usePasscode } from "@/components/PasscodeProvider";
 import { validateRecordFormValues } from "@/utils/record-form-validation";
-import { MAX_CREDENTIALS_PER_RECORD } from "@/utils/schemas";
+import {
+	MAX_CREDENTIALS_PER_RECORD,
+	MAX_TAGS_PER_RECORD,
+} from "@/utils/schemas";
 
 export interface RecordFormCredential {
 	id?: string;
@@ -225,6 +228,10 @@ export function useRecordForm(initialValues?: Partial<RecordFormValues>) {
 	}, []);
 
 	const setTags = useCallback((tags: string[]) => {
+		if (tags.length > MAX_TAGS_PER_RECORD) {
+			toast.error(`タグは${MAX_TAGS_PER_RECORD}個まで登録できます`);
+			return;
+		}
 		setValues((prev) => ({ ...prev, tags }));
 	}, []);
 
