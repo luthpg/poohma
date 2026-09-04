@@ -25,10 +25,15 @@ AI Agent が誤りやすい点、過去に問題となった点、実装上の�
 
 ## 2. Convex & バックエンド開発
 
-### `convex dev` の常駐プロセス
+### `convex dev` の常駐プロセスと開発環境へのワンショット反映 (`--once`)
 
-- **問題**: `convex dev` はファイル変更監視モードで常駐するため、AI Agent のセッションが終了しなくなる。
-- **回避法**: ワンショットで完了する `pnpm convex:sync`（デプロイ+codegen+フォーマット）または `pnpm convex:codegen` のみを使用する。
+- **問題**: 
+  - `convex dev` は通常ファイル変更監視モードで常駐するため、AI Agent 実行時にプロセスが終了しなくなる。
+  - 一方で `pnpm convex:codegen` だけを実行すると、ローカルの型定義は更新されるが **Convex 開発クラウドインスタンス（`dev:...`）には関数やスキーマがプッシュされない**。そのため、実バックエンドと通信する E2E テスト（Playwright）を実行した際に `Could not find public function for '...'` でテストが全滅する罠に陥る。
+  - また、`pnpm convex:deploy` / `pnpm convex:sync` は本番（production）デプロイまたは `CONVEX_DEPLOY_KEY` 設定環境向けであり、ローカル開発環境（`dev:...`）への反映には使えない（プロンプト待ちやデプロイキー未設定エラーとなる）。
+- **回避法**: 
+  - 開発環境（`dev:...`）に関数・スキーマの変更をワンショットで安全に反映し、型定義を生成するには **`convex dev --once`**（`pnpm -F @poohma/web exec convex dev --once`）を使用する。常駐せずにデプロイとコード生成を完了できる。
+  - E2E テスト実行前やローカル検証前にバックエンドのスキーマ・関数を変更した場合は、必ず事前に `convex dev --once` を実行すること。
 
 ### ConvexHttpClient の共有による状態汚染
 

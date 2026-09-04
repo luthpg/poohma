@@ -27,6 +27,9 @@ const ConvexCredentialInputSchema = CredentialInputSchema.extend({
   id: z.string().optional(),
 });
 
+export const EDIT_SESSION_TTL_MS = 5 * 60 * 1000; // 5分
+export const EDIT_HEARTBEAT_INTERVAL_MS = 30 * 1000; // 30秒
+
 const ConvexRecordInputSchema = RecordInputSchema.extend({
   credentials: z
     .array(ConvexCredentialInputSchema)
@@ -248,9 +251,7 @@ export const getAvailableTags = authenticatedQuery({
   args: {},
   handler: async (ctx) => {
     const { user } = ctx;
-
     const visibleRecords = await collectVisibleRecords(ctx, user);
-
     const tagsSet = new Set<string>();
     for (const r of visibleRecords) {
       for (const t of r.tags) {
@@ -383,6 +384,8 @@ export const createRecord = familyBoundMutation({
 export const updateRecord = familyBoundMutation({
   args: {
     id: v.id("serviceRecords"),
+    updatedAt: v.optional(v.number()),
+    force: v.optional(v.boolean()),
     data: v.object({
       title: v.string(),
       titleReading: v.optional(v.string()),
@@ -418,6 +421,15 @@ export const updateRecord = familyBoundMutation({
 
     // コンテンツ編集権限の確認
     requireContentAccess(ctx.user, record);
+
+    // 楽観的ロック検証（force: true の場合はバイパス）
+    if (
+      !args.force &&
+      args.updatedAt !== undefined &&
+      record.updatedAt !== args.updatedAt
+    ) {
+      throw new Error("CONFLICT: レコードが他のユーザーによって更新されました");
+    }
 
     const now = Date.now();
     const patchData: Partial<Doc<"serviceRecords">> = {
@@ -518,6 +530,17 @@ export const updateRecord = familyBoundMutation({
       if (!retainedIds.has(cred._id)) {
         await ctx.db.delete(cred._id);
       }
+    }
+
+    // 保存完了に伴い、自身の編集セッションを自動クリーンアップ
+    const existingSession = await ctx.db
+      .query("recordEditingSessions")
+      .withIndex("by_recordId_accountId", (i) =>
+        i.eq("recordId", args.id).eq("accountId", ctx.user._id),
+      )
+      .unique();
+    if (existingSession) {
+      await ctx.db.delete(existingSession._id);
     }
   },
 });
@@ -1233,6 +1256,129 @@ export const bulkUpdateRecords = familyBoundMutation({
         });
       }
     }
+  },
+});
+
+// === 同時編集セッション管理（FR-REC-15） ===
+
+export const startEditingSession = familyBoundMutation({
+  args: {
+    recordId: v.id("serviceRecords"),
+  },
+  handler: async (ctx, args) => {
+    const record = await ctx.db.get(args.recordId);
+    if (!record) throw new Error("Record not found");
+
+    requireContentAccess(ctx.user, record);
+
+    const now = Date.now();
+    const existingSession = await ctx.db
+      .query("recordEditingSessions")
+      .withIndex("by_recordId_accountId", (i) =>
+        i.eq("recordId", args.recordId).eq("accountId", ctx.user._id),
+      )
+      .unique();
+
+    if (existingSession) {
+      await ctx.db.patch(existingSession._id, { updatedAt: now });
+    } else {
+      await ctx.db.insert("recordEditingSessions", {
+        recordId: args.recordId,
+        accountId: ctx.user._id,
+        updatedAt: now,
+      });
+    }
+  },
+});
+
+export const heartbeatEditingSession = familyBoundMutation({
+  args: {
+    recordId: v.id("serviceRecords"),
+  },
+  handler: async (ctx, args) => {
+    const record = await ctx.db.get(args.recordId);
+    if (!record) throw new Error("Record not found");
+
+    requireContentAccess(ctx.user, record);
+
+    const now = Date.now();
+    const existingSession = await ctx.db
+      .query("recordEditingSessions")
+      .withIndex("by_recordId_accountId", (i) =>
+        i.eq("recordId", args.recordId).eq("accountId", ctx.user._id),
+      )
+      .unique();
+
+    if (existingSession) {
+      await ctx.db.patch(existingSession._id, { updatedAt: now });
+    } else {
+      await ctx.db.insert("recordEditingSessions", {
+        recordId: args.recordId,
+        accountId: ctx.user._id,
+        updatedAt: now,
+      });
+    }
+  },
+});
+
+export const endEditingSession = familyBoundMutation({
+  args: {
+    recordId: v.id("serviceRecords"),
+  },
+  handler: async (ctx, args) => {
+    const record = await ctx.db.get(args.recordId);
+    if (!record) return;
+
+    requireContentAccess(ctx.user, record);
+
+    const existingSession = await ctx.db
+      .query("recordEditingSessions")
+      .withIndex("by_recordId_accountId", (i) =>
+        i.eq("recordId", args.recordId).eq("accountId", ctx.user._id),
+      )
+      .unique();
+
+    if (existingSession) {
+      await ctx.db.delete(existingSession._id);
+    }
+  },
+});
+
+export const getActiveEditors = authenticatedQuery({
+  args: {
+    recordId: v.id("serviceRecords"),
+  },
+  handler: async (ctx, args) => {
+    const record = await ctx.db.get(args.recordId);
+    if (!record) return [];
+
+    requireContentAccess(ctx.user, record);
+
+    const sessions = await ctx.db
+      .query("recordEditingSessions")
+      .withIndex("by_recordId", (i) => i.eq("recordId", args.recordId))
+      .collect();
+
+    const now = Date.now();
+    const activeSessions = sessions.filter(
+      (s) => now - s.updatedAt < EDIT_SESSION_TTL_MS,
+    );
+
+    const editors = await Promise.all(
+      activeSessions.map(async (s) => {
+        const userDoc = await ctx.db.get(s.accountId);
+        return {
+          sessionId: s._id,
+          accountId: s.accountId,
+          displayName: userDoc?.displayName,
+          email: userDoc?.email,
+          updatedAt: s.updatedAt,
+          isCurrentAccount: s.accountId === ctx.user._id,
+        };
+      }),
+    );
+
+    return editors;
   },
 });
 

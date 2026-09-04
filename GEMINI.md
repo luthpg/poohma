@@ -44,13 +44,16 @@ Convex のスキーマ（`schema.ts`）やバックエンド関数（`convex/*.t
 
 ### 同期・コード生成手順
 
-1. **一括同期（推奨）**: `pnpm convex:sync`
+1. **開発環境へのワンショット反映（ローカル開発・E2Eテスト前）**: `pnpm convex:dev:once`（または `pnpm -F @poohma/web exec convex dev --once`）
+   - 開発インスタンス（`CONVEX_DEPLOYMENT=dev:...`）に関数・スキーマを反映し、型定義最新化とフォーマットを常駐プロセス化せずに一括実行します。
+   - Playwright E2E テストは実際の Convex 開発インスタンスと通信するため、**スキーマや関数を追加・変更した後は必ず E2E テスト実行前にこのコマンドを実行してください**。
+2. **本番・プレビュー環境への一括同期**: `pnpm convex:sync`
    - `convex deploy` → `convex codegen`（型定義最新化） → `pnpm check`（自動フォーマット）の順に一括実行します。
    - CI でプレビューデプロイキーを `CONVEX_DEPLOY_KEY` に設定した場合に限り、プレビュー環境へ反映されます。
-2. **個別に実行する場合**:
+3. **個別に実行する場合**:
    - **Deploy**: `pnpm convex:deploy`（実行時の `CONVEX_DEPLOY_KEY` が示す環境へのワンショット反映。プレビューデプロイキーを設定した場合に限りプレビュー環境へ反映）
    - **Codegen & Format**: `pnpm convex:codegen`（`_generated/` 型定義の最新化とフォーマット）
-3. **Verify Pipeline**: `pnpm verify`
+4. **Verify Pipeline**: `pnpm verify`
    - 型定義更新後、プロジェクト全体の一括品質検証を実行します。
 
 本番デプロイは、プレビュー用とは別の認証情報を使用し、定められたリリース運用に従って実行してください。

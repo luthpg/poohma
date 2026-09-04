@@ -1041,3 +1041,260 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
 		).rejects.toThrow("Unauthorized");
 	});
 });
+
+describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", () => {
+	it("編集セッションの開始・ハートビート・終了・アクティブ編集者一覧が正しく動作すること", async () => {
+		const t = convexTest(schema, modules);
+
+		let familyId!: Id<"families">;
+		let userAId!: Id<"users">;
+		let userBId!: Id<"users">;
+		let recordId!: Id<"serviceRecords">;
+
+		await t.run(async (ctx) => {
+			familyId = await ctx.db.insert("families", {
+				name: "Family Concurrency",
+				updatedAt: Date.now(),
+			});
+
+			userAId = await ctx.db.insert("users", {
+				userId: "user_a",
+				email: "a@example.com",
+				displayName: "ユーザーA",
+				familyId,
+				updatedAt: Date.now(),
+			});
+
+			userBId = await ctx.db.insert("users", {
+				userId: "user_b",
+				email: "b@example.com",
+				displayName: "ユーザーB",
+				familyId,
+				updatedAt: Date.now(),
+			});
+
+			recordId = await ctx.db.insert("serviceRecords", {
+				userId: "user_a",
+				accountId: userAId,
+				familyId,
+				ownerFamilyId: familyId,
+				title: "Concurrent Record",
+				sortKey: computeSortKey("Concurrent Record"),
+				ownerType: "family",
+				admins: [userAId],
+				tags: [],
+				updatedAt: 1000,
+			});
+		});
+
+		const userA = t.withIdentity({ subject: "user_a", email: "a@example.com" });
+		const userB = t.withIdentity({ subject: "user_b", email: "b@example.com" });
+
+		// 初期状態では編集者なし
+		let editors = await userA.query(api.records.getActiveEditors, { recordId });
+		expect(editors).toHaveLength(0);
+
+		// 1. ユーザーAが編集セッションを開始
+		await userA.mutation(api.records.startEditingSession, { recordId });
+
+		editors = await userB.query(api.records.getActiveEditors, { recordId });
+		expect(editors).toHaveLength(1);
+		expect(editors[0].accountId).toBe(userAId);
+		expect(editors[0].displayName).toBe("ユーザーA");
+		expect(editors[0].email).toBe("a@example.com");
+		expect(editors[0].isCurrentAccount).toBe(false); // Bから見た場合
+
+		const sessionUpdatedAtA = editors[0].updatedAt;
+
+		// 2. ユーザーBも編集セッションを開始（複数人の同時編集）
+		await userB.mutation(api.records.startEditingSession, { recordId });
+
+		editors = await userA.query(api.records.getActiveEditors, { recordId });
+		expect(editors).toHaveLength(2);
+		const editorIds = editors.map((e) => e.accountId);
+		expect(editorIds).toContain(userAId);
+		expect(editorIds).toContain(userBId);
+
+		// 3. ハートビートで更新日時が更新されること
+		await userA.mutation(api.records.heartbeatEditingSession, { recordId });
+		const editorsAfterHeartbeat = await userA.query(
+			api.records.getActiveEditors,
+			{ recordId },
+		);
+		const updatedSessionA = editorsAfterHeartbeat.find(
+			(e) => e.accountId === userAId,
+		);
+		expect(updatedSessionA?.updatedAt).toBeGreaterThanOrEqual(
+			sessionUpdatedAtA,
+		);
+
+		// 4. ユーザーAが編集を終了
+		await userA.mutation(api.records.endEditingSession, { recordId });
+		editors = await userB.query(api.records.getActiveEditors, { recordId });
+		expect(editors).toHaveLength(1);
+		expect(editors[0].accountId).toBe(userBId);
+	});
+
+	it("TTL（5分）を超過したセッションが getActiveEditors から自動除外されること", async () => {
+		const t = convexTest(schema, modules);
+
+		let familyId!: Id<"families">;
+		let userAId!: Id<"users">;
+		let recordId!: Id<"serviceRecords">;
+
+		await t.run(async (ctx) => {
+			familyId = await ctx.db.insert("families", {
+				name: "Family TTL",
+				updatedAt: Date.now(),
+			});
+
+			userAId = await ctx.db.insert("users", {
+				userId: "user_a",
+				email: "a@example.com",
+				familyId,
+				updatedAt: Date.now(),
+			});
+
+			recordId = await ctx.db.insert("serviceRecords", {
+				userId: "user_a",
+				accountId: userAId,
+				familyId,
+				ownerFamilyId: familyId,
+				title: "TTL Record",
+				sortKey: computeSortKey("TTL Record"),
+				ownerType: "family",
+				admins: [userAId],
+				tags: [],
+				updatedAt: 1000,
+			});
+
+			// 6分前の期限切れセッションを手動挿入
+			await ctx.db.insert("recordEditingSessions", {
+				recordId,
+				accountId: userAId,
+				updatedAt: Date.now() - 6 * 60 * 1000,
+			});
+		});
+
+		const userA = t.withIdentity({ subject: "user_a", email: "a@example.com" });
+
+		// 期限切れセッションは取得されないこと
+		const editors = await userA.query(api.records.getActiveEditors, {
+			recordId,
+		});
+		expect(editors).toHaveLength(0);
+
+		// ハートビートで復活（現在時刻に更新）
+		await userA.mutation(api.records.heartbeatEditingSession, { recordId });
+		const activeEditors = await userA.query(api.records.getActiveEditors, {
+			recordId,
+		});
+		expect(activeEditors).toHaveLength(1);
+		expect(activeEditors[0].accountId).toBe(userAId);
+	});
+
+	it("updateRecord で古い updatedAt を渡した場合に CONFLICT エラーで更新が拒否され、一致時は成功してセッションが消去されること", async () => {
+		const t = convexTest(schema, modules);
+
+		let familyId!: Id<"families">;
+		let userAId!: Id<"users">;
+		let recordId!: Id<"serviceRecords">;
+
+		await t.run(async (ctx) => {
+			familyId = await ctx.db.insert("families", {
+				name: "Family Conflict",
+				updatedAt: Date.now(),
+			});
+
+			userAId = await ctx.db.insert("users", {
+				userId: "user_a",
+				email: "a@example.com",
+				displayName: "ユーザーA",
+				familyId,
+				updatedAt: Date.now(),
+			});
+
+			await ctx.db.insert("users", {
+				userId: "user_b",
+				email: "b@example.com",
+				displayName: "ユーザーB",
+				familyId,
+				updatedAt: Date.now(),
+			});
+
+			recordId = await ctx.db.insert("serviceRecords", {
+				userId: "user_a",
+				accountId: userAId,
+				familyId,
+				ownerFamilyId: familyId,
+				title: "Original Title",
+				sortKey: computeSortKey("Original Title"),
+				ownerType: "family",
+				admins: [userAId],
+				tags: [],
+				updatedAt: 5000,
+			});
+		});
+
+		const userA = t.withIdentity({ subject: "user_a", email: "a@example.com" });
+		const userB = t.withIdentity({ subject: "user_b", email: "b@example.com" });
+
+		// ユーザーAがセッション開始して保存
+		await userA.mutation(api.records.startEditingSession, { recordId });
+		let editors = await userA.query(api.records.getActiveEditors, { recordId });
+		expect(editors).toHaveLength(1);
+
+		// ユーザーAが updatedAt: 5000 で正常更新
+		await userA.mutation(api.records.updateRecord, {
+			id: recordId,
+			updatedAt: 5000,
+			data: {
+				title: "Title updated by A",
+				tags: [],
+				credentials: [],
+			},
+		});
+
+		// Aの保存完了に伴い、編集セッションが自動削除されること
+		editors = await userA.query(api.records.getActiveEditors, { recordId });
+		expect(editors).toHaveLength(0);
+
+		// DBの updatedAt が進んでいることを確認
+		const recordAfterA = await t.run((ctx) => ctx.db.get(recordId));
+		expect(recordAfterA?.title).toBe("Title updated by A");
+		const newUpdatedAt = recordAfterA?.updatedAt;
+		expect(newUpdatedAt).toBeGreaterThan(5000);
+
+		// ユーザーBが以前の古い updatedAt: 5000 を渡して更新を試みると競合拒否されること
+		await expect(
+			userB.mutation(api.records.updateRecord, {
+				id: recordId,
+				updatedAt: 5000, // 古いタイムスタンプ
+				data: {
+					title: "Title updated by B (conflicted)",
+					tags: [],
+					credentials: [],
+				},
+			}),
+		).rejects.toThrow("CONFLICT");
+
+		// レコードはBの変更で上書きされていないこと
+		const recordAfterConflict = await t.run((ctx) => ctx.db.get(recordId));
+		expect(recordAfterConflict?.title).toBe("Title updated by A");
+
+		// force: true を指定した場合は、古いタイムスタンプでも上書きできること
+		await userB.mutation(api.records.updateRecord, {
+			id: recordId,
+			updatedAt: 5000,
+			force: true,
+			data: {
+				title: "Title force updated by B",
+				tags: [],
+				credentials: [],
+			},
+		});
+
+		const recordAfterForce = await t.run((ctx) => ctx.db.get(recordId));
+		expect(recordAfterForce?.title).toBe("Title force updated by B");
+	});
+});

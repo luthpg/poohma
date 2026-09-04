@@ -179,4 +179,13 @@ export default defineSchema({
     order: v.optional(v.number()),
     updatedAt: v.number(),
   }).index("by_recordId", ["recordId"]),
+
+  recordEditingSessions: defineTable({
+    recordId: v.id("serviceRecords"),
+    accountId: v.id("users"), // 編集者の PoohMa アカウント ID
+    updatedAt: v.number(), // 最終ハートビート時刻
+  })
+    .index("by_recordId", ["recordId"])
+    .index("by_accountId", ["accountId"])
+    .index("by_recordId_accountId", ["recordId", "accountId"]),
 });

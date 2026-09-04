@@ -162,7 +162,9 @@ familyInvites 1 ── * joinRequests   (joinRequests.invitedByCode → familyIn
 users     1 ── * serviceRecords      (serviceRecords.accountId → users._id, serviceRecords.userId = users.userId)
 users     1 ── * joinRequests         (joinRequests.userId = users.userId, 文字列参照)
 users     1 ── * pendingExportVaults  (pendingExportVaults.accountId → users._id)
+users     1 ── * recordEditingSessions (recordEditingSessions.accountId → users._id)
 serviceRecords 1 ── * credentials    (credentials.recordId → serviceRecords._id)
+serviceRecords 1 ── * recordEditingSessions (recordEditingSessions.recordId → serviceRecords._id)
 ```
 
 ### 4.2 テーブル定義
@@ -361,6 +363,18 @@ serviceRecords 1 ── * credentials    (credentials.recordId → serviceRecord
 | expiresAt         | number             | 有効期限日時（発行から10分）                             |
 
 インデックス: by_accountId, by_familyId_accountId。OTP検証成功時に一回限りのセッショントークンを発行・記録し、新パスコードによるマスターキー再ラップ実行時に検証・即時消費（削除）する。
+
+#### recordEditingSessions（FR-REC-15）
+
+レコードのリアルタイム同時編集検知とプレゼンス管理に用いる軽量セッションテーブル。
+
+| フィールド  | 型                  | 説明                                                              |
+| ----------- | ------------------- | ----------------------------------------------------------------- |
+| recordId    | Id<serviceRecords>  | 対象サービスレコード                                              |
+| accountId   | Id<users>           | 編集者のPoohMaアカウントID                                        |
+| updatedAt   | number              | 最終ハートビート時刻（epoch ms）。TTLは5分（300,000ms）             |
+
+インデックス: by_recordId, by_accountId, by_recordId_accountId。編集画面を開いている間30秒間隔でハートビート更新し、5分経過したセッションはクエリ側で自動失効扱いとする。保存完了時やキャンセル時に物理削除される。
 
 ## 5. 認証・認可設計
 
@@ -784,7 +798,7 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
 | bulkShareRecords / bulkUnshareRecords                             | Mutation     | familyBound   | 選択した個人レコードの一括共有 / 共有レコードの一括共有解除                                                                                                                 |
 | previewCsvImport                                                  | Query/Action | familyBound   | インポート予定のCSV行と既存データ（URL＋タイトルで突合）を比較し、行ごとに新規／上書き／スキップを判定して返す（FR-CSV-07、9.7参照）                                                                             |
 | createRecord                                                      | Mutation     | familyBound   | レコード新規作成（zodによるサーバー再検証、sortKey自動算出、ownerType: "user" \| "family"、credentials最大10件チェック）                                                                   |
-| updateRecord                                                      | Mutation     | familyBound   | レコード更新（rls.tsチェック、sortKey再算出、共有解除時は管理者権限を要求）                                                                                                 |
+| updateRecord                                                      | Mutation     | familyBound   | レコード更新（rls.tsチェック、sortKey再算出、共有解除時は管理者権限を要求、updatedAtによる楽観的ロック競合検証、forceフラグによる強制上書き、完了時セッション自動削除）       |
 | deleteRecord / deleteRecords                                      | Mutation     | familyBound   | 単体／一括削除（requireAdminAccessチェック、非管理者の共有レコード削除を防止）                                                                                              |
 | importRecords                                                     | Mutation     | familyBound   | CSVインポート（最大500件、家族内メールアドレスの厳格突合、行ごとのバリデーション結果を返却）                                                                                |
 | bulkUpdateRecords                                                 | Mutation     | familyBound   | 一括タグ付与／所有設定変更（所有設定変更は確認モーダルを経由）                                                                                                              |
@@ -794,8 +808,8 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
 | resolveUpdateRequest                                              | Mutation     | familyBound   | レコード編集保存時にneedsUpdateを自動解除                                                                                                                              |
 | mergeTags                                                         | Mutation     | familyBound   | 指定タグ名を持つ自分の閲覧可能レコード群のtags配列を一括置換（FR-REC-22）                                                                                                             |
 | getRecordAccessLog                                                | Query        | authenticated | 対象レコードのrecordAccessLogをタイムラインとして取得（rls.tsチェック、FR-REC-16）                                                                                                |
-| startEditingSession / heartbeatEditingSession / endEditingSession | Mutation     | familyBound   | recordEditingSessionsの作成・更新・削除（FR-REC-15）                                                                                                               |
-| getActiveEditors                                                  | Query        | familyBound   | 対象レコードを編集中のユーザー一覧を取得（Convexのリアクティブクエリでクライアントが購読）                                                                                                        |
+| startEditingSession / heartbeatEditingSession / endEditingSession | Mutation     | familyBound   | recordEditingSessionsの作成・更新・削除（FR-REC-15、TTL 5分、ハートビート30秒）                                                                                     |
+| getActiveEditors                                                  | Query        | authenticated | 対象レコードを編集中のユーザー一覧を取得（Convexのリアクティブクエリでクライアントが購読、TTL 5分超過分は自動除外）                                                       |
 
 ### 7.4 convex/actions.ts（Node runtime, "use node"）
 
@@ -964,15 +978,19 @@ PoohMaのUIは、Vercelのデザインシステム（Geist）を参考にした�
 ### 9.6 同時編集の検知（FR-REC-15）
 
 ```txt
-1. ユーザーAがレコード編集画面を開く → Mutation startEditingSession
-2. 編集画面を開いている間、15秒間隔で Mutation heartbeatEditingSession を送信
-3. ユーザーBが同じレコードの編集画面を開く → Query getActiveEditors（リアクティブ）が
-   ユーザーAの編集中セッションを検知し、「Aさんが編集中です」を表示
-4. ユーザーAが保存 or 画面を離れる → Mutation endEditingSession
-   （ハートビートが一定時間途絶えた場合はサーバー側で自動的に無効扱いとする）
-5. 保存時、updateRecord は対象レコードの updatedAt を前提条件として検証し（楽観的ロック）、
-   他ユーザーの保存と競合した場合は「他のメンバーが更新しました。再読み込みしてください」
-   として保存を拒否する
+1. ユーザーAがレコード編集画面を開く → Mutation startEditingSession（recordEditingSessions にセッション登録）
+2. 編集画面を開いている間、30秒間隔で Mutation heartbeatEditingSession を送信
+   （別アプリ・別タブから復帰した際（visibilitychange: visible）にも即時ハートビートを送信してセッション延長）
+3. ユーザーBが同じレコードの詳細または編集画面を開く → Query getActiveEditors（リアクティブ）が
+   ユーザーAの編集中セッションを検知し、「Aさんが編集中です（約○分前）」を表示（Soft Advisory）
+4. ユーザーAが保存 or キャンセル or 画面離脱 → Mutation endEditingSession
+   （離席やタスクキルでハートビートが途絶えた場合、TTL 5分（300秒）経過によりサーバー・クエリ側で自動失効）
+5. 保存時、updateRecord はクライアントが保持する updatedAt を検証し（楽観的ロック）、
+   他ユーザーの先行更新と競合した場合は「CONFLICT: レコードが他のユーザーによって更新されました」を送出
+6. 競合検知時、クライアントは競合解決ダイアログを表示:
+   - 「最新の内容を読み込む」: 最新レコードを再読み込みし、編集画面を最新データで更新
+   - 「上書き保存する」: force: true を指定して updateRecord を再実行し、強制上書き保存
+7. 保存完了時、実行者自身の recordEditingSessions はサーバー側で自動削除される
 ```
 
 ### 9.7 CSVインポートのプレビュー（FR-CSV-07）

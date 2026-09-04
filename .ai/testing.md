@@ -211,6 +211,11 @@ export const test = base.extend({
 - `logout.spec.ts`: ログアウト処理実行後のセッション破棄・未認証状態遷移の検証
 - `e2ee-seed-import.spec.ts`: 家族作成（Master Key生成・KEK導出）、CSVインポートによる平文ヒントのクライアント暗号化Seed投入、詳細画面でのヒント復号検証、およびUI一括削除機能による他家族データを壊さない安全なクリーンアップ検証
 
+### E2E テスト実行前のバックエンド反映ルール (`convex dev --once`)
+Playwright E2E テストはローカルのモックではなく、実際の Convex 開発インスタンス（`CONVEX_DEPLOYMENT=dev:...`）と通信する。
+そのため、**スキーマや Convex 関数を追加・変更した後は、必ず E2E テスト実行前に `pnpm -F @poohma/web exec convex dev --once` を実行して開発インスタンスへ最新コードを反映・型同期しておくこと**。
+これを行わずに `pnpm test:e2e` を実行すると、Convex クラウド環境に関数が存在せず `Could not find public function for '...'` が発生してテストが失敗する。
+
 ---
 
 ## 7. テスト実装時のプロダクションコード変更原則

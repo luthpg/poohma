@@ -13,9 +13,12 @@ flowchart TD
     
     PoohMaAccount -->|"1:N owner"| RecUser["serviceRecords (ownerType: user)"]
     PoohMaAccount -.->|"1:N admin"| RecFamily["serviceRecords (ownerType: family)"]
+    PoohMaAccount -->|"1:N editor"| EditSession["recordEditingSessions (TTL 5m)"]
     
     RecUser -->|"1:N"| CredsUser["credentials (by_recordId)"]
     RecFamily -->|"1:N"| CredsFamily["credentials (by_recordId)"]
+    RecUser -->|"1:N"| EditSession
+    RecFamily -->|"1:N"| EditSession
     
     Family -->|"1:N scope"| RecFamily
     Family -->|"1:N"| Invites["familyInvites"]
@@ -102,6 +105,27 @@ flowchart TD
 - **データ分離**: 共有レコード（`ownerType: "family"`）は旧家族資産として残り、被キックユーザーの `familyId` を即時クリア。管理者であった場合は `reconcileAdminsOnLeave` で残存メンバーへ調停。
 - **Export Vault 退避**: 個人レコード（`ownerType: "user"`）の持ち出しを可能にするため、旧家族の `masterKeyEncrypted`, `masterKeyIv`, `masterKeySalt`, `kdfIterations`, `cryptoVersion` を `pendingExportVaults` へ原子的に退避。
 - **持ち出し完了または破棄**: 被キックユーザーが旧パスコードでアンラップして新家族へ持ち出し完了（`commitFamilyMigration`）するか、手動破棄（`abandonPendingExportVault`）、または 30日経過による自動クリーンアップ（1時間ごとの Cron）によって Vault は物理削除される。
+
+---
+
+### 2.5 レコード同時編集セッションと排他制御 (`recordEditingSessions` / FR-REC-15)
+
+```mermaid
+flowchart TD
+    Open["編集画面を開く (startEditingSession)"] --> Active["ACTIVE<br/>(ハートビート送信: 30秒間隔)"]
+    Active -->|"ハートビート更新 (heartbeatEditingSession)<br/>/ タブ復帰 (visibilitychange: visible)"| Active
+    
+    Active -->|"正常保存 (updateRecord 成功)"| Cleaned["セッション自動削除 (保存完了)"]
+    Active -->|"キャンセル / 画面離脱 (endEditingSession)"| CleanedManual["セッション手動削除"]
+    Active -->|"離席・タスクキル (ハートビート途絶 5分超過)"| ExpiredSession["自然失効<br/>(クエリ getActiveEditors から除外)"]
+    
+    Active -.->|"保存時: 他者の先行更新検知<br/>(record.updatedAt !== 手元のupdatedAt)"| Conflict["CONFLICT エラー<br/>(競合解決ダイアログ表示)"]
+    Conflict -->|"最新の内容を読み込む"| Reload["最新化 & 編集終了"]
+    Conflict -->|"上書き保存する (force: true)"| ForceSave["強制保存実行 & セッション削除"]
+```
+
+- **プレゼンス（Soft Advisory）**: 編集セッションは他者の編集を一切ブロックせず、注意喚起のみを行う。誰かが開きっぱなしで放置しても家族が編集不能になるデッドロックを防止。
+- **データ保全（Hard Invariant）**: 最終防衛線として `updatedAt` の楽観的ロック検証により、無警告の先行データ上書きを確実に遮断。
 
 ---
 
