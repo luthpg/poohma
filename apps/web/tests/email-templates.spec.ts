@@ -54,6 +54,16 @@ function samplePayloadFor(key: string): EmailPayload {
 					familyName: "山田家",
 				},
 			};
+		case "memberKicked":
+			return {
+				template: "memberKicked",
+				props: {
+					displayName: "鈴木 一郎",
+					familyName: "山田家",
+					ctaUrl: "https://poohma.ciderlabs.link/family",
+					expiresInDays: 30,
+				},
+			};
 		case "familyMigrationCompleted":
 			return {
 				template: "familyMigrationCompleted",

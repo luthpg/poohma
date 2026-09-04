@@ -8,6 +8,7 @@ import {
 } from "convex/react";
 import { signOut } from "firebase/auth";
 import {
+	AlertTriangle,
 	Ban,
 	Check,
 	Clock,
@@ -20,6 +21,7 @@ import {
 	RotateCcw,
 	Share2,
 	ShieldCheck,
+	UserMinus,
 	X,
 } from "lucide-react";
 
@@ -136,6 +138,12 @@ function FamilyComponent() {
 	const recoveryStatus = useQuery(
 		api.recovery.getRecoveryStatus,
 		isAuthenticated && family
+			? { accountId: activeAccountId || undefined }
+			: "skip",
+	);
+	const pendingExportVault = useQuery(
+		api.families.getMyPendingExportVault,
+		isAuthenticated && !family
 			? { accountId: activeAccountId || undefined }
 			: "skip",
 	);
@@ -318,6 +326,32 @@ function FamilyComponent() {
 	const approveJoinRequestMut = useMutation(api.families.approveJoinRequest);
 	const rejectJoinRequestMut = useMutation(api.families.rejectJoinRequest);
 	const rotatePasscodeMut = useMutation(api.families.rotatePasscode);
+	const kickMemberMut = useMutation(api.families.kickMember);
+	const abandonPendingExportVaultMut = useMutation(
+		api.families.abandonPendingExportVault,
+	);
+
+	// キック実行用 state
+	const [memberToKick, setMemberToKick] = useState<{
+		id: Id<"users">;
+		userId: string;
+		displayName: string;
+		email: string;
+	} | null>(null);
+	const [isKicking, setIsKicking] = useState(false);
+	const [kickSuccessNotice, setKickSuccessNotice] = useState<{
+		memberName: string;
+	} | null>(null);
+
+	// 被キックユーザーの Export Vault 解除用 state
+	const [vaultPasscode, setVaultPasscode] = useState("");
+	const [showVaultPasscode, setShowVaultPasscode] = useState(false);
+	const [isVerifyingVault, setIsVerifyingVault] = useState(false);
+	const [vaultUnlockedKey, setVaultUnlockedKey] = useState<CryptoKey | null>(
+		null,
+	);
+	const [isAbandoningVault, setIsAbandoningVault] = useState(false);
+	const [showAbandonConfirm, setShowAbandonConfirm] = useState(false);
 
 	const [createName, setCreateName] = useState("");
 	const [createPasscode, setCreatePasscode] = useState("");
@@ -359,6 +393,80 @@ function FamilyComponent() {
 	const [isChangingFamily, setIsChangingFamily] = useState(
 		!!search.inviteCode && family !== undefined && family !== null,
 	);
+
+	const handleKickMember = async () => {
+		if (!memberToKick) return;
+		setIsKicking(true);
+		try {
+			await kickMemberMut({
+				accountId: activeAccountId || undefined,
+				targetAccountId: memberToKick.id,
+			});
+			const kickedName = memberToKick.displayName;
+			toast.success(`「${kickedName}」を家族から削除しました`);
+			setMemberToKick(null);
+			setKickSuccessNotice({ memberName: kickedName });
+			await queryClient.invalidateQueries({ queryKey: ["authUser"] });
+			await router.invalidate();
+		} catch (error) {
+			console.error("Failed to kick member:", error);
+			toast.error("メンバーの削除に失敗しました");
+		} finally {
+			setIsKicking(false);
+		}
+	};
+
+	const handleVerifyVaultPasscode = async (e: React.FormEvent) => {
+		e.preventDefault();
+		if (!pendingExportVault) return;
+		if (!vaultPasscode || vaultPasscode.length < 8) {
+			toast.error("旧家族のパスコードを入力してください（8文字以上）");
+			return;
+		}
+
+		setIsVerifyingVault(true);
+		try {
+			const wrappingKey = await deriveKeyFromPasscode(
+				vaultPasscode,
+				pendingExportVault.masterKeySalt,
+				pendingExportVault.kdfIterations ?? LEGACY_PBKDF2_ITERATIONS,
+				(pendingExportVault.cryptoVersion ?? LEGACY_KDF_VERSION) as KdfVersion,
+			);
+			const unwrapResult = await unwrapMasterKey(
+				pendingExportVault.masterKeyEncrypted,
+				pendingExportVault.masterKeyIv,
+				wrappingKey,
+			);
+			setVaultUnlockedKey(unwrapResult);
+			toast.success(
+				"旧家族のパスコードを確認しました。新しい家族を作成または参加してください",
+			);
+		} catch (error) {
+			console.error("Vault unlock failed:", error);
+			toast.error("パスコードが一致しません。もう一度お試しください");
+		} finally {
+			setIsVerifyingVault(false);
+		}
+	};
+
+	const handleAbandonVault = async () => {
+		setIsAbandoningVault(true);
+		try {
+			await abandonPendingExportVaultMut({
+				accountId: activeAccountId || undefined,
+			});
+			toast.success("旧家族のデータを破棄しました");
+			setShowAbandonConfirm(false);
+			setVaultUnlockedKey(null);
+			setVaultPasscode("");
+			await router.invalidate();
+		} catch (error) {
+			console.error("Failed to abandon vault:", error);
+			toast.error("データの破棄に失敗しました");
+		} finally {
+			setIsAbandoningVault(false);
+		}
+	};
 
 	// 参加申請を送信する
 	const handleSendJoinRequest = useCallback(
@@ -439,7 +547,8 @@ function FamilyComponent() {
 				ReturnType<typeof reEncryptCredentials>
 			> = [];
 			if (migrationData.records.length > 0) {
-				if (!getMasterKey()) {
+				let oldMasterKey = vaultUnlockedKey ?? getMasterKey();
+				if (!oldMasterKey) {
 					const unlocked = await requireUnlock();
 					if (!unlocked) {
 						await abortFamilyMigrationMut({
@@ -449,8 +558,8 @@ function FamilyComponent() {
 						currentMigrationId = null;
 						return;
 					}
+					oldMasterKey = getMasterKey();
 				}
-				const oldMasterKey = getMasterKey();
 				if (!oldMasterKey) {
 					throw new Error("旧マスターキーが利用できません");
 				}
@@ -471,6 +580,8 @@ function FamilyComponent() {
 			await queryClient.invalidateQueries({ queryKey: ["authUser"] });
 			toast.success("家族グループへの参加が完了しました");
 			setIsChangingFamily(false);
+			setVaultUnlockedKey(null);
+			setVaultPasscode("");
 			await router.invalidate();
 		} catch (error) {
 			if (currentMigrationId) {
@@ -495,6 +606,7 @@ function FamilyComponent() {
 		joinPasscode,
 		getMasterKey,
 		requireUnlock,
+		vaultUnlockedKey,
 		prepareFamilyMigrationMut,
 		convex,
 		commitFamilyMigrationMut,
@@ -523,13 +635,15 @@ function FamilyComponent() {
 			setIsLoading(true);
 			let currentMigrationId: Id<"familyMigrations"> | null = null;
 			try {
-				// 1. セッションに旧マスターキーがあるか確認、なければロック解除を要求
-				if (!getMasterKey()) {
+				// 1. セッションまたはVaultに旧マスターキーがあるか確認、なければロック解除を要求
+				let oldMasterKey = vaultUnlockedKey ?? getMasterKey();
+				if (!oldMasterKey && family) {
 					const unlocked = await requireUnlock();
 					if (!unlocked) {
 						setIsLoading(false);
 						return;
 					}
+					oldMasterKey = getMasterKey();
 				}
 
 				// 2. 新しいマスターキーの準備
@@ -564,15 +678,19 @@ function FamilyComponent() {
 						migrationId,
 					},
 				);
-				const oldMasterKey = getMasterKey();
-				if (!oldMasterKey) {
-					throw new Error("旧マスターキーが利用できません");
+				let reEncryptedCredentials: Awaited<
+					ReturnType<typeof reEncryptCredentials>
+				> = [];
+				if (migrationData.records.length > 0) {
+					if (!oldMasterKey) {
+						throw new Error("旧マスターキーが利用できません");
+					}
+					reEncryptedCredentials = await reEncryptCredentials(
+						migrationData.records,
+						oldMasterKey,
+						newMasterKey,
+					);
 				}
-				const reEncryptedCredentials = await reEncryptCredentials(
-					migrationData.records,
-					oldMasterKey,
-					newMasterKey,
-				);
 
 				// 5. commit
 				await commitFamilyMigrationMut({
@@ -582,8 +700,10 @@ function FamilyComponent() {
 				});
 
 				await queryClient.invalidateQueries({ queryKey: ["authUser"] });
-				toast.success("家族グループを変更し、データを移行しました");
+				toast.success("家族グループを作成し、データを移行しました");
 				setIsChangingFamily(false);
+				setVaultUnlockedKey(null);
+				setVaultPasscode("");
 				await router.invalidate();
 			} catch (error) {
 				if (currentMigrationId) {
@@ -759,6 +879,159 @@ function FamilyComponent() {
 	// family がまだロード中の場合はペンディングコンポーネントを表示
 	if (family === undefined) {
 		return <FamilyPending />;
+	}
+
+	// キックされて Export Vault を保有し、まだ旧パスコード認証も放棄もしていない場合の専用画面
+	if (!family && pendingExportVault && !vaultUnlockedKey) {
+		const daysRemaining = Math.max(
+			0,
+			Math.ceil(
+				(pendingExportVault.expiresAt - Date.now()) / (1000 * 60 * 60 * 24),
+			),
+		);
+
+		return (
+			<div className="mx-auto max-w-3xl p-6">
+				<div className="mb-6 sm:mb-8 flex flex-wrap items-center justify-between gap-3">
+					<h1 className="text-[26px] sm:text-[32px] font-semibold tracking-geist-h1 text-foreground">
+						家族管理
+					</h1>
+					<div className="flex items-center gap-2 sm:gap-3 ml-auto shrink-0">
+						<AccountSwitcher />
+						<button
+							type="button"
+							onClick={handleLogout}
+							className="rounded-md bg-card px-3.5 py-1.5 sm:px-4 sm:py-2 text-[13px] sm:text-[14px] font-medium text-red-500 shadow-border hover:bg-accent transition cursor-pointer"
+						>
+							ログアウト
+						</button>
+					</div>
+				</div>
+
+				<div className="rounded-lg bg-card p-6 shadow-card transition-shadow space-y-6">
+					<div className="flex items-start gap-4 border-b border-border pb-6">
+						<div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400">
+							<AlertTriangle className="h-6 w-6" />
+						</div>
+						<div className="space-y-1">
+							<div className="flex flex-wrap items-center gap-2">
+								<h2 className="text-[20px] font-semibold tracking-geist-ui text-foreground">
+									家族グループ「{pendingExportVault.oldFamilyName}
+									」から削除されました
+								</h2>
+								<span className="inline-flex items-center rounded-full bg-orange-500/10 px-2.5 py-0.5 text-xs font-medium text-orange-600 dark:text-orange-400">
+									持ち出し期限: あと {daysRemaining} 日
+								</span>
+							</div>
+							<p className="text-[14px] text-muted-foreground leading-relaxed">
+								あなたが「自分のみ」として登録していたデータは、旧家族のパスコードを使って新しい家族グループへ持ち出すことができます。
+								なお、家族と共有していたデータは家族グループ側に残るため、持ち出すことはできません。
+							</p>
+						</div>
+					</div>
+
+					{/* 選択肢1: 旧パスコードでデータを持ち出す */}
+					<div className="rounded-lg border border-orange-500/30 bg-orange-500/5 p-5 space-y-4">
+						<div className="flex items-center gap-2 text-foreground font-semibold text-[15px]">
+							<KeyRound className="h-4 w-4 text-orange-500" />
+							<span>旧家族のパスコードを入力してデータを引き継ぐ</span>
+						</div>
+						<p className="text-[13px] text-muted-foreground">
+							旧家族のパスコードを入力して確認が取れると、個人データを保持したまま新しい家族の作成や別家族への参加へ進めます。
+						</p>
+
+						<form onSubmit={handleVerifyVaultPasscode} className="space-y-3">
+							<div>
+								<label
+									htmlFor="vault-passcode-input"
+									className="block text-[13px] font-medium text-foreground mb-1"
+								>
+									旧家族のパスコード
+								</label>
+								<div className="relative">
+									<input
+										id="vault-passcode-input"
+										type={showVaultPasscode ? "text" : "password"}
+										required
+										minLength={8}
+										value={vaultPasscode}
+										onChange={(e) => setVaultPasscode(e.target.value)}
+										placeholder="8文字以上"
+										className="w-full rounded-md bg-background p-2.5 text-base md:text-[14px] pr-10 shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+									/>
+									<button
+										type="button"
+										onClick={() => setShowVaultPasscode(!showVaultPasscode)}
+										className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground cursor-pointer"
+									>
+										{showVaultPasscode ? (
+											<EyeOff className="h-4 w-4" />
+										) : (
+											<Eye className="h-4 w-4" />
+										)}
+									</button>
+								</div>
+							</div>
+							<button
+								type="submit"
+								disabled={isVerifyingVault}
+								className="flex items-center justify-center gap-2 rounded-md bg-orange-500 px-4 py-2.5 text-[14px] font-medium text-white shadow-sm hover:bg-orange-600 transition disabled:opacity-50 cursor-pointer"
+							>
+								{isVerifyingVault && <Spinner className="h-4 w-4" />}
+								パスコードを確認して引き継ぐ
+							</button>
+						</form>
+					</div>
+
+					{/* 選択肢2: データを持ち出さずに放棄して進む */}
+					<div className="pt-2 text-center">
+						<button
+							type="button"
+							onClick={() => setShowAbandonConfirm(true)}
+							className="text-[13px] text-muted-foreground hover:text-red-500 transition underline underline-offset-4 cursor-pointer"
+						>
+							データを持ち出さずに新規参加・作成する（データ破棄）
+						</button>
+					</div>
+				</div>
+
+				{/* 放棄確認モーダル */}
+				{showAbandonConfirm && (
+					<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+						<div className="w-full max-w-md rounded-lg bg-card p-6 shadow-card space-y-4">
+							<div className="flex items-center gap-3 text-red-500">
+								<AlertTriangle className="h-6 w-6" />
+								<h3 className="text-[18px] font-semibold text-foreground">
+									旧家族のデータを破棄しますか？
+								</h3>
+							</div>
+							<p className="text-[14px] text-muted-foreground leading-relaxed">
+								旧家族で登録していた「自分のみ」のデータは復号する手段がなくなり、実質的に二度と閲覧できなくなります。この操作は取り消せません。
+							</p>
+							<div className="flex justify-end gap-3 pt-2">
+								<button
+									type="button"
+									disabled={isAbandoningVault}
+									onClick={() => setShowAbandonConfirm(false)}
+									className="rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium text-foreground hover:bg-accent transition cursor-pointer"
+								>
+									キャンセル
+								</button>
+								<button
+									type="button"
+									disabled={isAbandoningVault}
+									onClick={handleAbandonVault}
+									className="flex items-center gap-2 rounded-md bg-red-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-red-700 transition disabled:opacity-50 cursor-pointer"
+								>
+									{isAbandoningVault && <Spinner className="h-4 w-4" />}
+									データを破棄して進む
+								</button>
+							</div>
+						</div>
+					</div>
+				)}
+			</div>
+		);
 	}
 
 	// 保留中・却下済み申請がある場合のUI（家族未所属ユーザー向け）
@@ -1337,6 +1610,25 @@ function FamilyComponent() {
 												{u.email}
 											</span>
 										</div>
+										{!isCurrentAccount && !isMyOtherAccount && (
+											<button
+												type="button"
+												onClick={() =>
+													setMemberToKick({
+														id: u.id,
+														userId: u.userId,
+														displayName: u.displayName || "メンバー",
+														email: u.email,
+													})
+												}
+												className="flex items-center gap-1 text-[12px] font-medium text-red-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 px-2.5 py-1.5 rounded-md transition cursor-pointer"
+												title="家族グループから削除"
+												data-testid={`kick-member-btn-${u.id}`}
+											>
+												<UserMinus className="h-3.5 w-3.5" />
+												削除
+											</button>
+										)}
 									</li>
 								);
 							})}
@@ -1426,7 +1718,10 @@ function FamilyComponent() {
 					)}
 
 					{/* 家族パスコードの変更 */}
-					<div className="mt-8 border-t border-border pt-6">
+					<div
+						id="rotate-passcode-section"
+						className="mt-8 border-t border-border pt-6"
+					>
 						<div className="flex items-center justify-between mb-4">
 							<div>
 								<h3 className="text-[14px] font-medium text-foreground">
@@ -1714,6 +2009,28 @@ function FamilyComponent() {
 				<div className="space-y-6">
 					{!family ? (
 						<>
+							{vaultUnlockedKey && (
+								<div className="rounded-lg bg-green-500/10 p-4 border border-green-500/30 flex items-center justify-between gap-3">
+									<div className="flex items-center gap-2.5">
+										<Check className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" />
+										<p className="text-[13px] text-green-700 dark:text-green-300">
+											旧家族「
+											<strong>{pendingExportVault?.oldFamilyName}</strong>
+											」のデータ引き継ぎ準備が完了しました。新しい家族を作成するか、招待から参加すると個人データが再暗号化されて引き継がれます。
+										</p>
+									</div>
+									<button
+										type="button"
+										onClick={() => {
+											setVaultUnlockedKey(null);
+											setVaultPasscode("");
+										}}
+										className="text-[12px] text-muted-foreground hover:text-foreground underline shrink-0 cursor-pointer"
+									>
+										やり直す
+									</button>
+								</div>
+							)}
 							{search.inviteCode && (
 								<div className="rounded-lg bg-orange-500/10 p-4 border border-orange-500/30 flex flex-col gap-1.5">
 									<span className="text-xs font-semibold uppercase tracking-wider text-orange-600 dark:text-orange-400">
@@ -1990,6 +2307,107 @@ function FamilyComponent() {
 									)}
 								</button>
 							</form>
+						</div>
+					</div>
+				</div>
+			)}
+
+			{/* メンバーキック確認ダイアログ */}
+			{memberToKick && (
+				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+					<div className="w-full max-w-md rounded-lg bg-card p-6 shadow-card space-y-4">
+						<div className="flex items-center gap-3 text-red-500">
+							<AlertTriangle className="h-6 w-6 shrink-0" />
+							<h3 className="text-[18px] font-semibold text-foreground">
+								メンバーを家族グループから削除
+							</h3>
+						</div>
+						<div className="space-y-3 text-[13px] text-muted-foreground leading-relaxed">
+							<p>
+								「
+								<strong className="text-foreground">
+									{memberToKick.displayName}
+								</strong>
+								」（{memberToKick.email}）を家族グループから削除しますか？
+							</p>
+							<ul className="list-disc pl-5 space-y-1">
+								<li>
+									対象者が「自分のみ」として登録したデータは、本人が旧パスコードを用いて持ち出すことができます。
+								</li>
+								<li>
+									対象者が家族と「共有」していたデータは、家族グループ側に残ります。
+								</li>
+								<li className="text-orange-600 dark:text-orange-400 font-medium">
+									削除されたメンバーはこれまでのパスコードを記憶しているため、削除後はパスコードの変更を強く推奨します。
+								</li>
+							</ul>
+						</div>
+						<div className="flex justify-end gap-3 pt-2">
+							<button
+								type="button"
+								disabled={isKicking}
+								onClick={() => setMemberToKick(null)}
+								className="rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium text-foreground hover:bg-accent transition cursor-pointer"
+							>
+								キャンセル
+							</button>
+							<button
+								type="button"
+								disabled={isKicking}
+								onClick={handleKickMember}
+								className="flex items-center gap-2 rounded-md bg-red-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-red-700 transition disabled:opacity-50 cursor-pointer"
+								data-testid="confirm-kick-btn"
+							>
+								{isKicking && <Spinner className="h-4 w-4" />}
+								削除する
+							</button>
+						</div>
+					</div>
+				</div>
+			)}
+
+			{/* キック後パスコード変更推奨モーダル */}
+			{kickSuccessNotice && (
+				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+					<div className="w-full max-w-md rounded-lg bg-card p-6 shadow-card space-y-4">
+						<div className="flex items-center gap-3 text-orange-500">
+							<KeyRound className="h-6 w-6 shrink-0" />
+							<h3 className="text-[18px] font-semibold text-foreground">
+								家族パスコードの変更を推奨します
+							</h3>
+						</div>
+						<p className="text-[13px] text-muted-foreground leading-relaxed">
+							メンバー「<strong>{kickSuccessNotice.memberName}</strong>
+							」を削除しました。
+							<br />
+							削除されたメンバーはこれまでの家族パスコードを記憶しているため、家族に残された共有データを確実に保護するには、
+							<strong>今すぐパスコードを変更（ローテーション）</strong>
+							することをお勧めします。
+						</p>
+						<div className="flex justify-end gap-3 pt-2">
+							<button
+								type="button"
+								onClick={() => setKickSuccessNotice(null)}
+								className="rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium text-foreground hover:bg-accent transition cursor-pointer"
+							>
+								あとで行う
+							</button>
+							<button
+								type="button"
+								onClick={() => {
+									setKickSuccessNotice(null);
+									setShowRotatePasscodeForm(true);
+									setTimeout(() => {
+										document
+											.getElementById("rotate-passcode-section")
+											?.scrollIntoView({ behavior: "smooth" });
+									}, 100);
+								}}
+								className="flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-[13px] font-medium text-white hover:bg-orange-600 transition cursor-pointer"
+							>
+								<KeyRound className="h-4 w-4" />
+								今すぐパスコードを変更
+							</button>
 						</div>
 					</div>
 				</div>

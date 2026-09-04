@@ -789,6 +789,14 @@ export const commitFamilyMigration = authenticatedMutation({
 
     await ctx.db.patch(migration._id, { status: "COMPLETED" });
 
+    const pendingVault = await ctx.db
+      .query("pendingExportVaults")
+      .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
+      .first();
+    if (pendingVault) {
+      await ctx.db.delete(pendingVault._id);
+    }
+
     const targetFamily = await ctx.db.get(migration.targetFamilyId);
     const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
     await ctx.scheduler.runAfter(
@@ -1688,5 +1696,155 @@ export const backfillKdfMetadataInternal = internalMutation({
       }
     }
     return { patched, total: allFamilies.length };
+  },
+});
+
+const EXPORT_VAULT_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30日
+
+/**
+ * 家族メンバーをグループからキック（削除）するMutation
+ * - 被キックユーザーの家族所属を解除
+ * - 旧家族マスターキー情報をpendingExportVaultsに30日間退避
+ * - 共有レコードのadminsを調停（reconcileAdminsOnLeave）
+ * - 被キックユーザーへ通知メールを送信
+ */
+export const kickMember = familyBoundMutation({
+  args: {
+    targetAccountId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const { user, familyId } = ctx;
+
+    const targetUser = await ctx.db.get(args.targetAccountId);
+    if (!targetUser) {
+      throw new Error("Target user not found");
+    }
+
+    if (targetUser._id === user._id || targetUser.userId === user.userId) {
+      throw new Error(
+        "Cannot kick yourself. Use family migration to leave voluntarily.",
+      );
+    }
+
+    if (targetUser.familyId !== familyId) {
+      throw new Error("Target user is not a member of your family");
+    }
+
+    const family = await ctx.db.get(familyId);
+    if (!family) {
+      throw new Error("Family not found");
+    }
+
+    // 1. 旧家族マスターキー情報をExport Vaultへ退避
+    if (
+      family.masterKeyEncrypted &&
+      family.masterKeyIv &&
+      family.masterKeySalt
+    ) {
+      const existingVault = await ctx.db
+        .query("pendingExportVaults")
+        .withIndex("by_accountId", (q) => q.eq("accountId", targetUser._id))
+        .first();
+      if (existingVault) {
+        await ctx.db.delete(existingVault._id);
+      }
+
+      await ctx.db.insert("pendingExportVaults", {
+        accountId: targetUser._id,
+        userId: targetUser.userId,
+        oldFamilyId: familyId,
+        oldFamilyName: family.name,
+        masterKeyEncrypted: family.masterKeyEncrypted,
+        masterKeyIv: family.masterKeyIv,
+        masterKeySalt: family.masterKeySalt,
+        kdfIterations: family.kdfIterations,
+        cryptoVersion: family.cryptoVersion,
+        createdAt: Date.now(),
+        expiresAt: Date.now() + EXPORT_VAULT_TTL_MS,
+      });
+    }
+
+    // 2. 被キックユーザーがadminsに含まれる共有レコードの管理者リストを調停
+    await reconcileAdminsOnLeave(ctx, familyId, targetUser._id);
+
+    // 3. 家族所属を解除（個人所有レコードはownerUserId・暗号化スコープとも維持される）
+    await ctx.db.patch(targetUser._id, { familyId: undefined });
+
+    // 4. 通知メールをスケジュール送信
+    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
+    await ctx.scheduler.runAfter(
+      0,
+      internal.actions.sendTemplatedEmailInternal,
+      {
+        email: targetUser.email,
+        payload: {
+          template: "memberKicked",
+          props: {
+            displayName: targetUser.displayName || "メンバー",
+            familyName: family.name,
+            ctaUrl: `${appUrl}/family`,
+            expiresInDays: 30,
+          },
+        },
+      },
+    );
+
+    return { success: true };
+  },
+});
+
+/**
+ * 自身の有効なExport Vaultを取得するQuery
+ */
+export const getMyPendingExportVault = authenticatedQuery({
+  args: {},
+  handler: async (ctx) => {
+    const { user } = ctx;
+    const vault = await ctx.db
+      .query("pendingExportVaults")
+      .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
+      .first();
+
+    if (!vault || vault.expiresAt < Date.now()) {
+      return null;
+    }
+
+    return vault;
+  },
+});
+
+/**
+ * 自身のExport Vaultを破棄（持ち出しを放棄）するMutation
+ */
+export const abandonPendingExportVault = authenticatedMutation({
+  args: {},
+  handler: async (ctx) => {
+    const { user } = ctx;
+    const vault = await ctx.db
+      .query("pendingExportVaults")
+      .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
+      .first();
+
+    if (vault) {
+      await ctx.db.delete(vault._id);
+    }
+
+    return { success: true };
+  },
+});
+
+/**
+ * 期限切れExport Vaultを定期削除する内部Mutation
+ */
+export const cleanupExpiredExportVaultsInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const allVaults = await ctx.db.query("pendingExportVaults").collect();
+    for (const vault of allVaults) {
+      if (vault.expiresAt < now) {
+        await ctx.db.delete(vault._id);
+      }
+    }
   },
 });

@@ -122,4 +122,110 @@ describe("Family Migration & パスコード変更時の再暗号化 (実ブラ�
 			),
 		).rejects.toThrow();
 	});
+
+	test("メンバーキック時: Export Vault経由で旧Master Keyを取り出し、新Master Keyで個人レコードのDEKを再Wrapして移行先で復号できる（共有レコードは家族側に残り新Master Keyでは復号不可）", async () => {
+		const oldFamilyPasscode = "old-family-passcode-2026";
+		const newFamilyPasscode = "new-independent-passcode-2027";
+		const salt = "family-salt-11223344";
+
+		// 1. 旧家族環境のセットアップ
+		const oldKek = await deriveKeyFromPasscode(oldFamilyPasscode, salt);
+		const oldMasterKey = await generateMasterKey();
+		const oldWrappedMasterKey = await wrapMasterKey(oldMasterKey, oldKek);
+
+		// Export Vault 退避データ
+		const exportVault = {
+			masterKeyEncrypted: oldWrappedMasterKey.encrypted,
+			masterKeyIv: oldWrappedMasterKey.iv,
+			masterKeySalt: salt,
+		};
+
+		// 2. 被キックユーザーの個人所有レコード（PRIVATE）
+		const personalSecret = "個人用秘密メモ: my-personal-secret-123";
+		const personalDek = await generateDEK();
+		const personalCipher = await encrypt(personalSecret, personalDek);
+		const oldWrappedPersonalDek = await wrapDEK(personalDek, oldMasterKey);
+
+		// 3. 家族共有レコード（SHARED: 家族側に残るもの）
+		const sharedSecret = "家族共有のWi-Fi: family-wifi-shared";
+		const sharedDek = await generateDEK();
+		const sharedCipher = await encrypt(sharedSecret, sharedDek);
+		const oldWrappedSharedDek = await wrapDEK(sharedDek, oldMasterKey);
+
+		// 4. キック後：被キックユーザーが旧パスコードを入力し、Export Vaultから旧Master Keyを取り出す
+		const vaultKek = await deriveKeyFromPasscode(
+			oldFamilyPasscode,
+			exportVault.masterKeySalt,
+		);
+		const recoveredOldMasterKey = await unwrapMasterKey(
+			exportVault.masterKeyEncrypted,
+			exportVault.masterKeyIv,
+			vaultKek,
+		);
+
+		// 5. 新家族の作成：新パスコードから新Master Keyを作成
+		const newKek = await deriveKeyFromPasscode(newFamilyPasscode, salt);
+		const newMasterKey = await generateMasterKey();
+		const newWrappedMasterKey = await wrapMasterKey(newMasterKey, newKek);
+
+		// 6. 個人所有レコードのDEKを、Export Vault由来の旧Master Keyでアンラップし、新Master Keyで再Wrap
+		const unwrappedPersonalDek = await unwrapDEK(
+			oldWrappedPersonalDek.encrypted,
+			oldWrappedPersonalDek.iv,
+			recoveredOldMasterKey,
+		);
+		const newWrappedPersonalDek = await wrapDEK(
+			unwrappedPersonalDek,
+			newMasterKey,
+		);
+
+		// 7. 検証: 新家族Master Keyで個人所有レコードが正常に復号できること
+		const unwrappedNewMasterKey = await unwrapMasterKey(
+			newWrappedMasterKey.encrypted,
+			newWrappedMasterKey.iv,
+			newKek,
+		);
+		const restoredPersonalDek = await unwrapDEK(
+			newWrappedPersonalDek.encrypted,
+			newWrappedPersonalDek.iv,
+			unwrappedNewMasterKey,
+		);
+		const decryptedPersonal = await decrypt(
+			personalCipher.encrypted,
+			personalCipher.iv,
+			restoredPersonalDek,
+		);
+		expect(decryptedPersonal).toBe(personalSecret);
+
+		// 8. 検証: 旧Master Keyでは新家族へ持ち出された個人レコードのDEKをアンラップできないこと
+		await expect(
+			unwrapDEK(
+				newWrappedPersonalDek.encrypted,
+				newWrappedPersonalDek.iv,
+				recoveredOldMasterKey,
+			),
+		).rejects.toThrow();
+
+		// 9. 検証: 家族側に残った共有レコードのDEKは、新家族Master Keyでは復号できないこと（共有資産保護）
+		await expect(
+			unwrapDEK(
+				oldWrappedSharedDek.encrypted,
+				oldWrappedSharedDek.iv,
+				unwrappedNewMasterKey,
+			),
+		).rejects.toThrow();
+
+		// 10. 検証: 共有レコードは旧家族側Master Keyでのみ復号できること
+		const restoredSharedDek = await unwrapDEK(
+			oldWrappedSharedDek.encrypted,
+			oldWrappedSharedDek.iv,
+			oldMasterKey,
+		);
+		const decryptedShared = await decrypt(
+			sharedCipher.encrypted,
+			sharedCipher.iv,
+			restoredSharedDek,
+		);
+		expect(decryptedShared).toBe(sharedSecret);
+	});
 });

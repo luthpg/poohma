@@ -2475,4 +2475,473 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 			).rejects.toThrow("User does not belong to a family");
 		});
 	});
+
+	describe("2.1.13 メンバーキック機能とExport Vault（E2EEデータ持ち出し）の検証", () => {
+		it("家族メンバーをキックすると、対象ユーザーのfamilyIdが解除され、Export Vaultが作成されること", async () => {
+			const t = convexTest(schema, modules);
+
+			let familyId!: Id<"families">;
+			let userBId!: Id<"users">;
+
+			await t.run(async (ctx) => {
+				familyId = await ctx.db.insert("families", {
+					name: "佐藤家",
+					masterKeyEncrypted: "oldMasterKeyEncryptedBase64==",
+					masterKeyIv: "oldMasterKeyIv==",
+					masterKeySalt: "oldMasterKeySalt==",
+					kdfIterations: 600000,
+					cryptoVersion: 1,
+					updatedAt: Date.now(),
+				});
+
+				await ctx.db.insert("users", {
+					userId: "user_a",
+					email: "a@example.com",
+					displayName: "佐藤 太郎",
+					familyId,
+					updatedAt: Date.now(),
+				});
+
+				userBId = await ctx.db.insert("users", {
+					userId: "user_b",
+					email: "b@example.com",
+					displayName: "佐藤 次郎",
+					familyId,
+					updatedAt: Date.now(),
+				});
+			});
+
+			const userA = t.withIdentity({
+				subject: "user_a",
+				email: "a@example.com",
+			});
+			const result = await userA.mutation(api.families.kickMember, {
+				targetAccountId: userBId,
+			});
+			expect(result.success).toBe(true);
+
+			// ユーザーBのfamilyIdが未設定になっていること
+			const updatedUserB = await t.run(async (ctx) => ctx.db.get(userBId));
+			expect(updatedUserB?.familyId).toBeUndefined();
+
+			// Export Vaultが作成されていること
+			const vault = await t.run(async (ctx) => {
+				return await ctx.db
+					.query("pendingExportVaults")
+					.withIndex("by_accountId", (q) => q.eq("accountId", userBId))
+					.first();
+			});
+			expect(vault).toBeDefined();
+			expect(vault?.oldFamilyId).toBe(familyId);
+			expect(vault?.oldFamilyName).toBe("佐藤家");
+			expect(vault?.masterKeyEncrypted).toBe("oldMasterKeyEncryptedBase64==");
+			expect(vault?.masterKeyIv).toBe("oldMasterKeyIv==");
+			expect(vault?.masterKeySalt).toBe("oldMasterKeySalt==");
+			expect(vault?.kdfIterations).toBe(600000);
+			expect(vault?.cryptoVersion).toBe(1);
+			expect(vault?.expiresAt).toBeGreaterThan(Date.now());
+		});
+
+		it("自分自身（または自分の別アカウント）をキックしようとすると拒否されること", async () => {
+			const t = convexTest(schema, modules);
+
+			let familyId!: Id<"families">;
+			let userAId!: Id<"users">;
+			let userA2Id!: Id<"users">;
+
+			await t.run(async (ctx) => {
+				familyId = await ctx.db.insert("families", {
+					name: "佐藤家",
+					masterKeyEncrypted: "encKey",
+					masterKeyIv: "iv",
+					masterKeySalt: "salt",
+					updatedAt: Date.now(),
+				});
+
+				userAId = await ctx.db.insert("users", {
+					userId: "user_a",
+					email: "a@example.com",
+					familyId,
+					updatedAt: Date.now(),
+				});
+
+				// 同一UIDの別アカウント
+				userA2Id = await ctx.db.insert("users", {
+					userId: "user_a",
+					email: "a-work@example.com",
+					familyId,
+					updatedAt: Date.now(),
+				});
+			});
+
+			const userA = t.withIdentity({
+				subject: "user_a",
+				email: "a@example.com",
+			});
+
+			// 同一アカウントのキック拒否
+			await expect(
+				userA.mutation(api.families.kickMember, { targetAccountId: userAId }),
+			).rejects.toThrow("Cannot kick yourself");
+
+			// 同一UID別アカウントのキック拒否
+			await expect(
+				userA.mutation(api.families.kickMember, { targetAccountId: userA2Id }),
+			).rejects.toThrow("Cannot kick yourself");
+		});
+
+		it("別家族のユーザーをキックしようとすると拒否されること", async () => {
+			const t = convexTest(schema, modules);
+
+			let family1Id!: Id<"families">;
+			let family2Id!: Id<"families">;
+			let userOtherId!: Id<"users">;
+
+			await t.run(async (ctx) => {
+				family1Id = await ctx.db.insert("families", {
+					name: "佐藤家",
+					masterKeyEncrypted: "enc1",
+					masterKeyIv: "iv1",
+					masterKeySalt: "salt1",
+					updatedAt: Date.now(),
+				});
+				family2Id = await ctx.db.insert("families", {
+					name: "鈴木家",
+					masterKeyEncrypted: "enc2",
+					masterKeyIv: "iv2",
+					masterKeySalt: "salt2",
+					updatedAt: Date.now(),
+				});
+
+				await ctx.db.insert("users", {
+					userId: "user_a",
+					email: "a@example.com",
+					familyId: family1Id,
+					updatedAt: Date.now(),
+				});
+
+				userOtherId = await ctx.db.insert("users", {
+					userId: "user_other",
+					email: "other@example.com",
+					familyId: family2Id,
+					updatedAt: Date.now(),
+				});
+			});
+
+			const userA = t.withIdentity({
+				subject: "user_a",
+				email: "a@example.com",
+			});
+			await expect(
+				userA.mutation(api.families.kickMember, {
+					targetAccountId: userOtherId,
+				}),
+			).rejects.toThrow("Target user is not a member of your family");
+		});
+
+		it("キックされたユーザーがadminsに含まれる共有レコードから除外され、管理者が調停されること", async () => {
+			const t = convexTest(schema, modules);
+
+			let familyId!: Id<"families">;
+			let userAId!: Id<"users">;
+			let userBId!: Id<"users">;
+			let sharedRecId!: Id<"serviceRecords">;
+
+			await t.run(async (ctx) => {
+				familyId = await ctx.db.insert("families", {
+					name: "田中家",
+					masterKeyEncrypted: "encKey",
+					masterKeyIv: "iv",
+					masterKeySalt: "salt",
+					updatedAt: Date.now(),
+				});
+
+				userAId = await ctx.db.insert("users", {
+					userId: "user_a",
+					email: "a@example.com",
+					familyId,
+					updatedAt: Date.now(),
+				});
+
+				userBId = await ctx.db.insert("users", {
+					userId: "user_b",
+					email: "b@example.com",
+					familyId,
+					updatedAt: Date.now(),
+				});
+
+				// ユーザーBのみが管理者となっている共有レコード
+				sharedRecId = await ctx.db.insert("serviceRecords", {
+					title: "家族Netflix",
+					sortKey: "netflix",
+					userId: "user_b",
+					accountId: userBId,
+					familyId,
+					ownerType: "family",
+					ownerFamilyId: familyId,
+					admins: [userBId],
+					tags: [],
+					updatedAt: Date.now(),
+				});
+			});
+
+			const userA = t.withIdentity({
+				subject: "user_a",
+				email: "a@example.com",
+			});
+			await userA.mutation(api.families.kickMember, {
+				targetAccountId: userBId,
+			});
+
+			// 管理者が0人になるため、残存メンバー（userAId）に自動昇格調停されていること
+			const record = await t.run(async (ctx) => ctx.db.get(sharedRecId));
+			expect(record?.admins).toEqual([userAId]);
+			expect(record?.ownerFamilyId).toBe(familyId);
+		});
+
+		it("getMyPendingExportVault / abandonPendingExportVault が正しく動作すること", async () => {
+			const t = convexTest(schema, modules);
+
+			let familyId!: Id<"families">;
+			let userBId!: Id<"users">;
+
+			await t.run(async (ctx) => {
+				familyId = await ctx.db.insert("families", {
+					name: "高橋家",
+					masterKeyEncrypted: "encKey",
+					masterKeyIv: "iv",
+					masterKeySalt: "salt",
+					updatedAt: Date.now(),
+				});
+
+				await ctx.db.insert("users", {
+					userId: "user_a",
+					email: "a@example.com",
+					familyId,
+					updatedAt: Date.now(),
+				});
+
+				userBId = await ctx.db.insert("users", {
+					userId: "user_b",
+					email: "b@example.com",
+					familyId,
+					updatedAt: Date.now(),
+				});
+			});
+
+			const userA = t.withIdentity({
+				subject: "user_a",
+				email: "a@example.com",
+			});
+			const userB = t.withIdentity({
+				subject: "user_b",
+				email: "b@example.com",
+			});
+
+			// キック前はnull
+			const vaultBefore = await userB.query(
+				api.families.getMyPendingExportVault,
+				{},
+			);
+			expect(vaultBefore).toBeNull();
+
+			// キック実行
+			await userA.mutation(api.families.kickMember, {
+				targetAccountId: userBId,
+			});
+
+			// キック後はVaultが取得できること
+			const vaultAfter = await userB.query(
+				api.families.getMyPendingExportVault,
+				{},
+			);
+			expect(vaultAfter).not.toBeNull();
+			expect(vaultAfter?.oldFamilyName).toBe("高橋家");
+
+			// 放棄（手動破棄）
+			await userB.mutation(api.families.abandonPendingExportVault, {});
+
+			// 破棄後はnull
+			const vaultAfterAbandon = await userB.query(
+				api.families.getMyPendingExportVault,
+				{},
+			);
+			expect(vaultAfterAbandon).toBeNull();
+		});
+
+		it("期限切れのExport Vaultは定期クリーンアップ（cleanupExpiredExportVaultsInternal）で削除されること", async () => {
+			const t = convexTest(schema, modules);
+
+			let userBId!: Id<"users">;
+
+			await t.run(async (ctx) => {
+				const famId = await ctx.db.insert("families", {
+					name: "旧家",
+					updatedAt: Date.now(),
+				});
+
+				userBId = await ctx.db.insert("users", {
+					userId: "user_b",
+					email: "b@example.com",
+					updatedAt: Date.now(),
+				});
+
+				// 過去の失効済みVault
+				await ctx.db.insert("pendingExportVaults", {
+					accountId: userBId,
+					userId: "user_b",
+					oldFamilyId: famId,
+					oldFamilyName: "旧家",
+					masterKeyEncrypted: "enc",
+					masterKeyIv: "iv",
+					masterKeySalt: "salt",
+					createdAt: Date.now() - 31 * 24 * 60 * 60 * 1000,
+					expiresAt: Date.now() - 1000, // 期限切れ
+				});
+			});
+
+			const userB = t.withIdentity({
+				subject: "user_b",
+				email: "b@example.com",
+			});
+
+			// 期限切れなのでgetMyPendingExportVaultからはnull
+			const vault = await userB.query(api.families.getMyPendingExportVault, {});
+			expect(vault).toBeNull();
+
+			// クリーンアップ実行
+			await t.mutation(
+				internal.families.cleanupExpiredExportVaultsInternal,
+				{},
+			);
+
+			// DBからも物理削除されていること
+			const count = await t.run(async (ctx) => {
+				const list = await ctx.db.query("pendingExportVaults").collect();
+				return list.length;
+			});
+			expect(count).toBe(0);
+		});
+
+		it("キックされたユーザーが新家族を作成して個人レコードを持ち出すと、移行完了時にVaultが削除されること", async () => {
+			const t = convexTest(schema, modules);
+
+			let oldFamilyId!: Id<"families">;
+			let userBId!: Id<"users">;
+			let personalRecId!: Id<"serviceRecords">;
+			let credDocId!: Id<"credentials">;
+
+			await t.run(async (ctx) => {
+				oldFamilyId = await ctx.db.insert("families", {
+					name: "小林家",
+					masterKeyEncrypted: "oldEncKey",
+					masterKeyIv: "oldIv",
+					masterKeySalt: "oldSalt",
+					updatedAt: Date.now(),
+				});
+
+				await ctx.db.insert("users", {
+					userId: "user_a",
+					email: "a@example.com",
+					familyId: oldFamilyId,
+					updatedAt: Date.now(),
+				});
+
+				userBId = await ctx.db.insert("users", {
+					userId: "user_b",
+					email: "b@example.com",
+					familyId: oldFamilyId,
+					updatedAt: Date.now(),
+				});
+
+				// ユーザーBの個人所有レコード（PRIVATE）
+				personalRecId = await ctx.db.insert("serviceRecords", {
+					title: "個人銀行",
+					sortKey: "personal_bank",
+					userId: "user_b",
+					accountId: userBId,
+					familyId: oldFamilyId,
+					ownerType: "user",
+					tags: [],
+					updatedAt: Date.now(),
+				});
+
+				credDocId = await ctx.db.insert("credentials", {
+					recordId: personalRecId,
+					label: "メイン",
+					loginId: "userBLogin",
+					passwordHint: "oldEncryptedHint",
+					passwordHintIv: "oldHintIv",
+					updatedAt: Date.now(),
+				});
+			});
+
+			const userA = t.withIdentity({
+				subject: "user_a",
+				email: "a@example.com",
+			});
+			const userB = t.withIdentity({
+				subject: "user_b",
+				email: "b@example.com",
+			});
+
+			// ユーザーAがユーザーBをキック
+			await userA.mutation(api.families.kickMember, {
+				targetAccountId: userBId,
+			});
+
+			// ユーザーBのVaultが存在することを確認
+			const myVault = await userB.query(
+				api.families.getMyPendingExportVault,
+				{},
+			);
+			expect(myVault).not.toBeNull();
+
+			// ユーザーBが新家族を作成して個人データを移行
+			const { migrationId, targetFamilyId } = await userB.mutation(
+				api.families.prepareFamilyMigration,
+				{
+					action: "create",
+					name: "新しいBの家",
+					masterKeyEncrypted: "newEncKey",
+					masterKeyIv: "newIv",
+					masterKeySalt: "newSalt",
+				},
+			);
+
+			// 移行コミット（再暗号化クレデンシャルを渡す）
+			await userB.mutation(api.families.commitFamilyMigration, {
+				migrationId,
+				credentials: [
+					{
+						recordId: personalRecId,
+						id: credDocId,
+						passwordHint: "newReEncryptedHint",
+						passwordHintIv: "newHintIv",
+					},
+				],
+			});
+
+			// 移行後、ユーザーBの新家族が反映されていること
+			const updatedUserB = await t.run(async (ctx) => ctx.db.get(userBId));
+			expect(updatedUserB?.familyId).toBe(targetFamilyId);
+
+			// 個人レコードのfamilyIdが新家族に更新されていること
+			const updatedRecord = await t.run(async (ctx) =>
+				ctx.db.get(personalRecId),
+			);
+			expect(updatedRecord?.familyId).toBe(targetFamilyId);
+
+			// クレデンシャルが新暗号データに更新されていること
+			const updatedCred = await t.run(async (ctx) => ctx.db.get(credDocId));
+			expect(updatedCred?.passwordHint).toBe("newReEncryptedHint");
+
+			// 持ち出し完了に伴い、Export Vaultが自動削除されていること
+			const vaultAfterCommit = await userB.query(
+				api.families.getMyPendingExportVault,
+				{},
+			);
+			expect(vaultAfterCommit).toBeNull();
+		});
+	});
 });

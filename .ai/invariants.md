@@ -84,6 +84,13 @@
 - 退会時は、ユーザーが個人所有する全レコード（共有設定の有無に関わらず）を削除する。
 - 退会ユーザーが家族の最後の 1 人であった場合、孤立した家族グループ（`families`）レコード自体も必ず削除する。
 
+### メンバーキックと Export Vault の不変条件
+
+- **共有レコード（`ownerType: "family"`）の不可侵性**: 家族共有レコードは家族全体の資産であり、キックされたユーザーが持ち出したり削除することは絶対に許されない。キックされたユーザーが共有レコードの唯一の管理者であった場合は、`reconcileAdminsOnLeave` により残存メンバーへ管理者権限が自動移譲されなければならない。
+- **個人所有レコード（`ownerType: "user"`）の持ち出し保証**: 被キックユーザーの個人所有レコードは作成者の個人資産として保護される。キック実行時に Convex サーバーは旧家族の暗号化マスターキー情報（`masterKeyEncrypted`, `masterKeyIv`, `masterKeySalt`, `kdfIterations`, `cryptoVersion`）を `pendingExportVaults` へ原子的に退避する。
+- **平文非保持の徹底**: `pendingExportVaults` に保存されるのは暗号化されたマスターキー情報のみであり、サーバーはマスターキーやパスコードの平文を一切受け取らない・保存しない。
+- **Export Vault の確実な破棄**: `pendingExportVaults` は 30日の有効期限（`expiresAt`）を持ち、移行完了時（`commitFamilyMigration`）、ユーザーによる明示的破棄（`abandonPendingExportVault`）、または定期クロンジョブ（`cleanupExpiredExportVaultsInternal`）によって確実に物理削除されなければならない。
+
 ---
 
 ## 4. リカバリー（2段階復元）の不変条件
