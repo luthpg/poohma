@@ -10,12 +10,18 @@ import {
 	SheetTitle,
 	SheetTrigger,
 } from "@/components/ui/sheet";
+import { UserMenu } from "@/components/user-menu";
 
 interface PublicLayoutProps {
 	children: React.ReactNode;
+	user?: {
+		displayName?: string | null;
+		email?: string | null;
+		photoURL?: string | null;
+	} | null;
 }
 
-export function PublicLayout({ children }: PublicLayoutProps) {
+export function PublicLayout({ children, user }: PublicLayoutProps) {
 	const [isOpen, setIsOpen] = useState(false);
 	const location = useLocation();
 
@@ -72,66 +78,74 @@ export function PublicLayout({ children }: PublicLayoutProps) {
 
 						{/* PC向けアクションボタン */}
 						<div className="hidden md:flex items-center gap-3">
-							<Button
-								asChild
-								className="bg-foreground text-background hover:bg-foreground/90 text-[14px] font-medium rounded-md px-4 py-2 shadow-sm transition-colors"
-							>
-								<Link to="/login">ログイン</Link>
-							</Button>
+							{user ? (
+								<UserMenu user={user} />
+							) : (
+								<Button
+									asChild
+									className="bg-foreground text-background hover:bg-foreground/90 text-[14px] font-medium rounded-md px-4 py-2 shadow-sm transition-colors"
+								>
+									<Link to="/login">ログイン</Link>
+								</Button>
+							)}
 						</div>
 
 						{/* モバイルメニュー */}
-						<div className="flex md:hidden">
-							<Sheet open={isOpen} onOpenChange={setIsOpen}>
-								<SheetTrigger asChild>
-									<Button
-										variant="ghost"
-										size="icon"
-										className="text-muted-foreground hover:bg-muted hover:text-foreground"
+						<div className="flex md:hidden items-center gap-2">
+							{user ? (
+								<UserMenu user={user} />
+							) : (
+								<Sheet open={isOpen} onOpenChange={setIsOpen}>
+									<SheetTrigger asChild>
+										<Button
+											variant="ghost"
+											size="icon"
+											className="text-muted-foreground hover:bg-muted hover:text-foreground"
+										>
+											<Menu className="h-5 w-5" />
+											<span className="sr-only">メニューを開く</span>
+										</Button>
+									</SheetTrigger>
+
+									{/* 上からスライドダウンする指定 (side="top") */}
+									<SheetContent
+										side="top"
+										className="w-full bg-background border-b border-border p-6 pt-16"
 									>
-										<Menu className="h-5 w-5" />
-										<span className="sr-only">メニューを開く</span>
-									</Button>
-								</SheetTrigger>
+										{/* アクセシビリティのためのタイトル（非表示） */}
+										<SheetHeader className="sr-only">
+											<SheetTitle>ナビゲーションメニュー</SheetTitle>
+										</SheetHeader>
 
-								{/* 上からスライドダウンする指定 (side="top") */}
-								<SheetContent
-									side="top"
-									className="w-full bg-background border-b border-border p-6 pt-16"
-								>
-									{/* アクセシビリティのためのタイトル（非表示） */}
-									<SheetHeader className="sr-only">
-										<SheetTitle>ナビゲーションメニュー</SheetTitle>
-									</SheetHeader>
+										<nav className="flex flex-col gap-1 mt-2">
+											{navigation.map((item) => (
+												<Link
+													key={item.href}
+													to={item.href}
+													onClick={() => setIsOpen(false)}
+													className={`block px-3 py-2.5 text-[15px] font-medium rounded-md ${
+														isActive(item.href)
+															? "text-foreground bg-muted font-semibold"
+															: "text-muted-foreground hover:bg-muted hover:text-foreground"
+													}`}
+												>
+													{item.name}
+												</Link>
+											))}
 
-									<nav className="flex flex-col gap-1 mt-2">
-										{navigation.map((item) => (
-											<Link
-												key={item.href}
-												to={item.href}
-												onClick={() => setIsOpen(false)}
-												className={`block px-3 py-2.5 text-[15px] font-medium rounded-md ${
-													isActive(item.href)
-														? "text-foreground bg-muted font-semibold"
-														: "text-muted-foreground hover:bg-muted hover:text-foreground"
-												}`}
-											>
-												{item.name}
-											</Link>
-										))}
-
-										<div className="pt-4 pb-2 border-t border-border mt-4 flex flex-col gap-2">
-											<Button
-												asChild
-												className="w-full justify-center bg-foreground text-background hover:bg-foreground/90 py-2.5"
-												onClick={() => setIsOpen(false)}
-											>
-												<Link to="/login">ログイン</Link>
-											</Button>
-										</div>
-									</nav>
-								</SheetContent>
-							</Sheet>
+											<div className="pt-4 pb-2 border-t border-border mt-4 flex flex-col gap-2">
+												<Button
+													asChild
+													className="w-full justify-center bg-foreground text-background hover:bg-foreground/90 py-2.5"
+													onClick={() => setIsOpen(false)}
+												>
+													<Link to="/login">ログイン</Link>
+												</Button>
+											</div>
+										</nav>
+									</SheetContent>
+								</Sheet>
+							)}
 						</div>
 					</div>
 				</div>

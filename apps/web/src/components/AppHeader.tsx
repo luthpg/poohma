@@ -22,8 +22,8 @@ export function AppHeader({ user }: AppHeaderProps) {
 	const isDashboard = matches.some((m) => m.routeId === "/(app)/dashboard");
 
 	return (
-		<header className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border/40">
-			<div className="mx-auto max-w-5xl flex items-center justify-between px-6 py-3">
+		<header className="sticky top-0 z-20 h-16 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border/40">
+			<div className="mx-auto max-w-5xl h-full flex items-center justify-between px-6">
 				<Link
 					to="/dashboard"
 					className="flex items-center gap-2 text-[24px] font-semibold tracking-geist-h1 text-foreground hover:opacity-80 transition-opacity"

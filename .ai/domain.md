@@ -135,3 +135,20 @@ flowchart TD
 - **同一 email アカウント再作成時のデータ引き継ぎ（`users.syncUser`）**:
   - メールアドレス未確認（`emailVerified: false`）の場合はエラーを送出して同期を拒否する。
   - 同一 email かつ別 UID の既存データが存在する場合、旧 UID の `serviceRecords.userId`、家族参加申請（`joinRequests`）、および家族移行データ（`familyMigrations`）を新 UID へ一括付け替えて引き継ぐ（所有権を示す `serviceRecords.accountId` は維持される）。
+
+---
+
+## 5. レコード制約・バリデーション境界 (Constraints & Limits)
+
+巨大ドキュメント生成防止およびUI・DB・CSVインポート間の整合性担保のため、以下の制約を設けている。
+
+- **認証情報項目数 (`credentials`)**: 最大 10 件 (`MAX_CREDENTIALS_PER_RECORD = 10`)
+  - UI追加制御、Zodスキーマ、Convexミューテーション、CSVエクスポート・インポートの列定義（1〜10）で統一。
+- **タグ数 (`tags`)**: 最大 20 個 (`MAX_TAGS_PER_RECORD = 20`)
+  - UI入力制御、Zodスキーマ、Convex一括更新（`bulkUpdateRecords`）、CSVインポートで統一。
+- **文字数上限**:
+  - タイトル (`title`): 最大 255 文字（必須）
+  - 読み仮名 (`titleReading`): 最大 255 文字
+  - メモ (`memo`): 最大 10,000 文字
+  - パスワードヒント平文: 最大 2,000 文字
+  - 各タグ文字列: 最大 50 文字

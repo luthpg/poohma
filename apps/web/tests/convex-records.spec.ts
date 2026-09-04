@@ -317,6 +317,55 @@ describe("2.2.3 CSVインポートのバリデーションと境界値 (Convex�
 			user.mutation(api.records.importRecords, { records: rows }),
 		).rejects.toThrow("User does not belong to a family");
 	});
+
+	it("タグ数が上限（20個）を超える行はインポートに失敗し、詳細が返ること", async () => {
+		const t = convexTest(schema, modules);
+
+		let familyId!: Id<"families">;
+
+		await t.run(async (ctx) => {
+			familyId = await ctx.db.insert("families", {
+				name: "Tag Limit Test Family",
+				updatedAt: Date.now(),
+			});
+
+			await ctx.db.insert("users", {
+				userId: "tag_limit_user",
+				email: "taglimit@example.com",
+				familyId,
+				updatedAt: Date.now(),
+			});
+		});
+
+		const user = t.withIdentity({
+			subject: "tag_limit_user",
+			email: "taglimit@example.com",
+		});
+
+		const rows = [
+			{
+				title: "20 Tags Record",
+				ownerType: "user" as const,
+				credentials: [],
+				tags: Array.from({ length: 20 }, (_, i) => `tag${i}`),
+			},
+			{
+				title: "21 Tags Record",
+				ownerType: "user" as const,
+				credentials: [],
+				tags: Array.from({ length: 21 }, (_, i) => `tag${i}`),
+			},
+		];
+
+		const result = await user.mutation(api.records.importRecords, {
+			records: rows,
+		});
+
+		expect(result.successes).toBe(1);
+		expect(result.failures).toHaveLength(1);
+		expect(result.failures[0].row).toBe(2);
+		expect(result.failures[0].reason).toContain("20個まで");
+	});
 });
 
 describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {

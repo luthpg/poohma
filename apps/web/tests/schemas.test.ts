@@ -294,6 +294,60 @@ describe("RecordInputSchema", () => {
 		const result = RecordInputSchema.safeParse(invalidData);
 		expect(result.success).toBe(false);
 	});
+
+	it("should allow up to MAX_TAGS_PER_RECORD tags and reject more", () => {
+		const baseData = {
+			title: "Tag Limit Test",
+			ownerType: "user" as const,
+			credentials: [],
+		};
+
+		// 20個（MAX_TAGS_PER_RECORD）は成功
+		const tags20 = Array.from({ length: 20 }, (_, i) => `tag${i}`);
+		const result20 = RecordInputSchema.safeParse({ ...baseData, tags: tags20 });
+		expect(result20.success).toBe(true);
+
+		// 21個は失敗
+		const tags21 = Array.from({ length: 21 }, (_, i) => `tag${i}`);
+		const result21 = RecordInputSchema.safeParse({ ...baseData, tags: tags21 });
+		expect(result21.success).toBe(false);
+		if (!result21.success) {
+			expect(result21.error.issues[0].message).toContain("20個まで");
+		}
+	});
+
+	it("should allow up to MAX_CREDENTIALS_PER_RECORD credentials and reject more", () => {
+		const baseData = {
+			title: "Credential Limit Test",
+			ownerType: "user" as const,
+			tags: [],
+		};
+
+		// 10個（MAX_CREDENTIALS_PER_RECORD）は成功
+		const creds10 = Array.from({ length: 10 }, (_, i) => ({
+			label: `Acc${i}`,
+			loginId: `user${i}@example.com`,
+		}));
+		const result10 = RecordInputSchema.safeParse({
+			...baseData,
+			credentials: creds10,
+		});
+		expect(result10.success).toBe(true);
+
+		// 11個は失敗
+		const creds11 = Array.from({ length: 11 }, (_, i) => ({
+			label: `Acc${i}`,
+			loginId: `user${i}@example.com`,
+		}));
+		const result11 = RecordInputSchema.safeParse({
+			...baseData,
+			credentials: creds11,
+		});
+		expect(result11.success).toBe(false);
+		if (!result11.success) {
+			expect(result11.error.issues[0].message).toContain("10件まで");
+		}
+	});
 });
 
 describe("1.3 スキーマ・バリデーション (CredentialInputSchema)", () => {

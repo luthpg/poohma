@@ -8,6 +8,7 @@ import {
 	Gavel,
 	HelpCircle,
 	Laptop,
+	LayoutDashboard,
 	LogOut,
 	Moon,
 	ScrollText,
@@ -21,6 +22,7 @@ import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import { usePasscode } from "@/components/PasscodeProvider";
 import { useTheme } from "@/components/theme-provider";
+import { UserAvatar } from "@/components/UserAvatar";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -32,7 +34,7 @@ import {
 	AlertDialogTitle,
 	AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -323,12 +325,12 @@ export function UserMenu({
 			data-testid="user-menu-trigger"
 			className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary shadow-border outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50 transition-transform hover:scale-105 active:scale-95 cursor-pointer"
 		>
-			<Avatar className="h-8 w-8">
-				<AvatarImage src={photoURL} alt={displayName} />
-				<AvatarFallback className="bg-orange-500 text-white text-[12px] font-semibold">
-					{(displayName || email || "U").slice(0, 1).toUpperCase()}
-				</AvatarFallback>
-			</Avatar>
+			<UserAvatar
+				displayName={displayName}
+				email={email}
+				photoURL={photoURL}
+				className="h-8 w-8"
+			/>
 		</button>
 	);
 
@@ -353,12 +355,13 @@ export function UserMenu({
 					>
 						<SheetHeader className="text-left p-0 pb-4 border-b border-border/50">
 							<div className="flex items-center gap-3">
-								<Avatar className="h-10 w-10">
-									<AvatarImage src={photoURL} alt={displayName} />
-									<AvatarFallback className="bg-orange-500 text-white text-sm font-semibold">
-										{(displayName || email || "U").slice(0, 1).toUpperCase()}
-									</AvatarFallback>
-								</Avatar>
+								<UserAvatar
+									displayName={displayName}
+									email={email}
+									photoURL={photoURL}
+									className="h-10 w-10"
+									fallbackClassName="bg-orange-500 text-white text-sm font-semibold"
+								/>
 								<div>
 									<SheetTitle className="text-base font-semibold">
 										{displayName}
@@ -369,6 +372,21 @@ export function UserMenu({
 						</SheetHeader>
 
 						<div className="py-4 space-y-5">
+							{/* ダッシュボードへのメイン導線 */}
+							<Button
+								asChild
+								variant="outline"
+								className="w-full justify-start gap-3 py-3 h-auto text-sm font-medium border-border hover:bg-accent hover:border-orange-500/40 transition cursor-pointer"
+								onClick={() => setIsSheetOpen(false)}
+							>
+								<Link to="/dashboard">
+									<LayoutDashboard className="h-5 w-5 text-orange-500 shrink-0" />
+									<span className="font-semibold text-foreground">
+										ダッシュボードへ
+									</span>
+								</Link>
+							</Button>
+
 							{/* アカウント・家族管理 */}
 							<div className="space-y-1">
 								<Link
@@ -583,6 +601,12 @@ export function UserMenu({
 						</DropdownMenuLabel>
 						<DropdownMenuSeparator />
 						<DropdownMenuGroup>
+							<DropdownMenuItem asChild>
+								<Link to="/dashboard" className="cursor-pointer">
+									<LayoutDashboard className="mr-2 h-4 w-4" />
+									<span>ダッシュボード</span>
+								</Link>
+							</DropdownMenuItem>
 							<DropdownMenuItem asChild>
 								<Link to="/settings" className="cursor-pointer">
 									<UserCog className="mr-2 h-4 w-4" />
