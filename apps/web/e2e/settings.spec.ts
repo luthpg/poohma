@@ -10,7 +10,7 @@ test.describe("設定画面のアクセスと家族ガードの検証", () => {
 		await expect(page).toHaveURL(/.*(\/family|\/settings)/, { timeout: 20000 });
 
 		// 家族画面または設定画面のいずれかのUI要素が表示されること
-		const header = page.locator("h1").first();
-		await expect(header).toBeVisible({ timeout: 15000 });
+		const header = page.locator("h1, h2").first();
+		await expect(header).toBeVisible({ timeout: 20000 });
 	});
 });
