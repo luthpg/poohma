@@ -30,7 +30,7 @@
 3. **Test (Unit / Integration)**: `pnpm test`（Turborepo 経由で全ワークスペースの Vitest を実行）
 4. **Build Check**: `pnpm build`（Turborepo 経由で全ワークスペースのビルドを実行）
 5. **E2E Test**: `pnpm test:e2e`（Turborepo 経由で Playwright E2E テストを実行）
-6. **Full Pipeline**: `pnpm verify`（上記1〜5を一括で順次実行し、エラー発生時に即時停止）
+6. **Full Pipeline**: `pnpm verify`（上記1〜4を一括で順次実行し、エラー発生時に即時停止。E2Eテストは個別検証またはCIで実行）
 
 > **Note**: 一括検証を行う際は、ルートの `pnpm verify` を使用してください（個別のスクリプトが失敗した時点で確実に処理が中断されます）。
 

@@ -132,14 +132,6 @@ export default defineConfig({
 							dirname,
 							"tests/browser-e2e/setup/mock-auth.functions.ts",
 						),
-						"@/services/prefs.functions": path.resolve(
-							dirname,
-							"tests/browser-e2e/setup/mock-security.functions.ts",
-						),
-						"@/services/cms.functions": path.resolve(
-							dirname,
-							"tests/browser-e2e/setup/mock-security.functions.ts",
-						),
 					},
 				},
 				test: {

@@ -56,18 +56,21 @@ test.describe("E2EE主要フローとCSVインポートSeed検証", () => {
 		await page.goto("/family");
 		await expect(page).toHaveURL(/.*\/family/, { timeout: 20000 });
 
-		// この実行専用のアカウントを作成し、既存アカウントの家族・レコードから分離する
-		const accountSwitcher = page
-			.locator('[data-slot="dropdown-menu-trigger"]')
-			.first();
-		await expect(accountSwitcher).toBeVisible({ timeout: 25000 });
-		await accountSwitcher.click();
-		await page.getByText("新しいアカウントを作成", { exact: true }).click();
-		await page.locator("input#account-name").fill(accountName);
-		await page
-			.getByRole("dialog")
-			.getByRole("button", { name: "作成する", exact: true })
-			.click();
+		let accountCreated = false;
+		try {
+			// この実行専用のアカウントを作成し、既存アカウントの家族・レコードから分離する
+			const accountSwitcher = page
+				.locator('[data-slot="dropdown-menu-trigger"]')
+				.first();
+			await expect(accountSwitcher).toBeVisible({ timeout: 25000 });
+			await accountSwitcher.click();
+			await page.getByText("新しいアカウントを作成", { exact: true }).click();
+			await page.locator("input#account-name").fill(accountName);
+			await page
+				.getByRole("dialog")
+				.getByRole("button", { name: "作成する", exact: true })
+				.click();
+			accountCreated = true;
 
 		// 新規アカウントに実行固有の家族グループを作成
 		const familyCreateInput = page.locator("input#family-name-input");
@@ -222,19 +225,37 @@ test.describe("E2EE主要フローとCSVインポートSeed検証", () => {
 			).toHaveCount(0);
 		}
 
-		// 実行専用アカウントを削除し、それに紐づく家族もクリーンアップする
-		await page.goto("/settings");
-		const deleteAccountButton = page.getByRole("button", {
-			name: `このアカウント（${accountName}）のみ削除`,
-		});
-		await expect(deleteAccountButton).toBeVisible({ timeout: 15000 });
-		await deleteAccountButton.click();
-		await page
-			.getByRole("alertdialog")
-			.getByRole("button", { name: "削除する", exact: true })
-			.click();
-		await expect(page.getByText("アカウントを削除しました").first()).toBeVisible({
-			timeout: 15000,
-		});
+		} finally {
+			// テスト成否にかかわらず、作成した実行専用アカウント（および家族）を削除して状態を初期化
+			if (accountCreated) {
+				try {
+					await page.goto("/settings");
+					const deleteAccountButton = page.getByRole("button", {
+						name: `このアカウント（${accountName}）のみ削除`,
+					});
+					if (
+						await deleteAccountButton
+							.isVisible({ timeout: 15000 })
+							.catch(() => false)
+					) {
+						await deleteAccountButton.click();
+						await page
+							.getByRole("alertdialog")
+							.getByRole("button", { name: "削除する", exact: true })
+							.click();
+						await expect(
+							page.getByText("アカウントを削除しました").first(),
+						).toBeVisible({
+							timeout: 15000,
+						});
+					}
+				} catch (cleanupError) {
+					console.warn(
+						`[Cleanup Warning] テスト専用アカウント（${accountName}）の削除に失敗しました:`,
+						cleanupError,
+					);
+				}
+			}
+		}
 	});
 });

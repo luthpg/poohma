@@ -158,24 +158,45 @@ Node.js 環境の `globalThis.crypto.subtle` を用いて、ブラウザと同�
 ## 6. フルスタック E2E テストパターン (`@playwright/test`)
 
 ### Origin-scoped 保護バイパスフィクスチャ
-ステージング環境（Vercel Deployment Protection / Cloudflare Access）での自動テスト実行時、`playwright.config.ts` の `use.extraHTTPHeaders` にグローバルにバイパスヘッダーを設定してはならない（Google Identity Toolkit などの外部 API への fetch にも付与され、CORS プリフライト拒否で認証失敗となる）。
+ステージング環境（Vercel Deployment Protection、および将来的なデプロイ基盤移行に備えた事前対応としての Cloudflare Access）での自動テスト実行時、`playwright.config.ts` の `use.extraHTTPHeaders` にグローバルにバイパスヘッダーを設定してはならない（Google Identity Toolkit などの外部 API への fetch にも付与され、CORS プリフライト拒否で認証失敗となる）。
 
 必ず `apps/web/e2e/support/test-fixtures.ts` を経由し、対象オリジン（`baseURL`）宛ての通信のみにヘッダーを注入する:
 
 ```typescript
 export const test = base.extend({
   context: async ({ context, baseURL }, use) => {
-    const headers: Record<string, string> = {};
-    if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
-      headers["x-vercel-protection-bypass"] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+    const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+    const cfId = process.env.CF_ACCESS_CLIENT_ID;
+    const cfSecret = process.env.CF_ACCESS_CLIENT_SECRET;
+
+    if (!bypassSecret && (!cfId || !cfSecret)) {
+      await use(context);
+      return;
     }
-    if (Object.keys(headers).length > 0 && baseURL) {
-      const targetOrigin = new URL(baseURL).origin;
-      await context.route(
-        (url) => url.toString().startsWith(targetOrigin),
-        (route) => route.continue({ headers: { ...route.request().headers(), ...headers } }),
-      );
-    }
+
+    const targetOrigin = baseURL ? new URL(baseURL).origin : "";
+
+    await context.route("**/*", async (route) => {
+      const request = route.request();
+      const requestUrl = request.url();
+
+      if (targetOrigin && new URL(requestUrl).origin === targetOrigin) {
+        const headers = {
+          ...request.headers(),
+          ...(bypassSecret ? { "x-vercel-protection-bypass": bypassSecret } : {}),
+          ...(cfId && cfSecret
+            ? {
+                "CF-Access-Client-Id": cfId,
+                "CF-Access-Client-Secret": cfSecret,
+              }
+            : {}),
+        };
+        await route.continue({ headers });
+      } else {
+        await route.continue();
+      }
+    });
+
     await use(context);
   },
 });
