@@ -61,18 +61,12 @@ test.describe("E2EE主要フローとCSVインポートSeed検証", () => {
 		await page.goto("/dashboard");
 		await expect(page).toHaveURL(/.*\/dashboard/, { timeout: 20000 });
 
-		// ダッシュボードのコンテンツがレンダリングされるまで待機
-		// UserMenu内のfile inputはページ完全描画後にDOMに追加される
-		await page
-			.locator("main, header, [role='main']")
-			.first()
-			.waitFor({ state: "visible", timeout: 15000 });
-
 		// CSVファイル入力要素（data-testidで安定的に取得）
 		const fileInput = page.locator('[data-testid="csv-file-input"]');
 
 		// 要素がDOMにアタッチされるまで待機（hidden要素のためvisibleではなくattachedを使う）
-		await fileInput.waitFor({ state: "attached", timeout: 15000 });
+		// UserMenu内のfile inputはページ完全描画後にDOMに追加されるため十分なタイムアウトを設定
+		await fileInput.waitFor({ state: "attached", timeout: 30000 });
 		await fileInput.setInputFiles(SEED_CSV_PATH);
 
 		// アンロックプロンプトが表示された場合はパスコードを入力して解除

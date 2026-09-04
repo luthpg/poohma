@@ -75,7 +75,7 @@ export const Route = createFileRoute("/(app)/family")({
 
 function FamilyPending() {
 	return (
-		<div className="mx-auto max-w-3xl p-6">
+		<div data-testid="family-pending" className="mx-auto max-w-3xl p-6">
 			<div className="mb-8 flex items-center justify-between">
 				<h1 className="text-[32px] font-semibold tracking-geist-h1 text-foreground">
 					家族管理
@@ -1076,7 +1076,10 @@ function FamilyComponent() {
 			</div>
 
 			{family && !isChangingFamily ? (
-				<div className="rounded-lg bg-card p-6 shadow-card transition-shadow">
+				<div
+					data-testid="family-manager-section"
+					className="rounded-lg bg-card p-6 shadow-card transition-shadow"
+				>
 					<div className="mb-6 flex items-center justify-between border-b border-border pb-4">
 						<h2 className="text-[18px] font-semibold tracking-geist-ui text-foreground">
 							{family.name}
