@@ -223,11 +223,10 @@ export const getCustomTokenFromSession = createServerFn({
 
 	const sessionCookie = getCookie("session");
 	if (!sessionCookie) return null;
+	let uid: string;
 	try {
 		// リカバリー用のカスタムトークン発行時は、失効済みセッションからの不正復旧を防ぐため checkRevoked=true で検証する
-		const { uid } = await verifySessionCookie(sessionCookie, true);
-		const customToken = await adminAuth().createCustomToken(uid);
-		return { customToken };
+		({ uid } = await verifySessionCookie(sessionCookie, true));
 	} catch (error) {
 		console.error("getCustomTokenFromSession failed:", error);
 		// 失効済みまたは無効なセッションCookieを削除し、サーバー側の認証状態を未認証に同期
@@ -244,6 +243,14 @@ export const getCustomTokenFromSession = createServerFn({
 			path: "/",
 			maxAge: 0,
 		});
+		return null;
+	}
+
+	try {
+		const customToken = await adminAuth().createCustomToken(uid);
+		return { customToken };
+	} catch (error) {
+		console.error("getCustomTokenFromSession failed:", error);
 		return null;
 	}
 });
