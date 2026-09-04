@@ -22,6 +22,13 @@ for (const envFile of envFiles) {
 }
 
 const STORAGE_STATE = path.join(dirname, "e2e/.auth/e2e-user.json");
+const configuredBaseURL =
+	process.env.E2E_BASE_URL ?? process.env.E2E_STAGING_URL;
+const baseURL = configuredBaseURL ?? "https://localhost:3000";
+const baseHostname = new URL(baseURL).hostname;
+const ignoreHTTPSErrors = ["localhost", "127.0.0.1", "[::1]"].includes(
+	baseHostname,
+);
 
 export default defineConfig({
 	testDir: "./e2e",
@@ -31,12 +38,12 @@ export default defineConfig({
 	workers: process.env.CI ? 1 : undefined,
 	reporter: process.env.CI ? "github" : "html",
 	use: {
-		baseURL: process.env.E2E_BASE_URL ?? "https://localhost:3000",
-		ignoreHTTPSErrors: true,
+		baseURL,
+		ignoreHTTPSErrors,
 		trace: "on-first-retry",
 	},
 	webServer:
-		process.env.CI && process.env.E2E_BASE_URL
+		process.env.CI && configuredBaseURL
 			? undefined
 			: {
 					command: "pnpm dev",

@@ -62,10 +62,7 @@ setup("authenticate as e2e test user", async ({ page, context, baseURL }) => {
 	await page
 		.locator("main, header, [role='main']")
 		.first()
-		.waitFor({ state: "visible", timeout: 15000 })
-		.catch(() => {
-			// 要素の探索がタイムアウトした場合でも続行
-		});
+		.waitFor({ state: "visible", timeout: 15000 });
 
 	// Cookie と IndexedDB の双方を含めて storageState として保存
 	await page.context().storageState({ path: STORAGE_STATE, indexedDB: true });

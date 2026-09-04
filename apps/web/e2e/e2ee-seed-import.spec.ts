@@ -1,5 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import type { Page } from "@playwright/test";
 import { expect, test } from "./support/test-fixtures";
 
 const dirname =
@@ -9,14 +10,28 @@ const SEED_CSV_PATH = path.join(
 	"fixtures/seed_value_user1_20260904.csv",
 );
 
+async function getRecordIds(page: Page): Promise<string[]> {
+	return page.locator('a[href^="/records/"]').evaluateAll((links) => [
+		...new Set(
+			links
+				.map((link) => link.getAttribute("href")?.split("/").pop())
+				.filter((id): id is string => Boolean(id)),
+		),
+	]);
+}
+
 test.describe("E2EE主要フローとCSVインポートSeed検証", () => {
 	// 家族作成→CSVインポート→E2EE復号→一括削除を一貫で実行する複合テスト。
 	// CI・ローカル問わず35件のOGPフェッチ・暗号化処理等で時間がかかるため
 	// テストタイムアウトを180秒に設定。
-	test("家族グループ作成、CSV暗号化インポート、詳細でのヒント復号、および安全な一括削除クリーンアップ", async ({
-		page,
-	}) => {
+	test("家族グループ作成、CSV暗号化インポート、詳細でのヒント復号、および安全な一括削除クリーンアップ", async (
+		{ page },
+		testInfo,
+	) => {
 		test.setTimeout(180_000);
+		const runId = `${testInfo.workerIndex}-${testInfo.retry}-${Date.now()}`;
+		const accountName = `E2E ${runId}`;
+		const familyName = `PoohMa E2E ${runId}`;
 
 		page.on("console", (msg) => {
 			if (msg.type() === "error") {
@@ -41,31 +56,36 @@ test.describe("E2EE主要フローとCSVインポートSeed検証", () => {
 		await page.goto("/family");
 		await expect(page).toHaveURL(/.*\/family/, { timeout: 20000 });
 
-		// 家族グループ作成フォームまたは既存家族管理セクションのいずれかが表示されるまで確実に待機
-		// （ページ読み込み中のスケルトン/ローディング完了を待つ）
+		// この実行専用のアカウントを作成し、既存アカウントの家族・レコードから分離する
+		const accountSwitcher = page
+			.locator('[data-slot="dropdown-menu-trigger"]')
+			.first();
+		await expect(accountSwitcher).toBeVisible({ timeout: 25000 });
+		await accountSwitcher.click();
+		await page.getByText("新しいアカウントを作成", { exact: true }).click();
+		await page.locator("input#account-name").fill(accountName);
+		await page
+			.getByRole("dialog")
+			.getByRole("button", { name: "作成する", exact: true })
+			.click();
+
+		// 新規アカウントに実行固有の家族グループを作成
 		const familyCreateInput = page.locator("input#family-name-input");
 		const familyManagerSection = page.locator(
 			'[data-testid="family-manager-section"]',
 		);
+		await expect(familyCreateInput).toBeVisible({ timeout: 25000 });
+		await familyCreateInput.fill(familyName);
+		await page.locator("input#family-passcode-input").fill(passcode);
+		await page.locator("input#family-passcode-confirm-input").fill(passcode);
 
-		await expect(
-			familyCreateInput.or(familyManagerSection),
-		).toBeVisible({ timeout: 25000 });
+		const submitCreateBtn = page
+			.locator('button[type="submit"]')
+			.filter({ hasText: "作成する" });
+		await submitCreateBtn.click();
 
-		// 家族未作成（作成フォームが表示されている）の場合は家族を作成
-		if (await familyCreateInput.isVisible()) {
-			await familyCreateInput.fill("PoohMa E2E Family");
-			await page.locator("input#family-passcode-input").fill(passcode);
-			await page.locator("input#family-passcode-confirm-input").fill(passcode);
-
-			const submitCreateBtn = page
-				.locator('button[type="submit"]')
-				.filter({ hasText: "作成する" });
-			await submitCreateBtn.click();
-
-			// 家族作成後、家族管理セクションが表示されるまで待機してグループ作成完了を確定
-			await expect(familyManagerSection).toBeVisible({ timeout: 20000 });
-		}
+		// 家族作成後、家族管理セクションが表示されるまで待機してグループ作成完了を確定
+		await expect(familyManagerSection).toBeVisible({ timeout: 20000 });
 
 		// ==========================================
 		// Phase 2: CSVインポートによる暗号化Seed投入 (/dashboard)
@@ -74,9 +94,10 @@ test.describe("E2EE主要フローとCSVインポートSeed検証", () => {
 		await expect(page).toHaveURL(/.*\/dashboard/, { timeout: 20000 });
 
 		// 家族グループ情報がロードされ、ヘッダーに反映されるまで待機（アカウント同期の完了を保証）
-		await expect(page.locator("text=PoohMa E2E Family")).toBeVisible({
+		await expect(page.getByText(familyName, { exact: true }).first()).toBeVisible({
 			timeout: 20000,
 		});
+		const recordIdsBeforeImport = new Set(await getRecordIds(page));
 
 		// CSVファイル入力要素（data-testidで安定的に取得）
 		const fileInput = page.locator('[data-testid="csv-file-input"]');
@@ -107,6 +128,10 @@ test.describe("E2EE主要フローとCSVインポートSeed検証", () => {
 
 		// レコード一覧の更新を待機
 		await page.waitForTimeout(2000);
+		const importedRecordIds = (await getRecordIds(page)).filter(
+			(id) => !recordIdsBeforeImport.has(id),
+		);
+		expect(importedRecordIds.length).toBeGreaterThan(0);
 
 		// ==========================================
 		// Phase 3: レコード詳細でのE2EE復号検証 (/records/$id)
@@ -152,7 +177,7 @@ test.describe("E2EE主要フローとCSVインポートSeed検証", () => {
 		// ==========================================
 		// Phase 4: テストデータの安全なクリーンアップ (/dashboard)
 		// ==========================================
-		// 他家族のデータを壊さず、テストユーザーのレコードのみを一括削除
+		// この実行でインポートしたIDだけを選択して一括削除
 		await page.goto("/dashboard");
 		await expect(page).toHaveURL(/.*\/dashboard/, { timeout: 20000 });
 
@@ -163,10 +188,12 @@ test.describe("E2EE主要フローとCSVインポートSeed検証", () => {
 		await expect(bulkOpButton).toBeVisible({ timeout: 15000 });
 		await bulkOpButton.click();
 
-		// 「すべて選択」チェックボックスをクリック
-		const selectAllLabel = page.locator('label:has-text("すべて選択")');
-		await expect(selectAllLabel).toBeVisible({ timeout: 5000 });
-		await selectAllLabel.click();
+		for (const recordId of importedRecordIds) {
+			const recordLink = page.locator(`a[href="/records/${recordId}"]`).first();
+			await expect(recordLink).toBeVisible({ timeout: 5000 });
+			await recordLink.click();
+		}
+		await expect(page.getByText(`${importedRecordIds.length} 件選択中`)).toBeVisible();
 
 		// フローティングバーの「削除」ボタンをクリック
 		const deleteTriggerBtn = page
@@ -189,9 +216,25 @@ test.describe("E2EE主要フローとCSVインポートSeed検証", () => {
 		);
 		await expect(deleteSuccessToast).toBeVisible({ timeout: 20000 });
 
-		// レコードが 0 件になったことを確認（初期空状態メッセージが表示される）
-		await expect(
-			page.locator("text=まだ登録されたサービスはありません。"),
-		).toBeVisible({ timeout: 15000 });
+		for (const recordId of importedRecordIds) {
+			await expect(
+				page.locator(`a[href="/records/${recordId}"]`),
+			).toHaveCount(0);
+		}
+
+		// 実行専用アカウントを削除し、それに紐づく家族もクリーンアップする
+		await page.goto("/settings");
+		const deleteAccountButton = page.getByRole("button", {
+			name: `このアカウント（${accountName}）のみ削除`,
+		});
+		await expect(deleteAccountButton).toBeVisible({ timeout: 15000 });
+		await deleteAccountButton.click();
+		await page
+			.getByRole("alertdialog")
+			.getByRole("button", { name: "削除する", exact: true })
+			.click();
+		await expect(page.getByText("アカウントを削除しました").first()).toBeVisible({
+			timeout: 15000,
+		});
 	});
 });

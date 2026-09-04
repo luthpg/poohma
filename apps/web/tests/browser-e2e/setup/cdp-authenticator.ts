@@ -36,12 +36,21 @@ export const removeVirtualAuthenticator: BrowserCommand<[string]> = async (
 export const setPlatformAuthenticatorAvailable: BrowserCommand<
 	[boolean]
 > = async (context, available) => {
-	await context.page.addInitScript((isAvailable) => {
+	const overridePlatformAuthenticatorAvailability = (isAvailable: boolean) => {
 		if (window.PublicKeyCredential) {
 			window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable =
 				() => Promise.resolve(isAvailable);
 		}
-	}, available);
+	};
+
+	await context.page.addInitScript(
+		overridePlatformAuthenticatorAvailability,
+		available,
+	);
+	await context.page.evaluate(
+		overridePlatformAuthenticatorAvailability,
+		available,
+	);
 };
 
 declare module "vitest/browser" {

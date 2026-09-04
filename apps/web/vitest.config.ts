@@ -22,24 +22,6 @@ export default defineConfig({
 	},
 	resolve: {
 		tsconfigPaths: true,
-		alias: {
-			"@/services/security.functions": path.resolve(
-				dirname,
-				"tests/browser-e2e/setup/mock-security.functions.ts",
-			),
-			"@/services/auth.functions": path.resolve(
-				dirname,
-				"tests/browser-e2e/setup/mock-auth.functions.ts",
-			),
-			"@/services/prefs.functions": path.resolve(
-				dirname,
-				"tests/browser-e2e/setup/mock-security.functions.ts",
-			),
-			"@/services/cms.functions": path.resolve(
-				dirname,
-				"tests/browser-e2e/setup/mock-security.functions.ts",
-			),
-		},
 	},
 	test: {
 		testTimeout: 15000,
@@ -140,6 +122,26 @@ export default defineConfig({
 			},
 			{
 				extends: true,
+				resolve: {
+					alias: {
+						"@/services/security.functions": path.resolve(
+							dirname,
+							"tests/browser-e2e/setup/mock-security.functions.ts",
+						),
+						"@/services/auth.functions": path.resolve(
+							dirname,
+							"tests/browser-e2e/setup/mock-auth.functions.ts",
+						),
+						"@/services/prefs.functions": path.resolve(
+							dirname,
+							"tests/browser-e2e/setup/mock-security.functions.ts",
+						),
+						"@/services/cms.functions": path.resolve(
+							dirname,
+							"tests/browser-e2e/setup/mock-security.functions.ts",
+						),
+					},
+				},
 				test: {
 					name: "browser-e2ee",
 					include: ["tests/browser-e2e/**/*.browser.test.{ts,tsx}"],

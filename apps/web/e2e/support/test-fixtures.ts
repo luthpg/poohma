@@ -24,7 +24,7 @@ export async function setupProtectionBypass(
 		const requestUrl = request.url();
 
 		// 自社ドメイン宛てのリクエストのみバイパスヘッダーを追加
-		if (targetOrigin && requestUrl.startsWith(targetOrigin)) {
+		if (targetOrigin && new URL(requestUrl).origin === targetOrigin) {
 			const headers = {
 				...request.headers(),
 				...(bypassSecret ? { "x-vercel-protection-bypass": bypassSecret } : {}),
