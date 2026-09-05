@@ -811,7 +811,7 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
 | getRecordAccessLog                                                | Query        | authenticated | 対象レコードのrecordAccessLogをタイムラインとして取得（rls.tsチェック、FR-REC-16）                                                                                                |
 | startEditingSession / heartbeatEditingSession / endEditingSession | Mutation     | familyBound   | recordEditingSessionsの作成・更新・削除（FR-REC-15、TTL 5分、ハートビート30秒）                                                                                     |
 | getActiveEditors                                                  | Query        | authenticated | 対象レコードを編集中のユーザー一覧を取得（Convexのリアクティブクエリでクライアントが購読、TTL 5分超過分は自動除外）                                                       |
-| cleanupExpiredEditingSessionsInternal                             | InternalMut  | internal      | 5分TTLを超過した期限切れ編集セッションの定期クリーンアップ（1分間隔cronから実行）                                                                                           |
+| cleanupExpiredEditingSessionsInternal                             | InternalMut  | internal      | 5分TTLを超過した期限切れ編集セッションの定期クリーンアップ（1分間隔cronから実行、1回最大500件のバッチ削除でトランザクション上限を回避）                                   |
 
 ### 7.4 convex/actions.ts（Node runtime, "use node"）
 
@@ -994,7 +994,7 @@ PoohMaのUIは、Vercelのデザインシステム（Geist）を参考にした�
    - 「最新の内容を読み込む」: 最新レコードを再読み込みし、編集画面を最新データで更新
    - 「上書き保存する」: force: true を指定して updateRecord を再実行し、強制上書き保存（revision は +1 インクリメント）
 7. 保存完了時、実行者自身の recordEditingSessions はサーバー側で自動削除される
-8. 放置された期限切れセッション（TTL 5分超過）は、1分間隔の定期cron（cleanupExpiredEditingSessionsInternal）によって自動削除される
+8. 放置された期限切れセッション（TTL 5分超過）は、1分間隔の定期cron（cleanupExpiredEditingSessionsInternal）によって自動削除される（1回最大500件バッチ）
 ```
 
 ### 9.7 CSVインポートのプレビュー（FR-CSV-07）
