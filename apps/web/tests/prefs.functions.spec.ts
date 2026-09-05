@@ -8,17 +8,19 @@ import {
 } from "../src/services/prefs.functions";
 
 describe("prefs.functions", () => {
-	const originalCookie = document.cookie;
-
 	beforeEach(() => {
 		// Cookie を初期化
 		// biome-ignore lint/suspicious/noDocumentCookie: テスト環境での Cookie 初期化のため
-		document.cookie = "";
+		document.cookie = "poohma_dashboard_sort=; max-age=0; path=/";
+		// biome-ignore lint/suspicious/noDocumentCookie: テスト環境での Cookie 初期化のため
+		document.cookie = "poohma_dashboard_view=; max-age=0; path=/";
 	});
 
 	afterEach(() => {
-		// biome-ignore lint/suspicious/noDocumentCookie: テスト環境での Cookie 復元のため
-		document.cookie = originalCookie;
+		// biome-ignore lint/suspicious/noDocumentCookie: テスト環境での Cookie 初期化のため
+		document.cookie = "poohma_dashboard_sort=; max-age=0; path=/";
+		// biome-ignore lint/suspicious/noDocumentCookie: テスト環境での Cookie 初期化のため
+		document.cookie = "poohma_dashboard_view=; max-age=0; path=/";
 		vi.restoreAllMocks();
 	});
 
