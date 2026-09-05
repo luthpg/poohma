@@ -7,7 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
 import { Check, Share2, Users } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import type { Doc, Id } from "@/../convex/_generated/dataModel";
@@ -158,7 +158,37 @@ function RecordDetailComponent({
 	const [copied, setCopied] = useState(false);
 	const [shareSuccess, setShareSuccess] = useState(false);
 
+	// 同時編集管理用ステート
+	const [initialRevision, setInitialRevision] = useState<number | null>(null);
+	const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
+	const [pendingPayload, setPendingPayload] = useState<
+		Parameters<Parameters<typeof form.submit>[0]>[0] | null
+	>(null);
+
 	const form = useRecordForm();
+
+	// 編集セッション情報のリアルタイム購読
+	const activeEditors = useQuery(api.records.getActiveEditors, {
+		recordId: record._id,
+		accountId: activeAccountId || undefined,
+	});
+	const otherEditors = (activeEditors ?? []).filter(
+		(editor) => editor.accountId !== effectiveAccountId,
+	);
+	const isBeingEditedByOther = otherEditors.length > 0;
+
+	// 編集開始後に他者によって更新されたか判定
+	const isRecordStale =
+		isEditing &&
+		initialRevision != null &&
+		(record.revision ?? 0) !== initialRevision;
+
+	const formatLastActive = (updatedAt: number) => {
+		const diffSec = Math.floor((Date.now() - updatedAt) / 1000);
+		if (diffSec < 60) return "たった今";
+		const diffMin = Math.floor(diffSec / 60);
+		return `約${diffMin}分前`;
+	};
 
 	const handleWebShare = async () => {
 		if (typeof window === "undefined") return;
@@ -201,8 +231,67 @@ function RecordDetailComponent({
 	const updateRecord = useMutation(api.records.updateRecord);
 	const deleteRecord = useMutation(api.records.deleteRecord);
 	const shareRecord = useMutation(api.records.shareRecord);
+	const startEditingSession = useMutation(api.records.startEditingSession);
+	const heartbeatEditingSession = useMutation(
+		api.records.heartbeatEditingSession,
+	);
+	const endEditingSession = useMutation(api.records.endEditingSession);
 
 	const { decryptHint, requireUnlock } = usePasscode();
+
+	// 編集モード中の定期ハートビートと復帰（visibilitychange）対応
+	useEffect(() => {
+		if (!isEditing) return;
+
+		// 30秒ごとの定期ハートビート
+		const intervalId = setInterval(() => {
+			heartbeatEditingSession({
+				recordId: record._id,
+				accountId: activeAccountId || undefined,
+			}).catch((e) => {
+				console.error("Heartbeat failed:", e);
+			});
+		}, 30_000);
+
+		// タブ・アプリ復帰（visibilitychange: visible）時の即時ハートビート
+		const handleVisibilityChange = () => {
+			if (document.visibilityState === "visible") {
+				heartbeatEditingSession({
+					recordId: record._id,
+					accountId: activeAccountId || undefined,
+				}).catch((e) => {
+					console.error("Heartbeat on visible failed:", e);
+				});
+			}
+		};
+
+		// ページ離脱時のセッション破棄試行
+		const handlePageHide = () => {
+			endEditingSession({
+				recordId: record._id,
+				accountId: activeAccountId || undefined,
+			}).catch(() => {});
+		};
+
+		document.addEventListener("visibilitychange", handleVisibilityChange);
+		window.addEventListener("pagehide", handlePageHide);
+
+		return () => {
+			clearInterval(intervalId);
+			document.removeEventListener("visibilitychange", handleVisibilityChange);
+			window.removeEventListener("pagehide", handlePageHide);
+			endEditingSession({
+				recordId: record._id,
+				accountId: activeAccountId || undefined,
+			}).catch(() => {});
+		};
+	}, [
+		isEditing,
+		record._id,
+		activeAccountId,
+		heartbeatEditingSession,
+		endEditingSession,
+	]);
 
 	const handleEditStart = async () => {
 		const hasEncryptedHints = record.credentials.some(
@@ -275,22 +364,106 @@ function RecordDetailComponent({
 			credentials,
 		});
 
+		setInitialRevision(record.revision ?? 0);
 		setIsEditing(true);
+
+		try {
+			await startEditingSession({
+				recordId: record._id,
+				accountId: activeAccountId || undefined,
+			});
+		} catch (e) {
+			console.error("Failed to start editing session:", e);
+		}
 	};
+
+	const handleEditCancel = useCallback(async () => {
+		toast.dismiss("record-stale-toast");
+		toast.dismiss("editing-presence-toast");
+		setIsEditing(false);
+		setInitialRevision(null);
+		setPendingPayload(null);
+		try {
+			await endEditingSession({
+				recordId: record._id,
+				accountId: activeAccountId || undefined,
+			});
+		} catch (e) {
+			console.error("Failed to end editing session:", e);
+		}
+	}, [endEditingSession, record._id, activeAccountId]);
 
 	const handleEditSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
+		let conflictDetected = false;
 		const succeeded = await form.submit(async (payload) => {
+			try {
+				await updateRecord({
+					accountId: activeAccountId || undefined,
+					id: record._id,
+					revision: initialRevision ?? record.revision ?? 0,
+					data: payload,
+				});
+			} catch (err: unknown) {
+				const message = err instanceof Error ? err.message : String(err);
+				if (message.includes("CONFLICT")) {
+					conflictDetected = true;
+					setPendingPayload(payload);
+					setConflictDialogOpen(true);
+					throw new Error("他のユーザーによる更新と競合しました");
+				}
+				throw err;
+			}
+		});
+		if (succeeded) {
+			toast.dismiss("record-stale-toast");
+			toast.dismiss("editing-presence-toast");
+			toast.success("レコードを更新しました");
+			setInitialRevision(null);
+			setPendingPayload(null);
+			await router.invalidate();
+			setIsEditing(false);
+		} else if (conflictDetected) {
+			// 競合ダイアログが表示されるため、トースト通知は不要
+		}
+	};
+
+	// 競合解決: 最新の内容を再読み込み
+	const handleResolveReload = useCallback(async () => {
+		toast.dismiss("record-stale-toast");
+		toast.dismiss("editing-presence-toast");
+		setConflictDialogOpen(false);
+		setPendingPayload(null);
+		setInitialRevision(null);
+		setIsEditing(false);
+		await router.invalidate();
+		toast.info("最新のレコード情報を再読み込みしました");
+	}, [router]);
+
+	// 競合解決: 強制上書き保存
+	const handleResolveForceSave = async () => {
+		if (!pendingPayload) return;
+		setIsLoading(true);
+		try {
 			await updateRecord({
 				accountId: activeAccountId || undefined,
 				id: record._id,
-				data: payload,
+				force: true,
+				data: pendingPayload,
 			});
-		});
-		if (succeeded) {
-			toast.success("レコードを更新しました");
+			toast.dismiss("record-stale-toast");
+			toast.dismiss("editing-presence-toast");
+			toast.success("レコードを上書き保存しました");
+			setConflictDialogOpen(false);
+			setPendingPayload(null);
+			setInitialRevision(null);
 			await router.invalidate();
 			setIsEditing(false);
+		} catch (err) {
+			console.error("強制上書き保存に失敗しました:", err);
+			toast.error("保存に失敗しました");
+		} finally {
+			setIsLoading(false);
 		}
 	};
 
@@ -312,20 +485,158 @@ function RecordDetailComponent({
 		}
 	};
 
+	// 編集開始後に他者が更新した場合（isRecordStale）、スクロール位置に関係なく消えないトーストを表示
+	useEffect(() => {
+		if (!isEditing) {
+			toast.dismiss("record-stale-toast");
+			return;
+		}
+
+		if (isRecordStale) {
+			toast.error(
+				"他のメンバーによってレコードが更新されました。保存時に競合が発生します。",
+				{
+					id: "record-stale-toast",
+					duration: Number.POSITIVE_INFINITY,
+					action: {
+						label: "最新を読み込む",
+						onClick: () => {
+							handleResolveReload();
+						},
+					},
+				},
+			);
+		} else {
+			toast.dismiss("record-stale-toast");
+		}
+
+		return () => {
+			toast.dismiss("record-stale-toast");
+		};
+	}, [isEditing, isRecordStale, handleResolveReload]);
+
+	// 編集中に他メンバーが同時編集している場合のトースト通知
+	useEffect(() => {
+		if (!isEditing) {
+			toast.dismiss("editing-presence-toast");
+			return;
+		}
+
+		if (isBeingEditedByOther && !isRecordStale) {
+			const editorsText = otherEditors
+				.map((e) => e.displayName || e.email || "メンバー")
+				.join("、 ");
+			toast.warning(
+				`${editorsText} もこのレコードを編集中です（保存競合にご注意ください）`,
+				{
+					id: "editing-presence-toast",
+					duration: Number.POSITIVE_INFINITY,
+					action: {
+						label: "編集をやめる",
+						onClick: () => {
+							handleEditCancel();
+						},
+					},
+					cancel: {
+						label: "最新を読み込む",
+						onClick: () => {
+							handleResolveReload();
+						},
+					},
+				},
+			);
+		} else {
+			toast.dismiss("editing-presence-toast");
+		}
+
+		return () => {
+			toast.dismiss("editing-presence-toast");
+		};
+	}, [
+		isEditing,
+		isBeingEditedByOther,
+		isRecordStale,
+		otherEditors,
+		handleEditCancel,
+		handleResolveReload,
+	]);
+
 	if (isEditing) {
 		return (
 			<div className="mx-auto max-w-3xl p-6">
-				<h1 className="mb-8 text-[24px] font-semibold tracking-geist-h2 text-foreground">
+				<h1 className="mb-4 text-[24px] font-semibold tracking-geist-h2 text-foreground">
 					サービス情報を編集
 				</h1>
+
+				{/* 編集中に他者が同時編集している場合の警告 */}
+				{isBeingEditedByOther && (
+					<div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2 shadow-sm">
+						<span className="text-base leading-none">⚠️</span>
+						<div>
+							<span className="font-semibold">同時編集中:</span>{" "}
+							{otherEditors
+								.map(
+									(e) =>
+										`${e.displayName || e.email || "メンバー"} (${formatLastActive(e.updatedAt)})`,
+								)
+								.join("、 ")}{" "}
+							もこのレコードを編集中です。保存時の競合にご注意ください。
+						</div>
+					</div>
+				)}
+
+				{/* 編集開始後に他者によって内容が更新された場合の警告 */}
+				{isRecordStale && (
+					<div className="mb-6 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-800 dark:text-red-300 flex items-start gap-2 shadow-sm">
+						<span className="text-base leading-none">⚠️</span>
+						<div>
+							<span className="font-semibold">内容が更新されました:</span>{" "}
+							編集を開始した後に、他のメンバーによってこのレコードが更新されました。このまま保存すると競合が発生します。
+						</div>
+					</div>
+				)}
+
 				<RecordForm
 					form={form}
 					availableTags={availableTags}
 					onSubmit={handleEditSubmit}
-					onCancel={() => setIsEditing(false)}
+					onCancel={handleEditCancel}
 					submitIdleLabel="保存する"
 					isAdmin={isAdmin}
 				/>
+
+				{/* 競合発生時の解決ダイアログ */}
+				<AlertDialog
+					open={conflictDialogOpen}
+					onOpenChange={setConflictDialogOpen}
+				>
+					<AlertDialogContent>
+						<AlertDialogHeader>
+							<AlertDialogTitle>編集の競合が発生しました</AlertDialogTitle>
+							<AlertDialogDescription className="space-y-2 text-sm text-muted-foreground">
+								<span className="block">
+									あなたが編集中に、他の家族メンバーによってこのレコードが更新されました。
+								</span>
+								<span className="block">
+									現在の変更内容で上書き保存するか、最新の内容を再読み込みするかを選択してください。
+								</span>
+							</AlertDialogDescription>
+						</AlertDialogHeader>
+						<AlertDialogFooter className="flex-col sm:flex-row gap-2">
+							<AlertDialogCancel onClick={handleResolveReload} className="mt-0">
+								最新の内容を読み込む
+							</AlertDialogCancel>
+							<AlertDialogAction
+								onClick={handleResolveForceSave}
+								disabled={isLoading}
+								className="bg-orange-500 hover:bg-orange-600 focus:ring-orange-500"
+							>
+								{isLoading ? <Spinner className="h-4 w-4 mr-1.5" /> : null}
+								上書き保存する
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				</AlertDialog>
 			</div>
 		);
 	}
@@ -371,6 +682,25 @@ function RecordDetailComponent({
 				</button>
 			</div>
 
+			{/* 閲覧中に他メンバーが編集中である場合の警告バナー */}
+			{isBeingEditedByOther && (
+				<div className="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-xs sm:text-sm text-amber-800 dark:text-amber-300 flex items-start gap-3 shadow-sm">
+					<span className="text-lg leading-none mt-0.5">⚠️</span>
+					<div className="flex-1">
+						<p className="font-semibold">家族メンバーが編集中です</p>
+						<p className="mt-0.5 text-xs text-amber-700/80 dark:text-amber-400/80">
+							{otherEditors
+								.map(
+									(e) =>
+										`${e.displayName || e.email || "メンバー"} (${formatLastActive(e.updatedAt)})`,
+								)
+								.join("、 ")}{" "}
+							が現在このレコードを編集しています。編集を開始する場合や更新時は競合にご注意ください。
+						</p>
+					</div>
+				</div>
+			)}
+
 			<div className="overflow-hidden rounded-lg bg-card shadow-card">
 				{/* OGP ヘッダー */}
 				<div className="relative aspect-video w-full bg-muted md:aspect-[21/9]">
@@ -397,6 +727,8 @@ function RecordDetailComponent({
 										const ogp = await getOgpInfo({ url: record.url });
 										await updateRecord({
 											id: record._id,
+											accountId: activeAccountId || undefined,
+											revision: record.revision ?? 0,
 											data: {
 												title: record.title,
 												url: record.url,
@@ -419,9 +751,16 @@ function RecordDetailComponent({
 										});
 										toast.success("OGP情報を更新しました");
 										await router.invalidate();
-									} catch (e) {
+									} catch (e: unknown) {
 										console.error(e);
-										toast.error("OGP情報の更新に失敗しました");
+										const msg = e instanceof Error ? e.message : "";
+										if (msg.includes("CONFLICT")) {
+											toast.error(
+												"他のユーザーによる更新と競合したためOGPを更新できませんでした",
+											);
+										} else {
+											toast.error("OGP情報の更新に失敗しました");
+										}
 									} finally {
 										setIsLoading(false);
 									}
