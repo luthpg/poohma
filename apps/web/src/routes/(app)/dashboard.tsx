@@ -24,8 +24,8 @@ import { useAccount } from "@/hooks/useAccount";
 import { usePersistentQuery } from "@/hooks/usePersistentQuery";
 import { cn } from "@/lib/utils";
 import {
-	getDashboardPrefsFn,
-	setDashboardPrefsFn,
+	getDashboardPrefs,
+	setDashboardPrefs,
 } from "@/services/prefs.functions";
 import { groupRecordsByIndex } from "@/utils/index-group";
 
@@ -50,7 +50,7 @@ const searchSchema = z.object({
 export const Route = createFileRoute("/(app)/dashboard")({
 	validateSearch: searchSchema,
 	beforeLoad: async () => {
-		const prefs = await getDashboardPrefsFn();
+		const prefs = await getDashboardPrefs();
 		return { prefs };
 	},
 	loaderDeps: ({ search: { q, tag, sort, view } }) => ({ q, tag, sort, view }),
@@ -169,7 +169,7 @@ function RouteComponent() {
 		| "list";
 
 	const handleViewModeChange = (newMode: "card" | "list") => {
-		setDashboardPrefsFn({ data: { view: newMode } }).catch(console.error);
+		setDashboardPrefs({ view: newMode });
 		navigate({
 			search: (prev) => ({
 				...prev,
@@ -179,7 +179,7 @@ function RouteComponent() {
 	};
 
 	const handleSortChange = (newSort: SortParam) => {
-		setDashboardPrefsFn({ data: { sort: newSort } }).catch(console.error);
+		setDashboardPrefs({ sort: newSort });
 		navigate({
 			search: (prev) => ({
 				...prev,
