@@ -27,4 +27,10 @@ crons.interval(
   internal.families.cleanupExpiredFamilyInvitesInternal,
 );
 
+crons.interval(
+  "cleanup expired record editing sessions",
+  { minutes: 1 },
+  internal.records.cleanupExpiredEditingSessionsInternal,
+);
+
 export default crons;

@@ -178,6 +178,7 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
 			await expect(
 				userB.mutation(api.records.updateRecord, {
 					id: recordAId,
+					revision: 0,
 					data: {
 						title: "Hacked!",
 						ownerType: "user" as const,

@@ -159,7 +159,7 @@ function RecordDetailComponent({
 	const [shareSuccess, setShareSuccess] = useState(false);
 
 	// 同時編集管理用ステート
-	const [initialUpdatedAt, setInitialUpdatedAt] = useState<number | null>(null);
+	const [initialRevision, setInitialRevision] = useState<number | null>(null);
 	const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
 	const [pendingPayload, setPendingPayload] = useState<
 		Parameters<Parameters<typeof form.submit>[0]>[0] | null
@@ -180,8 +180,8 @@ function RecordDetailComponent({
 	// 編集開始後に他者によって更新されたか判定
 	const isRecordStale =
 		isEditing &&
-		initialUpdatedAt != null &&
-		record.updatedAt !== initialUpdatedAt;
+		initialRevision != null &&
+		(record.revision ?? 0) !== initialRevision;
 
 	const formatLastActive = (updatedAt: number) => {
 		const diffSec = Math.floor((Date.now() - updatedAt) / 1000);
@@ -364,7 +364,7 @@ function RecordDetailComponent({
 			credentials,
 		});
 
-		setInitialUpdatedAt(record.updatedAt);
+		setInitialRevision(record.revision ?? 0);
 		setIsEditing(true);
 
 		try {
@@ -379,7 +379,7 @@ function RecordDetailComponent({
 
 	const handleEditCancel = async () => {
 		setIsEditing(false);
-		setInitialUpdatedAt(null);
+		setInitialRevision(null);
 		setPendingPayload(null);
 		try {
 			await endEditingSession({
@@ -399,7 +399,7 @@ function RecordDetailComponent({
 				await updateRecord({
 					accountId: activeAccountId || undefined,
 					id: record._id,
-					updatedAt: initialUpdatedAt ?? record.updatedAt,
+					revision: initialRevision ?? record.revision ?? 0,
 					data: payload,
 				});
 			} catch (err: unknown) {
@@ -415,7 +415,7 @@ function RecordDetailComponent({
 		});
 		if (succeeded) {
 			toast.success("レコードを更新しました");
-			setInitialUpdatedAt(null);
+			setInitialRevision(null);
 			setPendingPayload(null);
 			await router.invalidate();
 			setIsEditing(false);
@@ -428,7 +428,7 @@ function RecordDetailComponent({
 	const handleResolveReload = async () => {
 		setConflictDialogOpen(false);
 		setPendingPayload(null);
-		setInitialUpdatedAt(null);
+		setInitialRevision(null);
 		setIsEditing(false);
 		await router.invalidate();
 		toast.info("最新のレコード情報を再読み込みしました");
@@ -448,7 +448,7 @@ function RecordDetailComponent({
 			toast.success("レコードを上書き保存しました");
 			setConflictDialogOpen(false);
 			setPendingPayload(null);
-			setInitialUpdatedAt(null);
+			setInitialRevision(null);
 			await router.invalidate();
 			setIsEditing(false);
 		} catch (err) {
@@ -530,12 +530,12 @@ function RecordDetailComponent({
 						<AlertDialogHeader>
 							<AlertDialogTitle>編集の競合が発生しました</AlertDialogTitle>
 							<AlertDialogDescription className="space-y-2 text-sm text-muted-foreground">
-								<p>
+								<span className="block">
 									あなたが編集中に、他の家族メンバーによってこのレコードが更新されました。
-								</p>
-								<p>
+								</span>
+								<span className="block">
 									現在の変更内容で上書き保存するか、最新の内容を再読み込みするかを選択してください。
-								</p>
+								</span>
 							</AlertDialogDescription>
 						</AlertDialogHeader>
 						<AlertDialogFooter className="flex-col sm:flex-row gap-2">
@@ -644,7 +644,7 @@ function RecordDetailComponent({
 										await updateRecord({
 											id: record._id,
 											accountId: activeAccountId || undefined,
-											updatedAt: record.updatedAt,
+											revision: record.revision ?? 0,
 											data: {
 												title: record.title,
 												url: record.url,

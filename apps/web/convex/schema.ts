@@ -160,6 +160,7 @@ export default defineSchema({
     // マイグレーション用（旧スキーマ移行中の一時的互換性許容）
     credentials: v.optional(v.array(v.any())),
 
+    revision: v.optional(v.number()), // 楽観的ロック用（既存レコードは 0 として扱う）
     updatedAt: v.number(),
   })
     .index("by_userId", ["userId"])
@@ -187,5 +188,6 @@ export default defineSchema({
   })
     .index("by_recordId", ["recordId"])
     .index("by_accountId", ["accountId"])
+    .index("by_updatedAt", ["updatedAt"])
     .index("by_recordId_accountId", ["recordId", "accountId"]),
 });

@@ -9,7 +9,11 @@ import {
 } from "../src/utils/schemas";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import type { MutationCtx, QueryCtx } from "./_generated/server";
+import {
+  internalMutation,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
 import {
   authenticatedMutation,
   authenticatedQuery,
@@ -149,6 +153,7 @@ export const getRecords = authenticatedQuery({
         }));
         return {
           ...record,
+          revision: record.revision ?? 0,
           credentials: mappedCreds,
         };
       }),
@@ -235,6 +240,7 @@ export const getRecordDetail = authenticatedQuery({
 
     return {
       ...record,
+      revision: record.revision ?? 0,
       credentials: mappedCredentials,
       user: recordOwner
         ? {
@@ -358,6 +364,7 @@ export const createRecord = familyBoundMutation({
       ownerFamilyId: isFamily ? user.familyId : undefined,
       admins: isFamily ? [user._id] : [],
       tags: args.tags,
+      revision: 0,
       updatedAt: now,
     });
 
@@ -384,7 +391,7 @@ export const createRecord = familyBoundMutation({
 export const updateRecord = familyBoundMutation({
   args: {
     id: v.id("serviceRecords"),
-    updatedAt: v.optional(v.number()),
+    revision: v.optional(v.number()),
     force: v.optional(v.boolean()),
     data: v.object({
       title: v.string(),
@@ -423,12 +430,16 @@ export const updateRecord = familyBoundMutation({
     requireContentAccess(ctx.user, record);
 
     // 楽観的ロック検証（force: true の場合はバイパス）
-    if (
-      !args.force &&
-      args.updatedAt !== undefined &&
-      record.updatedAt !== args.updatedAt
-    ) {
-      throw new Error("CONFLICT: レコードが他のユーザーによって更新されました");
+    if (!args.force) {
+      if (args.revision === undefined) {
+        throw new Error("REVISION_REQUIRED: revision is required");
+      }
+      if (!Number.isSafeInteger(args.revision) || args.revision < 0) {
+        throw new Error("REVISION_INVALID: revision must be a non-negative integer");
+      }
+      if ((record.revision ?? 0) !== args.revision) {
+        throw new Error("CONFLICT: レコードが他のユーザーによって更新されました");
+      }
     }
 
     const now = Date.now();
@@ -443,6 +454,7 @@ export const updateRecord = familyBoundMutation({
       ogpDescription: args.data.ogpDescription,
       memo: args.data.memo,
       tags: args.data.tags,
+      revision: (record.revision ?? 0) + 1,
       updatedAt: now,
     };
 
@@ -1196,6 +1208,7 @@ export const importRecords = familyBoundMutation({
           ownerFamilyId: isFamily ? user.familyId : undefined,
           admins: resolvedAdmins,
           tags: record.tags,
+          revision: 0,
           updatedAt: now,
         });
 
@@ -1382,3 +1395,19 @@ export const getActiveEditors = authenticatedQuery({
   },
 });
 
+export const cleanupExpiredEditingSessionsInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const cutoff = Date.now() - EDIT_SESSION_TTL_MS;
+    const expiredSessions = await ctx.db
+      .query("recordEditingSessions")
+      .withIndex("by_updatedAt", (q) => q.lt("updatedAt", cutoff))
+      .collect();
+
+    for (const session of expiredSessions) {
+      await ctx.db.delete(session._id);
+    }
+
+    return { deletedCount: expiredSessions.length };
+  },
+});

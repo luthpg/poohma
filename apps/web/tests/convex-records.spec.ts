@@ -3,7 +3,7 @@ import type http from "node:http";
 import https from "node:https";
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "../convex/_generated/api";
+import { api, internal } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import schema from "../convex/schema";
 import { computeSortKey } from "../src/utils/index-group";
@@ -737,6 +737,7 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
 		// titleReading を含めずに更新を実行
 		await userA.mutation(api.records.updateRecord, {
 			id: recordId,
+			revision: 0,
 			data: {
 				title: "Amazon Renewed",
 				ownerType: "user",
@@ -1116,7 +1117,10 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
 		expect(editorIds).toContain(userBId);
 
 		// 3. ハートビートで更新日時が更新されること
+		const heartbeatAt = sessionUpdatedAtA + 1;
+		const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(heartbeatAt);
 		await userA.mutation(api.records.heartbeatEditingSession, { recordId });
+		dateNowSpy.mockRestore();
 		const editorsAfterHeartbeat = await userA.query(
 			api.records.getActiveEditors,
 			{ recordId },
@@ -1124,9 +1128,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
 		const updatedSessionA = editorsAfterHeartbeat.find(
 			(e) => e.accountId === userAId,
 		);
-		expect(updatedSessionA?.updatedAt).toBeGreaterThanOrEqual(
-			sessionUpdatedAtA,
-		);
+		expect(updatedSessionA?.updatedAt).toBeGreaterThan(sessionUpdatedAtA);
 
 		// 4. ユーザーAが編集を終了
 		await userA.mutation(api.records.endEditingSession, { recordId });
@@ -1193,7 +1195,60 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
 		expect(activeEditors[0].accountId).toBe(userAId);
 	});
 
-	it("updateRecord で古い updatedAt を渡した場合に CONFLICT エラーで更新が拒否され、一致時は成功してセッションが消去されること", async () => {
+	it("cleanupExpiredEditingSessionsInternal が期限切れセッションだけを削除すること", async () => {
+		const t = convexTest(schema, modules);
+		const now = 10 * 60 * 1000;
+
+		await t.run(async (ctx) => {
+			const familyId = await ctx.db.insert("families", {
+				name: "Cleanup Family",
+				updatedAt: now,
+			});
+			const accountId = await ctx.db.insert("users", {
+				userId: "cleanup_user",
+				email: "cleanup@example.com",
+				familyId,
+				updatedAt: now,
+			});
+			const recordId = await ctx.db.insert("serviceRecords", {
+				userId: "cleanup_user",
+				accountId,
+				familyId,
+				title: "Cleanup Record",
+				ownerType: "user",
+				admins: [],
+				tags: [],
+				updatedAt: now,
+			});
+
+			await ctx.db.insert("recordEditingSessions", {
+				recordId,
+				accountId,
+				updatedAt: now - 5 * 60 * 1000 - 1,
+			});
+			await ctx.db.insert("recordEditingSessions", {
+				recordId,
+				accountId,
+				updatedAt: now - 5 * 60 * 1000,
+			});
+		});
+
+		const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(now);
+		const result = await t.mutation(
+			internal.records.cleanupExpiredEditingSessionsInternal,
+			{},
+		);
+		dateNowSpy.mockRestore();
+
+		expect(result).toEqual({ deletedCount: 1 });
+		const sessions = await t.run((ctx) =>
+			ctx.db.query("recordEditingSessions").collect(),
+		);
+		expect(sessions).toHaveLength(1);
+		expect(sessions[0].updatedAt).toBe(now - 5 * 60 * 1000);
+	});
+
+	it("updateRecord で古い revision を渡した場合に CONFLICT エラーで更新が拒否され、一致時は成功してセッションが消去されること", async () => {
 		const t = convexTest(schema, modules);
 
 		let familyId!: Id<"families">;
@@ -1232,6 +1287,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
 				ownerType: "family",
 				admins: [userAId],
 				tags: [],
+				revision: 0,
 				updatedAt: 5000,
 			});
 		});
@@ -1244,16 +1300,18 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
 		let editors = await userA.query(api.records.getActiveEditors, { recordId });
 		expect(editors).toHaveLength(1);
 
-		// ユーザーAが updatedAt: 5000 で正常更新
+		// ユーザーAが revision: 0 で正常更新
+		const firstUpdateDateNowSpy = vi.spyOn(Date, "now").mockReturnValue(6000);
 		await userA.mutation(api.records.updateRecord, {
 			id: recordId,
-			updatedAt: 5000,
+			revision: 0,
 			data: {
 				title: "Title updated by A",
 				tags: [],
 				credentials: [],
 			},
 		});
+		firstUpdateDateNowSpy.mockRestore();
 
 		// Aの保存完了に伴い、編集セッションが自動削除されること
 		editors = await userA.query(api.records.getActiveEditors, { recordId });
@@ -1264,12 +1322,13 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
 		expect(recordAfterA?.title).toBe("Title updated by A");
 		const newUpdatedAt = recordAfterA?.updatedAt;
 		expect(newUpdatedAt).toBeGreaterThan(5000);
+		expect(recordAfterA?.revision).toBe(1);
 
-		// ユーザーBが以前の古い updatedAt: 5000 を渡して更新を試みると競合拒否されること
+		// ユーザーBが以前の古い revision: 0 を渡して更新を試みると競合拒否されること
 		await expect(
 			userB.mutation(api.records.updateRecord, {
 				id: recordId,
-				updatedAt: 5000, // 古いタイムスタンプ
+				revision: 0,
 				data: {
 					title: "Title updated by B (conflicted)",
 					tags: [],
@@ -1282,10 +1341,22 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
 		const recordAfterConflict = await t.run((ctx) => ctx.db.get(recordId));
 		expect(recordAfterConflict?.title).toBe("Title updated by A");
 
-		// force: true を指定した場合は、古いタイムスタンプでも上書きできること
+		// 通常更新で revision を省略した場合は拒否されること
+		await expect(
+			userB.mutation(api.records.updateRecord, {
+				id: recordId,
+				data: {
+					title: "Title updated without revision",
+					tags: [],
+					credentials: [],
+				},
+			}),
+		).rejects.toThrow("REVISION_REQUIRED");
+
+		// force: true を指定した場合は、revision を省略しても上書きできること
+		const forceUpdateDateNowSpy = vi.spyOn(Date, "now").mockReturnValue(6000);
 		await userB.mutation(api.records.updateRecord, {
 			id: recordId,
-			updatedAt: 5000,
 			force: true,
 			data: {
 				title: "Title force updated by B",
@@ -1293,8 +1364,11 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
 				credentials: [],
 			},
 		});
+		forceUpdateDateNowSpy.mockRestore();
 
 		const recordAfterForce = await t.run((ctx) => ctx.db.get(recordId));
 		expect(recordAfterForce?.title).toBe("Title force updated by B");
+		expect(recordAfterForce?.revision).toBe(2);
+		expect(recordAfterForce?.updatedAt).toBe(newUpdatedAt);
 	});
 });
