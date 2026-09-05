@@ -7,7 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
 import { Check, Share2, Users } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import type { Doc, Id } from "@/../convex/_generated/dataModel";
@@ -378,6 +378,8 @@ function RecordDetailComponent({
 	};
 
 	const handleEditCancel = async () => {
+		toast.dismiss("record-stale-toast");
+		toast.dismiss("editing-presence-toast");
 		setIsEditing(false);
 		setInitialRevision(null);
 		setPendingPayload(null);
@@ -414,6 +416,8 @@ function RecordDetailComponent({
 			}
 		});
 		if (succeeded) {
+			toast.dismiss("record-stale-toast");
+			toast.dismiss("editing-presence-toast");
 			toast.success("レコードを更新しました");
 			setInitialRevision(null);
 			setPendingPayload(null);
@@ -425,14 +429,16 @@ function RecordDetailComponent({
 	};
 
 	// 競合解決: 最新の内容を再読み込み
-	const handleResolveReload = async () => {
+	const handleResolveReload = useCallback(async () => {
+		toast.dismiss("record-stale-toast");
+		toast.dismiss("editing-presence-toast");
 		setConflictDialogOpen(false);
 		setPendingPayload(null);
 		setInitialRevision(null);
 		setIsEditing(false);
 		await router.invalidate();
 		toast.info("最新のレコード情報を再読み込みしました");
-	};
+	}, [router]);
 
 	// 競合解決: 強制上書き保存
 	const handleResolveForceSave = async () => {
@@ -445,6 +451,8 @@ function RecordDetailComponent({
 				force: true,
 				data: pendingPayload,
 			});
+			toast.dismiss("record-stale-toast");
+			toast.dismiss("editing-presence-toast");
 			toast.success("レコードを上書き保存しました");
 			setConflictDialogOpen(false);
 			setPendingPayload(null);
@@ -476,6 +484,63 @@ function RecordDetailComponent({
 			setIsLoading(false);
 		}
 	};
+
+	// 編集開始後に他者が更新した場合（isRecordStale）、スクロール位置に関係なく消えないトーストを表示
+	useEffect(() => {
+		if (!isEditing) {
+			toast.dismiss("record-stale-toast");
+			return;
+		}
+
+		if (isRecordStale) {
+			toast.error(
+				"他のメンバーによってレコードが更新されました。保存時に競合が発生します。",
+				{
+					id: "record-stale-toast",
+					duration: Number.POSITIVE_INFINITY,
+					action: {
+						label: "最新を読み込む",
+						onClick: () => {
+							handleResolveReload();
+						},
+					},
+				},
+			);
+		} else {
+			toast.dismiss("record-stale-toast");
+		}
+
+		return () => {
+			toast.dismiss("record-stale-toast");
+		};
+	}, [isEditing, isRecordStale, handleResolveReload]);
+
+	// 編集中に他メンバーが同時編集している場合のトースト通知
+	useEffect(() => {
+		if (!isEditing) {
+			toast.dismiss("editing-presence-toast");
+			return;
+		}
+
+		if (isBeingEditedByOther && !isRecordStale) {
+			const editorsText = otherEditors
+				.map((e) => e.displayName || e.email || "メンバー")
+				.join("、 ");
+			toast.warning(
+				`${editorsText} もこのレコードを編集中です（保存競合にご注意ください）`,
+				{
+					id: "editing-presence-toast",
+					duration: 8000,
+				},
+			);
+		} else {
+			toast.dismiss("editing-presence-toast");
+		}
+
+		return () => {
+			toast.dismiss("editing-presence-toast");
+		};
+	}, [isEditing, isBeingEditedByOther, isRecordStale, otherEditors]);
 
 	if (isEditing) {
 		return (
