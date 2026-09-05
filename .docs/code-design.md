@@ -984,7 +984,7 @@ PoohMaのUIは、Vercelのデザインシステム（Geist）を参考にした�
 2. 編集画面を開いている間、30秒間隔で Mutation heartbeatEditingSession を送信
    （別アプリ・別タブから復帰した際（visibilitychange: visible）にも即時ハートビートを送信してセッション延長）
 3. ユーザーBが同じレコードの詳細または編集画面を開く → Query getActiveEditors（リアクティブ）が
-   ユーザーAの編集中セッションを検知し、「Aさんが編集中です（約○分前）」を表示（Soft Advisory、編集画面ではトースト通知も発火）
+   ユーザーAの編集中セッションを検知し、「Aさんが編集中です（約○分前）」を表示（Soft Advisory、編集画面ではスクロール追従する消えないトースト通知（「編集をやめる」「最新を読み込む」アクション付き）も発火）
 4. ユーザーAが保存 or キャンセル or 画面離脱 → Mutation endEditingSession
    （離席やタスクキルでハートビートが途絶えた場合、TTL 5分（300秒）経過によりサーバー・クエリ側で自動失効）
 5. 保存時、updateRecord はクライアントが保持する revision（初期値0）を検証し（楽観的ロック）、

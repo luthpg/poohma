@@ -377,7 +377,7 @@ function RecordDetailComponent({
 		}
 	};
 
-	const handleEditCancel = async () => {
+	const handleEditCancel = useCallback(async () => {
 		toast.dismiss("record-stale-toast");
 		toast.dismiss("editing-presence-toast");
 		setIsEditing(false);
@@ -391,7 +391,7 @@ function RecordDetailComponent({
 		} catch (e) {
 			console.error("Failed to end editing session:", e);
 		}
-	};
+	}, [endEditingSession, record._id, activeAccountId]);
 
 	const handleEditSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -530,7 +530,19 @@ function RecordDetailComponent({
 				`${editorsText} もこのレコードを編集中です（保存競合にご注意ください）`,
 				{
 					id: "editing-presence-toast",
-					duration: 8000,
+					duration: Number.POSITIVE_INFINITY,
+					action: {
+						label: "編集をやめる",
+						onClick: () => {
+							handleEditCancel();
+						},
+					},
+					cancel: {
+						label: "最新を読み込む",
+						onClick: () => {
+							handleResolveReload();
+						},
+					},
 				},
 			);
 		} else {
@@ -540,7 +552,14 @@ function RecordDetailComponent({
 		return () => {
 			toast.dismiss("editing-presence-toast");
 		};
-	}, [isEditing, isBeingEditedByOther, isRecordStale, otherEditors]);
+	}, [
+		isEditing,
+		isBeingEditedByOther,
+		isRecordStale,
+		otherEditors,
+		handleEditCancel,
+		handleResolveReload,
+	]);
 
 	if (isEditing) {
 		return (
