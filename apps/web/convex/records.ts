@@ -129,6 +129,10 @@ export async function asyncMapBounded<T, U>(
   fn: (item: T) => Promise<U>,
   chunkSize = 64,
 ): Promise<U[]> {
+  if (!Number.isInteger(chunkSize) || chunkSize <= 0) {
+    throw new RangeError("chunkSize must be a positive integer");
+  }
+
   const results: U[] = [];
   for (let i = 0; i < items.length; i += chunkSize) {
     const chunk = items.slice(i, i + chunkSize);
