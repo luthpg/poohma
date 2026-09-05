@@ -1402,7 +1402,7 @@ export const cleanupExpiredEditingSessionsInternal = internalMutation({
     const expiredSessions = await ctx.db
       .query("recordEditingSessions")
       .withIndex("by_updatedAt", (q) => q.lt("updatedAt", cutoff))
-      .collect();
+      .take(500);
 
     for (const session of expiredSessions) {
       await ctx.db.delete(session._id);
