@@ -115,17 +115,18 @@ flowchart TD
     Open["編集画面を開く (startEditingSession)"] --> Active["ACTIVE<br/>(ハートビート送信: 30秒間隔)"]
     Active -->|"ハートビート更新 (heartbeatEditingSession)<br/>/ タブ復帰 (visibilitychange: visible)"| Active
     
-    Active -->|"正常保存 (updateRecord 成功)"| Cleaned["セッション自動削除 (保存完了)"]
+    Active -->|"正常保存 (updateRecord 成功: revision + 1)"| Cleaned["セッション自動削除 (保存完了)"]
     Active -->|"キャンセル / 画面離脱 (endEditingSession)"| CleanedManual["セッション手動削除"]
     Active -->|"離席・タスクキル (ハートビート途絶 5分超過)"| ExpiredSession["自然失効<br/>(クエリ getActiveEditors から除外)"]
+    ExpiredSession -->|"1分間隔 cron (cleanupExpiredEditingSessionsInternal)"| Purged["DB物理削除 (定期クリーンアップ)"]
     
-    Active -.->|"保存時: 他者の先行更新検知<br/>(record.updatedAt !== 手元のupdatedAt)"| Conflict["CONFLICT エラー<br/>(競合解決ダイアログ表示)"]
+    Active -.->|"保存時: 他者の先行更新検知<br/>(record.revision !== 手元のrevision)"| Conflict["CONFLICT エラー<br/>(競合解決ダイアログ表示)"]
     Conflict -->|"最新の内容を読み込む"| Reload["最新化 & 編集終了"]
     Conflict -->|"上書き保存する (force: true)"| ForceSave["強制保存実行 & セッション削除"]
 ```
 
-- **プレゼンス（Soft Advisory）**: 編集セッションは他者の編集を一切ブロックせず、注意喚起のみを行う。誰かが開きっぱなしで放置しても家族が編集不能になるデッドロックを防止。
-- **データ保全（Hard Invariant）**: 最終防衛線として `updatedAt` の楽観的ロック検証により、無警告の先行データ上書きを確実に遮断。
+- **プレゼンス（Soft Advisory）**: 編集セッションは他者の編集を一切ブロックせず、注意喚起のみを行う。誰かが開きっぱなしで放置しても家族が編集不能になるデッドロックを防止。放置された期限切れセッションは1分cronで物理削除される。
+- **データ保全（Hard Invariant）**: 最終防衛線として `revision`（単調増加整数）の楽観的ロック検証により、無警告の先行データ上書きを確実に遮断。
 
 ---
 
