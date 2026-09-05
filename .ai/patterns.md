@@ -263,4 +263,30 @@ git show <commit-hash>
 - **文脈優先の原則**: コード差分（`git diff`）を見る前に、必ずレビュアーが「どのようなリスクや不具合を指摘し、なぜその実装方針を推奨したのか」のレビュー本文を確認する。
 - **断面最適の評価**: 変更提案が「現在開発中のブランチ断面」においてアーキテクチャの堅牢性（例: タイムスタンプよりリビジョン番号が優位、放置セッションの定期cron削除）を高めるものであれば、過去の一時的な議論の制約に囚われず、前向きに採用して仕様書・AIナレッジと同期する。
 
+---
+
+## 15. Convex Bounded Concurrency と一覧プロジェクションパターン (`records.ts`)
+
+Convex の同時実行 I/O 上限（1,000 ops / 関数）を安全に回避しつつ、正規化された子テーブルから一覧画面に必要な最小限のフィールドのみをプロジェクション取得するパターン。
+
+```typescript
+export async function asyncMapBounded<T, U>(
+  items: T[],
+  fn: (item: T) => Promise<U>,
+  chunkSize = 64,
+): Promise<U[]> {
+  const results: U[] = [];
+  for (let i = 0; i < items.length; i += chunkSize) {
+    const chunk = items.slice(i, i + chunkSize);
+    const chunkResults = await Promise.all(chunk.map(fn));
+    results.push(...chunkResults);
+  }
+  return results;
+}
+```
+
+- **有界並行性（Bounded Concurrency）**: 無制限な `Promise.all(records.map(...))` を廃止し、64 件チャンク単位で並行処理することで、レコード数が数百〜数千件に増加しても関数内の同時 I/O を常に安全な範囲内に抑え込む。
+- **一覧プロジェクション（暗号化フィールド除外）**: 一覧取得（`getRecords`）において、詳細表示・編集に必要な暗号化データ（`passwordHint`, `passwordHintIv`, `passwordHintDekEncrypted`, `passwordHintDekIv`）をあえて結合せず、表示・検索に必要なプロパティ（`_id`, `id`, `label`, `loginId`）のみを返却する。これにより転送データ量を激減させ、不要な暗号化データのクライアント漏洩を防ぐ（最小権限の原則）。詳細画面（`/records/$id`）は独立した `getRecordDetail` で完全なクレデンシャルを取得する。
+
+
 

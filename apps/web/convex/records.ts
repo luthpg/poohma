@@ -120,6 +120,28 @@ async function collectVisibleRecords(
   return personalRecords.filter((r) => getEffectiveOwnerType(r) === "user");
 }
 
+/**
+ * Convex の同時実行 I/O 上限（1,000 ops）を安全に回避するための有界並行マッピングヘルパー
+ * 各チャンク（既定64件）内を Promise.all で並列処理し、チャンク間は順次処理する
+ */
+export async function asyncMapBounded<T, U>(
+  items: T[],
+  fn: (item: T) => Promise<U>,
+  chunkSize = 64,
+): Promise<U[]> {
+  if (!Number.isInteger(chunkSize) || chunkSize <= 0) {
+    throw new RangeError("chunkSize must be a positive integer");
+  }
+
+  const results: U[] = [];
+  for (let i = 0; i < items.length; i += chunkSize) {
+    const chunk = items.slice(i, i + chunkSize);
+    const chunkResults = await Promise.all(chunk.map(fn));
+    results.push(...chunkResults);
+  }
+  return results;
+}
+
 // === Queries ===
 
 export const getRecords = authenticatedQuery({
@@ -137,26 +159,25 @@ export const getRecords = authenticatedQuery({
       records = records.filter((r) => r.tags.includes(args.tag as string));
     }
 
-    // 各レコードに紐づく credentials を一括取得
-    const recordsWithCredentials = await Promise.all(
-      records.map(async (record) => {
+    // 各レコードに紐づく credentials をチャンク分割（Bounded Concurrency）で取得
+    // 一覧表示・検索に必要なフィールド（_id, label, loginId）のみを結合し、暗号化データは除外してペイロードを軽量化
+    const recordsWithCredentials = await asyncMapBounded(
+      records,
+      async (record) => {
         const creds = await getCredentialsForRecord(ctx, record._id);
         const mappedCreds = creds.map((c) => ({
           _id: c._id,
           id: c._id,
           label: c.label,
           loginId: c.loginId,
-          passwordHint: c.passwordHint,
-          passwordHintIv: c.passwordHintIv,
-          passwordHintDekEncrypted: c.passwordHintDekEncrypted,
-          passwordHintDekIv: c.passwordHintDekIv,
         }));
         return {
           ...record,
           revision: record.revision ?? 0,
           credentials: mappedCreds,
         };
-      }),
+      },
+      64,
     );
 
     let filtered = recordsWithCredentials;

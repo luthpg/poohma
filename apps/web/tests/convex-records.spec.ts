@@ -1371,4 +1371,85 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
 		expect(recordAfterForce?.revision).toBe(2);
 		expect(recordAfterForce?.updatedAt).toBe(newUpdatedAt);
 	});
+
+	it("getRecords が暗号化フィールドを除外した軽量クレデンシャルを返し、64件超のチャンク境界を跨いでも正しく全件取得できること", async () => {
+		const t = convexTest(schema, modules);
+		let familyId!: Id<"families">;
+		let userAId!: Id<"users">;
+
+		await t.run(async (ctx) => {
+			familyId = await ctx.db.insert("families", {
+				name: "Chunk Test Family",
+				updatedAt: Date.now(),
+			});
+
+			userAId = await ctx.db.insert("users", {
+				userId: "user_chunk_a",
+				email: "chunk_a@example.com",
+				familyId,
+				updatedAt: Date.now(),
+			});
+
+			// チャンクサイズ（64件）を超える 70 件のレコードと各クレデンシャルを一括投入
+			for (let i = 0; i < 70; i++) {
+				const recId = await ctx.db.insert("serviceRecords", {
+					userId: "user_chunk_a",
+					accountId: userAId,
+					familyId,
+					title: `Service ${i.toString().padStart(3, "0")}`,
+					sortKey: `01_service_${i.toString().padStart(3, "0")}`,
+					ownerType: "family",
+					ownerFamilyId: familyId,
+					admins: [userAId],
+					tags: ["chunk-test"],
+					updatedAt: Date.now() + i,
+				});
+
+				await ctx.db.insert("credentials", {
+					recordId: recId,
+					label: `Label ${i}`,
+					loginId: `user${i}@example.com`,
+					passwordHint: `secret-hint-${i}`,
+					passwordHintIv: `iv-${i}`,
+					passwordHintDekEncrypted: `dek-${i}`,
+					passwordHintDekIv: `dek-iv-${i}`,
+					order: 0,
+					updatedAt: Date.now() + i,
+				});
+			}
+		});
+
+		const userA = t.withIdentity({
+			subject: "user_chunk_a",
+			email: "chunk_a@example.com",
+		});
+
+		const records = await userA.query(api.records.getRecords, {
+			tag: "chunk-test",
+		});
+
+		// 64 件チャンクを跨いで全 70 件が漏れなく取得できていること
+		expect(records).toHaveLength(70);
+
+		// 各レコードの credentials を検証
+		for (const record of records) {
+			expect(record.credentials).toHaveLength(1);
+			const cred = record.credentials[0];
+
+			// 一覧表示・検索用のフィールドが存在すること
+			expect(cred._id).toBeDefined();
+			expect(cred.label).toBeDefined();
+			expect(cred.loginId).toBeDefined();
+
+			// 暗号化フィールド（passwordHint*）が除外されていること
+			expect((cred as Record<string, unknown>).passwordHint).toBeUndefined();
+			expect((cred as Record<string, unknown>).passwordHintIv).toBeUndefined();
+			expect(
+				(cred as Record<string, unknown>).passwordHintDekEncrypted,
+			).toBeUndefined();
+			expect(
+				(cred as Record<string, unknown>).passwordHintDekIv,
+			).toBeUndefined();
+		}
+	});
 });
