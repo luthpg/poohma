@@ -97,7 +97,7 @@ export const isValidContentId = (id: unknown): id is string => {
 		return false;
 	}
 	// /, \, %, . を含む文字列（.. を含むパストラバーサル等）を拒否
-	if (/[/\\%.]/.test(id)) {
+	if (/[/\\%.\p{Cc}\p{Zl}\p{Zp}]/u.test(id)) {
 		return false;
 	}
 	return true;
