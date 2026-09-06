@@ -3,6 +3,7 @@ import {
 	type FAQContent,
 	type LegalContent,
 	microCmsClient,
+	type NewsContent,
 } from "@/lib/cms.server";
 
 /**
@@ -39,3 +40,49 @@ export const fetchLegalServer = createServerFn({ method: "GET" }).handler(
 		}
 	},
 );
+
+/**
+ * お知らせ一覧を取得するサーバー関数
+ */
+export const fetchNewsListServer = createServerFn({ method: "GET" })
+	.validator(
+		(d?: { limit?: number; offset?: number }) =>
+			d as { limit?: number; offset?: number } | undefined,
+	)
+	.handler(async ({ data }) => {
+		try {
+			const response = await microCmsClient.getList<NewsContent>({
+				endpoint: "info",
+				queries: {
+					limit: data?.limit ?? 20,
+					offset: data?.offset ?? 0,
+					orders: "-publishedAt,-createdAt",
+				},
+			});
+			return response;
+		} catch (error) {
+			console.error("Failed to fetch news list from microCMS:", error);
+			throw new Error("お知らせ一覧の取得に失敗しました");
+		}
+	});
+
+/**
+ * お知らせ詳細を取得するサーバー関数
+ */
+export const fetchNewsDetailServer = createServerFn({ method: "GET" })
+	.validator((id: string) => id)
+	.handler(async ({ data: id }) => {
+		try {
+			const response = await microCmsClient.getListDetail<NewsContent>({
+				endpoint: "info",
+				contentId: id,
+			});
+			return response;
+		} catch (error) {
+			console.error(
+				`Failed to fetch news detail (${id}) from microCMS:`,
+				error,
+			);
+			throw new Error("お知らせ詳細の取得に失敗しました");
+		}
+	});

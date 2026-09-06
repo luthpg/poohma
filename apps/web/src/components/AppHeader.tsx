@@ -1,5 +1,7 @@
 import { Link, useMatches } from "@tanstack/react-router";
+import { Plus } from "lucide-react";
 import { AccountSwitcher } from "@/components/AccountSwitcher";
+import { ResponsiveNews } from "@/components/ResponsiveNews";
 import { UserMenu } from "@/components/user-menu";
 
 interface AppHeaderProps {
@@ -14,6 +16,7 @@ interface AppHeaderProps {
  * (app) 配下の全ページで共通表示されるヘッダーコンポーネント。
  * - ロゴ（ダッシュボードへのリンク）
  * - AccountSwitcher（アカウント切り替えドロップダウン）
+ * - お知らせ通知ベル (ResponsiveNews variant="bell")
  * - ダッシュボード表示時のみ「+ 新規登録」ボタン
  * - UserMenu（アバター＋ドロップダウン）
  */
@@ -39,12 +42,15 @@ export function AppHeader({ user }: AppHeaderProps) {
 				</Link>
 				<div className="flex items-center gap-2 sm:gap-3">
 					<AccountSwitcher />
+					<ResponsiveNews variant="bell" />
 					{isDashboard && (
 						<Link
 							to="/records/new"
-							className="rounded-md bg-orange-500 px-4 py-2 text-[14px] font-medium text-white shadow-border hover:bg-orange-600 transition"
+							className="flex h-9 items-center justify-center rounded-md bg-orange-500 px-2.5 sm:px-4 text-[14px] font-medium text-white shadow-border hover:bg-orange-600 transition shrink-0"
+							aria-label="新規登録"
 						>
-							+ 新規登録
+							<Plus className="h-4 w-4 sm:mr-1" />
+							<span className="hidden sm:inline">新規登録</span>
 						</Link>
 					)}
 					<UserMenu user={user} />

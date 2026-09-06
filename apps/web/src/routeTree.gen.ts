@@ -16,6 +16,7 @@ import { Route as appFamilyRouteImport } from './routes/(app)/family'
 import { Route as appRecoveryRouteImport } from './routes/(app)/recovery'
 import { Route as appSettingsRouteImport } from './routes/(app)/settings'
 import { Route as publicIndexRouteImport } from './routes/(public)/index'
+import { Route as publicContactRouteImport } from './routes/(public)/contact'
 import { Route as publicFaqRouteImport } from './routes/(public)/faq'
 import { Route as publicLoginRouteImport } from './routes/(public)/login'
 import { Route as publicPrivacyPolicyRouteImport } from './routes/(public)/privacy-policy'
@@ -23,6 +24,8 @@ import { Route as publicTermsOfServiceRouteImport } from './routes/(public)/term
 import { Route as publicUsageRouteImport } from './routes/(public)/usage'
 import { Route as appRecordsIdRouteImport } from './routes/(app)/records/$id'
 import { Route as appRecordsNewRouteImport } from './routes/(app)/records/new'
+import { Route as publicNewsIndexRouteImport } from './routes/(public)/news/index'
+import { Route as publicNewsIdRouteImport } from './routes/(public)/news/$id'
 
 const appRouteRoute = appRouteRouteImport.update({
   id: '/(app)',
@@ -55,6 +58,11 @@ const appSettingsRoute = appSettingsRouteImport.update({
 const publicIndexRoute = publicIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => publicRouteRoute,
+} as any)
+const publicContactRoute = publicContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
   getParentRoute: () => publicRouteRoute,
 } as any)
 const publicFaqRoute = publicFaqRouteImport.update({
@@ -92,12 +100,23 @@ const appRecordsNewRoute = appRecordsNewRouteImport.update({
   path: '/records/new',
   getParentRoute: () => appRouteRoute,
 } as any)
+const publicNewsIndexRoute = publicNewsIndexRouteImport.update({
+  id: '/news/',
+  path: '/news/',
+  getParentRoute: () => publicRouteRoute,
+} as any)
+const publicNewsIdRoute = publicNewsIdRouteImport.update({
+  id: '/news/$id',
+  path: '/news/$id',
+  getParentRoute: () => publicRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/dashboard': typeof appDashboardRoute
   '/family': typeof appFamilyRoute
   '/recovery': typeof appRecoveryRoute
   '/settings': typeof appSettingsRoute
+  '/contact': typeof publicContactRoute
   '/faq': typeof publicFaqRoute
   '/login': typeof publicLoginRoute
   '/privacy-policy': typeof publicPrivacyPolicyRoute
@@ -106,12 +125,15 @@ export interface FileRoutesByFullPath {
   '/': typeof publicIndexRoute
   '/records/$id': typeof appRecordsIdRoute
   '/records/new': typeof appRecordsNewRoute
+  '/news/$id': typeof publicNewsIdRoute
+  '/news/': typeof publicNewsIndexRoute
 }
 export interface FileRoutesByTo {
   '/dashboard': typeof appDashboardRoute
   '/family': typeof appFamilyRoute
   '/recovery': typeof appRecoveryRoute
   '/settings': typeof appSettingsRoute
+  '/contact': typeof publicContactRoute
   '/faq': typeof publicFaqRoute
   '/login': typeof publicLoginRoute
   '/privacy-policy': typeof publicPrivacyPolicyRoute
@@ -120,6 +142,8 @@ export interface FileRoutesByTo {
   '/': typeof publicIndexRoute
   '/records/$id': typeof appRecordsIdRoute
   '/records/new': typeof appRecordsNewRoute
+  '/news/$id': typeof publicNewsIdRoute
+  '/news': typeof publicNewsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -129,6 +153,7 @@ export interface FileRoutesById {
   '/(app)/family': typeof appFamilyRoute
   '/(app)/recovery': typeof appRecoveryRoute
   '/(app)/settings': typeof appSettingsRoute
+  '/(public)/contact': typeof publicContactRoute
   '/(public)/faq': typeof publicFaqRoute
   '/(public)/login': typeof publicLoginRoute
   '/(public)/privacy-policy': typeof publicPrivacyPolicyRoute
@@ -137,6 +162,8 @@ export interface FileRoutesById {
   '/(public)/': typeof publicIndexRoute
   '/(app)/records/$id': typeof appRecordsIdRoute
   '/(app)/records/new': typeof appRecordsNewRoute
+  '/(public)/news/$id': typeof publicNewsIdRoute
+  '/(public)/news/': typeof publicNewsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -145,6 +172,7 @@ export interface FileRouteTypes {
     | '/family'
     | '/recovery'
     | '/settings'
+    | '/contact'
     | '/faq'
     | '/login'
     | '/privacy-policy'
@@ -153,12 +181,15 @@ export interface FileRouteTypes {
     | '/'
     | '/records/$id'
     | '/records/new'
+    | '/news/$id'
+    | '/news/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/dashboard'
     | '/family'
     | '/recovery'
     | '/settings'
+    | '/contact'
     | '/faq'
     | '/login'
     | '/privacy-policy'
@@ -167,6 +198,8 @@ export interface FileRouteTypes {
     | '/'
     | '/records/$id'
     | '/records/new'
+    | '/news/$id'
+    | '/news'
   id:
     | '__root__'
     | '/(app)'
@@ -175,6 +208,7 @@ export interface FileRouteTypes {
     | '/(app)/family'
     | '/(app)/recovery'
     | '/(app)/settings'
+    | '/(public)/contact'
     | '/(public)/faq'
     | '/(public)/login'
     | '/(public)/privacy-policy'
@@ -183,6 +217,8 @@ export interface FileRouteTypes {
     | '/(public)/'
     | '/(app)/records/$id'
     | '/(app)/records/new'
+    | '/(public)/news/$id'
+    | '/(public)/news/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -241,6 +277,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof publicIndexRouteImport
       parentRoute: typeof publicRouteRoute
     }
+    '/(public)/contact': {
+      id: '/(public)/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof publicContactRouteImport
+      parentRoute: typeof publicRouteRoute
+    }
     '/(public)/faq': {
       id: '/(public)/faq'
       path: '/faq'
@@ -290,6 +333,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof appRecordsNewRouteImport
       parentRoute: typeof appRouteRoute
     }
+    '/(public)/news/': {
+      id: '/(public)/news/'
+      path: '/news'
+      fullPath: '/news/'
+      preLoaderRoute: typeof publicNewsIndexRouteImport
+      parentRoute: typeof publicRouteRoute
+    }
+    '/(public)/news/$id': {
+      id: '/(public)/news/$id'
+      path: '/news/$id'
+      fullPath: '/news/$id'
+      preLoaderRoute: typeof publicNewsIdRouteImport
+      parentRoute: typeof publicRouteRoute
+    }
   }
 }
 
@@ -316,21 +373,27 @@ const appRouteRouteWithChildren = appRouteRoute._addFileChildren(
 )
 
 interface publicRouteRouteChildren {
+  publicContactRoute: typeof publicContactRoute
   publicFaqRoute: typeof publicFaqRoute
   publicLoginRoute: typeof publicLoginRoute
   publicPrivacyPolicyRoute: typeof publicPrivacyPolicyRoute
   publicTermsOfServiceRoute: typeof publicTermsOfServiceRoute
   publicUsageRoute: typeof publicUsageRoute
   publicIndexRoute: typeof publicIndexRoute
+  publicNewsIdRoute: typeof publicNewsIdRoute
+  publicNewsIndexRoute: typeof publicNewsIndexRoute
 }
 
 const publicRouteRouteChildren: publicRouteRouteChildren = {
+  publicContactRoute: publicContactRoute,
   publicFaqRoute: publicFaqRoute,
   publicLoginRoute: publicLoginRoute,
   publicPrivacyPolicyRoute: publicPrivacyPolicyRoute,
   publicTermsOfServiceRoute: publicTermsOfServiceRoute,
   publicUsageRoute: publicUsageRoute,
   publicIndexRoute: publicIndexRoute,
+  publicNewsIdRoute: publicNewsIdRoute,
+  publicNewsIndexRoute: publicNewsIndexRoute,
 }
 
 const publicRouteRouteWithChildren = publicRouteRoute._addFileChildren(
