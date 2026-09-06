@@ -67,10 +67,30 @@ export const fetchNewsListServer = createServerFn({ method: "GET" })
 	});
 
 /**
+ * microCMSのcontentIdが有効な単一パスセグメントであるかを検証する
+ * パストラバーサルを防ぐため、/, \, %, ., .. などの文字を含む場合は無効とする
+ */
+export const isValidContentId = (id: unknown): id is string => {
+	if (typeof id !== "string" || !id.trim()) {
+		return false;
+	}
+	// /, \, %, . を含む文字列（.. を含むパストラバーサル等）を拒否
+	if (/[/\\%.]/.test(id)) {
+		return false;
+	}
+	return true;
+};
+
+/**
  * お知らせ詳細を取得するサーバー関数
  */
 export const fetchNewsDetailServer = createServerFn({ method: "GET" })
-	.validator((id: string) => id)
+	.validator((id: string) => {
+		if (!isValidContentId(id)) {
+			throw new Error("無効なコンテンツIDです");
+		}
+		return id;
+	})
 	.handler(async ({ data: id }) => {
 		try {
 			const response = await microCmsClient.getListDetail<NewsContent>({

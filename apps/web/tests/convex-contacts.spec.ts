@@ -42,15 +42,15 @@ describe("Convex Contacts (お問い合わせ機能)", () => {
 		});
 	});
 
-	it("ログイン中の userId を含めてお問い合わせが登録できること", async () => {
+	it("ログイン中の場合は認証情報から自動で userId が紐づいて登録されること", async () => {
 		const t = setupTest();
+		const authedT = t.withIdentity({ subject: "firebase_user_123" });
 
-		const contactId = (await t.mutation(api.contacts.createContact, {
+		const contactId = (await authedT.mutation(api.contacts.createContact, {
 			name: "佐藤 花子",
 			email: "sato@example.com",
 			category: "機能の要望・提案",
 			message: "ダークモードの切り替えをより簡単にしたいです。",
-			userId: "firebase_user_123",
 		})) as Id<"contacts"> | null;
 
 		expect(contactId).toBeDefined();
@@ -144,6 +144,36 @@ describe("Convex Contacts (お問い合わせ機能)", () => {
 				email: testEmail,
 				category: "一般的なお問い合わせ",
 				message: "これは4回目の問い合わせメッセージです。",
+			}),
+		).rejects.toThrow("短時間に複数回送信されています");
+	});
+
+	it("大文字小文字を変えた同一メールアドレスでもレート制限が正しく適用されること", async () => {
+		const t = setupTest();
+
+		// 3回送信（小文字・大文字・混在を交互に使用）
+		const emailVariants = [
+			"CaseTest@Example.COM",
+			"casetest@example.com",
+			"CASETEST@EXAMPLE.COM",
+		];
+		for (let i = 0; i < 3; i++) {
+			const res = await t.mutation(api.contacts.createContact, {
+				name: "ケーステスト",
+				email: emailVariants[i],
+				category: "一般的なお問い合わせ",
+				message: `ケーステスト${i + 1}回目のメッセージです。`,
+			});
+			expect(res).toBeDefined();
+		}
+
+		// 4回目は大文字で送信してもレート制限で拒否されること
+		await expect(
+			t.mutation(api.contacts.createContact, {
+				name: "ケーステスト",
+				email: "CASETEST@EXAMPLE.COM",
+				category: "一般的なお問い合わせ",
+				message: "ケーステスト4回目のメッセージです。",
 			}),
 		).rejects.toThrow("短時間に複数回送信されています");
 	});

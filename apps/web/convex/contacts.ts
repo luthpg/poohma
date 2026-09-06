@@ -16,7 +16,6 @@ export const createContact = mutation({
 		email: v.string(),
 		category: v.string(),
 		message: v.string(),
-		userId: v.optional(v.string()),
 		hpConfirm: v.optional(v.string()), // Honeypot スパム防御フィールド
 	},
 	handler: async (ctx, args) => {
@@ -28,7 +27,7 @@ export const createContact = mutation({
 
 		// 基本バリデーション
 		const trimmedName = args.name.trim();
-		const trimmedEmail = args.email.trim();
+		const trimmedEmail = args.email.trim().toLowerCase();
 		const trimmedCategory = args.category.trim();
 		const trimmedMessage = args.message.trim();
 
@@ -56,7 +55,7 @@ export const createContact = mutation({
 			}
 
 			const emailStatus = await rateLimiter.limit(ctx, "contactEmail", {
-				key: trimmedEmail.toLowerCase(),
+				key: trimmedEmail,
 			});
 			if (!emailStatus.ok) {
 				throw new ConvexError(
@@ -80,13 +79,16 @@ export const createContact = mutation({
 			);
 		}
 
+		const identity = await ctx.auth.getUserIdentity();
+		const userId = identity?.subject;
+
 		const now = Date.now();
 		const contactId = await ctx.db.insert("contacts", {
 			name: trimmedName,
 			email: trimmedEmail,
 			category: trimmedCategory,
 			message: trimmedMessage,
-			userId: args.userId,
+			userId,
 			createdAt: now,
 			status: "UNREAD",
 		});
@@ -98,7 +100,7 @@ export const createContact = mutation({
 			category: trimmedCategory,
 			message: trimmedMessage,
 			createdAt: now,
-			userId: args.userId,
+			userId,
 		});
 
 		return contactId;
