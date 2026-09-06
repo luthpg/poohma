@@ -3,6 +3,7 @@ import {
 	getRouteApi,
 	Link,
 	useNavigate,
+	useSearch,
 } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { Globe, LayoutGrid, List, Lock, Tag, Trash2, X } from "lucide-react";
@@ -11,6 +12,7 @@ import {
 	Suspense,
 	useEffect,
 	useMemo,
+	useRef,
 	useState,
 } from "react";
 import { toast } from "sonner";
@@ -18,10 +20,19 @@ import { z } from "zod";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
 import { IndexScrollBar } from "@/components/IndexScrollBar";
+import { OnboardingBanner } from "@/components/onboarding/OnboardingBanner";
+import { OnboardingModal } from "@/components/onboarding/OnboardingModal";
+import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TagInput } from "@/components/ui/tag-input";
 import { useAccount } from "@/hooks/useAccount";
+import { useOnboarding } from "@/hooks/useOnboarding";
 import { usePersistentQuery } from "@/hooks/usePersistentQuery";
+import {
+	dashboardPart1Steps,
+	dashboardPart2Steps,
+	manualDashboardSteps,
+} from "@/lib/onboarding/tours";
 import { cn } from "@/lib/utils";
 import {
 	getDashboardPrefs,
@@ -45,6 +56,7 @@ const searchSchema = z.object({
 		])
 		.optional(),
 	view: z.enum(["card", "list"]).optional(),
+	onboarding: z.string().optional(),
 });
 
 export const Route = createFileRoute("/(app)/dashboard")({
@@ -164,6 +176,63 @@ function RouteComponent() {
 	useEffect(() => {
 		setSearchInput(searchParams.q || "");
 	}, [searchParams.q]);
+
+	// --- オンボーディング ---
+	const { activeAccountId } = useAccount();
+	const records = usePersistentQuery<
+		NonNullable<typeof api.records.getRecords._returnType>
+	>(api.records.getRecords, {
+		accountId: activeAccountId || undefined,
+	});
+	const onboarding = useOnboarding();
+	const onboardingInitRef = useRef(false);
+	const onboardingSearch = useSearch({ from: "/(app)/dashboard" });
+
+	// 通常データ（非サンプル）が存在するか
+	const hasRealRecords = useMemo(
+		() =>
+			records
+				? records.some(
+						(r: (typeof records)[number]) =>
+							!(r as { isSample?: boolean }).isSample,
+					)
+				: false,
+		[records],
+	);
+
+	// 初回表示時にモーダルを表示、またはURLクエリから復帰
+	useEffect(() => {
+		if (onboardingSearch.onboarding) {
+			onboarding.resumeFromQuery(onboardingSearch.onboarding);
+			return;
+		}
+
+		// レコードの取得完了を待機
+		if (records === undefined) return;
+		if (onboardingInitRef.current) return;
+		onboardingInitRef.current = true;
+
+		// 既に通常データが存在するユーザー・家族はモーダルを出さず完了済みにマーク
+		if (hasRealRecords) {
+			if (onboarding.needsOnboarding) {
+				onboarding.markCompleted();
+			}
+			return;
+		}
+
+		// データが1件もない完全新規の家族・アカウントのみ初回体験モーダルを表示
+		if (onboarding.needsOnboarding && records && records.length === 0) {
+			onboarding.showModal();
+		}
+	}, [
+		records,
+		hasRealRecords,
+		onboardingSearch.onboarding,
+		onboarding.needsOnboarding,
+		onboarding.showModal,
+		onboarding.markCompleted,
+		onboarding.resumeFromQuery,
+	]);
 	const viewMode = (searchParams.view || prefs.view || "card") as
 		| "card"
 		| "list";
@@ -208,7 +277,6 @@ function RouteComponent() {
 	};
 
 	// 一括操作用状態
-	const { activeAccountId } = useAccount();
 	const [isSelectMode, setIsSelectMode] = useState(false);
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
 	const [activeModal, setActiveModal] = useState<
@@ -305,12 +373,51 @@ function RouteComponent() {
 				isSelectMode && selectedIds.length > 0 && "pb-28",
 			)}
 		>
+			{/* オンボーディングモーダル */}
+			<OnboardingModal
+				isOpen={onboarding.phase === "modal"}
+				isLoading={onboarding.isLoading}
+				onStartTour={onboarding.startTour}
+				onSkip={onboarding.skipOnboarding}
+			/>
+
+			{/* ダッシュボードツアー（前半: サンプルカード紹介） */}
+			<OnboardingTour
+				steps={dashboardPart1Steps}
+				isActive={onboarding.phase === "dashboard-tour-1"}
+				onComplete={onboarding.onDashboardTour1Complete}
+				onClose={onboarding.onTourClose}
+			/>
+
+			{/* ダッシュボードツアー（後半: 新規登録・バナー案内） */}
+			<OnboardingTour
+				steps={dashboardPart2Steps}
+				isActive={onboarding.phase === "dashboard-tour-2"}
+				onComplete={onboarding.onDashboardTour2Complete}
+				onClose={onboarding.onTourClose}
+			/>
+
+			{/* 手動機能ツアー（サンプルデータ不要） */}
+			<OnboardingTour
+				steps={manualDashboardSteps}
+				isActive={onboarding.phase === "manual-tour"}
+				onComplete={onboarding.onTourClose}
+				onClose={onboarding.onTourClose}
+			/>
+			{/* サンプルデータ表示中バナー */}
+			<RecordListBannerSection
+				onRestart={onboarding.restartTour}
+				onPurge={onboarding.purgeSamples}
+				isPurging={onboarding.isPurging}
+			/>
+
 			{/* 検索・フィルターエリア */}
 			<div className="mb-6">
 				<form onSubmit={handleSearch} className="flex items-center gap-2">
 					<div className="relative flex-1">
 						<input
 							type="text"
+							data-tour="search-input"
 							value={searchInput}
 							onChange={(e) => setSearchInput(e.target.value)}
 							placeholder="タグやサービス名で検索..."
@@ -342,9 +449,14 @@ function RouteComponent() {
 					</button>
 				</form>
 				{/* タグクラウド (フィルター) - Suspense化 */}
-				<Suspense fallback={<TagCloudSkeleton />}>
-					<TagCloud activeTag={searchParams.tag} onTagClick={handleTagClick} />
-				</Suspense>
+				<div data-tour="tag-cloud">
+					<Suspense fallback={<TagCloudSkeleton />}>
+						<TagCloud
+							activeTag={searchParams.tag}
+							onTagClick={handleTagClick}
+						/>
+					</Suspense>
+				</div>
 			</div>
 
 			{/* レコード一覧 */}
@@ -506,6 +618,40 @@ function RouteComponent() {
 				</div>
 			)}
 		</div>
+	);
+}
+
+// サンプルデータ表示中バナー（レコード一覧のisSampleをチェック）
+function RecordListBannerSection({
+	onRestart,
+	onPurge,
+	isPurging,
+}: {
+	onRestart: () => void;
+	onPurge: () => void;
+	isPurging: boolean;
+}) {
+	const { activeAccountId } = useAccount();
+	const records = usePersistentQuery<RecordType[]>(api.records.getRecords, {
+		accountId: activeAccountId || undefined,
+	});
+
+	const hasSamples = useMemo(
+		() =>
+			records?.some(
+				(r) => (r as RecordType & { isSample?: boolean }).isSample,
+			) ?? false,
+		[records],
+	);
+
+	if (!hasSamples) return null;
+
+	return (
+		<OnboardingBanner
+			isPurging={isPurging}
+			onRestartTour={onRestart}
+			onPurge={onPurge}
+		/>
 	);
 }
 
@@ -742,6 +888,11 @@ function RecordListSection({
 												isSelectMode={isSelectMode}
 												isSelected={selectedIds.includes(record._id)}
 												onToggleSelect={() => onToggleSelect(record._id)}
+												dataTour={
+													record._id === records[0]?._id
+														? "sample-record"
+														: undefined
+												}
 											/>
 										) : (
 											<ServiceListItem
@@ -776,6 +927,9 @@ function RecordListSection({
 								isSelectMode={isSelectMode}
 								isSelected={selectedIds.includes(record._id)}
 								onToggleSelect={() => onToggleSelect(record._id)}
+								dataTour={
+									record._id === records[0]?._id ? "sample-record" : undefined
+								}
 							/>
 						) : (
 							<ServiceListItem
@@ -918,12 +1072,14 @@ function ServiceCard({
 	isSelectMode,
 	isSelected,
 	onToggleSelect,
+	dataTour,
 }: {
 	record: RecordType;
 	onTagClick: (tag: string) => void;
 	isSelectMode?: boolean;
 	isSelected?: boolean;
 	onToggleSelect?: () => void;
+	dataTour?: string;
 }) {
 	return (
 		<Link
@@ -936,6 +1092,7 @@ function ServiceCard({
 					onToggleSelect();
 				}
 			}}
+			{...(dataTour ? { "data-tour": dataTour } : {})}
 			className={`group relative flex flex-row md:flex-col overflow-hidden rounded-lg bg-card shadow-card transition-shadow hover:shadow-card-hover block border ${
 				isSelected
 					? "border-orange-500 ring-2 ring-orange-500/20"

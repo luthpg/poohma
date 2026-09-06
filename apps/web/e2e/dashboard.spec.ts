@@ -1,3 +1,4 @@
+import { ensureOnboardingCompleted } from "./support/ensure-onboarding";
 import { expect, test } from "./support/test-fixtures";
 
 test.describe("認証済みルートのアクセス検証", () => {
@@ -9,6 +10,9 @@ test.describe("認証済みルートのアクセス検証", () => {
 		// 家族所属時は /dashboard、未所属時は /family へルーティングされる
 		await page.waitForURL(/.*(\/dashboard|\/family)/, { timeout: 20000 });
 		await expect(page).toHaveURL(/.*(\/dashboard|\/family)/);
+
+		// オンボーディングモーダルが表示された場合はスキップして完了済みにする
+		await ensureOnboardingCompleted(page);
 
 		// コンポーネントが描画され、メインコンテンツまたはヘッダーが表示されること
 		const mainContent = page

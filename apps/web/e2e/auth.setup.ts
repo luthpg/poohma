@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { test as setup } from "@playwright/test";
 import { ensureTestUserCustomToken } from "./support/ensure-test-user";
+import { ensureOnboardingCompleted } from "./support/ensure-onboarding";
 
 import { setupProtectionBypass } from "./support/test-fixtures";
 
@@ -63,6 +64,9 @@ setup("authenticate as e2e test user", async ({ page, context, baseURL }) => {
 		.locator("main, header, [role='main']")
 		.first()
 		.waitFor({ state: "visible", timeout: 15000 });
+
+	// オンボーディングモーダルが表示されている場合はスキップしてオンボーディング完了済みにする
+	await ensureOnboardingCompleted(page);
 
 	// Cookie と IndexedDB の双方を含めて storageState として保存
 	await page.context().storageState({ path: STORAGE_STATE, indexedDB: true });

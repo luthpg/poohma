@@ -1,5 +1,5 @@
 import { Link, useMatches } from "@tanstack/react-router";
-import { Plus } from "lucide-react";
+import { Lightbulb, Plus } from "lucide-react";
 import { AccountSwitcher } from "@/components/AccountSwitcher";
 import { ResponsiveNews } from "@/components/ResponsiveNews";
 import { UserMenu } from "@/components/user-menu";
@@ -17,6 +17,7 @@ interface AppHeaderProps {
  * - ロゴ（ダッシュボードへのリンク）
  * - AccountSwitcher（アカウント切り替えドロップダウン）
  * - お知らせ通知ベル (ResponsiveNews variant="bell")
+ * - 使い方ガイドツアー起動ランプ
  * - ダッシュボード表示時のみ「+ 新規登録」ボタン
  * - UserMenu（アバター＋ドロップダウン）
  */
@@ -41,11 +42,26 @@ export function AppHeader({ user }: AppHeaderProps) {
 					</span>
 				</Link>
 				<div className="flex items-center gap-2 sm:gap-3">
-					<AccountSwitcher />
+					<div data-tour="account-switcher">
+						<AccountSwitcher />
+					</div>
 					<ResponsiveNews variant="bell" />
 					{isDashboard && (
 						<Link
+							to="/dashboard"
+							search={(prev) => ({ ...prev, onboarding: "guide" })}
+							className="flex h-9 items-center gap-1.5 rounded-md px-2.5 text-[13px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition cursor-pointer"
+							title="使い方を見る"
+							aria-label="使い方を見る"
+						>
+							<Lightbulb className="h-4 w-4 text-amber-500" />
+							<span className="hidden md:inline">使い方</span>
+						</Link>
+					)}
+					{isDashboard && (
+						<Link
 							to="/records/new"
+							data-tour="add-record"
 							className="flex h-9 items-center justify-center rounded-md bg-orange-500 px-2.5 sm:px-4 text-[14px] font-medium text-white shadow-border hover:bg-orange-600 transition shrink-0"
 							aria-label="新規登録"
 						>
@@ -53,7 +69,9 @@ export function AppHeader({ user }: AppHeaderProps) {
 							<span className="hidden sm:inline">新規登録</span>
 						</Link>
 					)}
-					<UserMenu user={user} />
+					<div data-tour="user-menu">
+						<UserMenu user={user} />
+					</div>
 				</div>
 			</div>
 		</header>

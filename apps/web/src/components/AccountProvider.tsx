@@ -34,6 +34,7 @@ export interface Account {
 		kdfIterations?: number;
 		cryptoVersion?: number;
 	} | null;
+	onboardingVersion?: number;
 	createdAt?: number;
 	updatedAt: number;
 }

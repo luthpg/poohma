@@ -4,13 +4,16 @@ import {
 	Link,
 	useNavigate,
 	useRouter,
+	useSearch,
 } from "@tanstack/react-router";
 import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
 import { Check, Share2, Users } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { z } from "zod";
 import { api } from "@/../convex/_generated/api";
 import type { Doc, Id } from "@/../convex/_generated/dataModel";
+import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { usePasscode } from "@/components/PasscodeProvider";
 import { RecordForm } from "@/components/records/RecordForm";
 import {
@@ -35,9 +38,16 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { useAccount } from "@/hooks/useAccount";
+import { useOnboarding } from "@/hooks/useOnboarding";
 import { useRecordForm } from "@/hooks/useRecordForm";
+import { recordDetailSteps } from "@/lib/onboarding/tours";
+
+const detailSearchSchema = z.object({
+	onboarding: z.string().optional(),
+});
 
 export const Route = createFileRoute("/(app)/records/$id")({
+	validateSearch: detailSearchSchema,
 	loader: ({ params }) => {
 		return { id: params.id as Id<"serviceRecords"> };
 	},
@@ -147,6 +157,23 @@ function RecordDetailComponent({
 
 	const navigate = useNavigate();
 	const router = useRouter();
+	const searchParams = useSearch({ from: "/(app)/records/$id" });
+
+	// --- オンボーディングツアー（詳細画面用） ---
+	const onboarding = useOnboarding();
+	const tourInitRef = useRef(false);
+	const [detailTourActive, setDetailTourActive] = useState(false);
+
+	useEffect(() => {
+		if (tourInitRef.current) return;
+		tourInitRef.current = true;
+
+		if (searchParams.onboarding === "detail") {
+			// ページ読み込み後少し待ってからツアーを開始（DOM描画完了待ち）
+			const timer = setTimeout(() => setDetailTourActive(true), 500);
+			return () => clearTimeout(timer);
+		}
+	}, [searchParams.onboarding]);
 
 	useEffect(() => {
 		window.scrollTo(0, 0);
@@ -643,10 +670,24 @@ function RecordDetailComponent({
 
 	return (
 		<div className="mx-auto max-w-3xl p-6">
+			{/* オンボーディングツアー（詳細画面用） */}
+			<OnboardingTour
+				steps={recordDetailSteps}
+				isActive={detailTourActive}
+				onComplete={() => {
+					setDetailTourActive(false);
+					onboarding.onDetailTourComplete();
+				}}
+				onClose={() => {
+					setDetailTourActive(false);
+					onboarding.onTourClose();
+				}}
+			/>
 			{/* ヘッダーナビゲーション（戻るボタン & 共有ボタン） */}
 			<div className="sticky top-16 z-10 -mx-6 -mt-6 mb-6 bg-background/95 px-6 pb-4 pt-6 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between gap-4 border-b border-border/40">
 				<button
 					type="button"
+					data-tour="back-to-dashboard"
 					disabled={isNavigating}
 					onClick={() => {
 						setIsNavigating(true);
@@ -789,7 +830,7 @@ function RecordDetailComponent({
 						<h1 className="text-[24px] font-semibold tracking-geist-h2 text-foreground">
 							{record.title}
 						</h1>
-						<div className="flex items-center gap-2">
+						<div className="flex items-center gap-2" data-tour="share-status">
 							<span
 								className={`shrink-0 rounded-full px-3 py-1 text-[12px] font-medium tracking-wide ${
 									isShared
@@ -880,7 +921,7 @@ function RecordDetailComponent({
 					)}
 
 					{/* アカウント情報（ID / ヒント） */}
-					<div className="mb-10">
+					<div className="mb-10" data-tour="hint-container">
 						<h2 className="mb-6 text-[18px] font-semibold text-foreground tracking-geist-ui border-b border-border pb-2">
 							アカウント情報
 						</h2>
@@ -1297,6 +1338,7 @@ function CredentialCard({
 					) : isEncrypted ? (
 						<button
 							type="button"
+							data-tour="hint-reveal-btn"
 							onClick={handleReveal}
 							disabled={isDecrypting}
 							className="inline-flex items-center gap-1.5 rounded bg-orange-300/10 px-2.5 py-1 text-xs font-medium text-orange-600 hover:bg-orange-500/20 transition disabled:opacity-50"

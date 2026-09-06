@@ -1,6 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Page } from "@playwright/test";
+import { ensureOnboardingCompleted } from "./support/ensure-onboarding";
 import { expect, test } from "./support/test-fixtures";
 
 const dirname =
@@ -89,6 +90,10 @@ async function importCsvSeed(
 	await expect(page.getByText(familyName, { exact: true }).first()).toBeVisible({
 		timeout: 20000,
 	});
+
+	// 家族情報・アカウント解決後にオンボーディングモーダルが表示された場合はスキップして完了状態にする
+	await ensureOnboardingCompleted(page);
+
 	const recordIdsBeforeImport = new Set(await getRecordIds(page));
 
 	// CSVファイル入力要素（hidden要素のためattachedを待機）
@@ -133,6 +138,9 @@ async function verifyRecordDecryption(
 	expectedHint: string,
 	passcode: string,
 ): Promise<void> {
+	// オンボーディングモーダルが残っている場合はスキップ
+	await ensureOnboardingCompleted(page);
+
 	// インポートされたレコードカードを探索して詳細へ遷移
 	const recordCard = page.locator(`text="${recordTitle}"`).first();
 	await expect(recordCard).toBeVisible({ timeout: 20000 });
@@ -175,6 +183,9 @@ async function bulkDeleteRecords(
 ): Promise<void> {
 	await page.goto("/dashboard");
 	await expect(page).toHaveURL(/.*\/dashboard/, { timeout: 20000 });
+
+	// オンボーディングモーダルが表示された場合はスキップ
+	await ensureOnboardingCompleted(page);
 
 	// 一括操作モードを起動
 	const bulkOpButton = page.locator('button:has-text("一括操作")').first();

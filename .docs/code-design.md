@@ -1105,6 +1105,18 @@ cleanupExpiredMigrationsInternal:
 | Yahoo!テキスト解析API         | サービス名からのふりがな自動生成             | アプリケーションID                             |
 | Cloudflare Workers / R2 | Convexデータの定期自動バックアップ（日次）   | Cloudflare Secret（`CONVEX_DEPLOY_KEY`） |
 
+## 4.3 オンボーディング関連変更
+
+### users テーブル拡張
+| フィールド | 型 | 説明 |
+| --------- | ---- | ---- |
+| onboardingVersion | number (optional) | ユーザーのオンボーディング進捗を示すバージョン番号。`0` は未開始、`1` 以降は対応するオンボーディングフローが完了したことを表す。既存ユーザーはデフォルトで `0` が設定され、オンボーディング完了時に `completeOnboarding` Mutation により更新される。 |
+
+### serviceRecords テーブル拡張
+| フィールド | 型 | 説明 |
+| --------- | ---- | ---- |
+| isSample | boolean (optional) | サンプルデータかどうかを示すフラグ。`true` のレコードはオンボーディング時に生成されたサンプルであり、ユーザーが実データを作成した後は自動的に削除されるか保持されない。 |
+
 ## 14. 環境変数一覧
 
 ### クライアント（src/env/client.ts, VITE_プレフィックス）
