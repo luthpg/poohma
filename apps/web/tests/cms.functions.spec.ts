@@ -38,6 +38,12 @@ describe("isValidContentId", () => {
 		expect(isValidContentId("news.json")).toBe(false);
 		expect(isValidContentId(".env")).toBe(false);
 	});
+
+	it("制御文字とUnicodeの行区切り文字を含むコンテンツIDを拒否すること", () => {
+		expect(isValidContentId("news\nforged-entry")).toBe(false);
+		expect(isValidContentId("news\u2028forged-entry")).toBe(false);
+		expect(isValidContentId("news\u2029forged-entry")).toBe(false);
+	});
 });
 
 describe("normalizeNewsListParams", () => {
