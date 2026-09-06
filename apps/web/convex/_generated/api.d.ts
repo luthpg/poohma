@@ -9,6 +9,7 @@
  */
 
 import type * as actions from "../actions.js";
+import type * as contacts from "../contacts.js";
 import type * as crons from "../crons.js";
 import type * as customBuilders from "../customBuilders.js";
 import type * as families from "../families.js";
@@ -27,6 +28,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   actions: typeof actions;
+  contacts: typeof contacts;
   crons: typeof crons;
   customBuilders: typeof customBuilders;
   families: typeof families;
@@ -64,4 +66,6 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
-export declare const components: {};
+export declare const components: {
+  rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
+};

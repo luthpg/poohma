@@ -376,6 +376,22 @@ serviceRecords 1 ── * recordEditingSessions (recordEditingSessions.recordId 
 | updatedAt   | number              | 最終ハートビート時刻（epoch ms）。TTLは5分（300,000ms）             |
 
 インデックス: by_recordId, by_accountId, by_updatedAt, by_recordId_accountId。編集画面を開いている間30秒間隔でハートビート更新し、5分経過したセッションはクエリ側で自動失効扱いとする。保存完了時やキャンセル時に物理削除されるほか、放置された期限切れセッションは1分間隔の定期cron（cleanupExpiredEditingSessionsInternal）により自動削除される。
+ 
+#### contacts
+
+ユーザーまたは未認証訪問者からのお問い合わせ情報。
+
+| フィールド | 型                                            | 説明                                           |
+| ---------- | --------------------------------------------- | ---------------------------------------------- |
+| name       | string                                        | 送信者名（1〜100文字）                         |
+| email      | string                                        | メールアドレス                                 |
+| category   | string                                        | お問い合わせ種別                               |
+| message    | string                                        | メッセージ本文（5〜3000文字）                  |
+| userId     | string(optional)                              | 送信者の Firebase UID（ログイン時）            |
+| createdAt  | number                                        | 送信日時（epoch ms）                           |
+| status     | "UNREAD" \| "READ" \| "RESOLVED"              | 対応ステータス                                 |
+
+インデックス: by_createdAt, by_email_createdAt。同一メールアドレスによる短時間連投の抑止（レート制限）および一覧照会に使用。
 
 ## 5. 認証・認可設計
 
@@ -837,6 +853,15 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
 | getCustomTokenFromSession    | auth.functions.ts     | POST | セッションCookie検証            | セッションCookieからFirebaseカスタムトークンを再発行（セッション復旧用） |
 | logout                       | auth.functions.ts     | POST | セッションCookie失効            | ログアウト処理（Cookie削除＋トークン失効）              |
 | getClientRequestContext      | security.functions.ts | GET  | なし                      | 接続元のIPアドレス・User-Agent・GeoIP位置情報の取得     |
+| fetchNewsListServer          | cms.functions.ts      | GET  | なし                      | microCMSからのお知らせ一覧取得（SSR・TanStack Query）   |
+| fetchNewsDetailServer        | cms.functions.ts      | GET  | なし                      | microCMSからのお知らせ詳細取得（SSR・TanStack Query）   |
+
+### 7.7 convex/contacts.ts
+
+| 関数                  | 種別           | 認可       | 概要                                                                                         |
+| --------------------- | -------------- | ---------- | -------------------------------------------------------------------------------------------- |
+| createContact         | Mutation       | 公開       | お問い合わせ送信（Honeypot、Zod整合バリデーション、@convex-dev/rate-limiterトークンバケット、同一メール短時間連投制限、管理者メール通知予約） |
+| sendNotificationEmail | InternalAction | 内部限定   | 管理者（ADMIN_EMAIL）宛てにお問い合わせ受領通知メールを配信（送信者をreplyToに設定）        |
 
 
 ## 8. 画面設計・ルーティング設計
@@ -846,7 +871,8 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
 ```txt
 (public)/  … PublicLayout配下。ヘッダー・フッター共通、未ログインでも閲覧可
   index.tsx, usage.tsx, faq.tsx, login.tsx,
-  terms-of-service.tsx, privacy-policy.tsx
+  terms-of-service.tsx, privacy-policy.tsx,
+  news/index.tsx, news/$id.tsx, contact.tsx
 
 (app)/     … 認証必須。Client-First AuthGuard（useAuth）により保護。未認証確定時は /login へリダイレクト、
               家族未所属時は /family 以外を /family へ強制リダイレクト。

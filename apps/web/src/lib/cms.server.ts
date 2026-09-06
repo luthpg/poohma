@@ -33,17 +33,21 @@ export type LegalContent = {
 	published_at: string;
 } & MicroCMSBase;
 
-export type InfoContent = {
+// お知らせ（News / Info）の型定義
+export type NewsContent = {
 	id: string;
 	slug: string;
 	title: string;
-	content: string;
+	content: string; // リッチテキスト（HTML文字列）
+	published_at?: string; // microCMSカスタム日時フィールド
 	thumbnail?: {
 		url: string;
 		width: number;
 		height: number;
 	};
 } & MicroCMSBase;
+
+export type InfoContent = NewsContent;
 
 // サーバーサイドでのみ初期化されるクライアント
 export const microCmsClient = createClient({

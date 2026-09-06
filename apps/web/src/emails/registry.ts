@@ -2,6 +2,7 @@ import { type Infer, v } from "convex/values";
 import { accountDeletedEmail } from "./templates/account/AccountDeletedEmail";
 import { recordAdminChangedEmail } from "./templates/account/RecordAdminChangedEmail";
 import { shareSettingChangedEmail } from "./templates/account/ShareSettingChangedEmail";
+import { contactNotificationEmail } from "./templates/admin/ContactNotificationEmail";
 import { familyMigrationCompletedEmail } from "./templates/family/FamilyMigrationCompletedEmail";
 import { familyWelcomeEmail } from "./templates/family/FamilyWelcomeEmail";
 import { joinApprovedEmail } from "./templates/family/JoinApprovedEmail";
@@ -35,6 +36,7 @@ export const emailTemplates = [
 	biometricRemovedEmail,
 	recoveryOtpEmail,
 	recoveryKitIssuedEmail,
+	contactNotificationEmail,
 ] as const;
 
 export const emailPayload = v.union(
@@ -105,6 +107,10 @@ export const emailPayload = v.union(
 	v.object({
 		template: v.literal(recoveryKitIssuedEmail.key),
 		props: recoveryKitIssuedEmail.props,
+	}),
+	v.object({
+		template: v.literal(contactNotificationEmail.key),
+		props: contactNotificationEmail.props,
 	}),
 );
 

@@ -23,6 +23,7 @@
     "test:e2e:ui": "pnpm build:e2e-bridge && playwright test --ui"
   },
   "dependencies": {
+    "@convex-dev/rate-limiter": "^0.3.2",
     "@fontsource/geist-mono": "^5.3.0",
     "@fontsource/geist-sans": "^5.3.0",
     "@icons-pack/react-simple-icons": "^13.13.0",
@@ -48,6 +49,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "cn": "^0.2.5",
     "convex": "^1.43.0",
     "convex-helpers": "^0.1.122",
     "firebase": "^12.17.1",

@@ -190,4 +190,16 @@ export default defineSchema({
     .index("by_accountId", ["accountId"])
     .index("by_updatedAt", ["updatedAt"])
     .index("by_recordId_accountId", ["recordId", "accountId"]),
+
+  contacts: defineTable({
+    name: v.string(),
+    email: v.string(),
+    category: v.string(),
+    message: v.string(),
+    userId: v.optional(v.string()),
+    createdAt: v.number(),
+    status: v.union(v.literal("UNREAD"), v.literal("READ"), v.literal("RESOLVED")),
+  })
+    .index("by_createdAt", ["createdAt"])
+    .index("by_email_createdAt", ["email", "createdAt"]),
 });

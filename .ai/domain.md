@@ -177,3 +177,49 @@ flowchart TD
   - メモ (`memo`): 最大 10,000 文字
   - パスワードヒント平文: 最大 2,000 文字
   - 各タグ文字列: 最大 50 文字
+
+---
+
+## 6. お問い合わせ (`contacts`) エンティティ
+
+`contacts` テーブルはユーザーからのお問い合わせを格納する単純な書き込み専用テーブル。アクセス制御は不要（認証不要で送信可能）で、読み取りは管理者運用のみを想定。
+
+| フィールド | 型 | 説明 |
+| --- | --- | --- |
+| `name` | string | 送信者名 |
+| `email` | string | 送信者メールアドレス |
+| `category` | string | お問い合わせ種別 |
+| `message` | string | 本文（最大3000文字） |
+| `userId` | string? | Firebase UID（ログイン中の場合のみ） |
+| `createdAt` | number | 送信日時（Unix ms） |
+| `status` | `UNREAD`\|`READ`\|`RESOLVED` | 管理ステータス（初期値: `UNREAD`） |
+
+- **スパム・乱用対策**:
+  - **Honeypot**: 非表示フィールド（`hpConfirm`）による単純ボット排除
+  - **グローバル/バースト制限**: Convex公式 `@convex-dev/rate-limiter` によるトークンバケット制限（1分間に最大5件回復、キャパシティ10件）
+  - **同一メール短時間連投制限**: `by_email_createdAt` インデックスにより直近10分間で3件以上の同一メール送信をブロック
+  - **入力バリデーション**: 厳格な型検証（お名前1〜100文字、メールRFC準拠、メッセージ5〜3000文字）
+- **メール通知**: `createContact` 成功後、`ctx.scheduler.runAfter(0, ...)` で `sendNotificationEmail` internalAction を非同期実行。`ADMIN_EMAIL`（フォールバック: `RESEND_MAIL_FROM`）宛てに `ContactNotificationEmail` テンプレートで通知。`replyTo` に問い合わせ者メールを設定。
+- **インデックス**: `by_createdAt`（管理一覧ソート用）、`by_email_createdAt`（メール別短時間レート制限用）
+
+---
+
+## 7. お知らせ (`NewsContent`) - microCMS `info` エンドポイント
+
+お知らせはConvexではなくmicroCMSで管理。`NewsContent` 型（`cms.server.ts`）と同義の `InfoContent` エイリアスも提供。
+
+| フィールド | 型 | 説明 |
+| --- | --- | --- |
+| `id` | string | microCMS コンテンツID |
+| `slug` | string | URLスラッグ |
+| `title` | string | お知らせタイトル |
+| `content` | string | リッチテキスト（HTML文字列） |
+| `published_at` | string? | カスタム公開日時フィールド |
+| `thumbnail` | `{url, width, height}`? | サムネイル画像 |
+| `publishedAt` | string | microCMS標準公開日時（MicroCMSBase） |
+
+- **取得関数**: `fetchNewsListServer`（`info` エンドポイント、最大20件、`-publishedAt,-createdAt` 順）/ `fetchNewsDetailServer`（IDで1件取得）
+- **キャッシュ**: `staleTime = 5分`（NEWS_STALE_TIME）
+- **表示**: ヘッダーベル（`NewsBell` + Popover、未読バッジ付き）/ ユーザーメニュー / `/news` 一覧・`/news/$id` 詳細ページ（公開ルート）
+- **未読管理**: localStorage の `poohma_last_read_news_time`（Unix ms）と最新記事の `published_at` を比較。ベル開封時に更新。
+

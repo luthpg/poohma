@@ -196,6 +196,18 @@ function samplePayloadFor(key: string): EmailPayload {
 					ctaUrl: "https://poohma.ciderlabs.link/family",
 				},
 			};
+		case "contactNotification":
+			return {
+				template: "contactNotification",
+				props: {
+					name: "山田 太郎",
+					email: "yamada@example.com",
+					category: "機能要望",
+					message: "お問い合わせ本文です。",
+					createdAt: Date.now(),
+					userId: "user_test",
+				},
+			};
 		default:
 			throw new Error(`Unknown template key: ${key}`);
 	}

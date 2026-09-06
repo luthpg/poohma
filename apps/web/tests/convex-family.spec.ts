@@ -2080,7 +2080,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 				cryptoVersion: 1,
 			});
 			await t.run(async (ctx) => {
-				const family = await ctx.db.get(familyId);
+				const family = await ctx.db.get(familyId as Id<"families">);
 				expect(family?.kdfIterations).toBe(400_000);
 				expect(family?.cryptoVersion).toBe(1);
 			});
@@ -2106,7 +2106,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 				masterKeySalt: "salt",
 			});
 			await t.run(async (ctx) => {
-				const family = await ctx.db.get(familyId);
+				const family = await ctx.db.get(familyId as Id<"families">);
 				expect(family?.kdfIterations).toBe(300_000);
 				expect(family?.cryptoVersion).toBe(1);
 			});

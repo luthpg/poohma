@@ -36,7 +36,7 @@ poohma/
 
 - **Routing**: TanStack Router によるファイルベースルーティング
   - `routes/(app)/`: 認証必須ルート（`dashboard.tsx`, `family.tsx`, `records/`, `settings.tsx`, `recovery.tsx`）
-  - `routes/(public)/`: 未認証公開ルート（`index.tsx` (LP), `login.tsx`, `usage.tsx`, `faq.tsx`, `terms-of-service.tsx`, `privacy-policy.tsx`）
+  - `routes/(public)/`: 未認証公開ルート（`index.tsx` (LP), `login.tsx`, `usage.tsx`, `faq.tsx`, `news/index.tsx`, `news/$id.tsx`, `contact.tsx`, `terms-of-service.tsx`, `privacy-policy.tsx`）
   - `routes/__root.tsx`: ルート共通レイアウト、認証コンテキスト（`beforeLoad` で `getAuthUser` 実行）、各種 Provider
 - **State & Context**:
   - `AuthProvider`: Firebase Auth 状態管理
@@ -45,7 +45,9 @@ poohma/
 - **Services (Server Functions)**:
   - `auth.functions.ts`: `syncUser`, `refreshSessionCookie`, `getAuthUser`, `logout`, `getCustomTokenFromSession`（Firebase Admin SDK とセッション Cookie 制御）
   - `firebase-admin.server.ts`: Firebase Admin 初期化・トークン検証
-  - `cms.functions.ts` / `cms.server.ts`: microCMS 連携（FAQ/利用規約等）
+  - `cms.functions.ts` / `cms.server.ts`: microCMS 連携（FAQ/利用規約/お知らせ）
+    - `fetchNewsListServer`, `fetchNewsDetailServer`: `info` エンドポイント（`NewsContent` 型）でお知らせ一覧・詳細取得
+  - `cms.queries.ts`: TanStack Query の `queryOptions` ラッパー（`cmsQueries.newsList()`, `cmsQueries.newsDetail(id)` 等）
 - **Lib & Utils**:
   - `crypto.ts`: Web Crypto API による E2EE（AES-GCM, PBKDF2, DEK/MasterKey ラップ/アンラップ）
   - `biometric.ts`: WebAuthn PRF 拡張による生体認証連携
@@ -56,9 +58,11 @@ poohma/
 - `schema.ts`: データベーススキーマおよびインデックス定義
 - `customBuilders.ts`: 認可レベル別 Convex クエリ/ミューテーションビルダー（`identityVerified*`, `authenticated*`, `familyBound*`, `resolveAccount`）
 - `rls.ts`: レコード単位のアクセス制御関数（`requireContentAccess`, `requireAdminAccess`, レガシー互換ヘルパー）
+- `convex.config.ts`: Convex Components 設定（`@convex-dev/rate-limiter` の登録）
 - `records.ts`: サービスレコード CRUD、検索、タグ、一括操作、同時編集セッション管理（`recordEditingSessions`、1分cron上限500件バッチ自動削除）、`updateRecord` revision方式楽観的ロック競合防止（FR-REC-15）
 - `families.ts`: 家族グループ、家族招待（`familyInvites`）、参加申請（`joinRequests`）、家族移行（`familyMigrations`）、パスコードローテーション、メンバーキック・データ持ち出し（`pendingExportVaults`）
 - `users.ts`: ユーザー同期、アカウント作成・切り替え・削除、ログイン履歴記録、SSR用ユーザー/アカウント（family暗号化メタデータ含む）取得
+- `contacts.ts`: お問い合わせ受付（`createContact` mutation）、Honeypot スパム防御、多層レート制限（①Convex公式 `@convex-dev/rate-limiter` トークンバケット ＋ ②同一メール短時間連投制限 `by_email_createdAt`）、管理者メール通知（`sendNotificationEmail` internalAction、`ADMIN_EMAIL` 宛て Resend 送信、replyTo: 問い合わせ者メール）
 - `recovery.ts`: リカバリーキット検証、2段階復元（メールOTP発行・検証、マスターキー再ラップ）
 - `actions.ts`: Node.js ランタイムでの外部連携（OGP取得、ふりがなAPI、Resend メール送信）
 - `http.ts`: 内部 HTTP エンドポイント（`getUserByFirebaseUid`、内部共有シークレット認証）

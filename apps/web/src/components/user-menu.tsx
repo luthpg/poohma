@@ -11,6 +11,8 @@ import {
 	Laptop,
 	LayoutDashboard,
 	LogOut,
+	Mail,
+	Megaphone,
 	Moon,
 	ScrollText,
 	Sun,
@@ -545,15 +547,23 @@ export function UserMenu({
 
 							<div className="h-[1px] bg-border/50" />
 
-							{/* ヘルプ & 規約 */}
+							{/* ヘルプ & 規約 & お知らせ */}
 							<div className="grid grid-cols-2 gap-1 text-xs">
 								<Link
 									to="/usage"
 									onClick={() => setIsSheetOpen(false)}
-									className="flex items-center gap-2 p-2 rounded.md hover:bg-accent text-muted-foreground hover:text-foreground transition"
+									className="flex items-center gap-2 p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition"
 								>
 									<BookOpen className="h-4 w-4" />
 									<span>使い方</span>
+								</Link>
+								<Link
+									to="/news"
+									onClick={() => setIsSheetOpen(false)}
+									className="flex items-center gap-2 p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition"
+								>
+									<Megaphone className="h-4 w-4" />
+									<span>お知らせ</span>
 								</Link>
 								<Link
 									to="/faq"
@@ -562,6 +572,14 @@ export function UserMenu({
 								>
 									<HelpCircle className="h-4 w-4" />
 									<span>FAQ</span>
+								</Link>
+								<Link
+									to="/contact"
+									onClick={() => setIsSheetOpen(false)}
+									className="flex items-center gap-2 p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition"
+								>
+									<Mail className="h-4 w-4" />
+									<span>お問い合わせ</span>
 								</Link>
 								<Link
 									to="/terms-of-service"
@@ -718,9 +736,21 @@ export function UserMenu({
 								</Link>
 							</DropdownMenuItem>
 							<DropdownMenuItem asChild>
+								<Link to="/news" className="cursor-pointer">
+									<Megaphone className="mr-2 h-4 w-4" />
+									<span>お知らせ</span>
+								</Link>
+							</DropdownMenuItem>
+							<DropdownMenuItem asChild>
 								<Link to="/faq" className="cursor-pointer">
 									<HelpCircle className="mr-2 h-4 w-4" />
 									<span>FAQ</span>
+								</Link>
+							</DropdownMenuItem>
+							<DropdownMenuItem asChild>
+								<Link to="/contact" className="cursor-pointer">
+									<Mail className="mr-2 h-4 w-4" />
+									<span>お問い合わせ</span>
 								</Link>
 							</DropdownMenuItem>
 							<DropdownMenuItem asChild>

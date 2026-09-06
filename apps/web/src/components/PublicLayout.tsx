@@ -28,7 +28,9 @@ export function PublicLayout({ children, user }: PublicLayoutProps) {
 	const navigation = [
 		{ name: "トップ", href: "/" },
 		{ name: "使い方", href: "/usage" },
+		{ name: "お知らせ", href: "/news" },
 		{ name: "FAQ", href: "/faq" },
+		{ name: "お問い合わせ", href: "/contact" },
 		{ name: "利用規約", href: "/terms-of-service" },
 		{ name: "プライバシーポリシー", href: "/privacy-policy" },
 	];
@@ -174,10 +176,22 @@ export function PublicLayout({ children, user }: PublicLayoutProps) {
 								使い方
 							</Link>
 							<Link
+								to="/news"
+								className="hover:text-foreground transition-colors"
+							>
+								お知らせ
+							</Link>
+							<Link
 								to="/faq"
 								className="hover:text-foreground transition-colors"
 							>
 								FAQ
+							</Link>
+							<Link
+								to="/contact"
+								className="hover:text-foreground transition-colors"
+							>
+								お問い合わせ
 							</Link>
 							<Link
 								to="/terms-of-service"

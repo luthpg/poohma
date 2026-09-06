@@ -3,6 +3,7 @@ import type { EmailPayload } from "./registry";
 import { accountDeletedEmail } from "./templates/account/AccountDeletedEmail";
 import { recordAdminChangedEmail } from "./templates/account/RecordAdminChangedEmail";
 import { shareSettingChangedEmail } from "./templates/account/ShareSettingChangedEmail";
+import { contactNotificationEmail } from "./templates/admin/ContactNotificationEmail";
 import { familyMigrationCompletedEmail } from "./templates/family/FamilyMigrationCompletedEmail";
 import { familyWelcomeEmail } from "./templates/family/FamilyWelcomeEmail";
 import { joinApprovedEmail } from "./templates/family/JoinApprovedEmail";
@@ -67,5 +68,7 @@ export function resolveEmail(payload: EmailPayload) {
 			return resolve(recoveryOtpEmail, payload.props);
 		case "recoveryKitIssued":
 			return resolve(recoveryKitIssuedEmail, payload.props);
+		case "contactNotification":
+			return resolve(contactNotificationEmail, payload.props);
 	}
 }
