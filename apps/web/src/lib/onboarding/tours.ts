@@ -124,7 +124,7 @@ export const manualDashboardSteps: DriveStep[] = [
 		},
 	},
 	{
-		element: '[data-tour="account-switcher"]',
+		element: '[data-tour="user-menu"]',
 		popover: {
 			title: "アカウントと家族の管理",
 			description:

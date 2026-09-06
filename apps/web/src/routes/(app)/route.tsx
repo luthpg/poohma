@@ -62,7 +62,6 @@ function RouteComponent() {
 		);
 	}
 
-	// family ページは独自ヘッダーを持つため、共通ヘッダーを非表示にする
 	return (
 		<>
 			{currentAccount?.familyId && <AppHeader user={currentAccount} />}

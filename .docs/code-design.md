@@ -953,7 +953,7 @@ PoohMaのUIは、Vercelのデザインシステム（Geist）を参考にした�
 ### 9.2 CSVインポート
 
 ```txt
-1. ユーザーがCSVファイルを選択 (user-menu.tsx)
+1. ユーザーがCSVファイルを選択 (UserMenu.tsx)
 2. papaparseでパース（ヘッダー行あり）
 3. 行数（500件以下）・フィールド長（10,000文字以下）の早期バリデーション
 4. パスワードヒントを含む行がある場合、requireUnlock() でロック解除

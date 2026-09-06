@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
 import { useAccount } from "@/hooks/useAccount";
+import { cn } from "@/lib/utils";
 
 interface AccountSwitcherProps {
 	className?: string;
@@ -73,7 +74,10 @@ export function AccountSwitcher({ className = "" }: AccountSwitcherProps) {
 		<>
 			<DropdownMenu>
 				<DropdownMenuTrigger
-					className={`flex items-center gap-2 rounded-lg border border-border/60 bg-background/80 px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${className}`}
+					className={cn(
+						"flex items-center gap-2 rounded-lg border border-border/60 bg-background/80 px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+						className,
+					)}
 				>
 					<div className="flex h-5 w-5 items-center justify-center rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 font-semibold text-[10px]">
 						{isLoading ? (

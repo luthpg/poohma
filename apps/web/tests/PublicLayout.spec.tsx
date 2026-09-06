@@ -26,7 +26,7 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 
 // Mock UserMenu to avoid complex internal dependencies (Firebase, Convex)
-vi.mock("@/components/user-menu", () => ({
+vi.mock("@/components/UserMenu", () => ({
 	UserMenu: ({ user }: { user: { displayName?: string } }) => (
 		<div data-testid="mock-user-menu">UserMenu: {user.displayName}</div>
 	),

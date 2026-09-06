@@ -1,8 +1,7 @@
 import { Link, useMatches } from "@tanstack/react-router";
 import { Lightbulb, Plus } from "lucide-react";
-import { AccountSwitcher } from "@/components/AccountSwitcher";
 import { ResponsiveNews } from "@/components/ResponsiveNews";
-import { UserMenu } from "@/components/user-menu";
+import { UserMenu } from "@/components/UserMenu";
 
 interface AppHeaderProps {
 	user: {
@@ -15,7 +14,6 @@ interface AppHeaderProps {
 /**
  * (app) 配下の全ページで共通表示されるヘッダーコンポーネント。
  * - ロゴ（ダッシュボードへのリンク）
- * - AccountSwitcher（アカウント切り替えドロップダウン）
  * - お知らせ通知ベル (ResponsiveNews variant="bell")
  * - 使い方ガイドツアー起動ランプ
  * - ダッシュボード表示時のみ「+ 新規登録」ボタン
@@ -42,9 +40,6 @@ export function AppHeader({ user }: AppHeaderProps) {
 					</span>
 				</Link>
 				<div className="flex items-center gap-2 sm:gap-3">
-					<div data-tour="account-switcher">
-						<AccountSwitcher />
-					</div>
 					<ResponsiveNews variant="bell" />
 					{isDashboard && (
 						<Link

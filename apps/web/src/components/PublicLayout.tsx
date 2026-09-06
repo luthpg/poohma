@@ -2,6 +2,7 @@ import { Link, useLocation } from "@tanstack/react-router";
 import { Menu } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
+import { UserMenu } from "@/components/UserMenu";
 import { Button } from "@/components/ui/button";
 import {
 	Sheet,
@@ -10,7 +11,6 @@ import {
 	SheetTitle,
 	SheetTrigger,
 } from "@/components/ui/sheet";
-import { UserMenu } from "@/components/user-menu";
 
 interface PublicLayoutProps {
 	children: React.ReactNode;
