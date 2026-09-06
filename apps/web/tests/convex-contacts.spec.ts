@@ -64,6 +64,25 @@ describe("Convex Contacts (お問い合わせ機能)", () => {
 		});
 	});
 
+	it("クライアントから任意の userId を引数として指定しようとしてもバリデータで拒否されること", async () => {
+		const t = setupTest();
+
+		await expect(
+			t.mutation(api.contacts.createContact, {
+				name: "攻撃者",
+				email: "attacker@example.com",
+				category: "一般的なお問い合わせ",
+				message: "他人のUIDを偽装しようとする試みです。",
+				userId: "victim_user_999",
+			} as unknown as {
+				name: string;
+				email: string;
+				category: string;
+				message: string;
+			}),
+		).rejects.toThrow();
+	});
+
 	it("Honeypot フィールド（hpConfirm）が入力されている場合はスパムとして登録されないこと", async () => {
 		const t = setupTest();
 
@@ -176,5 +195,69 @@ describe("Convex Contacts (お問い合わせ機能)", () => {
 				message: "ケーステスト4回目のメッセージです。",
 			}),
 		).rejects.toThrow("短時間に複数回送信されています");
+	});
+
+	it("許可されていないお問い合わせ種別（category）の場合はエラーになること", async () => {
+		const t = setupTest();
+
+		await expect(
+			t.mutation(api.contacts.createContact, {
+				name: "山田 太郎",
+				email: "yamada@example.com",
+				category: "不正なカテゴリー",
+				message: "お問い合わせメッセージです。",
+			}),
+		).rejects.toThrow("有効なお問い合わせ種別を選択してください");
+	});
+
+	it("お名前とメッセージの文字数境界値が正しく検証されること", async () => {
+		const t = setupTest();
+
+		// 100文字のお名前: 成功
+		const valid100NameRes = await t.mutation(api.contacts.createContact, {
+			name: "あ".repeat(100),
+			email: "boundary-name@example.com",
+			category: "一般的なお問い合わせ",
+			message: "ちょうど100文字の名前テストです。",
+		});
+		expect(valid100NameRes).toBeDefined();
+
+		// 101文字のお名前: エラー
+		await expect(
+			t.mutation(api.contacts.createContact, {
+				name: "あ".repeat(101),
+				email: "boundary-name-err@example.com",
+				category: "一般的なお問い合わせ",
+				message: "101文字の名前テストです。",
+			}),
+		).rejects.toThrow("お名前は1文字以上100文字以内で入力してください");
+
+		// 5文字のメッセージ: 成功
+		const valid5MsgRes = await t.mutation(api.contacts.createContact, {
+			name: "テストユーザー",
+			email: "boundary-msg5@example.com",
+			category: "一般的なお問い合わせ",
+			message: "12345",
+		});
+		expect(valid5MsgRes).toBeDefined();
+
+		// 3000文字のメッセージ: 成功
+		const valid3000MsgRes = await t.mutation(api.contacts.createContact, {
+			name: "テストユーザー",
+			email: "boundary-msg3000@example.com",
+			category: "一般的なお問い合わせ",
+			message: "あ".repeat(3000),
+		});
+		expect(valid3000MsgRes).toBeDefined();
+
+		// 3001文字のメッセージ: エラー
+		await expect(
+			t.mutation(api.contacts.createContact, {
+				name: "テストユーザー",
+				email: "boundary-msg3001@example.com",
+				category: "一般的なお問い合わせ",
+				message: "あ".repeat(3001),
+			}),
+		).rejects.toThrow("メッセージは5文字以上3000文字以内で入力してください");
 	});
 });

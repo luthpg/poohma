@@ -3,10 +3,20 @@ import { ConvexError, v } from "convex/values";
 import { components, internal } from "./_generated/api";
 import { internalAction, mutation } from "./_generated/server";
 
+export const CONTACT_CATEGORIES = [
+	"一般的なお問い合わせ",
+	"機能の要望・提案",
+	"不具合・障害の報告",
+	"セキュリティに関するご報告",
+	"その他",
+] as const;
+
+export type ContactCategory = (typeof CONTACT_CATEGORIES)[number];
+
 const rateLimiter = new RateLimiter(components.rateLimiter, {
-	// グローバルなお問い合わせバースト制限: 1分間に最大5件、キャパシティ10件
+	// 防衛層 1-A: グローバルなお問い合わせバースト制限（DoS対策: 1分間に最大5件、キャパシティ10件）
 	contactGlobal: { kind: "token bucket", rate: 5, period: MINUTE, capacity: 10 },
-	// メールアドレスごとの制限: 1時間に最大5件
+	// 防衛層 1-B: メールアドレスごとの持続的大量送信制限（1時間に最大5件）
 	contactEmail: { kind: "token bucket", rate: 5, period: HOUR, capacity: 5 },
 });
 
@@ -37,34 +47,36 @@ export const createContact = mutation({
 		if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
 			throw new ConvexError("有効なメールアドレスを入力してください");
 		}
-		if (!trimmedCategory) {
-			throw new ConvexError("お問い合わせ種別を選択してください");
+		if (
+			!trimmedCategory ||
+			!CONTACT_CATEGORIES.includes(trimmedCategory as ContactCategory)
+		) {
+			throw new ConvexError("有効なお問い合わせ種別を選択してください");
 		}
 		if (!trimmedMessage || trimmedMessage.length < 5 || trimmedMessage.length > 3000) {
 			throw new ConvexError("メッセージは5文字以上3000文字以内で入力してください");
 		}
 
-		// レート制限 1: RateLimiter コンポーネント（トークンバケット）
-		// テスト環境等で components.rateLimiter が利用可能な場合に実行
-		if (components?.rateLimiter) {
-			const globalStatus = await rateLimiter.limit(ctx, "contactGlobal");
-			if (!globalStatus.ok) {
-				throw new ConvexError(
-					"現在アクセスが集中しています。恐れ入りますが、しばらく時間をおいてから再度お試しください。",
-				);
-			}
-
-			const emailStatus = await rateLimiter.limit(ctx, "contactEmail", {
-				key: trimmedEmail,
-			});
-			if (!emailStatus.ok) {
-				throw new ConvexError(
-					"短時間に複数回送信されています。恐れ入りますが、しばらく時間をおいてから再度お試しください。",
-				);
-			}
+		// 多層防御層 1: RateLimiter コンポーネント（トークンバケット）
+		// グローバルバースト保護
+		const globalStatus = await rateLimiter.limit(ctx, "contactGlobal");
+		if (!globalStatus.ok) {
+			throw new ConvexError(
+				"現在アクセスが集中しています。恐れ入りますが、しばらく時間をおいて再度お試しください。",
+			);
 		}
 
-		// レート制限 2: 同一メールアドレスの短時間連投制限（直近10分間で3件まで）
+		// 送信元メールごとの持続的レート制限
+		const emailStatus = await rateLimiter.limit(ctx, "contactEmail", {
+			key: trimmedEmail,
+		});
+		if (!emailStatus.ok) {
+			throw new ConvexError(
+				"短時間に複数回送信されています。恐れ入りますが、しばらく時間をおいて再度お試しください。",
+			);
+		}
+
+		// 多層防御層 2: DB永続化データを用いた直近10分間の短時間連投防止（直近10分間で3件まで）
 		const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
 		const recentContacts = await ctx.db
 			.query("contacts")
@@ -75,7 +87,7 @@ export const createContact = mutation({
 
 		if (recentContacts.length >= 3) {
 			throw new ConvexError(
-				"短時間に複数回送信されています。恐れ入りますが、しばらく時間をおいてから再度お試しください。",
+				"短時間に複数回送信されています。恐れ入りますが、しばらく時間をおいて再度お試しください。",
 			);
 		}
 

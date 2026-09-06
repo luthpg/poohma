@@ -42,13 +42,35 @@ export const fetchLegalServer = createServerFn({ method: "GET" }).handler(
 );
 
 /**
+ * お知らせ一覧のパラメータ（limit, offset）を検証・正規化する
+ * limit: 1〜50 の整数（デフォルト 20）
+ * offset: 0 以上の整数（デフォルト 0）
+ */
+export const normalizeNewsListParams = (d?: {
+	limit?: number;
+	offset?: number;
+}): { limit: number; offset: number } => {
+	const rawLimit = d?.limit;
+	const rawOffset = d?.offset;
+
+	const limit =
+		rawLimit != null && Number.isFinite(rawLimit)
+			? Math.min(Math.max(1, Math.floor(rawLimit)), 50)
+			: 20;
+
+	const offset =
+		rawOffset != null && Number.isFinite(rawOffset)
+			? Math.max(0, Math.floor(rawOffset))
+			: 0;
+
+	return { limit, offset };
+};
+
+/**
  * お知らせ一覧を取得するサーバー関数
  */
 export const fetchNewsListServer = createServerFn({ method: "GET" })
-	.validator(
-		(d?: { limit?: number; offset?: number }) =>
-			d as { limit?: number; offset?: number } | undefined,
-	)
+	.validator(normalizeNewsListParams)
 	.handler(async ({ data }) => {
 		try {
 			const response = await microCmsClient.getList<NewsContent>({

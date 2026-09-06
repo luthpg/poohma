@@ -4,6 +4,23 @@ interface CmsRichTextProps {
 	htmlContent: string;
 }
 
+// Completely stripped elements (including children) for security
+const DANGEROUS_TAGS = new Set([
+	"script",
+	"style",
+	"iframe",
+	"object",
+	"embed",
+	"svg",
+	"img",
+	"video",
+	"audio",
+	"canvas",
+	"form",
+	"input",
+	"button",
+]);
+
 // Allowlist of permitted HTML tags from microCMS (XSS mitigation)
 const ALLOWED_TAGS = new Set([
 	"h1",
@@ -23,16 +40,26 @@ const ALLOWED_TAGS = new Set([
 
 export function CmsRichText({ htmlContent }: CmsRichTextProps) {
 	// microCMSのHTMLタグを、Shadcn / Geist風クラスに動的に置換・装飾するパーサー
-	// セキュリティ: 許可されたタグのみを描画し、それ以外は除去する（基本的なXSS対策）
+	// セキュリティ: 危険タグを完全排除し、許可されたタグのみを描画する（XSS対策）
 	const options = {
 		replace: (domNode: DOMNode) => {
 			if (domNode instanceof Element) {
-				// Reject any tag not in the allowlist
-				if (!ALLOWED_TAGS.has(domNode.name)) {
-					// Return null to strip the element, or return its children to preserve text content
-					return domNode.children?.length
-						? domToReact(domNode.children as DOMNode[], options)
-						: null;
+				const tagName = domNode.name.toLowerCase();
+
+				// 危険なタグは子要素も含めて完全に消去
+				if (DANGEROUS_TAGS.has(tagName)) {
+					// biome-ignore lint/complexity/noUselessFragments: html-react-parser でタグを除去するために空フラグメントが必要
+					return <></>;
+				}
+
+				// 許可されていないタグは要素自体を除去し、テキスト等の子要素のみを返す（なければ空フラグメント）
+				if (!ALLOWED_TAGS.has(tagName)) {
+					return domNode.children?.length ? (
+						domToReact(domNode.children as DOMNode[], options)
+					) : (
+						// biome-ignore lint/complexity/noUselessFragments: html-react-parser でタグを除去するために空フラグメントが必要
+						<></>
+					);
 				}
 
 				// Strip any inline event handlers (onclick, onerror, etc.) from attributes

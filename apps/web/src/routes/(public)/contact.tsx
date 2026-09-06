@@ -7,6 +7,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { api } from "@/../convex/_generated/api";
+import { CONTACT_CATEGORIES } from "@/../convex/contacts";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { auth } from "@/utils/firebase";
@@ -15,13 +16,7 @@ export const Route = createFileRoute("/(public)/contact")({
 	component: ContactPage,
 });
 
-const CATEGORIES = [
-	"一般的なお問い合わせ",
-	"機能の要望・提案",
-	"不具合・障害の報告",
-	"セキュリティに関するご報告",
-	"その他",
-] as const;
+const CATEGORIES = CONTACT_CATEGORIES;
 
 const contactFormSchema = z.object({
 	name: z
@@ -34,7 +29,13 @@ const contactFormSchema = z.object({
 		.trim()
 		.min(1, "メールアドレスを入力してください")
 		.email("有効なメールアドレスを入力してください"),
-	category: z.string().min(1, "お問い合わせ種別を選択してください"),
+	category: z
+		.string()
+		.refine(
+			(val): val is (typeof CONTACT_CATEGORIES)[number] =>
+				CONTACT_CATEGORIES.includes(val as (typeof CONTACT_CATEGORIES)[number]),
+			{ message: "お問い合わせ種別を選択してください" },
+		),
 	message: z
 		.string()
 		.trim()
