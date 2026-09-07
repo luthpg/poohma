@@ -19,29 +19,54 @@ const SEED_CSV_PATH = path.join(
  * 画面上のレコード一覧からレコードID配列を抽出
  */
 async function getRecordIds(page: Page): Promise<string[]> {
-	return page.locator('a[href^="/records/"]').evaluateAll((links) => [
-		...new Set(
-			links
-				.map((link) => link.getAttribute("href")?.split("/").pop())
-				.filter((id): id is string => Boolean(id)),
-		),
-	]);
+	return page
+		.locator('a[href^="/records/"]')
+		.evaluateAll((links) => [
+			...new Set(
+				links
+					.map((link) => link.getAttribute("href")?.split("/").pop())
+					.filter((id): id is string => Boolean(id)),
+			),
+		]);
 }
 
 /**
  * 実行専用のサブアカウントを作成し、アクティブアカウントとして設定
  */
-async function createTestAccount(page: Page, accountName: string): Promise<void> {
+async function createTestAccount(
+	page: Page,
+	accountName: string,
+): Promise<void> {
 	await page.goto("/family");
 	await expect(page).toHaveURL(/.*\/family/, { timeout: 20000 });
 
-	const accountSwitcher = page
-		.locator('[data-slot="dropdown-menu-trigger"]')
+	// ① ユーザーメニューアバターをクリック
+	const userMenuTrigger = page
+		.locator('[data-testid="user-menu-trigger"]')
+		.filter({ visible: true })
 		.first();
-	await expect(accountSwitcher).toBeVisible({ timeout: 25000 });
-	await accountSwitcher.click();
-	await page.getByText("新しいアカウントを作成", { exact: true }).click();
-	await page.locator("input#account-name").fill(accountName);
+	await expect(userMenuTrigger).toBeVisible({ timeout: 25000 });
+	await userMenuTrigger.click();
+
+	// ② Googleアカウント情報欄をクリック
+	const accountSubTrigger = page
+		.locator('[data-slot="dropdown-menu-sub-trigger"]')
+		.or(page.locator('button:has-text("切替")'))
+		.first();
+	await expect(accountSubTrigger).toBeVisible({ timeout: 5000 });
+	await accountSubTrigger.click();
+
+	// ③ サブメニュー内の「新しいアカウントを作成」をクリック
+	const createBtn = page.getByText("新しいアカウントを作成", { exact: true });
+	await expect(createBtn).toBeVisible({ timeout: 5000 });
+	await createBtn.click();
+
+	// ④ アカウント作成ダイアログへの入力と送信
+	const nameInput = page
+		.locator("input#account-name, input#user-menu-account-name")
+		.first();
+	await expect(nameInput).toBeVisible({ timeout: 5000 });
+	await nameInput.fill(accountName);
 	await page
 		.getByRole("dialog")
 		.getByRole("button", { name: "作成する", exact: true })
@@ -86,17 +111,31 @@ async function importCsvSeed(
 	await page.goto("/dashboard");
 	await expect(page).toHaveURL(/.*\/dashboard/, { timeout: 20000 });
 
-	// 家族グループ情報がロードされ、ヘッダーに反映されるまで待機
-	await expect(page.getByText(familyName, { exact: true }).first()).toBeVisible({
-		timeout: 20000,
-	});
+	// ① ユーザーメニューを開いて家族名を確認
+	const userMenuTrigger = page
+		.locator('[data-testid="user-menu-trigger"]')
+		.filter({ visible: true })
+		.first();
+	await expect(userMenuTrigger).toBeVisible({ timeout: 25000 });
+	await userMenuTrigger.click();
 
-	// 家族情報・アカウント解決後にオンボーディングモーダルが表示された場合はスキップして完了状態にする
+	// 家族グループ名が表示されることを確認
+	await expect(page.getByText(familyName, { exact: true }).first()).toBeVisible(
+		{
+			timeout: 20000,
+		},
+	);
+
+	// 確認が終わったらメニューを閉じる
+	await page.keyboard.press("Escape");
+	await page.waitForTimeout(300); // メニューのアニメーション完了を待つ
+
+	// ② オンボーディングモーダルが表示された場合はスキップして消えるまで待機
 	await ensureOnboardingCompleted(page);
 
 	const recordIdsBeforeImport = new Set(await getRecordIds(page));
 
-	// CSVファイル入力要素（hidden要素のためattachedを待機）
+	// ③ CSVファイル入力要素
 	const fileInput = page.locator('[data-testid="csv-file-input"]');
 	await fileInput.waitFor({ state: "attached", timeout: 30000 });
 	await fileInput.setInputFiles(csvPath);
@@ -116,8 +155,10 @@ async function importCsvSeed(
 		// プロンプトが表示されなかった（既にアンロック状態）場合はスキップ
 	}
 
-	// クライアント側（Web Crypto API）暗号化とConvex保存の完了トーストを待機（最大120秒）
-	const successToast = page.locator("text=/\\d+件のデータをインポートしました/");
+	// クライアント側暗号化と保存完了トーストを待機
+	const successToast = page.locator(
+		"text=/\\d+件のデータをインポートしました/",
+	);
 	await expect(successToast).toBeVisible({ timeout: 120000 });
 
 	// レコード一覧の更新を待機して、新しく追加されたレコードIDを返す
@@ -138,12 +179,18 @@ async function verifyRecordDecryption(
 	expectedHint: string,
 	passcode: string,
 ): Promise<void> {
-	// オンボーディングモーダルが残っている場合はスキップ
+	// オンボーディングモーダルが確実に消去されていることを保証
 	await ensureOnboardingCompleted(page);
+
+	// モーダルが消えていることを明示的に待つ
+	await page
+		.locator("text=PoohMaへようこそ！")
+		.waitFor({ state: "hidden", timeout: 10000 })
+		.catch(() => {});
 
 	// インポートされたレコードカードを探索して詳細へ遷移
 	const recordCard = page.locator(`text="${recordTitle}"`).first();
-	await expect(recordCard).toBeVisible({ timeout: 20000 });
+	await expect(recordCard).toBeVisible({ timeout: 25000 });
 	await recordCard.click();
 	await expect(page).toHaveURL(/.*\/records\/.+/, { timeout: 15000 });
 
@@ -166,7 +213,7 @@ async function verifyRecordDecryption(
 			await page.keyboard.press("Enter");
 		}
 	} catch {
-		// アンロックモーダルが表示されなかった場合はスキップ
+		// すでにアンロック済みの場合はスキップ
 	}
 
 	// 暗号化されていたパスワードヒントが平文に復号されて表示されていることを検証
@@ -209,9 +256,7 @@ async function bulkDeleteRecords(
 	await deleteTriggerBtn.click();
 
 	// 削除確認モーダルの「削除する」ボタンをクリック
-	const confirmDeleteBtn = page
-		.locator('button:has-text("削除する")')
-		.first();
+	const confirmDeleteBtn = page.locator('button:has-text("削除する")').first();
 	await expect(confirmDeleteBtn).toBeVisible({ timeout: 5000 });
 	await confirmDeleteBtn.click();
 
@@ -223,9 +268,7 @@ async function bulkDeleteRecords(
 
 	// 一覧から削除されたことを確認
 	for (const recordId of recordIds) {
-		await expect(
-			page.locator(`a[href="/records/${recordId}"]`),
-		).toHaveCount(0);
+		await expect(page.locator(`a[href="/records/${recordId}"]`)).toHaveCount(0);
 	}
 }
 
@@ -240,25 +283,49 @@ async function cleanupTestAccount(
 		await page.goto("/settings");
 		await page.waitForLoadState("domcontentloaded");
 
-		// 現在のアカウントが作成したテスト専用アカウントでない場合は切り替える
-		const switcher = page.locator('[data-slot="dropdown-menu-trigger"]').first();
-		if (await switcher.isVisible({ timeout: 5000 }).catch(() => false)) {
-			const currentText = await switcher.innerText().catch(() => "");
-			if (!currentText.includes(accountName)) {
-				await switcher.click();
-				const targetItem = page
-					.locator('[role="menuitem"]')
-					.filter({ hasText: accountName })
-					.first();
-				if (await targetItem.isVisible({ timeout: 5000 }).catch(() => false)) {
-					await targetItem.click();
-					await page.waitForLoadState("domcontentloaded");
-					await page.waitForTimeout(1000);
+		// ① ユーザーメニューを開く
+		const userMenuTrigger = page
+			.locator('[data-testid="user-menu-trigger"]')
+			.filter({ visible: true })
+			.first();
+		if (await userMenuTrigger.isVisible({ timeout: 5000 }).catch(() => false)) {
+			await userMenuTrigger.click();
+
+			// ② アカウントサブメニューを展開
+			const accountSubTrigger = page
+				.locator('[data-slot="dropdown-menu-sub-trigger"]')
+				.or(page.locator('button:has-text("切替")'))
+				.first();
+
+			if (
+				await accountSubTrigger.isVisible({ timeout: 5000 }).catch(() => false)
+			) {
+				const currentAccountText = await accountSubTrigger
+					.innerText()
+					.catch(() => "");
+
+				// 目的のアカウントでない場合は切り替えを実行
+				if (!currentAccountText.includes(accountName)) {
+					await accountSubTrigger.click();
+					const targetItem = page
+						.locator('[role="menuitem"], [role="button"]')
+						.filter({ hasText: accountName })
+						.first();
+					if (
+						await targetItem.isVisible({ timeout: 5000 }).catch(() => false)
+					) {
+						await targetItem.click();
+						await page.waitForLoadState("domcontentloaded");
+						await page.waitForTimeout(1000);
+					}
+				} else {
+					// 既に選択中であればメニューを閉じる（Escキー）
+					await page.keyboard.press("Escape");
 				}
 			}
 		}
 
-		// アカウント削除ボタンが表示されるまで待機（Convexアカウント一覧のロード待ち）
+		// ③ 設定画面上の「このアカウントのみ削除」を実行（従来通り）
 		const deleteAccountButton = page
 			.getByRole("button", { name: /のみ削除/ })
 			.first();
@@ -266,7 +333,6 @@ async function cleanupTestAccount(
 			.waitFor({ state: "visible", timeout: 25000 })
 			.then(() => true)
 			.catch(() => false);
-
 		if (isVisible) {
 			await deleteAccountButton.click();
 			const confirmBtn = page
@@ -279,16 +345,9 @@ async function cleanupTestAccount(
 			).toBeVisible({
 				timeout: 15000,
 			});
-		} else {
-			console.warn(
-				`[Cleanup Warning] アカウント削除ボタンが見つかりませんでした (accountName: ${accountName}, currentURL: ${page.url()})`,
-			);
 		}
 	} catch (cleanupError) {
-		console.warn(
-			`[Cleanup Error] テスト専用アカウント（${accountName}）の削除処理でエラーが発生しました (currentURL: ${page.url()}):`,
-			cleanupError,
-		);
+		console.warn(`[Cleanup Error] ${accountName}:`, cleanupError);
 	}
 }
 
@@ -300,10 +359,9 @@ test.describe("E2EE主要フローとCSVインポートSeed検証", () => {
 	// 家族作成→CSVインポート→E2EE復号→一括削除を一貫で実行する統合ジャーニーテスト。
 	// CI・ローカル問わず35件のOGPフェッチ・暗号化処理等で時間がかかるため
 	// テストタイムアウトを180秒に設定。
-	test("家族グループ作成、CSV暗号化インポート、詳細でのヒント復号、および安全な一括削除クリーンアップ", async (
-		{ page },
-		testInfo,
-	) => {
+	test("家族グループ作成、CSV暗号化インポート、詳細でのヒント復号、および安全な一括削除クリーンアップ", async ({
+		page,
+	}, testInfo) => {
 		test.setTimeout(180_000);
 		const runId = `${testInfo.workerIndex}-${testInfo.retry}-${Date.now()}`;
 		const accountName = `E2E ${runId}`;

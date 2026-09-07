@@ -8,13 +8,19 @@ test.describe("家族管理画面の検証", () => {
 		await expect(page).toHaveURL(/\/family/);
 
 		// 家族管理の主要見出しが描画されること
-		const familyHeading = page.getByRole("heading", { name: "家族管理" }).first();
+		const familyHeading = page
+			.getByRole("heading", { name: "家族管理" })
+			.first();
 		await expect(familyHeading).toBeVisible({ timeout: 15000 });
 
 		// 家族管理セクション、新規グループ作成入力、または参加申請導線のいずれかが描画されること
-		const familyManagerSection = page.locator('[data-testid="family-manager-section"]');
+		const familyManagerSection = page.locator(
+			'[data-testid="family-manager-section"]',
+		);
 		const createFamilyInput = page.locator("input#family-name-input");
-		const joinRequestSection = page.getByRole("button", { name: /申請|参加|招待/ });
+		const joinRequestSection = page.getByRole("button", {
+			name: /申請|参加|招待/,
+		});
 
 		await expect(
 			familyManagerSection.or(createFamilyInput).or(joinRequestSection).first(),

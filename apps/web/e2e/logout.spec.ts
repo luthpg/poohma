@@ -8,7 +8,9 @@ test.describe("ログアウトフローの検証", () => {
 
 		// 1. 認証済み画面（/dashboard または /family）へアクセス
 		await page.goto("/family");
-		await expect(page).toHaveURL(/.*(\/dashboard|\/family)/, { timeout: 20000 });
+		await expect(page).toHaveURL(/.*(\/dashboard|\/family)/, {
+			timeout: 20000,
+		});
 
 		// 2. ログアウト操作を実行（画面直下ボタン、またはUserMenuアバターからのドロップダウン）
 		const directLogout = page.locator("button:has-text('ログアウト')").first();
@@ -40,7 +42,9 @@ test.describe("ログアウトフローの検証", () => {
 		const confirmDialogButton = page
 			.locator("[role='alertdialog'] button:has-text('ログアウト')")
 			.first();
-		if (await confirmDialogButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+		if (
+			await confirmDialogButton.isVisible({ timeout: 3000 }).catch(() => false)
+		) {
 			await confirmDialogButton.click();
 		}
 

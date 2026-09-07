@@ -33,4 +33,3 @@ test.describe("認証済みルートのアクセス検証", () => {
 		await expect(page).toHaveURL(/.*(\/dashboard|\/family)/);
 	});
 });
-

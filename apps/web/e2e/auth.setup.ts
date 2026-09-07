@@ -2,8 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { test as setup } from "@playwright/test";
-import { ensureTestUserCustomToken } from "./support/ensure-test-user";
 import { ensureOnboardingCompleted } from "./support/ensure-onboarding";
+import { ensureTestUserCustomToken } from "./support/ensure-test-user";
 
 import { setupProtectionBypass } from "./support/test-fixtures";
 
@@ -36,7 +36,6 @@ setup("authenticate as e2e test user", async ({ page, context, baseURL }) => {
 	// CDP / evaluate 経由で独立ブリッジを実行して IndexedDB に認証状態を注入
 	await page.evaluate(
 		async ({ source, config, token }) => {
-			// biome-ignore lint/security/noGlobalEval: E2Eブリッジの読み込み専用
 			new Function(source)();
 			await window.__e2eSignIn(config, token);
 		},

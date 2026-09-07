@@ -42,7 +42,9 @@ test.describe("未認証公開ルートの検証", () => {
 		// 未認証ガードにより /login へリダイレクトされることを検証
 		await expect(page).toHaveURL(/.*\/login/, { timeout: 20000 });
 		await expect(
-			page.locator("button:has-text('Googleでログイン'), h1:has-text('PoohMa')").first(),
+			page
+				.locator("button:has-text('Googleでログイン'), h1:has-text('PoohMa')")
+				.first(),
 		).toBeVisible({ timeout: 15000 });
 	});
 

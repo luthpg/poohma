@@ -1,4 +1,8 @@
-import { type BrowserContext, expect, test as baseTest } from "@playwright/test";
+import {
+	type BrowserContext,
+	test as baseTest,
+	expect,
+} from "@playwright/test";
 
 /**
  * 自社ドメイン（baseURL）宛てのリクエストにのみ保護バイパスヘッダーを付与する。

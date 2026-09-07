@@ -65,4 +65,4 @@ export async function ensureTestUserCustomToken(): Promise<string> {
 	return auth.createCustomToken(E2E_TEST_UID);
 }
 
-export { E2E_TEST_UID, E2E_TEST_EMAIL };
+export { E2E_TEST_EMAIL, E2E_TEST_UID };
