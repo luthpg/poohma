@@ -40,6 +40,9 @@ async function createTestAccount(
   await page.goto("/family");
   await expect(page).toHaveURL(/.*\/family/, { timeout: 20000 });
 
+  // オンボーディングモーダルが表示された場合はスキップして消えるまで待機
+  await ensureOnboardingCompleted(page);
+
   // ① ユーザーメニューアバターをクリック
   const userMenuTrigger = page
     .locator('[data-testid="user-menu-trigger"]')
@@ -62,9 +65,7 @@ async function createTestAccount(
   await createBtn.click();
 
   // ④ アカウント作成ダイアログへの入力と送信
-  const nameInput = page
-    .locator("input#account-name, input#user-menu-account-name")
-    .first();
+  const nameInput = page.locator("input#create-account-name-input").first();
   await expect(nameInput).toBeVisible({ timeout: 5000 });
   await nameInput.fill(accountName);
   await page
@@ -110,6 +111,10 @@ async function importCsvSeed(
 ): Promise<string[]> {
   await page.goto("/dashboard");
   await expect(page).toHaveURL(/.*\/dashboard/, { timeout: 20000 });
+
+  // オンボーディングモーダルが表示された場合はスキップして消えるまで待機
+  await page.waitForTimeout(300);
+  await ensureOnboardingCompleted(page);
 
   // ① ユーザーメニューを開いて家族名を確認
   const userMenuTrigger = page
