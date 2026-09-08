@@ -2,14 +2,14 @@ import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { PublicLayout } from "@/components/PublicLayout";
 
 export const Route = createFileRoute("/(public)")({
-	component: RouteComponent,
+  component: RouteComponent,
 });
 
 function RouteComponent() {
-	const { user } = Route.useRouteContext();
-	return (
-		<PublicLayout user={user}>
-			<Outlet />
-		</PublicLayout>
-	);
+  const { user } = Route.useRouteContext();
+  return (
+    <PublicLayout user={user}>
+      <Outlet />
+    </PublicLayout>
+  );
 }

@@ -6,27 +6,27 @@
  * @param onProgress 進捗を通知するコールバック（オプション）
  */
 export async function processInChunks<T, R>(
-	items: T[],
-	processItem: (item: T) => Promise<R>,
-	chunkSize = 10,
-	onProgress?: (current: number, total: number) => void,
+  items: T[],
+  processItem: (item: T) => Promise<R>,
+  chunkSize = 10,
+  onProgress?: (current: number, total: number) => void,
 ): Promise<R[]> {
-	const results: R[] = [];
+  const results: R[] = [];
 
-	for (let i = 0; i < items.length; i += chunkSize) {
-		const chunk = items.slice(i, i + chunkSize);
+  for (let i = 0; i < items.length; i += chunkSize) {
+    const chunk = items.slice(i, i + chunkSize);
 
-		// チャンク単位で並列処理
-		const chunkResults = await Promise.all(chunk.map(processItem));
-		results.push(...chunkResults);
+    // チャンク単位で並列処理
+    const chunkResults = await Promise.all(chunk.map(processItem));
+    results.push(...chunkResults);
 
-		if (onProgress) {
-			onProgress(Math.min(i + chunkSize, items.length), items.length);
-		}
+    if (onProgress) {
+      onProgress(Math.min(i + chunkSize, items.length), items.length);
+    }
 
-		// 次のチャンク処理へ移る前に、メインスレッドのキューを空にする（UI描画を許容する）
-		await new Promise((resolve) => setTimeout(resolve, 0));
-	}
+    // 次のチャンク処理へ移る前に、メインスレッドのキューを空にする（UI描画を許容する）
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
 
-	return results;
+  return results;
 }

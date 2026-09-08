@@ -5,155 +5,155 @@ import react from "@vitejs/plugin-react";
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 import {
-	removeVirtualAuthenticator,
-	setPlatformAuthenticatorAvailable,
-	setupVirtualAuthenticator,
+  removeVirtualAuthenticator,
+  setPlatformAuthenticatorAvailable,
+  setupVirtualAuthenticator,
 } from "./tests/browser-e2e/setup/cdp-authenticator.ts";
 
 const dirname =
-	import.meta.dirname ?? path.dirname(fileURLToPath(import.meta.url));
+  import.meta.dirname ?? path.dirname(fileURLToPath(import.meta.url));
 
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
-	plugins: [react()],
-	optimizeDeps: {
-		include: ["idb-keyval"],
-		exclude: ["@tanstack/react-start", "@tanstack/start-server-core"],
-	},
-	resolve: {
-		tsconfigPaths: true,
-	},
-	test: {
-		testTimeout: 15000,
-		coverage: {
-			provider: "v8",
-			reporter: ["text", "json", "html"],
-			exclude: [
-				"node_modules/**",
-				"tests/**",
-				".storybook/**",
-				"src/components/ui/**",
-				"src/utils/schemas.ts",
-				"convex/_generated/**",
-				"convex/schema.ts",
-				"routeTree.gen.ts",
-				"src/emails/**",
-				"**/*.d.ts",
-				"**/*.config.ts",
-				"**/*.css",
-			],
-			thresholds: {
-				statements: 50,
-				branches: 40,
-				functions: 50,
-				lines: 50,
-				"src/lib/crypto.ts": {
-					statements: 80,
-					branches: 80,
-					functions: 80,
-					lines: 80,
-				},
-				"convex/rls.ts": {
-					statements: 80,
-					branches: 80,
-					functions: 80,
-					lines: 80,
-				},
-				"convex/customBuilders.ts": {
-					statements: 80,
-					branches: 80,
-					functions: 80,
-					lines: 80,
-				},
-				"convex/users.ts": {
-					statements: 80,
-					branches: 80,
-					functions: 80,
-					lines: 80,
-				},
-				"src/utils/url-safety.ts": {
-					statements: 80,
-					branches: 80,
-					functions: 80,
-					lines: 80,
-				},
-			},
-		},
-		projects: [
-			{
-				extends: true,
-				test: {
-					environment: "node",
-					exclude: [
-						"**/node_modules/**",
-						"**/dist/**",
-						"e2e/**",
-						"tests/browser-e2e/**",
-					],
-					server: {
-						deps: {
-							inline: ["convex-test"],
-						},
-					},
-				},
-			},
-			{
-				extends: true,
-				plugins: [
-					// The plugin will run tests for the stories defined in your Storybook config
-					// See options at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon#storybooktest
-					storybookTest({
-						configDir: path.join(dirname, ".storybook"),
-					}),
-				],
-				test: {
-					name: "storybook",
-					browser: {
-						enabled: true,
-						headless: true,
-						provider: playwright(),
-						instances: [
-							{
-								browser: "chromium",
-							},
-						],
-					},
-				},
-			},
-			{
-				extends: true,
-				resolve: {
-					alias: {
-						"@/services/security.functions": path.resolve(
-							dirname,
-							"tests/browser-e2e/setup/mock-security.functions.ts",
-						),
-						"@/services/auth.functions": path.resolve(
-							dirname,
-							"tests/browser-e2e/setup/mock-auth.functions.ts",
-						),
-					},
-				},
-				test: {
-					name: "browser-e2ee",
-					include: ["tests/browser-e2e/**/*.browser.test.{ts,tsx}"],
-					browser: {
-						enabled: true,
-						headless: true,
-						provider: playwright(),
-						instances: [
-							{
-								browser: "chromium",
-							},
-						],
-						commands: {
-							setupVirtualAuthenticator,
-							removeVirtualAuthenticator,
-							setPlatformAuthenticatorAvailable,
-						},
-					},
-				},
-			},
-		],
-	},
+  plugins: [react()],
+  optimizeDeps: {
+    include: ["idb-keyval"],
+    exclude: ["@tanstack/react-start", "@tanstack/start-server-core"],
+  },
+  resolve: {
+    tsconfigPaths: true,
+  },
+  test: {
+    testTimeout: 15000,
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json", "html"],
+      exclude: [
+        "node_modules/**",
+        "tests/**",
+        ".storybook/**",
+        "src/components/ui/**",
+        "src/utils/schemas.ts",
+        "convex/_generated/**",
+        "convex/schema.ts",
+        "routeTree.gen.ts",
+        "src/emails/**",
+        "**/*.d.ts",
+        "**/*.config.ts",
+        "**/*.css",
+      ],
+      thresholds: {
+        statements: 50,
+        branches: 40,
+        functions: 50,
+        lines: 50,
+        "src/lib/crypto.ts": {
+          statements: 80,
+          branches: 80,
+          functions: 80,
+          lines: 80,
+        },
+        "convex/rls.ts": {
+          statements: 80,
+          branches: 80,
+          functions: 80,
+          lines: 80,
+        },
+        "convex/customBuilders.ts": {
+          statements: 80,
+          branches: 80,
+          functions: 80,
+          lines: 80,
+        },
+        "convex/users.ts": {
+          statements: 80,
+          branches: 80,
+          functions: 80,
+          lines: 80,
+        },
+        "src/utils/url-safety.ts": {
+          statements: 80,
+          branches: 80,
+          functions: 80,
+          lines: 80,
+        },
+      },
+    },
+    projects: [
+      {
+        extends: true,
+        test: {
+          environment: "node",
+          exclude: [
+            "**/node_modules/**",
+            "**/dist/**",
+            "e2e/**",
+            "tests/browser-e2e/**",
+          ],
+          server: {
+            deps: {
+              inline: ["convex-test"],
+            },
+          },
+        },
+      },
+      {
+        extends: true,
+        plugins: [
+          // The plugin will run tests for the stories defined in your Storybook config
+          // See options at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon#storybooktest
+          storybookTest({
+            configDir: path.join(dirname, ".storybook"),
+          }),
+        ],
+        test: {
+          name: "storybook",
+          browser: {
+            enabled: true,
+            headless: true,
+            provider: playwright(),
+            instances: [
+              {
+                browser: "chromium",
+              },
+            ],
+          },
+        },
+      },
+      {
+        extends: true,
+        resolve: {
+          alias: {
+            "@/services/security.functions": path.resolve(
+              dirname,
+              "tests/browser-e2e/setup/mock-security.functions.ts",
+            ),
+            "@/services/auth.functions": path.resolve(
+              dirname,
+              "tests/browser-e2e/setup/mock-auth.functions.ts",
+            ),
+          },
+        },
+        test: {
+          name: "browser-e2ee",
+          include: ["tests/browser-e2e/**/*.browser.test.{ts,tsx}"],
+          browser: {
+            enabled: true,
+            headless: true,
+            provider: playwright(),
+            instances: [
+              {
+                browser: "chromium",
+              },
+            ],
+            commands: {
+              setupVirtualAuthenticator,
+              removeVirtualAuthenticator,
+              setPlatformAuthenticatorAvailable,
+            },
+          },
+        },
+      },
+    ],
+  },
 });

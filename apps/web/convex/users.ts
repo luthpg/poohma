@@ -186,6 +186,7 @@ export const getAccounts = identityVerifiedQuery({
           photoURL: acc.photoURL,
           familyId: acc.familyId,
           family,
+          onboardingVersion: acc.onboardingVersion,
           createdAt: acc.createdAt,
           updatedAt: acc.updatedAt,
         };
@@ -548,6 +549,7 @@ export const getUserByFirebaseUid = internalQuery({
           photoURL: acc.photoURL,
           familyId: acc.familyId,
           family: accFamily,
+          onboardingVersion: acc.onboardingVersion,
         };
       }),
     );
@@ -562,6 +564,7 @@ export const getUserByFirebaseUid = internalQuery({
       photoURL: user.photoURL,
       familyId: user.familyId,
       family,
+      onboardingVersion: user.onboardingVersion,
       accounts: accountsWithFamily,
     };
   },

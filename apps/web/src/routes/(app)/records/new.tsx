@@ -9,52 +9,52 @@ import { useAccount } from "@/hooks/useAccount";
 import { useRecordForm } from "@/hooks/useRecordForm";
 
 export const Route = createFileRoute("/(app)/records/new")({
-	component: NewRecordComponent,
+  component: NewRecordComponent,
 });
 
 function NewRecordComponent() {
-	useEffect(() => {
-		window.scrollTo(0, 0);
-	}, []);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
-	const { isAuthenticated } = useConvexAuth();
-	const { activeAccountId } = useAccount();
-	const availableTags =
-		useQuery(
-			api.records.getAvailableTags,
-			isAuthenticated ? { accountId: activeAccountId || undefined } : "skip",
-		) || [];
-	const navigate = useNavigate();
-	const createRecord = useMutation(api.records.createRecord);
+  const { isAuthenticated } = useConvexAuth();
+  const { activeAccountId } = useAccount();
+  const availableTags =
+    useQuery(
+      api.records.getAvailableTags,
+      isAuthenticated ? { accountId: activeAccountId || undefined } : "skip",
+    ) || [];
+  const navigate = useNavigate();
+  const createRecord = useMutation(api.records.createRecord);
 
-	const form = useRecordForm();
+  const form = useRecordForm();
 
-	const handleSubmit = async (e: React.FormEvent) => {
-		e.preventDefault();
-		const succeeded = await form.submit(async (payload) => {
-			await createRecord({
-				accountId: activeAccountId || undefined,
-				...payload,
-			});
-		});
-		if (succeeded) {
-			toast.success("サービスを登録しました");
-			await navigate({ to: "/dashboard" });
-		}
-	};
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const succeeded = await form.submit(async (payload) => {
+      await createRecord({
+        accountId: activeAccountId || undefined,
+        ...payload,
+      });
+    });
+    if (succeeded) {
+      toast.success("サービスを登録しました");
+      await navigate({ to: "/dashboard" });
+    }
+  };
 
-	return (
-		<div className="mx-auto max-w-3xl p-6">
-			<h1 className="mb-8 text-[24px] font-semibold tracking-geist-h2 text-foreground">
-				サービスを登録
-			</h1>
-			<RecordForm
-				form={form}
-				availableTags={availableTags}
-				onSubmit={handleSubmit}
-				onCancel={() => navigate({ to: "/dashboard" })}
-				submitIdleLabel="登録する"
-			/>
-		</div>
-	);
+  return (
+    <div className="mx-auto max-w-3xl p-6">
+      <h1 className="mb-8 text-[24px] font-semibold tracking-geist-h2 text-foreground">
+        サービスを登録
+      </h1>
+      <RecordForm
+        form={form}
+        availableTags={availableTags}
+        onSubmit={handleSubmit}
+        onCancel={() => navigate({ to: "/dashboard" })}
+        submitIdleLabel="登録する"
+      />
+    </div>
+  );
 }

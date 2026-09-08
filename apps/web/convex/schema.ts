@@ -64,6 +64,7 @@ export default defineSchema({
     displayName: v.optional(v.string()),
     photoURL: v.optional(v.string()),
     familyId: v.optional(v.id("families")),
+    onboardingVersion: v.optional(v.number()),
     createdAt: v.optional(v.number()),
     updatedAt: v.number(),
   })
@@ -161,11 +162,13 @@ export default defineSchema({
     credentials: v.optional(v.array(v.any())),
 
     revision: v.optional(v.number()), // 楽観的ロック用（既存レコードは 0 として扱う）
+    isSample: v.optional(v.boolean()), // オンボーディング用サンプルデータ識別フラグ
     updatedAt: v.number(),
   })
     .index("by_userId", ["userId"])
     .index("by_accountId", ["accountId"])
     .index("by_family_sortKey", ["familyId", "sortKey"])
+    .index("by_family_isSample", ["familyId", "isSample"])
     .index("by_ownerType_accountId", ["ownerType", "accountId"])
     .index("by_ownerType_ownerFamilyId", ["ownerType", "ownerFamilyId"]),
 

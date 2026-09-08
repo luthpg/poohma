@@ -47,6 +47,7 @@ erDiagram
         string displayName
         string photoURL
         id familyId
+        number onboardingVersion
         number createdAt
         number updatedAt
     }
@@ -64,6 +65,7 @@ erDiagram
         id ownerFamilyId
         array admins
         array tags
+        boolean isSample
         number updatedAt
     }
     CREDENTIALS {
@@ -141,13 +143,16 @@ erDiagram
 
 ### USERS
 
-- Firebase UID（`userId`）に紐づくアプリケーション内アカウント。`familyId` は単一値であり、現行スキーマは「1ユーザー1家族グループ」を前提とする（複数家族の並行所属は現行スキーマでは未対応）。
+- PoohMa 内の個別アカウント（PoohMa Account）を表すエンティティ。
+- 1つの Firebase 認証（同一の `userId: Firebase UID`）に対して、用途や所属家族ごとに複数の `users` レコードを作成可能（1:N）。
+- 各 `users` レコード（Account）が独立した主キー（`_id: Id<"users">`）、表示名（`displayName`）、所属家族ID（`familyId`）、およびオンボーディング進捗（`onboardingVersion`）を保持する。
+- 1つの Account が同時に所属できる家族グループは1つ（`familyId` は単一値）であり、別家族に所属したい場合は新規 PoohMa Account を作成して切り替える運用モデルを採用している。
 
 ### SERVICE_RECORDS
 
 - クレデンシャル管理の中心となるエンティティ。`ownerType`（`"user"` | `"family"`）により個人所有か家族共有かを切り替え、`ownerFamilyId` と `admins` は共有時のみ意味を持つ（Drive型ACLモデル、Issue #137）。
 - `titleReading` はサービス名のふりがな（自動取得または手動編集）で、ダッシュボードの五十音順ソートに利用される（Issue #118「nameソートに読み仮名が使われていない」の修正で追加）。`ogpImage` / `ogpDescription` は登録時に自動取得したOGPメタデータのキャッシュで、いずれも平文で保存される（暗号化対象外のメタデータ）。
-- インデックス：`by_userId`, `by_accountId`, `by_family_sortKey`（家族内の並び順取得）, `by_ownerType_accountId`, `by_ownerType_ownerFamilyId`（フルテーブルスキャンを避けた効率的な取得に利用）。
+- インデックス：`by_userId`, `by_accountId`, `by_family_sortKey`（家族内の並び順取得）, `by_family_isSample`, `by_ownerType_accountId`, `by_ownerType_ownerFamilyId`（フルテーブルスキャンを避けた効率的な取得に利用）。
 
 ### CREDENTIALS
 
