@@ -166,7 +166,6 @@ function RecordDetailComponent({
 
 	useEffect(() => {
 		if (tourInitRef.current) return;
-		tourInitRef.current = true;
 
 		// クエリパラメータで onboarding=detail が指定されている場合
 		if (searchParams.onboarding === "detail") {
@@ -181,6 +180,9 @@ function RecordDetailComponent({
 				});
 				return;
 			}
+
+			// ツアー起動が確定した段階でフラグを立てる
+			tourInitRef.current = true;
 			const timer = setTimeout(() => setDetailTourActive(true), 500);
 			return () => clearTimeout(timer);
 		}

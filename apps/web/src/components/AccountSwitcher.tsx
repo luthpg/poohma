@@ -1,16 +1,6 @@
 import { Check, Plus, Users } from "lucide-react";
-import type React from "react";
 import { useState } from "react";
-import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -23,45 +13,17 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { useAccount } from "@/hooks/useAccount";
 import { cn } from "@/lib/utils";
+import { CreateAccountDialog } from "./CreateAccountDialog";
 
 interface AccountSwitcherProps {
 	className?: string;
 }
 
 export function AccountSwitcher({ className = "" }: AccountSwitcherProps) {
-	const {
-		accounts,
-		activeAccount,
-		activeAccountId,
-		switchAccount,
-		createAccount,
-		isLoading,
-	} = useAccount();
+	const { accounts, activeAccount, activeAccountId, switchAccount, isLoading } =
+		useAccount();
 
 	const [isCreateOpen, setIsCreateOpen] = useState(false);
-	const [newAccountName, setNewAccountName] = useState("");
-	const [isSubmitting, setIsSubmitting] = useState(false);
-
-	const handleCreateSubmit = async (e: React.FormEvent) => {
-		e.preventDefault();
-		const trimmed = newAccountName.trim();
-		if (!trimmed) {
-			toast.error("アカウント名を入力してください");
-			return;
-		}
-
-		try {
-			setIsSubmitting(true);
-			await createAccount(trimmed);
-			setNewAccountName("");
-			setIsCreateOpen(false);
-		} catch (error) {
-			console.error(error);
-			toast.error("アカウントの作成に失敗しました");
-		} finally {
-			setIsSubmitting(false);
-		}
-	};
 
 	const currentDisplayName = isLoading
 		? "読み込み中..."
@@ -157,65 +119,7 @@ export function AccountSwitcher({ className = "" }: AccountSwitcherProps) {
 			</DropdownMenu>
 
 			{/* 新規アカウント作成モーダル */}
-			<Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-				<DialogContent className="sm:max-w-md">
-					<DialogHeader>
-						<DialogTitle className="text-lg font-bold">
-							新しいPoohMaアカウントの作成
-						</DialogTitle>
-						<DialogDescription className="text-xs text-muted-foreground">
-							用途ごとに独立したアカウントとファミリー環境を作成できます。
-						</DialogDescription>
-					</DialogHeader>
-
-					<form onSubmit={handleCreateSubmit} className="space-y-4 pt-2">
-						<div className="space-y-1.5">
-							<label
-								htmlFor="account-name"
-								className="text-xs font-medium text-foreground"
-							>
-								アカウント表示名
-							</label>
-							<input
-								id="account-name"
-								type="text"
-								value={newAccountName}
-								onChange={(e) => setNewAccountName(e.target.value)}
-								placeholder="例: 個人用、仕事用、実家用"
-								maxLength={30}
-								className="w-full rounded-md border border-input bg-background px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary/20"
-								disabled={isSubmitting}
-								autoFocus
-							/>
-						</div>
-
-						<DialogFooter className="gap-2 pt-2">
-							<button
-								type="button"
-								onClick={() => setIsCreateOpen(false)}
-								disabled={isSubmitting}
-								className="rounded-md border px-4 py-2 text-xs font-medium text-foreground hover:bg-muted transition"
-							>
-								キャンセル
-							</button>
-							<button
-								type="submit"
-								disabled={isSubmitting || !newAccountName.trim()}
-								className="flex items-center justify-center rounded-md bg-orange-500 px-4 py-2 text-xs font-medium text-white hover:bg-orange-600 transition disabled:opacity-50"
-							>
-								{isSubmitting ? (
-									<>
-										<Spinner className="mr-1.5 h-3.5 w-3.5 text-white" />
-										作成中...
-									</>
-								) : (
-									"作成する"
-								)}
-							</button>
-						</DialogFooter>
-					</form>
-				</DialogContent>
-			</Dialog>
+			<CreateAccountDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} />
 		</>
 	);
 }

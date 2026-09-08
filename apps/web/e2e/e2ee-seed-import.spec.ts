@@ -279,72 +279,63 @@ async function cleanupTestAccount(
 	page: Page,
 	accountName: string,
 ): Promise<void> {
-	try {
-		await page.goto("/settings");
-		await page.waitForLoadState("domcontentloaded");
+	await page.goto("/settings");
+	await page.waitForLoadState("domcontentloaded");
 
-		// 現在表示されているアカウント名を確認
-		const currentDisplayNameInput = page.locator("input#display-name-input");
-		await currentDisplayNameInput.waitFor({ state: "visible", timeout: 10000 });
-		const currentName = await currentDisplayNameInput.inputValue();
+	// 現在表示されているアカウント名を確認
+	const currentDisplayNameInput = page.locator("input#display-name-input");
+	await expect(currentDisplayNameInput).toBeVisible({ timeout: 10000 });
 
-		// 目的のテスト用アカウントでない場合は切り替えを試みる
-		if (currentName !== accountName) {
-			const userMenuTrigger = page
-				.locator('[data-testid="user-menu-trigger"]')
-				.first();
-			await userMenuTrigger.click();
-			const accountSubTrigger = page
-				.locator('[data-slot="dropdown-menu-sub-trigger"]')
-				.or(page.locator('button:has-text("切替")'))
-				.first();
-			await accountSubTrigger.click();
+	const currentName = await currentDisplayNameInput.inputValue();
 
-			const targetItem = page
-				.locator('[role="menuitem"], [role="button"]')
-				.filter({ hasText: accountName })
-				.first();
-			const isTargetAvailable = await targetItem
-				.isVisible({ timeout: 5000 })
-				.catch(() => false);
-			if (!isTargetAvailable) {
-				console.warn(
-					`[Cleanup Skipped] 削除対象アカウント「${accountName}」が見つからないため削除を中止します`,
-				);
-				return;
-			}
-			await targetItem.click();
-			await page.waitForLoadState("domcontentloaded");
-			await page.waitForTimeout(1000);
-		}
+	// 目的のテスト用アカウントでない場合は切り替えを試みる
+	if (currentName !== accountName) {
+		const userMenuTrigger = page
+			.locator('[data-testid="user-menu-trigger"]')
+			.first();
+		await expect(userMenuTrigger).toBeVisible({ timeout: 5000 });
+		await userMenuTrigger.click();
+		const accountSubTrigger = page
+			.locator('[data-slot="dropdown-menu-sub-trigger"]')
+			.or(page.locator('button:has-text("切替")'))
+			.first();
+		await expect(accountSubTrigger).toBeVisible({ timeout: 5000 });
+		await accountSubTrigger.click();
 
-		// 削除ボタンの対象アカウント名テキストを検証
-		const deleteBtn = page.getByRole("button", {
-			name: new RegExp(`このアカウント（${accountName}）のみ削除`),
+		const targetItem = page
+			.locator('[role="menuitem"], [role="button"]')
+			.filter({ hasText: accountName })
+			.first();
+
+		// 対象アカウントが存在することを厳格に保証（見つからなければテスト失敗とする）
+		await expect(targetItem).toBeVisible({
+			timeout: 5000,
 		});
-		const isDeleteBtnVisible = await deleteBtn
-			.isVisible({ timeout: 5000 })
-			.catch(() => false);
-		if (!isDeleteBtnVisible) {
-			console.warn(
-				`[Cleanup Skipped] 削除ボタンのアカウント名が一致しないため削除を中止します`,
-			);
-			return;
-		}
+		await targetItem.click();
 
-		await deleteBtn.click();
-		const confirmBtn = page
-			.getByRole("alertdialog")
-			.getByRole("button", { name: "削除する", exact: true });
-		await confirmBtn.waitFor({ state: "visible", timeout: 5000 });
-		await confirmBtn.click();
-		await expect(
-			page.getByText("アカウントを削除しました").first(),
-		).toBeVisible({ timeout: 15000 });
-	} catch (cleanupError) {
-		console.warn(`[Cleanup Error] ${accountName}:`, cleanupError);
+		// 切り替え完了後、設定画面の表示名が対象アカウント名に切り替わったことを確認
+		await expect(currentDisplayNameInput).toHaveValue(accountName, {
+			timeout: 10000,
+		});
 	}
+
+	// 削除ボタンの対象アカウント名テキストを検証
+	const deleteBtn = page.getByRole("button", {
+		name: new RegExp(`このアカウント（${accountName}）のみ削除`),
+	});
+	await expect(deleteBtn).toBeVisible({ timeout: 5000 });
+	await deleteBtn.click();
+	const confirmBtn = page
+		.getByRole("alertdialog")
+		.getByRole("button", { name: "削除する", exact: true });
+	await expect(confirmBtn).toBeVisible({ timeout: 5000 });
+	await confirmBtn.click();
+
+	await expect(page.getByText("アカウントを削除しました").first()).toBeVisible({
+		timeout: 15000,
+	});
 }
+
 // =============================================================================
 // Test Suites (E2EE暗号化ジャーニーの段階的検証)
 // =============================================================================

@@ -60,16 +60,22 @@ export const insertSampleRecords = familyBoundMutation({
   handler: async (ctx, args) => {
     const { user, familyId } = ctx;
 
-    // 冪等性の担保: 既に同一家族・アカウントでサンプルが存在する場合は一旦パージする
-    const existingSamples = await ctx.db
+    // 1. 同一家族の既存サンプルレコードを取得
+    const familySamples = await ctx.db
       .query("serviceRecords")
       .withIndex("by_family_isSample", (q) =>
         q.eq("familyId", familyId).eq("isSample", true),
       )
-      .filter((q) => q.eq(q.field("accountId"), user._id))
       .collect();
 
-    for (const record of existingSamples) {
+    // 2. クリーンアップ対象の選別:
+    //    - 家族共有サンプル (ownerType === "family") は家族単位で重複を防ぐため削除
+    //    - 個人所有サンプル (ownerType === "user") は操作中アカウントのもののみ削除
+    const recordsToDelete = familySamples.filter(
+      (r) => r.ownerType === "family" || r.accountId === user._id,
+    );
+
+    for (const record of recordsToDelete) {
       await deleteCredentialsForRecord(ctx, record._id);
       await ctx.db.delete(record._id);
     }

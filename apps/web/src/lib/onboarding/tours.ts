@@ -34,9 +34,9 @@ export const recordDetailSteps: DriveStep[] = [
 	{
 		element: '[data-tour="hint-reveal-btn"]',
 		popover: {
-			title: "実際にヒントを表示してみましょう",
+			title: "実際にヒントを復号してみましょう",
 			description:
-				"「🔒 クリックして表示」を押すと、あなたの家族パスコードを使って端末内だけで瞬時に平文に復号されます。ぜひ試してみてください！",
+				"「🔒 クリックして表示」を押すと、あなたの合言葉を使って端末内だけで瞬時に平文に復号されます。ぜひ試してみてください！",
 			side: "bottom",
 			align: "start",
 			nextBtnText: "表示を確認したら次へ",
@@ -84,9 +84,20 @@ export const dashboardPart2Steps: DriveStep[] = [
 		popover: {
 			title: "サンプルの片付け",
 			description:
-				"使い方が確認できたら、このバナーからいつでもサンプルデータを一括削除して実際の登録を始められます。",
+				"体験が完了したら、このバナーからいつでもサンプルデータを一括削除できます。",
 			side: "bottom",
 			align: "center",
+		},
+	},
+	{
+		element: '[data-tour="user-menu"]',
+		popover: {
+			title: "【重要】リカバリーキットを発行しましょう",
+			description:
+				"PoohMaは暗号化を行っているため、合言葉を忘れるとデータが復旧できなくなります。\n家族管理画面からいつでも復元用PDFキットを発行・保管できますので、事前に発行・保存をお勧めします。",
+			side: "bottom",
+			align: "end",
+			doneBtnText: "ツアーを完了する",
 		},
 	},
 ];

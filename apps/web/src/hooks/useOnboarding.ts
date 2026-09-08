@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -57,6 +58,8 @@ export function useOnboarding() {
 	const [isPurging, setIsPurging] = useState(false);
 	const sampleRecordIdsRef = useRef<Id<"serviceRecords">[]>([]);
 
+	const queryClient = useQueryClient();
+
 	// オンボーディング未完了かどうか
 	const needsOnboarding = useMemo(() => {
 		if (!activeAccount) return false;
@@ -81,6 +84,27 @@ export function useOnboarding() {
 		});
 	}, [navigate]);
 
+	// 完了処理の共通ヘルパー（DB更新 + authUser クエリの無効化 + クエリ削除）
+	const completeAndSync = useCallback(async () => {
+		try {
+			await completeOnboardingMutation({
+				accountId: activeAccount?._id,
+				version: ONBOARDING_CURRENT_VERSION,
+			});
+			// ★重要: TanStack Query の authUser キャッシュを更新し、AccountProvider に最新の onboardingVersion を反映
+			await queryClient.invalidateQueries({ queryKey: ["authUser"] });
+			setPhase("completed");
+			clearOnboardingQuery();
+		} catch (e) {
+			console.error("Failed to complete onboarding:", e);
+		}
+	}, [
+		activeAccount?._id,
+		completeOnboardingMutation,
+		queryClient,
+		clearOnboardingQuery,
+	]);
+
 	// サンプルデータが存在するか（家族内に isSample=true のレコードがある場合、バナーを表示）
 	// この判定は呼び出し側（dashboard）で Convex クエリ結果から行う
 	// フックでは hasSampleData を外部から受け取る形にする
@@ -100,19 +124,11 @@ export function useOnboarding() {
 	const skipOnboarding = useCallback(async () => {
 		setIsLoading(true);
 		try {
-			await completeOnboardingMutation({
-				accountId: activeAccount?._id,
-				version: ONBOARDING_CURRENT_VERSION,
-			});
-			setPhase("completed");
-			clearOnboardingQuery();
-		} catch (e) {
-			console.error("Failed to skip onboarding:", e);
-			toast.error("スキップに失敗しました。もう一度お試しください。");
+			await completeAndSync();
 		} finally {
 			setIsLoading(false);
 		}
-	}, [activeAccount?._id, completeOnboardingMutation, clearOnboardingQuery]);
+	}, [completeAndSync]);
 
 	/**
 	 * 「サンプルデータで体験してみる」
@@ -153,6 +169,17 @@ export function useOnboarding() {
 			});
 			sampleRecordIdsRef.current = result.recordIds;
 
+			// 検索フィルタやタグによってサンプルが隠れないよう、クエリを初期化してツアーを開始
+			navigate({
+				to: "/dashboard",
+				search: (prev: Record<string, unknown>): DashboardSearchParams => ({
+					view: (prev as DashboardSearchParams).view,
+					sort: (prev as DashboardSearchParams).sort,
+					onboarding: "part1",
+				}),
+				replace: true,
+			});
+
 			// ダッシュボードツアー（前半）開始
 			setPhase("dashboard-tour-1");
 		} catch (e) {
@@ -168,6 +195,7 @@ export function useOnboarding() {
 		requireUnlock,
 		activeAccount?._id,
 		insertSampleRecordsMutation,
+		navigate,
 	]);
 
 	/**
@@ -209,19 +237,9 @@ export function useOnboarding() {
 	 * ダッシュボードツアー（後半）完了 → オンボーディング完了
 	 */
 	const onDashboardTour2Complete = useCallback(async () => {
-		try {
-			await completeOnboardingMutation({
-				accountId: activeAccount?._id,
-				version: ONBOARDING_CURRENT_VERSION,
-			});
-			setPhase("completed");
-			clearOnboardingQuery();
-			toast.success("ツアーが完了しました！自由にお使いください。");
-		} catch (e) {
-			console.error("Failed to complete onboarding:", e);
-			toast.error("ツアー完了状態の保存に失敗しました。");
-		}
-	}, [activeAccount?._id, completeOnboardingMutation, clearOnboardingQuery]);
+		await completeAndSync();
+		toast.success("ツアーが完了しました！自由にお使いください。");
+	}, [completeAndSync]);
 
 	/**
 	 * ツアーの途中離脱（×ボタン）
@@ -268,36 +286,34 @@ export function useOnboarding() {
 	 * データが既存の場合などにバックグラウンドでオンボーディング完了をマーク
 	 */
 	const markCompleted = useCallback(async () => {
-		try {
-			await completeOnboardingMutation({
-				accountId: activeAccount?._id,
-				version: ONBOARDING_CURRENT_VERSION,
-			});
-			setPhase("completed");
-			clearOnboardingQuery();
-		} catch (e) {
-			console.error("Failed to mark onboarding completed:", e);
-		}
-	}, [activeAccount?._id, completeOnboardingMutation, clearOnboardingQuery]);
+		await completeAndSync();
+	}, [completeAndSync]);
 
 	/**
 	 * URLクエリパラメータからフェーズを復元（画面遷移後の再開用）
 	 */
-	const resumeFromQuery = useCallback((queryParam?: string): boolean => {
-		if (queryParam === "detail") {
-			setPhase("detail-tour");
-			return true;
-		}
-		if (queryParam === "part2") {
-			setPhase("dashboard-tour-2");
-			return true;
-		}
-		if (queryParam === "guide") {
-			setPhase("manual-tour");
-			return true;
-		}
-		return false;
-	}, []);
+	const resumeFromQuery = useCallback(
+		(queryParam?: string): boolean => {
+			if (queryParam === "guide") {
+				setPhase("manual-tour");
+				return true;
+			}
+			// サンプルツアー関連のクエリは、オンボーディングが未完了の場合のみ許可
+			if (!needsOnboarding) {
+				return false;
+			}
+			if (queryParam === "detail") {
+				setPhase("detail-tour");
+				return true;
+			}
+			if (queryParam === "part2") {
+				setPhase("dashboard-tour-2");
+				return true;
+			}
+			return false;
+		},
+		[needsOnboarding],
+	);
 
 	return {
 		phase,
@@ -319,5 +335,6 @@ export function useOnboarding() {
 		purgeSamples,
 		resumeFromQuery,
 		clearOnboardingQuery,
+		completeAndSync,
 	};
 }

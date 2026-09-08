@@ -918,6 +918,11 @@ function RecordListSection({
 												isSelectMode={isSelectMode}
 												isSelected={selectedIds.includes(record._id)}
 												onToggleSelect={() => onToggleSelect(record._id)}
+												dataTour={
+													record._id === firstSampleRecordId
+														? "sample-record"
+														: undefined
+												}
 											/>
 										),
 									)}
@@ -957,6 +962,11 @@ function RecordListSection({
 								isSelectMode={isSelectMode}
 								isSelected={selectedIds.includes(record._id)}
 								onToggleSelect={() => onToggleSelect(record._id)}
+								dataTour={
+									record._id === firstSampleRecordId
+										? "sample-record"
+										: undefined
+								}
 							/>
 						),
 					)}
@@ -977,18 +987,21 @@ function ServiceListItem({
 	isSelectMode,
 	isSelected,
 	onToggleSelect,
+	dataTour,
 }: {
 	record: RecordType;
 	onTagClick: (tag: string) => void;
 	isSelectMode?: boolean;
 	isSelected?: boolean;
 	onToggleSelect?: () => void;
+	dataTour?: string;
 }) {
 	const isShared = record.ownerType === "family";
 	return (
 		<Link
 			to="/records/$id"
 			params={{ id: record._id }}
+			{...(dataTour ? { "data-tour": dataTour } : {})}
 			onClick={(e) => {
 				if (isSelectMode && onToggleSelect) {
 					e.preventDefault();

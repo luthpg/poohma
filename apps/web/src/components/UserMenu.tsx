@@ -43,14 +43,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
-import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuGroup,
@@ -78,6 +70,7 @@ import { cn } from "@/lib/utils";
 import { logout } from "@/services/auth.functions";
 import { processInChunks } from "@/utils/chunk-processor";
 import { auth } from "@/utils/firebase";
+import { CreateAccountDialog } from "./CreateAccountDialog";
 
 export function UserMenu({
 	user,
@@ -94,18 +87,11 @@ export function UserMenu({
 	const { theme, setTheme } = useTheme();
 
 	// マルチアカウント管理
-	const {
-		accounts,
-		activeAccount,
-		activeAccountId,
-		switchAccount,
-		createAccount,
-	} = useAccount();
+	const { accounts, activeAccount, activeAccountId, switchAccount } =
+		useAccount();
 
 	// 新規アカウント作成モーダル用ステート
 	const [isCreateOpen, setIsCreateOpen] = useState(false);
-	const [newAccountName, setNewAccountName] = useState("");
-	const [isSubmittingAccount, setIsSubmittingAccount] = useState(false);
 
 	// モバイルSheet用ステート
 	const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -128,27 +114,6 @@ export function UserMenu({
 	const photoURL = activeAccount?.photoURL || user?.photoURL || undefined;
 	const email = user?.email || activeAccount?.email || "";
 	const familyName = activeAccount?.family?.name || "ファミリー未所属";
-
-	const handleCreateAccountSubmit = async (e: React.FormEvent) => {
-		e.preventDefault();
-		const trimmed = newAccountName.trim();
-		if (!trimmed) {
-			toast.error("アカウント名を入力してください");
-			return;
-		}
-		try {
-			setIsSubmittingAccount(true);
-			await createAccount(trimmed);
-			setNewAccountName("");
-			setIsCreateOpen(false);
-			setMobileView("main");
-		} catch (error) {
-			console.error(error);
-			toast.error("アカウントの作成に失敗しました");
-		} finally {
-			setIsSubmittingAccount(false);
-		}
-	};
 
 	const handleLogout = async () => {
 		try {
@@ -1056,63 +1021,13 @@ export function UserMenu({
 			{/* ========================================================= */}
 			{/* 新規アカウント作成モーダル (Menuの外側に配置して競合回避)   */}
 			{/* ========================================================= */}
-			<Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-				<DialogContent className="sm:max-w-md">
-					<DialogHeader>
-						<DialogTitle className="text-lg font-bold">
-							新しいPoohMaアカウントの作成
-						</DialogTitle>
-						<DialogDescription className="text-xs text-muted-foreground">
-							用途ごとに独立したアカウントとファミリー環境を作成できます。
-						</DialogDescription>
-					</DialogHeader>
-					<form onSubmit={handleCreateAccountSubmit} className="space-y-4 pt-2">
-						<div className="space-y-1.5">
-							<label
-								htmlFor="user-menu-account-name"
-								className="text-xs font-medium text-foreground"
-							>
-								アカウント表示名
-							</label>
-							<input
-								id="user-menu-account-name"
-								type="text"
-								value={newAccountName}
-								onChange={(e) => setNewAccountName(e.target.value)}
-								placeholder="家族メンバーに表示される名前…"
-								maxLength={30}
-								className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-								disabled={isSubmittingAccount}
-								autoFocus
-							/>
-						</div>
-						<DialogFooter className="gap-2 pt-2">
-							<button
-								type="button"
-								onClick={() => setIsCreateOpen(false)}
-								disabled={isSubmittingAccount}
-								className="rounded-md border px-4 py-2 text-xs font-medium text-foreground hover:bg-muted transition cursor-pointer"
-							>
-								キャンセル
-							</button>
-							<button
-								type="submit"
-								disabled={isSubmittingAccount || !newAccountName.trim()}
-								className="flex items-center justify-center rounded-md bg-orange-500 px-4 py-2 text-xs font-medium text-white hover:bg-orange-600 transition disabled:opacity-50 cursor-pointer"
-							>
-								{isSubmittingAccount ? (
-									<>
-										<Spinner className="mr-1.5 h-3.5 w-3.5 text-white" />
-										作成中...
-									</>
-								) : (
-									"作成する"
-								)}
-							</button>
-						</DialogFooter>
-					</form>
-				</DialogContent>
-			</Dialog>
+			<CreateAccountDialog
+				open={isCreateOpen}
+				onOpenChange={setIsCreateOpen}
+				onSuccess={() => {
+					setMobileView("main");
+				}}
+			/>
 		</>
 	);
 }
