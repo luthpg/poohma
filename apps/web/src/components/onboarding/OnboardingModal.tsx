@@ -1,4 +1,11 @@
-import { Play, Sparkles, X } from "lucide-react";
+import { Play, Sparkles } from "lucide-react";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 
 interface OnboardingModalProps {
@@ -14,41 +21,31 @@ export function OnboardingModal({
 	onStartTour,
 	onSkip,
 }: OnboardingModalProps) {
-	if (!isOpen) return null;
-
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-			<div className="relative w-full max-w-md rounded-2xl border border-border bg-card p-6 sm:p-8 shadow-xl">
-				{/* 右上のスキップボタン */}
-				<button
-					type="button"
-					onClick={onSkip}
-					disabled={isLoading}
-					className="absolute top-4 right-4 rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition disabled:opacity-50 cursor-pointer"
-					aria-label="スキップ"
-				>
-					<X className="h-4 w-4" />
-				</button>
-
-				{/* アイコンヘッダー */}
-				<div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-500/10 text-orange-500">
+		<Dialog
+			open={isOpen}
+			onOpenChange={(open) => !open && !isLoading && onSkip()}
+		>
+			<DialogContent
+				className="sm:max-w-md rounded-2xl p-6 sm:p-8 shadow-xl"
+				showCloseButton={!isLoading}
+			>
+				<div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-500/10 text-orange-500">
 					<Sparkles className="h-7 w-7" />
 				</div>
 
-				{/* テキストコンテンツ */}
-				<div className="text-center mb-6">
-					<h2 className="text-xl font-bold tracking-tight text-foreground mb-2">
+				<DialogHeader className="text-center">
+					<DialogTitle className="text-xl font-bold tracking-tight text-foreground text-center">
 						PoohMaへようこそ！
-					</h2>
-					<p className="text-sm text-muted-foreground leading-relaxed">
+					</DialogTitle>
+					<DialogDescription className="text-sm text-muted-foreground text-center leading-relaxed mt-2">
 						PoohMaは、大切なパスワードヒントを端末上で安全に守り、家族とだけ共有できるアプリです。
 						<br />
 						まずはサンプルデータを使って、安心の仕組みを体験してみませんか？
-					</p>
-				</div>
+					</DialogDescription>
+				</DialogHeader>
 
-				{/* 特徴ハイライト */}
-				<div className="mb-6 rounded-xl bg-muted/40 p-3.5 border border-border/50 text-xs text-muted-foreground space-y-2">
+				<div className="my-4 rounded-xl bg-muted/40 p-3.5 border border-border/50 text-xs text-muted-foreground space-y-2">
 					<div className="flex items-center gap-2">
 						<span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
 						<span>サンプルは端末上で安全に作られ、後から一括削除できます</span>
@@ -59,8 +56,7 @@ export function OnboardingModal({
 					</div>
 				</div>
 
-				{/* アクションボタン */}
-				<div className="flex flex-col gap-2.5">
+				<div className="flex flex-col gap-2.5 mt-2">
 					<button
 						type="button"
 						onClick={onStartTour}
@@ -79,7 +75,6 @@ export function OnboardingModal({
 							</>
 						)}
 					</button>
-
 					<button
 						type="button"
 						onClick={onSkip}
@@ -89,7 +84,7 @@ export function OnboardingModal({
 						スキップして空のまま始める
 					</button>
 				</div>
-			</div>
-		</div>
+			</DialogContent>
+		</Dialog>
 	);
 }

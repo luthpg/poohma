@@ -283,74 +283,68 @@ async function cleanupTestAccount(
 		await page.goto("/settings");
 		await page.waitForLoadState("domcontentloaded");
 
-		// ① ユーザーメニューを開く
-		const userMenuTrigger = page
-			.locator('[data-testid="user-menu-trigger"]')
-			.filter({ visible: true })
-			.first();
-		if (await userMenuTrigger.isVisible({ timeout: 5000 }).catch(() => false)) {
-			await userMenuTrigger.click();
+		// 現在表示されているアカウント名を確認
+		const currentDisplayNameInput = page.locator("input#display-name-input");
+		await currentDisplayNameInput.waitFor({ state: "visible", timeout: 10000 });
+		const currentName = await currentDisplayNameInput.inputValue();
 
-			// ② アカウントサブメニューを展開
+		// 目的のテスト用アカウントでない場合は切り替えを試みる
+		if (currentName !== accountName) {
+			const userMenuTrigger = page
+				.locator('[data-testid="user-menu-trigger"]')
+				.first();
+			await userMenuTrigger.click();
 			const accountSubTrigger = page
 				.locator('[data-slot="dropdown-menu-sub-trigger"]')
 				.or(page.locator('button:has-text("切替")'))
 				.first();
+			await accountSubTrigger.click();
 
-			if (
-				await accountSubTrigger.isVisible({ timeout: 5000 }).catch(() => false)
-			) {
-				const currentAccountText = await accountSubTrigger
-					.innerText()
-					.catch(() => "");
-
-				// 目的のアカウントでない場合は切り替えを実行
-				if (!currentAccountText.includes(accountName)) {
-					await accountSubTrigger.click();
-					const targetItem = page
-						.locator('[role="menuitem"], [role="button"]')
-						.filter({ hasText: accountName })
-						.first();
-					if (
-						await targetItem.isVisible({ timeout: 5000 }).catch(() => false)
-					) {
-						await targetItem.click();
-						await page.waitForLoadState("domcontentloaded");
-						await page.waitForTimeout(1000);
-					}
-				} else {
-					// 既に選択中であればメニューを閉じる（Escキー）
-					await page.keyboard.press("Escape");
-				}
+			const targetItem = page
+				.locator('[role="menuitem"], [role="button"]')
+				.filter({ hasText: accountName })
+				.first();
+			const isTargetAvailable = await targetItem
+				.isVisible({ timeout: 5000 })
+				.catch(() => false);
+			if (!isTargetAvailable) {
+				console.warn(
+					`[Cleanup Skipped] 削除対象アカウント「${accountName}」が見つからないため削除を中止します`,
+				);
+				return;
 			}
+			await targetItem.click();
+			await page.waitForLoadState("domcontentloaded");
+			await page.waitForTimeout(1000);
 		}
 
-		// ③ 設定画面上の「このアカウントのみ削除」を実行（従来通り）
-		const deleteAccountButton = page
-			.getByRole("button", { name: /のみ削除/ })
-			.first();
-		const isVisible = await deleteAccountButton
-			.waitFor({ state: "visible", timeout: 25000 })
-			.then(() => true)
+		// 削除ボタンの対象アカウント名テキストを検証
+		const deleteBtn = page.getByRole("button", {
+			name: new RegExp(`このアカウント（${accountName}）のみ削除`),
+		});
+		const isDeleteBtnVisible = await deleteBtn
+			.isVisible({ timeout: 5000 })
 			.catch(() => false);
-		if (isVisible) {
-			await deleteAccountButton.click();
-			const confirmBtn = page
-				.getByRole("alertdialog")
-				.getByRole("button", { name: "削除する", exact: true });
-			await confirmBtn.waitFor({ state: "visible", timeout: 5000 });
-			await confirmBtn.click();
-			await expect(
-				page.getByText("アカウントを削除しました").first(),
-			).toBeVisible({
-				timeout: 15000,
-			});
+		if (!isDeleteBtnVisible) {
+			console.warn(
+				`[Cleanup Skipped] 削除ボタンのアカウント名が一致しないため削除を中止します`,
+			);
+			return;
 		}
+
+		await deleteBtn.click();
+		const confirmBtn = page
+			.getByRole("alertdialog")
+			.getByRole("button", { name: "削除する", exact: true });
+		await confirmBtn.waitFor({ state: "visible", timeout: 5000 });
+		await confirmBtn.click();
+		await expect(
+			page.getByText("アカウントを削除しました").first(),
+		).toBeVisible({ timeout: 15000 });
 	} catch (cleanupError) {
 		console.warn(`[Cleanup Error] ${accountName}:`, cleanupError);
 	}
 }
-
 // =============================================================================
 // Test Suites (E2EE暗号化ジャーニーの段階的検証)
 // =============================================================================

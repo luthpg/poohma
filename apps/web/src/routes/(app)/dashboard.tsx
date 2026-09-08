@@ -200,11 +200,17 @@ function RouteComponent() {
 		[records],
 	);
 
+	const firstSampleRecord = useMemo(
+		() =>
+			records?.find((r) => (r as RecordType & { isSample?: boolean }).isSample),
+		[records],
+	);
+
 	// 初回表示時にモーダルを表示、またはURLクエリから復帰
 	useEffect(() => {
 		if (onboardingSearch.onboarding) {
-			onboarding.resumeFromQuery(onboardingSearch.onboarding);
-			return;
+			const resumed = onboarding.resumeFromQuery(onboardingSearch.onboarding);
+			if (resumed) return;
 		}
 
 		// レコードの取得完了を待機
@@ -385,7 +391,10 @@ function RouteComponent() {
 			<OnboardingTour
 				steps={dashboardPart1Steps}
 				isActive={onboarding.phase === "dashboard-tour-1"}
-				onComplete={onboarding.onDashboardTour1Complete}
+				onComplete={() => {
+					// sampleRecordIdsRef が空（リロード後など）でも、Convexから取得したサンプルIDで確実に詳細へ遷移させる
+					onboarding.onDashboardTour1Complete(firstSampleRecord?._id);
+				}}
 				onClose={onboarding.onTourClose}
 			/>
 
@@ -745,6 +754,13 @@ function RecordListSection({
 		sort: sortParam,
 	});
 
+	const firstSampleRecordId = useMemo(
+		() =>
+			records?.find((r) => (r as RecordType & { isSample?: boolean }).isSample)
+				?._id,
+		[records],
+	);
+
 	const groupedRecords = useMemo(() => {
 		return groupRecordsByIndex(records || []);
 	}, [records]);
@@ -889,7 +905,7 @@ function RecordListSection({
 												isSelected={selectedIds.includes(record._id)}
 												onToggleSelect={() => onToggleSelect(record._id)}
 												dataTour={
-													record._id === records[0]?._id
+													record._id === firstSampleRecordId
 														? "sample-record"
 														: undefined
 												}
@@ -928,7 +944,9 @@ function RecordListSection({
 								isSelected={selectedIds.includes(record._id)}
 								onToggleSelect={() => onToggleSelect(record._id)}
 								dataTour={
-									record._id === records[0]?._id ? "sample-record" : undefined
+									record._id === firstSampleRecordId
+										? "sample-record"
+										: undefined
 								}
 							/>
 						) : (

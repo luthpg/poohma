@@ -376,6 +376,12 @@ export function UserMenu({
 					if (fileInputRef.current) fileInputRef.current.value = "";
 				}
 			},
+			error: (err) => {
+				console.error("Papa.parse error:", err);
+				toast.error("CSVファイルの解析に失敗しました", { id: toastId });
+				setIsImporting(false);
+				if (fileInputRef.current) fileInputRef.current.value = "";
+			},
 		});
 	};
 

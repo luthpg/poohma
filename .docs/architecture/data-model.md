@@ -47,6 +47,7 @@ erDiagram
         string displayName
         string photoURL
         id familyId
+        number onboardingVersion
         number createdAt
         number updatedAt
     }
@@ -64,6 +65,7 @@ erDiagram
         id ownerFamilyId
         array admins
         array tags
+        boolean isSample
         number updatedAt
     }
     CREDENTIALS {
@@ -147,7 +149,7 @@ erDiagram
 
 - クレデンシャル管理の中心となるエンティティ。`ownerType`（`"user"` | `"family"`）により個人所有か家族共有かを切り替え、`ownerFamilyId` と `admins` は共有時のみ意味を持つ（Drive型ACLモデル、Issue #137）。
 - `titleReading` はサービス名のふりがな（自動取得または手動編集）で、ダッシュボードの五十音順ソートに利用される（Issue #118「nameソートに読み仮名が使われていない」の修正で追加）。`ogpImage` / `ogpDescription` は登録時に自動取得したOGPメタデータのキャッシュで、いずれも平文で保存される（暗号化対象外のメタデータ）。
-- インデックス：`by_userId`, `by_accountId`, `by_family_sortKey`（家族内の並び順取得）, `by_ownerType_accountId`, `by_ownerType_ownerFamilyId`（フルテーブルスキャンを避けた効率的な取得に利用）。
+- インデックス：`by_userId`, `by_accountId`, `by_family_sortKey`（家族内の並び順取得）, `by_family_isSample`, `by_ownerType_accountId`, `by_ownerType_ownerFamilyId`（フルテーブルスキャンを避けた効率的な取得に利用）。
 
 ### CREDENTIALS
 

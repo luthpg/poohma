@@ -14,6 +14,23 @@ import type { OnboardingPhase } from "@/lib/onboarding/types";
 
 const ONBOARDING_CURRENT_VERSION = 1;
 
+// ダッシュボードの SearchParams の型を定義
+export interface DashboardSearchParams {
+	q?: string;
+	tag?: string;
+	sort?:
+		| "name-asc"
+		| "name-desc"
+		| "url-asc"
+		| "url-desc"
+		| "date-asc"
+		| "date-desc"
+		| "updatedAt-asc"
+		| "updatedAt-desc";
+	view?: "card" | "list";
+	onboarding?: string;
+}
+
 /**
  * オンボーディングの状態管理・画面間遷移を統括するフック
  *
@@ -49,6 +66,21 @@ export function useOnboarding() {
 		return version < ONBOARDING_CURRENT_VERSION;
 	}, [activeAccount]);
 
+	/**
+	 * URLの `onboarding` クエリパラメータを型安全に除去する
+	 */
+	const clearOnboardingQuery = useCallback(() => {
+		navigate({
+			to: "/dashboard",
+			search: (prev: Record<string, unknown>): DashboardSearchParams => {
+				const next = { ...prev };
+				delete next.onboarding;
+				return next as DashboardSearchParams;
+			},
+			replace: true,
+		});
+	}, [navigate]);
+
 	// サンプルデータが存在するか（家族内に isSample=true のレコードがある場合、バナーを表示）
 	// この判定は呼び出し側（dashboard）で Convex クエリ結果から行う
 	// フックでは hasSampleData を外部から受け取る形にする
@@ -73,13 +105,14 @@ export function useOnboarding() {
 				version: ONBOARDING_CURRENT_VERSION,
 			});
 			setPhase("completed");
+			clearOnboardingQuery();
 		} catch (e) {
 			console.error("Failed to skip onboarding:", e);
 			toast.error("スキップに失敗しました。もう一度お試しください。");
 		} finally {
 			setIsLoading(false);
 		}
-	}, [activeAccount?._id, completeOnboardingMutation]);
+	}, [activeAccount?._id, completeOnboardingMutation, clearOnboardingQuery]);
 
 	/**
 	 * 「サンプルデータで体験してみる」
@@ -140,20 +173,23 @@ export function useOnboarding() {
 	/**
 	 * ダッシュボードツアー（前半）完了 → 詳細画面へナビゲート
 	 */
-	const onDashboardTour1Complete = useCallback(() => {
-		const firstSampleId = sampleRecordIdsRef.current[0];
-		if (firstSampleId) {
-			setPhase("detail-tour");
-			navigate({
-				to: "/records/$id",
-				params: { id: firstSampleId },
-				search: { onboarding: "detail" },
-			});
-		} else {
-			// サンプルがない場合はツアー完了
-			setPhase("completed");
-		}
-	}, [navigate]);
+	const onDashboardTour1Complete = useCallback(
+		(fallbackSampleId?: Id<"serviceRecords">) => {
+			const targetSampleId = sampleRecordIdsRef.current[0] || fallbackSampleId;
+			if (targetSampleId) {
+				setPhase("detail-tour");
+				navigate({
+					to: "/records/$id",
+					params: { id: targetSampleId },
+					search: { onboarding: "detail" },
+				});
+			} else {
+				setPhase("completed");
+				clearOnboardingQuery();
+			}
+		},
+		[navigate, clearOnboardingQuery],
+	);
 
 	/**
 	 * 詳細画面ツアー完了 → ダッシュボードに戻り、後半ツアー開始
@@ -162,7 +198,10 @@ export function useOnboarding() {
 		setPhase("dashboard-tour-2");
 		navigate({
 			to: "/dashboard",
-			search: { onboarding: "part2" },
+			search: (prev: Record<string, unknown>): DashboardSearchParams => ({
+				...(prev as DashboardSearchParams),
+				onboarding: "part2",
+			}),
 		});
 	}, [navigate]);
 
@@ -175,19 +214,22 @@ export function useOnboarding() {
 				accountId: activeAccount?._id,
 				version: ONBOARDING_CURRENT_VERSION,
 			});
+			setPhase("completed");
+			clearOnboardingQuery();
+			toast.success("ツアーが完了しました！自由にお使いください。");
 		} catch (e) {
 			console.error("Failed to complete onboarding:", e);
+			toast.error("ツアー完了状態の保存に失敗しました。");
 		}
-		setPhase("completed");
-		toast.success("ツアーが完了しました！自由にお使いください。");
-	}, [activeAccount?._id, completeOnboardingMutation]);
+	}, [activeAccount?._id, completeOnboardingMutation, clearOnboardingQuery]);
 
 	/**
 	 * ツアーの途中離脱（×ボタン）
 	 */
 	const onTourClose = useCallback(() => {
 		setPhase("completed");
-	}, []);
+		clearOnboardingQuery();
+	}, [clearOnboardingQuery]);
 
 	/**
 	 * ツアーを再開
@@ -232,22 +274,29 @@ export function useOnboarding() {
 				version: ONBOARDING_CURRENT_VERSION,
 			});
 			setPhase("completed");
+			clearOnboardingQuery();
 		} catch (e) {
 			console.error("Failed to mark onboarding completed:", e);
 		}
-	}, [activeAccount?._id, completeOnboardingMutation]);
+	}, [activeAccount?._id, completeOnboardingMutation, clearOnboardingQuery]);
 
 	/**
 	 * URLクエリパラメータからフェーズを復元（画面遷移後の再開用）
 	 */
-	const resumeFromQuery = useCallback((queryParam?: string) => {
+	const resumeFromQuery = useCallback((queryParam?: string): boolean => {
 		if (queryParam === "detail") {
 			setPhase("detail-tour");
-		} else if (queryParam === "part2") {
-			setPhase("dashboard-tour-2");
-		} else if (queryParam === "guide") {
-			setPhase("manual-tour");
+			return true;
 		}
+		if (queryParam === "part2") {
+			setPhase("dashboard-tour-2");
+			return true;
+		}
+		if (queryParam === "guide") {
+			setPhase("manual-tour");
+			return true;
+		}
+		return false;
 	}, []);
 
 	return {
@@ -269,5 +318,6 @@ export function useOnboarding() {
 		restartTour,
 		purgeSamples,
 		resumeFromQuery,
+		clearOnboardingQuery,
 	};
 }

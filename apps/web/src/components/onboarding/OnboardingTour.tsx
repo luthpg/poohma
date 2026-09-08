@@ -50,7 +50,7 @@ export function OnboardingTour({
 			const driverObj = driver({
 				showProgress: true,
 				animate: true,
-				allowClose: true,
+				allowClose: false,
 				overlayColor: "rgba(0, 0, 0, 0.5)",
 				stagePadding: 8,
 				stageRadius: 12,

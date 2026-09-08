@@ -9,9 +9,10 @@ export const dashboardPart1Steps: DriveStep[] = [
 		popover: {
 			title: "登録されたサービス",
 			description:
-				"家族で利用しているサービスやアカウントがここに並びます。まずはカードを押して、詳細を見てみましょう。",
+				"家族で利用しているサービスやアカウントがここに並びます。「詳細画面へ」を押して、ヒントの暗号化の仕組みを確認してみましょう。",
 			side: "bottom",
 			align: "start",
+			doneBtnText: "詳細画面へ",
 		},
 	},
 ];
@@ -25,7 +26,7 @@ export const recordDetailSteps: DriveStep[] = [
 		popover: {
 			title: "大切なヒントは安全に保護",
 			description:
-				"パスワードのヒントは端末上で暗号化されています。サーバーの管理者も見ることができない安全な状態で保管されます。",
+				"パスワードのヒントはブラウザ上で暗号化されて保管されています。サーバーの管理者であっても閲覧できません。",
 			side: "top",
 			align: "start",
 		},
@@ -33,11 +34,12 @@ export const recordDetailSteps: DriveStep[] = [
 	{
 		element: '[data-tour="hint-reveal-btn"]',
 		popover: {
-			title: "合言葉で復号",
+			title: "実際にヒントを表示してみましょう",
 			description:
-				"「表示」を押すと、あなただけの合言葉を使ってこの画面上だけで安全に復号されます。",
+				"「🔒 クリックして表示」を押すと、あなたの家族パスコードを使って端末内だけで瞬時に平文に復号されます。ぜひ試してみてください！",
 			side: "bottom",
 			align: "start",
+			nextBtnText: "表示を確認したら次へ",
 		},
 	},
 	{
@@ -55,9 +57,10 @@ export const recordDetailSteps: DriveStep[] = [
 		popover: {
 			title: "ダッシュボードに戻る",
 			description:
-				"確認できたら、左上のリンクからダッシュボードに戻りましょう。",
+				"確認できたら、ダッシュボードに戻って実際の利用を始めましょう。",
 			side: "bottom",
 			align: "start",
+			doneBtnText: "ダッシュボードへ戻る",
 		},
 	},
 ];

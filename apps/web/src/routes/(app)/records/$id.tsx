@@ -168,12 +168,23 @@ function RecordDetailComponent({
 		if (tourInitRef.current) return;
 		tourInitRef.current = true;
 
+		// クエリパラメータで onboarding=detail が指定されている場合
 		if (searchParams.onboarding === "detail") {
-			// ページ読み込み後少し待ってからツアーを開始（DOM描画完了待ち）
+			// レコードがサンプルでない、あるいは不正なアクセスの場合はダッシュボードへ戻す
+			if (record && !record.isSample) {
+				// サンプルが存在しない場合はクエリを消去
+				navigate({
+					to: "/records/$id",
+					params: { id: record._id },
+					search: {},
+					replace: true,
+				});
+				return;
+			}
 			const timer = setTimeout(() => setDetailTourActive(true), 500);
 			return () => clearTimeout(timer);
 		}
-	}, [searchParams.onboarding]);
+	}, [searchParams.onboarding, record, navigate]);
 
 	useEffect(() => {
 		window.scrollTo(0, 0);
@@ -680,6 +691,13 @@ function RecordDetailComponent({
 				}}
 				onClose={() => {
 					setDetailTourActive(false);
+					// クローズ時はURLのクエリパラメータも消去してダッシュボードへ戻すか安全に終了
+					navigate({
+						to: "/records/$id",
+						params: { id: record._id },
+						search: {},
+						replace: true,
+					});
 					onboarding.onTourClose();
 				}}
 			/>

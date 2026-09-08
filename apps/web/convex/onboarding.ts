@@ -3,7 +3,6 @@ import { computeSortKey } from "../src/utils/index-group";
 import type { Id } from "./_generated/dataModel";
 import { authenticatedMutation, familyBoundMutation } from "./customBuilders";
 import { deleteCredentialsForRecord } from "./records";
-import { requireAdminAccess } from "./rls";
 
 /**
  * オンボーディング完了状態を記録
@@ -60,6 +59,21 @@ export const insertSampleRecords = familyBoundMutation({
   },
   handler: async (ctx, args) => {
     const { user, familyId } = ctx;
+
+    // 冪等性の担保: 既に同一家族・アカウントでサンプルが存在する場合は一旦パージする
+    const existingSamples = await ctx.db
+      .query("serviceRecords")
+      .withIndex("by_family_isSample", (q) =>
+        q.eq("familyId", familyId).eq("isSample", true),
+      )
+      .filter((q) => q.eq(q.field("accountId"), user._id))
+      .collect();
+
+    for (const record of existingSamples) {
+      await deleteCredentialsForRecord(ctx, record._id);
+      await ctx.db.delete(record._id);
+    }
+
     const now = Date.now();
     const createdRecordIds: Id<"serviceRecords">[] = [];
 
@@ -121,8 +135,7 @@ export const purgeSampleData = familyBoundMutation({
     accountId: v.optional(v.id("users")),
   },
   handler: async (ctx) => {
-    const { user, familyId } = ctx;
-
+    const { familyId } = ctx;
     const sampleRecords = await ctx.db
       .query("serviceRecords")
       .withIndex("by_family_isSample", (q) =>
@@ -132,7 +145,10 @@ export const purgeSampleData = familyBoundMutation({
 
     let deletedCount = 0;
     for (const record of sampleRecords) {
-      requireAdminAccess(user, record);
+      // サンプルレコードかつ同一家族であることを保証し、通常レコード用の strict な requireAdminAccess はバイパスする
+      if (record.familyId !== familyId || !record.isSample) {
+        continue;
+      }
       await deleteCredentialsForRecord(ctx, record._id);
       await ctx.db.delete(record._id);
       deletedCount++;
