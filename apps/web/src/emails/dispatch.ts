@@ -20,55 +20,55 @@ import { recoveryKitIssuedEmail } from "./templates/security/RecoveryKitIssuedEm
 import { recoveryOtpEmail } from "./templates/security/RecoveryOtpEmail";
 
 function resolve<Props>(
-	definition: {
-		subject: (props: Props) => string;
-		Component: (props: Props) => ReactElement;
-	},
-	props: Props,
+  definition: {
+    subject: (props: Props) => string;
+    Component: (props: Props) => ReactElement;
+  },
+  props: Props,
 ) {
-	return {
-		subject: definition.subject(props),
-		element: definition.Component(props),
-	};
+  return {
+    subject: definition.subject(props),
+    element: definition.Component(props),
+  };
 }
 
 export function resolveEmail(payload: EmailPayload) {
-	switch (payload.template) {
-		case "familyWelcome":
-			return resolve(familyWelcomeEmail, payload.props);
-		case "newMemberJoined":
-			return resolve(newMemberJoinedEmail, payload.props);
-		case "joinRequestReceived":
-			return resolve(joinRequestReceivedEmail, payload.props);
-		case "joinApproved":
-			return resolve(joinApprovedEmail, payload.props);
-		case "joinRequestRejected":
-			return resolve(joinRequestRejectedEmail, payload.props);
-		case "memberKicked":
-			return resolve(memberKickedEmail, payload.props);
-		case "familyMigrationCompleted":
-			return resolve(familyMigrationCompletedEmail, payload.props);
-		case "passcodeRotated":
-			return resolve(passcodeRotatedEmail, payload.props);
-		case "shareSettingChanged":
-			return resolve(shareSettingChangedEmail, payload.props);
-		case "recordAdminChanged":
-			return resolve(recordAdminChangedEmail, payload.props);
-		case "accountDeleted":
-			return resolve(accountDeletedEmail, payload.props);
-		case "newDeviceLogin":
-			return resolve(newDeviceLoginEmail, payload.props);
-		case "csvExported":
-			return resolve(csvExportedEmail, payload.props);
-		case "biometricRegistered":
-			return resolve(biometricRegisteredEmail, payload.props);
-		case "biometricRemoved":
-			return resolve(biometricRemovedEmail, payload.props);
-		case "recoveryOtp":
-			return resolve(recoveryOtpEmail, payload.props);
-		case "recoveryKitIssued":
-			return resolve(recoveryKitIssuedEmail, payload.props);
-		case "contactNotification":
-			return resolve(contactNotificationEmail, payload.props);
-	}
+  switch (payload.template) {
+    case "familyWelcome":
+      return resolve(familyWelcomeEmail, payload.props);
+    case "newMemberJoined":
+      return resolve(newMemberJoinedEmail, payload.props);
+    case "joinRequestReceived":
+      return resolve(joinRequestReceivedEmail, payload.props);
+    case "joinApproved":
+      return resolve(joinApprovedEmail, payload.props);
+    case "joinRequestRejected":
+      return resolve(joinRequestRejectedEmail, payload.props);
+    case "memberKicked":
+      return resolve(memberKickedEmail, payload.props);
+    case "familyMigrationCompleted":
+      return resolve(familyMigrationCompletedEmail, payload.props);
+    case "passcodeRotated":
+      return resolve(passcodeRotatedEmail, payload.props);
+    case "shareSettingChanged":
+      return resolve(shareSettingChangedEmail, payload.props);
+    case "recordAdminChanged":
+      return resolve(recordAdminChangedEmail, payload.props);
+    case "accountDeleted":
+      return resolve(accountDeletedEmail, payload.props);
+    case "newDeviceLogin":
+      return resolve(newDeviceLoginEmail, payload.props);
+    case "csvExported":
+      return resolve(csvExportedEmail, payload.props);
+    case "biometricRegistered":
+      return resolve(biometricRegisteredEmail, payload.props);
+    case "biometricRemoved":
+      return resolve(biometricRemovedEmail, payload.props);
+    case "recoveryOtp":
+      return resolve(recoveryOtpEmail, payload.props);
+    case "recoveryKitIssued":
+      return resolve(recoveryKitIssuedEmail, payload.props);
+    case "contactNotification":
+      return resolve(contactNotificationEmail, payload.props);
+  }
 }

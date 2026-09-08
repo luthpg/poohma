@@ -8,8 +8,8 @@ import type { Id } from "@/../convex/_generated/dataModel";
 import { usePasscode } from "@/components/PasscodeProvider";
 import { useAccount } from "@/hooks/useAccount";
 import {
-	encryptSampleRecords,
-	SAMPLE_RECORDS,
+  encryptSampleRecords,
+  SAMPLE_RECORDS,
 } from "@/lib/onboarding/sampleData";
 import type { OnboardingPhase } from "@/lib/onboarding/types";
 
@@ -17,19 +17,19 @@ const ONBOARDING_CURRENT_VERSION = 1;
 
 // ダッシュボードの SearchParams の型を定義
 export interface DashboardSearchParams {
-	q?: string;
-	tag?: string;
-	sort?:
-		| "name-asc"
-		| "name-desc"
-		| "url-asc"
-		| "url-desc"
-		| "date-asc"
-		| "date-desc"
-		| "updatedAt-asc"
-		| "updatedAt-desc";
-	view?: "card" | "list";
-	onboarding?: string;
+  q?: string;
+  tag?: string;
+  sort?:
+    | "name-asc"
+    | "name-desc"
+    | "url-asc"
+    | "url-desc"
+    | "date-asc"
+    | "date-desc"
+    | "updatedAt-asc"
+    | "updatedAt-desc";
+  view?: "card" | "list";
+  onboarding?: string;
 }
 
 /**
@@ -42,299 +42,299 @@ export interface DashboardSearchParams {
  * - ツアー再開
  */
 export function useOnboarding() {
-	const { activeAccount } = useAccount();
-	const { getMasterKey, requireUnlock } = usePasscode();
-	const navigate = useNavigate();
-	const completeOnboardingMutation = useMutation(
-		api.onboarding.completeOnboarding,
-	);
-	const insertSampleRecordsMutation = useMutation(
-		api.onboarding.insertSampleRecords,
-	);
-	const purgeSampleDataMutation = useMutation(api.onboarding.purgeSampleData);
+  const { activeAccount } = useAccount();
+  const { getMasterKey, requireUnlock } = usePasscode();
+  const navigate = useNavigate();
+  const completeOnboardingMutation = useMutation(
+    api.onboarding.completeOnboarding,
+  );
+  const insertSampleRecordsMutation = useMutation(
+    api.onboarding.insertSampleRecords,
+  );
+  const purgeSampleDataMutation = useMutation(api.onboarding.purgeSampleData);
 
-	const [phase, setPhase] = useState<OnboardingPhase>("idle");
-	const [isLoading, setIsLoading] = useState(false);
-	const [isPurging, setIsPurging] = useState(false);
-	const sampleRecordIdsRef = useRef<Id<"serviceRecords">[]>([]);
+  const [phase, setPhase] = useState<OnboardingPhase>("idle");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isPurging, setIsPurging] = useState(false);
+  const sampleRecordIdsRef = useRef<Id<"serviceRecords">[]>([]);
 
-	const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-	// オンボーディング未完了かどうか
-	const needsOnboarding = useMemo(() => {
-		if (!activeAccount) return false;
-		// 家族未所属 → オンボーディングの対象外（家族作成後に初めて発動）
-		if (!activeAccount.familyId) return false;
-		const version = activeAccount.onboardingVersion ?? 0;
-		return version < ONBOARDING_CURRENT_VERSION;
-	}, [activeAccount]);
+  // オンボーディング未完了かどうか
+  const needsOnboarding = useMemo(() => {
+    if (!activeAccount) return false;
+    // 家族未所属 → オンボーディングの対象外（家族作成後に初めて発動）
+    if (!activeAccount.familyId) return false;
+    const version = activeAccount.onboardingVersion ?? 0;
+    return version < ONBOARDING_CURRENT_VERSION;
+  }, [activeAccount]);
 
-	/**
-	 * URLの `onboarding` クエリパラメータを型安全に除去する
-	 */
-	const clearOnboardingQuery = useCallback(() => {
-		navigate({
-			to: "/dashboard",
-			search: (prev: Record<string, unknown>): DashboardSearchParams => {
-				const next = { ...prev };
-				delete next.onboarding;
-				return next as DashboardSearchParams;
-			},
-			replace: true,
-		});
-	}, [navigate]);
+  /**
+   * URLの `onboarding` クエリパラメータを型安全に除去する
+   */
+  const clearOnboardingQuery = useCallback(() => {
+    navigate({
+      to: "/dashboard",
+      search: (prev: Record<string, unknown>): DashboardSearchParams => {
+        const next = { ...prev };
+        delete next.onboarding;
+        return next as DashboardSearchParams;
+      },
+      replace: true,
+    });
+  }, [navigate]);
 
-	// 完了処理の共通ヘルパー（DB更新 + authUser クエリの無効化 + クエリ削除）
-	const completeAndSync = useCallback(async () => {
-		try {
-			await completeOnboardingMutation({
-				accountId: activeAccount?._id,
-				version: ONBOARDING_CURRENT_VERSION,
-			});
-			// ★重要: TanStack Query の authUser キャッシュを更新し、AccountProvider に最新の onboardingVersion を反映
-			await queryClient.invalidateQueries({ queryKey: ["authUser"] });
-			setPhase("completed");
-			clearOnboardingQuery();
-		} catch (e) {
-			console.error("Failed to complete onboarding:", e);
-		}
-	}, [
-		activeAccount?._id,
-		completeOnboardingMutation,
-		queryClient,
-		clearOnboardingQuery,
-	]);
+  // 完了処理の共通ヘルパー（DB更新 + authUser クエリの無効化 + クエリ削除）
+  const completeAndSync = useCallback(async () => {
+    try {
+      await completeOnboardingMutation({
+        accountId: activeAccount?._id,
+        version: ONBOARDING_CURRENT_VERSION,
+      });
+      // ★重要: TanStack Query の authUser キャッシュを更新し、AccountProvider に最新の onboardingVersion を反映
+      await queryClient.invalidateQueries({ queryKey: ["authUser"] });
+      setPhase("completed");
+      clearOnboardingQuery();
+    } catch (e) {
+      console.error("Failed to complete onboarding:", e);
+    }
+  }, [
+    activeAccount?._id,
+    completeOnboardingMutation,
+    queryClient,
+    clearOnboardingQuery,
+  ]);
 
-	// サンプルデータが存在するか（家族内に isSample=true のレコードがある場合、バナーを表示）
-	// この判定は呼び出し側（dashboard）で Convex クエリ結果から行う
-	// フックでは hasSampleData を外部から受け取る形にする
+  // サンプルデータが存在するか（家族内に isSample=true のレコードがある場合、バナーを表示）
+  // この判定は呼び出し側（dashboard）で Convex クエリ結果から行う
+  // フックでは hasSampleData を外部から受け取る形にする
 
-	/**
-	 * モーダルを表示（初回ダッシュボード到達時に呼ばれる）
-	 */
-	const showModal = useCallback(() => {
-		if (needsOnboarding) {
-			setPhase("modal");
-		}
-	}, [needsOnboarding]);
+  /**
+   * モーダルを表示（初回ダッシュボード到達時に呼ばれる）
+   */
+  const showModal = useCallback(() => {
+    if (needsOnboarding) {
+      setPhase("modal");
+    }
+  }, [needsOnboarding]);
 
-	/**
-	 * 「スキップして空のまま始める」
-	 */
-	const skipOnboarding = useCallback(async () => {
-		setIsLoading(true);
-		try {
-			await completeAndSync();
-		} finally {
-			setIsLoading(false);
-		}
-	}, [completeAndSync]);
+  /**
+   * 「スキップして空のまま始める」
+   */
+  const skipOnboarding = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      await completeAndSync();
+    } finally {
+      setIsLoading(false);
+    }
+  }, [completeAndSync]);
 
-	/**
-	 * 「サンプルデータで体験してみる」
-	 * 1. masterKey を取得（ロック中なら合言葉プロンプトを表示）
-	 * 2. クライアント側でサンプルデータを暗号化
-	 * 3. Convex に投入
-	 * 4. ダッシュボードツアー（前半）を開始
-	 */
-	const startTour = useCallback(async () => {
-		setIsLoading(true);
-		try {
-			// masterKey 取得（ロック中ならプロンプト）
-			let masterKey = getMasterKey();
-			if (!masterKey) {
-				const unlocked = await requireUnlock();
-				if (!unlocked) {
-					setIsLoading(false);
-					return;
-				}
-				masterKey = getMasterKey();
-			}
-			if (!masterKey) {
-				toast.error("合言葉の確認に失敗しました。");
-				setIsLoading(false);
-				return;
-			}
+  /**
+   * 「サンプルデータで体験してみる」
+   * 1. masterKey を取得（ロック中なら合言葉プロンプトを表示）
+   * 2. クライアント側でサンプルデータを暗号化
+   * 3. Convex に投入
+   * 4. ダッシュボードツアー（前半）を開始
+   */
+  const startTour = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // masterKey 取得（ロック中ならプロンプト）
+      let masterKey = getMasterKey();
+      if (!masterKey) {
+        const unlocked = await requireUnlock();
+        if (!unlocked) {
+          setIsLoading(false);
+          return;
+        }
+        masterKey = getMasterKey();
+      }
+      if (!masterKey) {
+        toast.error("合言葉の確認に失敗しました。");
+        setIsLoading(false);
+        return;
+      }
 
-			// クライアント暗号化
-			const encryptedRecords = await encryptSampleRecords(
-				SAMPLE_RECORDS,
-				masterKey,
-			);
+      // クライアント暗号化
+      const encryptedRecords = await encryptSampleRecords(
+        SAMPLE_RECORDS,
+        masterKey,
+      );
 
-			// Convex 投入
-			const result = await insertSampleRecordsMutation({
-				accountId: activeAccount?._id,
-				records: encryptedRecords,
-			});
-			sampleRecordIdsRef.current = result.recordIds;
+      // Convex 投入
+      const result = await insertSampleRecordsMutation({
+        accountId: activeAccount?._id,
+        records: encryptedRecords,
+      });
+      sampleRecordIdsRef.current = result.recordIds;
 
-			// 検索フィルタやタグによってサンプルが隠れないよう、クエリを初期化してツアーを開始
-			navigate({
-				to: "/dashboard",
-				search: (prev: Record<string, unknown>): DashboardSearchParams => ({
-					view: (prev as DashboardSearchParams).view,
-					sort: (prev as DashboardSearchParams).sort,
-					onboarding: "part1",
-				}),
-				replace: true,
-			});
+      // 検索フィルタやタグによってサンプルが隠れないよう、クエリを初期化してツアーを開始
+      navigate({
+        to: "/dashboard",
+        search: (prev: Record<string, unknown>): DashboardSearchParams => ({
+          view: (prev as DashboardSearchParams).view,
+          sort: (prev as DashboardSearchParams).sort,
+          onboarding: "part1",
+        }),
+        replace: true,
+      });
 
-			// ダッシュボードツアー（前半）開始
-			setPhase("dashboard-tour-1");
-		} catch (e) {
-			console.error("Failed to start onboarding tour:", e);
-			toast.error(
-				"サンプルデータの作成に失敗しました。もう一度お試しください。",
-			);
-		} finally {
-			setIsLoading(false);
-		}
-	}, [
-		getMasterKey,
-		requireUnlock,
-		activeAccount?._id,
-		insertSampleRecordsMutation,
-		navigate,
-	]);
+      // ダッシュボードツアー（前半）開始
+      setPhase("dashboard-tour-1");
+    } catch (e) {
+      console.error("Failed to start onboarding tour:", e);
+      toast.error(
+        "サンプルデータの作成に失敗しました。もう一度お試しください。",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, [
+    getMasterKey,
+    requireUnlock,
+    activeAccount?._id,
+    insertSampleRecordsMutation,
+    navigate,
+  ]);
 
-	/**
-	 * ダッシュボードツアー（前半）完了 → 詳細画面へナビゲート
-	 */
-	const onDashboardTour1Complete = useCallback(
-		(fallbackSampleId?: Id<"serviceRecords">) => {
-			const targetSampleId = sampleRecordIdsRef.current[0] || fallbackSampleId;
-			if (targetSampleId) {
-				setPhase("detail-tour");
-				navigate({
-					to: "/records/$id",
-					params: { id: targetSampleId },
-					search: { onboarding: "detail" },
-				});
-			} else {
-				setPhase("completed");
-				clearOnboardingQuery();
-			}
-		},
-		[navigate, clearOnboardingQuery],
-	);
+  /**
+   * ダッシュボードツアー（前半）完了 → 詳細画面へナビゲート
+   */
+  const onDashboardTour1Complete = useCallback(
+    (fallbackSampleId?: Id<"serviceRecords">) => {
+      const targetSampleId = sampleRecordIdsRef.current[0] || fallbackSampleId;
+      if (targetSampleId) {
+        setPhase("detail-tour");
+        navigate({
+          to: "/records/$id",
+          params: { id: targetSampleId },
+          search: { onboarding: "detail" },
+        });
+      } else {
+        setPhase("completed");
+        clearOnboardingQuery();
+      }
+    },
+    [navigate, clearOnboardingQuery],
+  );
 
-	/**
-	 * 詳細画面ツアー完了 → ダッシュボードに戻り、後半ツアー開始
-	 */
-	const onDetailTourComplete = useCallback(() => {
-		setPhase("dashboard-tour-2");
-		navigate({
-			to: "/dashboard",
-			search: (prev: Record<string, unknown>): DashboardSearchParams => ({
-				...(prev as DashboardSearchParams),
-				onboarding: "part2",
-			}),
-		});
-	}, [navigate]);
+  /**
+   * 詳細画面ツアー完了 → ダッシュボードに戻り、後半ツアー開始
+   */
+  const onDetailTourComplete = useCallback(() => {
+    setPhase("dashboard-tour-2");
+    navigate({
+      to: "/dashboard",
+      search: (prev: Record<string, unknown>): DashboardSearchParams => ({
+        ...(prev as DashboardSearchParams),
+        onboarding: "part2",
+      }),
+    });
+  }, [navigate]);
 
-	/**
-	 * ダッシュボードツアー（後半）完了 → オンボーディング完了
-	 */
-	const onDashboardTour2Complete = useCallback(async () => {
-		await completeAndSync();
-		toast.success("ツアーが完了しました！自由にお使いください。");
-	}, [completeAndSync]);
+  /**
+   * ダッシュボードツアー（後半）完了 → オンボーディング完了
+   */
+  const onDashboardTour2Complete = useCallback(async () => {
+    await completeAndSync();
+    toast.success("ツアーが完了しました！自由にお使いください。");
+  }, [completeAndSync]);
 
-	/**
-	 * ツアーの途中離脱（×ボタン）
-	 */
-	const onTourClose = useCallback(() => {
-		setPhase("completed");
-		clearOnboardingQuery();
-	}, [clearOnboardingQuery]);
+  /**
+   * ツアーの途中離脱（×ボタン）
+   */
+  const onTourClose = useCallback(() => {
+    setPhase("completed");
+    clearOnboardingQuery();
+  }, [clearOnboardingQuery]);
 
-	/**
-	 * ツアーを再開
-	 */
-	const restartTour = useCallback(() => {
-		setPhase("dashboard-tour-1");
-	}, []);
+  /**
+   * ツアーを再開
+   */
+  const restartTour = useCallback(() => {
+    setPhase("dashboard-tour-1");
+  }, []);
 
-	/**
-	 * サンプルデータを一括削除
-	 */
-	const purgeSamples = useCallback(async () => {
-		setIsPurging(true);
-		try {
-			const result = await purgeSampleDataMutation({
-				accountId: activeAccount?._id,
-			});
-			sampleRecordIdsRef.current = [];
-			toast.success(`${result.deletedCount}件のサンプルデータを削除しました。`);
-		} catch (e) {
-			console.error("Failed to purge sample data:", e);
-			toast.error("サンプルデータの削除に失敗しました。");
-		} finally {
-			setIsPurging(false);
-		}
-	}, [activeAccount?._id, purgeSampleDataMutation]);
+  /**
+   * サンプルデータを一括削除
+   */
+  const purgeSamples = useCallback(async () => {
+    setIsPurging(true);
+    try {
+      const result = await purgeSampleDataMutation({
+        accountId: activeAccount?._id,
+      });
+      sampleRecordIdsRef.current = [];
+      toast.success(`${result.deletedCount}件のサンプルデータを削除しました。`);
+    } catch (e) {
+      console.error("Failed to purge sample data:", e);
+      toast.error("サンプルデータの削除に失敗しました。");
+    } finally {
+      setIsPurging(false);
+    }
+  }, [activeAccount?._id, purgeSampleDataMutation]);
 
-	/**
-	 * サンプルデータ不要の手動機能ツアーを開始
-	 */
-	const startManualTour = useCallback(() => {
-		setPhase("manual-tour");
-	}, []);
+  /**
+   * サンプルデータ不要の手動機能ツアーを開始
+   */
+  const startManualTour = useCallback(() => {
+    setPhase("manual-tour");
+  }, []);
 
-	/**
-	 * データが既存の場合などにバックグラウンドでオンボーディング完了をマーク
-	 */
-	const markCompleted = useCallback(async () => {
-		await completeAndSync();
-	}, [completeAndSync]);
+  /**
+   * データが既存の場合などにバックグラウンドでオンボーディング完了をマーク
+   */
+  const markCompleted = useCallback(async () => {
+    await completeAndSync();
+  }, [completeAndSync]);
 
-	/**
-	 * URLクエリパラメータからフェーズを復元（画面遷移後の再開用）
-	 */
-	const resumeFromQuery = useCallback(
-		(queryParam?: string): boolean => {
-			if (queryParam === "guide") {
-				setPhase("manual-tour");
-				return true;
-			}
-			// サンプルツアー関連のクエリは、オンボーディングが未完了の場合のみ許可
-			if (!needsOnboarding) {
-				return false;
-			}
-			if (queryParam === "detail") {
-				setPhase("detail-tour");
-				return true;
-			}
-			if (queryParam === "part2") {
-				setPhase("dashboard-tour-2");
-				return true;
-			}
-			return false;
-		},
-		[needsOnboarding],
-	);
+  /**
+   * URLクエリパラメータからフェーズを復元（画面遷移後の再開用）
+   */
+  const resumeFromQuery = useCallback(
+    (queryParam?: string): boolean => {
+      if (queryParam === "guide") {
+        setPhase("manual-tour");
+        return true;
+      }
+      // サンプルツアー関連のクエリは、オンボーディングが未完了の場合のみ許可
+      if (!needsOnboarding) {
+        return false;
+      }
+      if (queryParam === "detail") {
+        setPhase("detail-tour");
+        return true;
+      }
+      if (queryParam === "part2") {
+        setPhase("dashboard-tour-2");
+        return true;
+      }
+      return false;
+    },
+    [needsOnboarding],
+  );
 
-	return {
-		phase,
-		needsOnboarding,
-		isLoading,
-		isPurging,
-		sampleRecordIds: sampleRecordIdsRef.current,
-		// アクション
-		showModal,
-		skipOnboarding,
-		startTour,
-		startManualTour,
-		markCompleted,
-		onDashboardTour1Complete,
-		onDetailTourComplete,
-		onDashboardTour2Complete,
-		onTourClose,
-		restartTour,
-		purgeSamples,
-		resumeFromQuery,
-		clearOnboardingQuery,
-		completeAndSync,
-	};
+  return {
+    phase,
+    needsOnboarding,
+    isLoading,
+    isPurging,
+    sampleRecordIds: sampleRecordIdsRef.current,
+    // アクション
+    showModal,
+    skipOnboarding,
+    startTour,
+    startManualTour,
+    markCompleted,
+    onDashboardTour1Complete,
+    onDetailTourComplete,
+    onDashboardTour2Complete,
+    onTourClose,
+    restartTour,
+    purgeSamples,
+    resumeFromQuery,
+    clearOnboardingQuery,
+    completeAndSync,
+  };
 }

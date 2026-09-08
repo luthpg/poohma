@@ -2,161 +2,161 @@
 
 /* PoohMa テーマに調和させた Driver.js ポップオーバースタイル */
 .driver-popover.poohma-tour-popover {
-	background-color: var(--color-card, #ffffff);
-	color: var(--color-foreground, #09090b);
-	border: 1px solid var(--color-border, #e4e4e7);
-	border-radius: 0.875rem; /* rounded-xl */
-	padding: 1.25rem;
-	box-shadow:
-		0 10px 25px -5px rgba(0, 0, 0, 0.15),
-		0 8px 10px -6px rgba(0, 0, 0, 0.1);
-	font-family: inherit;
-	max-width: 340px;
+  background-color: var(--color-card, #ffffff);
+  color: var(--color-foreground, #09090b);
+  border: 1px solid var(--color-border, #e4e4e7);
+  border-radius: 0.875rem; /* rounded-xl */
+  padding: 1.25rem;
+  box-shadow:
+    0 10px 25px -5px rgba(0, 0, 0, 0.15),
+    0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  font-family: inherit;
+  max-width: 340px;
 }
 
 .dark .driver-popover.poohma-tour-popover {
-	background-color: #18181b;
-	color: #f4f4f5;
-	border-color: #27272a;
-	box-shadow:
-		0 10px 30px -5px rgba(0, 0, 0, 0.5),
-		0 8px 15px -6px rgba(0, 0, 0, 0.4);
+  background-color: #18181b;
+  color: #f4f4f5;
+  border-color: #27272a;
+  box-shadow:
+    0 10px 30px -5px rgba(0, 0, 0, 0.5),
+    0 8px 15px -6px rgba(0, 0, 0, 0.4);
 }
 
 .driver-popover.poohma-tour-popover .driver-popover-title {
-	font-size: 1rem;
-	font-weight: 600;
-	color: inherit;
-	margin-bottom: 0.5rem;
-	line-height: 1.4;
+  font-size: 1rem;
+  font-weight: 600;
+  color: inherit;
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
 }
 
 .driver-popover.poohma-tour-popover .driver-popover-description {
-	font-size: 0.875rem;
-	color: var(--color-muted-foreground, #71717a);
-	line-height: 1.6;
-	margin-bottom: 1rem;
+  font-size: 0.875rem;
+  color: var(--color-muted-foreground, #71717a);
+  line-height: 1.6;
+  margin-bottom: 1rem;
 }
 
 .dark .driver-popover.poohma-tour-popover .driver-popover-description {
-	color: #a1a1aa;
+  color: #a1a1aa;
 }
 
 .driver-popover.poohma-tour-popover .driver-popover-close-btn {
-	color: var(--color-muted-foreground, #71717a);
-	top: 0.875rem;
-	right: 0.875rem;
-	padding: 0.25rem;
-	border-radius: 0.375rem;
-	transition:
-		color 0.15s ease,
-		background-color 0.15s ease;
+  color: var(--color-muted-foreground, #71717a);
+  top: 0.875rem;
+  right: 0.875rem;
+  padding: 0.25rem;
+  border-radius: 0.375rem;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
 }
 
 .driver-popover.poohma-tour-popover .driver-popover-close-btn:hover {
-	color: inherit;
-	background-color: var(--color-accent, rgba(0, 0, 0, 0.05));
+  color: inherit;
+  background-color: var(--color-accent, rgba(0, 0, 0, 0.05));
 }
 
 .dark .driver-popover.poohma-tour-popover .driver-popover-close-btn:hover {
-	background-color: rgba(255, 255, 255, 0.1);
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .driver-popover.poohma-tour-popover .driver-popover-footer {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.5rem;
 }
 
 .driver-popover.poohma-tour-popover .driver-popover-progress-text {
-	font-size: 0.75rem;
-	color: var(--color-muted-foreground, #71717a);
-	font-weight: 500;
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground, #71717a);
+  font-weight: 500;
 }
 
 .driver-popover.poohma-tour-popover .driver-popover-navigation-btns {
-	display: flex;
-	gap: 0.5rem;
+  display: flex;
+  gap: 0.5rem;
 }
 
 .driver-popover.poohma-tour-popover button.driver-popover-prev-btn,
 .driver-popover.poohma-tour-popover button.driver-popover-next-btn {
-	border-radius: 0.375rem;
-	font-size: 0.8125rem;
-	font-weight: 500;
-	padding: 0.375rem 0.75rem;
-	cursor: pointer;
-	transition: all 0.15s ease;
-	text-shadow: none;
+  border-radius: 0.375rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 0.375rem 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-shadow: none;
 }
 
 .driver-popover.poohma-tour-popover button.driver-popover-prev-btn {
-	background: transparent;
-	color: var(--color-muted-foreground, #71717a);
-	border: 1px solid var(--color-border, #e4e4e7);
+  background: transparent;
+  color: var(--color-muted-foreground, #71717a);
+  border: 1px solid var(--color-border, #e4e4e7);
 }
 
 .driver-popover.poohma-tour-popover button.driver-popover-prev-btn:hover {
-	background-color: var(--color-accent, #f4f4f5);
-	color: inherit;
+  background-color: var(--color-accent, #f4f4f5);
+  color: inherit;
 }
 
 .dark .driver-popover.poohma-tour-popover button.driver-popover-prev-btn {
-	border-color: #27272a;
-	color: #a1a1aa;
+  border-color: #27272a;
+  color: #a1a1aa;
 }
 
 .dark .driver-popover.poohma-tour-popover button.driver-popover-prev-btn:hover {
-	background-color: #27272a;
-	color: #f4f4f5;
+  background-color: #27272a;
+  color: #f4f4f5;
 }
 
 .driver-popover.poohma-tour-popover button.driver-popover-next-btn {
-	background-color: #f97316; /* orange-500 */
-	color: #ffffff;
-	border: 1px solid #ea580c;
+  background-color: #f97316; /* orange-500 */
+  color: #ffffff;
+  border: 1px solid #ea580c;
 }
 
 .driver-popover.poohma-tour-popover button.driver-popover-next-btn:hover {
-	background-color: #ea580c; /* orange-600 */
+  background-color: #ea580c; /* orange-600 */
 }
 
 /* 矢印の色 */
 .driver-popover.poohma-tour-popover
 .driver-popover-arrow-side-top.driver-popover-arrow {
-	border-top-color: var(--color-card, #ffffff);
+  border-top-color: var(--color-card, #ffffff);
 }
 .driver-popover.poohma-tour-popover
-	.driver-popover-arrow-side-bottom.driver-popover-arrow {
-	border-bottom-color: var(--color-card, #ffffff);
+  .driver-popover-arrow-side-bottom.driver-popover-arrow {
+  border-bottom-color: var(--color-card, #ffffff);
 }
 .driver-popover.poohma-tour-popover
-	.driver-popover-arrow-side-left.driver-popover-arrow {
-	border-left-color: var(--color-card, #ffffff);
+  .driver-popover-arrow-side-left.driver-popover-arrow {
+  border-left-color: var(--color-card, #ffffff);
 }
 .driver-popover.poohma-tour-popover
-	.driver-popover-arrow-side-right.driver-popover-arrow {
-	border-right-color: var(--color-card, #ffffff);
+  .driver-popover-arrow-side-right.driver-popover-arrow {
+  border-right-color: var(--color-card, #ffffff);
 }
 
 .dark
-	.driver-popover.poohma-tour-popover
-	.driver-popover-arrow-side-top.driver-popover-arrow {
-	border-top-color: #18181b;
+  .driver-popover.poohma-tour-popover
+  .driver-popover-arrow-side-top.driver-popover-arrow {
+  border-top-color: #18181b;
 }
 .dark
-	.driver-popover.poohma-tour-popover
-	.driver-popover-arrow-side-bottom.driver-popover-arrow {
-	border-bottom-color: #18181b;
+  .driver-popover.poohma-tour-popover
+  .driver-popover-arrow-side-bottom.driver-popover-arrow {
+  border-bottom-color: #18181b;
 }
 .dark
-	.driver-popover.poohma-tour-popover
-	.driver-popover-arrow-side-left.driver-popover-arrow {
-	border-left-color: #18181b;
+  .driver-popover.poohma-tour-popover
+  .driver-popover-arrow-side-left.driver-popover-arrow {
+  border-left-color: #18181b;
 }
 .dark
-	.driver-popover.poohma-tour-popover
-	.driver-popover-arrow-side-right.driver-popover-arrow {
-	border-right-color: #18181b;
+  .driver-popover.poohma-tour-popover
+  .driver-popover-arrow-side-right.driver-popover-arrow {
+  border-right-color: #18181b;
 }

@@ -19,99 +19,99 @@ import { recoveryKitIssuedEmail } from "./templates/security/RecoveryKitIssuedEm
 import { recoveryOtpEmail } from "./templates/security/RecoveryOtpEmail";
 
 export const emailTemplates = [
-	familyWelcomeEmail,
-	newMemberJoinedEmail,
-	joinRequestReceivedEmail,
-	joinApprovedEmail,
-	joinRequestRejectedEmail,
-	memberKickedEmail,
-	familyMigrationCompletedEmail,
-	passcodeRotatedEmail,
-	shareSettingChangedEmail,
-	recordAdminChangedEmail,
-	accountDeletedEmail,
-	newDeviceLoginEmail,
-	csvExportedEmail,
-	biometricRegisteredEmail,
-	biometricRemovedEmail,
-	recoveryOtpEmail,
-	recoveryKitIssuedEmail,
-	contactNotificationEmail,
+  familyWelcomeEmail,
+  newMemberJoinedEmail,
+  joinRequestReceivedEmail,
+  joinApprovedEmail,
+  joinRequestRejectedEmail,
+  memberKickedEmail,
+  familyMigrationCompletedEmail,
+  passcodeRotatedEmail,
+  shareSettingChangedEmail,
+  recordAdminChangedEmail,
+  accountDeletedEmail,
+  newDeviceLoginEmail,
+  csvExportedEmail,
+  biometricRegisteredEmail,
+  biometricRemovedEmail,
+  recoveryOtpEmail,
+  recoveryKitIssuedEmail,
+  contactNotificationEmail,
 ] as const;
 
 export const emailPayload = v.union(
-	v.object({
-		template: v.literal(familyWelcomeEmail.key),
-		props: familyWelcomeEmail.props,
-	}),
-	v.object({
-		template: v.literal(newMemberJoinedEmail.key),
-		props: newMemberJoinedEmail.props,
-	}),
-	v.object({
-		template: v.literal(joinRequestReceivedEmail.key),
-		props: joinRequestReceivedEmail.props,
-	}),
-	v.object({
-		template: v.literal(joinApprovedEmail.key),
-		props: joinApprovedEmail.props,
-	}),
-	v.object({
-		template: v.literal(joinRequestRejectedEmail.key),
-		props: joinRequestRejectedEmail.props,
-	}),
-	v.object({
-		template: v.literal(memberKickedEmail.key),
-		props: memberKickedEmail.props,
-	}),
-	v.object({
-		template: v.literal(familyMigrationCompletedEmail.key),
-		props: familyMigrationCompletedEmail.props,
-	}),
-	v.object({
-		template: v.literal(passcodeRotatedEmail.key),
-		props: passcodeRotatedEmail.props,
-	}),
-	v.object({
-		template: v.literal(shareSettingChangedEmail.key),
-		props: shareSettingChangedEmail.props,
-	}),
-	v.object({
-		template: v.literal(recordAdminChangedEmail.key),
-		props: recordAdminChangedEmail.props,
-	}),
-	v.object({
-		template: v.literal(accountDeletedEmail.key),
-		props: accountDeletedEmail.props,
-	}),
-	v.object({
-		template: v.literal(newDeviceLoginEmail.key),
-		props: newDeviceLoginEmail.props,
-	}),
-	v.object({
-		template: v.literal(csvExportedEmail.key),
-		props: csvExportedEmail.props,
-	}),
-	v.object({
-		template: v.literal(biometricRegisteredEmail.key),
-		props: biometricRegisteredEmail.props,
-	}),
-	v.object({
-		template: v.literal(biometricRemovedEmail.key),
-		props: biometricRemovedEmail.props,
-	}),
-	v.object({
-		template: v.literal(recoveryOtpEmail.key),
-		props: recoveryOtpEmail.props,
-	}),
-	v.object({
-		template: v.literal(recoveryKitIssuedEmail.key),
-		props: recoveryKitIssuedEmail.props,
-	}),
-	v.object({
-		template: v.literal(contactNotificationEmail.key),
-		props: contactNotificationEmail.props,
-	}),
+  v.object({
+    template: v.literal(familyWelcomeEmail.key),
+    props: familyWelcomeEmail.props,
+  }),
+  v.object({
+    template: v.literal(newMemberJoinedEmail.key),
+    props: newMemberJoinedEmail.props,
+  }),
+  v.object({
+    template: v.literal(joinRequestReceivedEmail.key),
+    props: joinRequestReceivedEmail.props,
+  }),
+  v.object({
+    template: v.literal(joinApprovedEmail.key),
+    props: joinApprovedEmail.props,
+  }),
+  v.object({
+    template: v.literal(joinRequestRejectedEmail.key),
+    props: joinRequestRejectedEmail.props,
+  }),
+  v.object({
+    template: v.literal(memberKickedEmail.key),
+    props: memberKickedEmail.props,
+  }),
+  v.object({
+    template: v.literal(familyMigrationCompletedEmail.key),
+    props: familyMigrationCompletedEmail.props,
+  }),
+  v.object({
+    template: v.literal(passcodeRotatedEmail.key),
+    props: passcodeRotatedEmail.props,
+  }),
+  v.object({
+    template: v.literal(shareSettingChangedEmail.key),
+    props: shareSettingChangedEmail.props,
+  }),
+  v.object({
+    template: v.literal(recordAdminChangedEmail.key),
+    props: recordAdminChangedEmail.props,
+  }),
+  v.object({
+    template: v.literal(accountDeletedEmail.key),
+    props: accountDeletedEmail.props,
+  }),
+  v.object({
+    template: v.literal(newDeviceLoginEmail.key),
+    props: newDeviceLoginEmail.props,
+  }),
+  v.object({
+    template: v.literal(csvExportedEmail.key),
+    props: csvExportedEmail.props,
+  }),
+  v.object({
+    template: v.literal(biometricRegisteredEmail.key),
+    props: biometricRegisteredEmail.props,
+  }),
+  v.object({
+    template: v.literal(biometricRemovedEmail.key),
+    props: biometricRemovedEmail.props,
+  }),
+  v.object({
+    template: v.literal(recoveryOtpEmail.key),
+    props: recoveryOtpEmail.props,
+  }),
+  v.object({
+    template: v.literal(recoveryKitIssuedEmail.key),
+    props: recoveryKitIssuedEmail.props,
+  }),
+  v.object({
+    template: v.literal(contactNotificationEmail.key),
+    props: contactNotificationEmail.props,
+  }),
 );
 
 export type EmailPayload = Infer<typeof emailPayload>;
