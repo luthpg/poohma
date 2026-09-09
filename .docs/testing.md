@@ -181,6 +181,16 @@ flowchart TD
 | SEARCH-09〜15 | 五十音・アルファベット・更新日ソート（`sortKey`） | 単体/統合 | P1 | ✅ 実装済 | `src/utils/index-group.ts` 単体テスト, `convex-records.spec.ts` |
 | SEARCH-16 | `availableTags` が可視レコードのみから生成されること | 統合 | P0 | ✅ 実装済 | `tests/convex-records.spec.ts` |
 
+### 4.5b 監査ログ (Audit Log)
+
+| ID | テストケース | 種別 | 優先度 | 現状 | 主な対応ファイル |
+| --- | --- | --- | --- | :---: | --- |
+| AUDIT-01 | 暗号化境界: auditLogs の metadata に平文ヒント・暗号資材が含まれないこと (Zero-Knowledge) | 統合 | P0 | ✅ 実装済 | `tests/convex-audit-logs.spec.ts` |
+| AUDIT-02 | レコード作成・更新・ヒント閲覧時に auditLog が生成されること | 統合 | P0 | ✅ 実装済 | `tests/convex-audit-logs.spec.ts` |
+| AUDIT-03 | 他家族メンバーが auditLogs を閲覧できないこと (IDOR 防止) | 統合 | P0 | ✅ 実装済 | `tests/convex-audit-logs.spec.ts` |
+| AUDIT-04 | updatedByAccountId・lastViewedAt・lastViewedByAccountId が正しく更新されること | 統合 | P1 | ⏳ 未実装 | — |
+| AUDIT-05 | cleanupOldAuditLogsInternal が 180日超過ログのみを削除し、直近ログを保持すること | 統合 | P1 | ✅ 実装済 | `tests/convex-audit-logs.spec.ts` |
+
 ### 4.6 CSV & OGP (SSRF 防御)
 
 | ID | テストケース | 種別 | 優先度 | 現状 | 主な対応ファイル |

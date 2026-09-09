@@ -3,6 +3,7 @@ import {
   useConvex,
   useConvexAuth,
   useMutation,
+  usePaginatedQuery,
   useQuery,
   useQuery_experimental,
 } from "convex/react";
@@ -15,16 +16,21 @@ import {
   Copy,
   Eye,
   EyeOff,
+  FileEdit,
+  History,
   KeyRound,
   Plus,
+  PlusCircle,
   QrCode,
   RotateCcw,
   Share2,
+  ShieldAlert,
   ShieldCheck,
+  Trash2,
   UserMinus,
+  Users,
   X,
 } from "lucide-react";
-
 import { QRCodeCanvas } from "qrcode.react";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
@@ -33,8 +39,15 @@ import type { Id } from "@/../convex/_generated/dataModel";
 import { AccountSwitcher } from "@/components/AccountSwitcher";
 import { RecoveryKitDialog } from "@/components/family/RecoveryKitDialog";
 import { usePasscode } from "@/components/PasscodeProvider";
-
 import { PasscodeStrengthMeter } from "@/components/PasscodeStrengthMeter";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Button } from "@/components/ui/button";
+
 import {
   Dialog,
   DialogContent,
@@ -2004,6 +2017,9 @@ function FamilyComponent() {
             />
           )}
 
+          {/* 家族のアクティビティログ */}
+          <FamilyAuditLogSection activeAccountId={activeAccount?._id} />
+
           <div className="mt-8 border-t border-border pt-6 text-center">
             <button
               type="button"
@@ -2447,5 +2463,213 @@ function FamilyComponent() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+const ACTION_CONFIG = {
+  RECORD_CREATE: {
+    label: "新規作成",
+    icon: PlusCircle,
+    badgeClass:
+      "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+  },
+  RECORD_UPDATE: {
+    label: "更新",
+    icon: FileEdit,
+    badgeClass:
+      "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+  },
+  RECORD_DELETE: {
+    label: "削除",
+    icon: Trash2,
+    badgeClass:
+      "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
+  },
+  HINT_VIEW: {
+    label: "閲覧",
+    icon: Eye,
+    badgeClass:
+      "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
+  },
+  SHARE_SETTING_CHANGED: {
+    label: "共有設定",
+    icon: Users,
+    badgeClass:
+      "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+  },
+  ADMIN_CHANGED: {
+    label: "管理者変更",
+    icon: ShieldAlert,
+    badgeClass:
+      "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+  },
+};
+
+/** 家族共有レコードの監査ログをページネーション付きで表示する。 */
+export function FamilyAuditLogSection({
+  activeAccountId,
+}: {
+  activeAccountId?: Id<"users"> | null;
+}) {
+  const { results, status, loadMore, isLoading } = usePaginatedQuery(
+    api.records.getFamilyAuditLogs,
+    { accountId: activeAccountId || undefined },
+    { initialNumItems: 15 },
+  );
+
+  /** 監査イベントの日時を日本語ロケールで表示できる形式にする。 */
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp).toLocaleString("ja-JP", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  return (
+    <Accordion
+      type="single"
+      collapsible
+      className="mt-8 border-t border-border pt-6"
+    >
+      <AccordionItem value="audit-log" className="border-none">
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <History className="h-4 w-4 text-orange-500" />
+            <h3 className="text-[14px] font-medium text-foreground">
+              家族のアクティビティログ
+            </h3>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-muted-foreground hidden sm:block">
+              直近の変更・閲覧証跡
+            </span>
+            <AccordionTrigger
+              className="py-0 px-1 hover:no-underline"
+              aria-label="家族のアクティビティログを展開または折りたたむ"
+            />
+          </div>
+        </div>
+        <p className="text-[12px] text-muted-foreground mb-3">
+          家族共有レコードに対する登録・更新・ヒント閲覧・削除の履歴を確認できます。
+        </p>
+        <AccordionContent className="pb-0">
+          {status === "LoadingFirstPage" ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-2 text-muted-foreground text-xs">
+              <Spinner className="h-5 w-5" />
+              <span>アクティビティを読み込み中...</span>
+            </div>
+          ) : results.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border/80 p-8 text-center text-xs text-muted-foreground">
+              アクティビティログはまだありません。
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Accordion type="multiple" className="w-full space-y-2">
+                {results.map((log) => {
+                  const config = ACTION_CONFIG[log.action] || {
+                    label: log.action,
+                    icon: Clock,
+                    badgeClass: "bg-muted text-muted-foreground",
+                  };
+                  const Icon = config.icon;
+                  const hasMetadata =
+                    log.metadata?.changedFields?.length || log.metadata?.detail;
+
+                  return (
+                    <AccordionItem
+                      key={log._id}
+                      value={log._id}
+                      className="rounded-lg border border-border/50 bg-card px-3.5 shadow-xs"
+                    >
+                      <div className="flex items-center justify-between py-2.5 gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border shrink-0 ${config.badgeClass}`}
+                          >
+                            <Icon className="h-3.5 w-3.5" />
+                            {config.label}
+                          </span>
+                          <div className="min-w-0 truncate">
+                            <span className="font-semibold text-foreground text-xs mr-2">
+                              {log.actorDisplayName}:{" "}
+                            </span>
+                            <span className="text-xs text-muted-foreground truncate">
+                              {log.metadata?.targetTitle
+                                ? `${log.metadata.targetTitle}`
+                                : "対象レコード"}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <time className="text-[11px] text-muted-foreground font-mono">
+                            {formatDate(log.createdAt)}
+                          </time>
+                          {hasMetadata ? (
+                            <AccordionTrigger
+                              className="py-0 px-1 hover:no-underline"
+                              aria-label="個別ログの詳細を展開または折りたたむ"
+                            />
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {hasMetadata ? (
+                        <AccordionContent className="pt-2 pb-3 text-xs text-muted-foreground border-t border-border/40">
+                          <div className="space-y-1 bg-muted/30 p-2.5 rounded-md">
+                            {log.metadata?.changedFields && (
+                              <div>
+                                <span className="font-medium text-foreground mr-1.5">
+                                  変更されたフィールド:
+                                </span>
+                                <span>
+                                  {log.metadata.changedFields.join(", ")}
+                                </span>
+                              </div>
+                            )}
+                            {log.metadata?.detail && (
+                              <div>
+                                <span className="font-medium text-foreground mr-1.5">
+                                  詳細:
+                                </span>
+                                <span>{log.metadata.detail}</span>
+                              </div>
+                            )}
+                          </div>
+                        </AccordionContent>
+                      ) : null}
+                    </AccordionItem>
+                  );
+                })}
+              </Accordion>
+
+              {/* ページネーション（もっと読み込むボタン） */}
+              {status === "CanLoadMore" && (
+                <div className="pt-3 text-center">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => loadMore(15)}
+                    disabled={isLoading}
+                    className="text-xs"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Spinner className="h-3 w-3 mr-1.5" />
+                        読み込み中...
+                      </>
+                    ) : (
+                      "過去のアクティビティをさらに読み込む"
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </AccordionContent>
+      </AccordionItem>
+    </Accordion>
   );
 }

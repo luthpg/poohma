@@ -24,7 +24,10 @@ export const completeOnboarding = authenticatedMutation({
       });
     }
 
-    return { success: true, onboardingVersion: Math.max(currentVersion, args.version) };
+    return {
+      success: true,
+      onboardingVersion: Math.max(currentVersion, args.version),
+    };
   },
 });
 

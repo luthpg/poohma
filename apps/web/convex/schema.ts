@@ -41,7 +41,6 @@ export default defineSchema({
     .index("by_accountId", ["accountId"])
     .index("by_familyId_accountId", ["familyId", "accountId"]),
 
-
   loginEvents: defineTable({
     accountId: v.id("users"),
     userId: v.string(),
@@ -155,6 +154,10 @@ export default defineSchema({
     ownerFamilyId: v.optional(v.id("families")), // ownerType === "family" のとき
     admins: v.optional(v.array(v.id("users"))), // ownerType === "family" のときの管理者 PoohMa アカウント ID 配列
 
+    updatedByAccountId: v.optional(v.id("users")), // 最終更新を行ったアカウントID
+    lastViewedAt: v.optional(v.number()), // 最終ヒント閲覧日時 (epoch ms)
+    lastViewedByAccountId: v.optional(v.id("users")), // 最終ヒント閲覧者アカウントID
+
     // タグを配列として埋め込み
     tags: v.array(v.string()),
 
@@ -170,7 +173,13 @@ export default defineSchema({
     .index("by_family_sortKey", ["familyId", "sortKey"])
     .index("by_family_isSample", ["familyId", "isSample"])
     .index("by_ownerType_accountId", ["ownerType", "accountId"])
-    .index("by_ownerType_ownerFamilyId", ["ownerType", "ownerFamilyId"]),
+    .index("by_ownerType_ownerFamilyId", ["ownerType", "ownerFamilyId"])
+    .index("by_family_updatedAt", ["familyId", "updatedAt"])
+    .index("by_ownerType_accountId_updatedAt", [
+      "ownerType",
+      "accountId",
+      "updatedAt",
+    ]),
 
   credentials: defineTable({
     recordId: v.id("serviceRecords"),
@@ -201,8 +210,43 @@ export default defineSchema({
     message: v.string(),
     userId: v.optional(v.string()),
     createdAt: v.number(),
-    status: v.union(v.literal("UNREAD"), v.literal("READ"), v.literal("RESOLVED")),
+    status: v.union(
+      v.literal("UNREAD"),
+      v.literal("READ"),
+      v.literal("RESOLVED"),
+    ),
   })
     .index("by_createdAt", ["createdAt"])
     .index("by_email_createdAt", ["email", "createdAt"]),
+
+  auditLogs: defineTable({
+    familyId: v.optional(v.id("families")), // 家族共有レコードまたは家族内操作の場合に設定
+    accountId: v.optional(v.id("users")), // 操作者のアカウントID (削除された場合は参照切れ考慮)
+    userId: v.string(), // 操作者の Firebase UID
+    actorDisplayName: v.string(), // 操作時点の表示名 (脱退・削除後の表示維持用)
+    recordId: v.optional(v.id("serviceRecords")), // 対象レコードID (削除後も特定可能)
+    ownerType: v.union(v.literal("user"), v.literal("family")), // 操作時点の所有種別
+    ownerFamilyId: v.optional(v.id("families")), // ownerType === "family" の対象家族ID
+    targetAccountId: v.optional(v.id("users")), // ownerType === "user" の所有者アカウントID
+    action: v.union(
+      v.literal("RECORD_CREATE"),
+      v.literal("RECORD_UPDATE"),
+      v.literal("RECORD_DELETE"),
+      v.literal("HINT_VIEW"),
+      v.literal("SHARE_SETTING_CHANGED"),
+      v.literal("ADMIN_CHANGED"),
+    ),
+    metadata: v.optional(
+      v.object({
+        targetTitle: v.optional(v.string()), // レコード名（削除後もログ一覧で識別可能）
+        changedFields: v.optional(v.array(v.string())), // 変更されたフィールド名配列
+        detail: v.optional(v.string()), // 管理者追加/解除等の付加情報
+      }),
+    ),
+    createdAt: v.number(), // 記録日時 (epoch ms)
+  })
+    .index("by_family_createdAt", ["familyId", "createdAt"])
+    .index("by_recordId_createdAt", ["recordId", "createdAt"])
+    .index("by_targetAccountId_createdAt", ["targetAccountId", "createdAt"])
+    .index("by_createdAt", ["createdAt"]), // 定期パージ用
 });

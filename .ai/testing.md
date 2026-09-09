@@ -211,6 +211,15 @@ export const test = base.extend({
 - `logout.spec.ts`: ログアウト処理実行後のセッション破棄・未認証状態遷移の検証
 - `e2ee-seed-import.spec.ts`: 家族作成（Master Key生成・KEK導出）、CSVインポートによる平文ヒントのクライアント暗号化Seed投入、詳細画面でのヒント復号検証、およびUI一括削除機能による他家族データを壊さない安全なクリーンアップ検証
 
+#### `tests/convex-audit-logs.spec.ts`（バックエンド統合テスト）
+
+`convex-test` を用いた監査ログ機能の結合テストスイート。以下の観点を検証する：
+
+- **Zero-Knowledge保証**: `auditLogs.metadata` に平文ヒントや暗号資材（passwordHint, passwordHintIv, DEK等）が記録されないこと
+- **監査ログ生成**: createRecord / updateRecord / logRecordHintView 実行時にログが生成されること
+- **アクセス制御（IDOR防止）**: 他家族のメンバーが `getFamilyAuditLogs` / `getRecordAuditLogs` で他家族のログを取得できないこと
+- **TTLクリーンアップ**: `cleanupOldAuditLogsInternal` が180日超過ログのみを削除し、直近ログを保持すること
+
 ### E2E テスト実行前のバックエンド反映ルール (`convex dev --once`)
 Playwright E2E テストはローカルのモックではなく、実際の Convex 開発インスタンス（`CONVEX_DEPLOYMENT=dev:...`）と通信する。
 そのため、**スキーマや Convex 関数を追加・変更した後は、必ず E2E テスト実行前に `pnpm -F @poohma/web exec convex dev --once` を実行して開発インスタンスへ最新コードを反映・型同期しておくこと**。
