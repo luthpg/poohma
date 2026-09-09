@@ -33,4 +33,10 @@ crons.interval(
   internal.records.cleanupExpiredEditingSessionsInternal,
 );
 
+crons.interval(
+  "cleanup old audit logs",
+  { hours: 24 },
+  internal.records.cleanupOldAuditLogsInternal,
+);
+
 export default crons;

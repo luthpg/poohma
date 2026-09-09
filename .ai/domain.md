@@ -23,6 +23,10 @@ flowchart TD
     Family -->|"1:N scope"| RecFamily
     Family -->|"1:N"| Invites["familyInvites"]
     Family -->|"1:N"| JoinReqs["joinRequests"]
+    Family -->|"1:N"| AuditLog["auditLogs (by_family_createdAt, TTL 180d)"]
+    PoohMaAccount -.->|"actor"| AuditLog
+    RecUser -.->|"optional ref"| AuditLog
+    RecFamily -.->|"optional ref"| AuditLog
 ```
 
 ---
@@ -223,3 +227,31 @@ flowchart TD
 - **表示**: ヘッダーベル（`NewsBell` + Popover、未読バッジ付き）/ ユーザーメニュー / `/news` 一覧・`/news/$id` 詳細ページ（公開ルート）
 - **未読管理**: localStorage の `poohma_last_read_news_time`（Unix ms）と最新記事の `published_at` を比較。ベル開封時に更新。
 
+---
+
+## 8. 監査ログ (`auditLogs`) エンティティ
+
+`auditLogs` テーブルは、レコードの全操作（作成・更新・削除・ヒント閲覧・共有設定変更・管理者変更）を家族単位で時系列記録する書き込み専用テーブル。
+
+### 記録トリガー・操作種別
+
+| action | トリガー | familyId | targetAccountId |
+| --- | --- | --- | --- |
+| `RECORD_CREATE` | `createRecord` | ownerType=familyのとき | ownerType=userのとき |
+| `RECORD_UPDATE` | `updateRecord` | ownerType=familyのとき | ownerType=userのとき |
+| `RECORD_DELETE` | `deleteRecord` / `deleteRecords` | ownerType=familyのとき | ownerType=userのとき |
+| `HINT_VIEW` | `logRecordHintView` | ownerType=familyのとき | ownerType=userのとき |
+| `SHARE_SETTING_CHANGED` | `shareRecord` / `unshareRecord` | 常にfamilyIdあり | - |
+| `ADMIN_CHANGED` | `addRecordAdmin` / `removeRecordAdmin` | 常にfamilyIdあり | - |
+
+### データ保持・クリーンアップ
+
+- **保持期間**: 180日（`RETENTION_MS = 180 * 24 * 60 * 60 * 1000`）
+- **定期削除**: 24時間間隔cron（`cleanupOldAuditLogsInternal`）が `by_createdAt` インデックスで期限切れログを100件ずつバッチ削除。件数上限到達時は `ctx.scheduler.runAfter(0, ...)` で再帰実行。
+- **actorDisplayNameの保存**: 脱退・アカウント削除後もログ一覧で権限者を識別できるよう、操作時点の表示名を参照切れに顧慮して保存する。取得時（`getFamilyAuditLogs` / `getRecordAuditLogs`）には DB から最新の `displayName` を上書きして返す。
+
+### UI連携
+
+- **レコード詳細画面** (`routes/(app)/records/$id.tsx`): `RecordAuditHistoryAccordion` コンポーネントが `getRecordAuditLogs`（最大30件）を購読し、アクセス・変更履歴をアコーディオンUIで表示。
+- **家族画面** (`routes/(app)/family.tsx`): `FamilyAuditLogSection` コンポーネントが `getFamilyAuditLogs`（ページネーション）を購読し、家族のアクティビティログをアコーディオンUIで表示。
+- **ヒント閲覧ログ記録**: `CredentialCard` コンポーネントの暗号復号成功時に `logRecordHintView` Mutationを非同期呼び出し（失敗してもUIに影響しない）。

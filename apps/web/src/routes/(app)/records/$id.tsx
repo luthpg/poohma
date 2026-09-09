@@ -7,7 +7,18 @@ import {
   useSearch,
 } from "@tanstack/react-router";
 import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
-import { Check, Share2, Users } from "lucide-react";
+import {
+  Check,
+  Clock,
+  Eye,
+  FileEdit,
+  History,
+  PlusCircle,
+  Share2,
+  ShieldAlert,
+  Trash2,
+  Users,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -16,6 +27,12 @@ import type { Doc, Id } from "@/../convex/_generated/dataModel";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { usePasscode } from "@/components/PasscodeProvider";
 import { RecordForm } from "@/components/records/RecordForm";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -924,6 +941,19 @@ function RecordDetailComponent({
             </div>
           )}
 
+          {/* 更新者情報 */}
+          {record.lastUpdateUser?.displayName && (
+            <div className="mb-6 flex items-center gap-2 text-[13px] text-muted-foreground">
+              <span className="font-medium">最終更新:</span>
+              <span>
+                {record.ownerType === "family"
+                  ? `${record.lastUpdateUser.displayName} (${record.lastUpdateUser.email}) - `
+                  : null}
+                {new Date(record.updatedAt).toLocaleString()}
+              </span>
+            </div>
+          )}
+
           {/* タグ */}
           {record.tags.length > 0 && (
             <div className="mb-8 flex flex-wrap gap-2">
@@ -952,7 +982,11 @@ function RecordDetailComponent({
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
                 {record.credentials.map((cred) => (
-                  <CredentialCard key={cred.id} cred={cred} />
+                  <CredentialCard
+                    key={cred.id}
+                    cred={cred}
+                    recordId={record._id}
+                  />
                 ))}
               </div>
             )}
@@ -969,6 +1003,9 @@ function RecordDetailComponent({
               </div>
             </div>
           )}
+
+          {/* 編集履歴 */}
+          <RecordAuditHistoryAccordion recordId={record._id} />
 
           {/* アクションボタン (編集権限がある場合のみ) */}
           {isEditable && (
@@ -1280,6 +1317,7 @@ function ShareSettingsDialog({
 // E2EE対応: 暗号化されたヒントの復号表示カード
 function CredentialCard({
   cred,
+  recordId,
 }: {
   cred: {
     id: string;
@@ -1290,10 +1328,14 @@ function CredentialCard({
     passwordHintDekEncrypted?: string;
     passwordHintDekIv?: string;
   };
+  recordId: Id<"serviceRecords">;
 }) {
+  const { activeAccountId } = useAccount();
   const { decryptHint, requireUnlock, masterKey } = usePasscode();
   const [decryptedHint, setDecryptedHint] = useState<string | null>(null);
   const [isDecrypting, setIsDecrypting] = useState(false);
+
+  const logRecordHintViewMut = useMutation(api.records.logRecordHintView);
 
   useEffect(() => {
     if (masterKey == null) {
@@ -1317,8 +1359,15 @@ function CredentialCard({
         cred.passwordHintDekIv,
       );
       setDecryptedHint(plaintext);
-    } catch (error) {
-      console.error("Decrypt failed:", error);
+
+      // ログ記録 非同期
+      logRecordHintViewMut({
+        recordId,
+        accountId: activeAccountId ?? undefined,
+      }).catch(() => {
+        // ログ記録失敗は UI に影響させない
+      });
+    } catch {
       toast.error("復号に失敗しました");
     } finally {
       setIsDecrypting(false);
@@ -1412,5 +1461,151 @@ function CopyButton({ text, label }: { text: string; label: string }) {
         <span>コピー</span>
       )}
     </button>
+  );
+}
+
+// 操作種別ごとのラベル・バッジ設定マッピング
+const ACTION_CONFIG = {
+  RECORD_CREATE: {
+    label: "作成",
+    variant: "default" as const,
+    icon: PlusCircle,
+    colorClass:
+      "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+  },
+  RECORD_UPDATE: {
+    label: "更新",
+    variant: "secondary" as const,
+    icon: FileEdit,
+    colorClass:
+      "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+  },
+  HINT_VIEW: {
+    label: "ヒント閲覧",
+    variant: "outline" as const,
+    icon: Eye,
+    colorClass:
+      "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
+  },
+  SHARE_SETTING_CHANGED: {
+    label: "共有設定変更",
+    variant: "secondary" as const,
+    icon: History,
+    colorClass:
+      "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+  },
+  ADMIN_CHANGED: {
+    label: "管理者変更",
+    variant: "secondary" as const,
+    icon: ShieldAlert,
+    colorClass:
+      "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+  },
+  RECORD_DELETE: {
+    label: "削除",
+    variant: "destructive" as const,
+    icon: Trash2,
+    colorClass:
+      "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
+  },
+};
+
+// --- レコード詳細内の履歴表示コンポーネント ---
+function RecordAuditHistoryAccordion({
+  recordId,
+}: {
+  recordId: Id<"serviceRecords">;
+}) {
+  const { activeAccountId } = useAccount();
+  const auditLogs = useQuery(api.records.getRecordAuditLogs, {
+    recordId,
+    accountId: activeAccountId || undefined,
+    limit: 30,
+  });
+
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp).toLocaleString("ja-JP", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  };
+
+  return (
+    <div className="mb-10">
+      <Accordion type="single" collapsible className="w-full">
+        <AccordionItem
+          value="audit-logs"
+          className="rounded-lg bg-card shadow-border px-4 py-1"
+        >
+          <AccordionTrigger className="hover:no-underline py-3">
+            <div className="flex items-center gap-2 text-[14px] font-semibold text-foreground tracking-wide uppercase">
+              <History className="h-4 w-4 text-orange-500" />
+              <span>アクセス・変更履歴</span>
+              {auditLogs !== undefined && (
+                <span className="text-xs font-normal text-muted-foreground ml-1">
+                  ({auditLogs.length}件)
+                </span>
+              )}
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="pt-2 pb-4">
+            {auditLogs === undefined ? (
+              <div className="flex items-center justify-center py-6 text-muted-foreground text-xs gap-2">
+                <Spinner className="h-4 w-4" />
+                <span>履歴を読み込み中...</span>
+              </div>
+            ) : auditLogs.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-2">
+                記録されたアクセス履歴はありません。
+              </p>
+            ) : (
+              <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                {auditLogs.map((log) => {
+                  const config = ACTION_CONFIG[log.action] || {
+                    label: log.action,
+                    icon: Clock,
+                    colorClass: "bg-muted text-muted-foreground",
+                  };
+                  const Icon = config.icon;
+
+                  return (
+                    <div
+                      key={log._id}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 p-2.5 rounded-md bg-muted/40 border border-border/40 text-xs"
+                    >
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${config.colorClass}`}
+                        >
+                          <Icon className="h-3 w-3 shrink-0" />
+                          {config.label}
+                        </span>
+                        <span className="font-semibold text-foreground truncate max-w-[140px] sm:max-w-[180px]">
+                          {log.actorDisplayName}
+                        </span>
+                        {log.metadata?.changedFields &&
+                          log.metadata.changedFields.length > 0 && (
+                            <span className="text-[11px] text-muted-foreground w-full md:w-auto whitespace-pre-wrap break-words block md:inline">
+                              (変更項目: {log.metadata.changedFields.join(", ")}
+                              )
+                            </span>
+                          )}
+                      </div>
+                      <time className="text-[11px] text-muted-foreground shrink-0 font-mono self-end sm:self-auto">
+                        {formatDate(log.createdAt)}
+                      </time>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    </div>
   );
 }

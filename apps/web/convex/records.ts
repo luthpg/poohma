@@ -1,3 +1,4 @@
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { z } from "zod";
 import { computeSortKey } from "../src/utils/index-group";
@@ -14,10 +15,12 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
+import { logAuditEvent } from "./auditLogs";
 import {
   authenticatedMutation,
   authenticatedQuery,
   familyBoundMutation,
+  familyBoundQuery,
 } from "./customBuilders";
 import {
   getEffectiveAdmins,
@@ -259,6 +262,10 @@ export const getRecordDetail = authenticatedQuery({
       passwordHintDekIv: c.passwordHintDekIv,
     }));
 
+    const lastUpdateUser = record.updatedByAccountId
+      ? await ctx.db.get("users", record.updatedByAccountId)
+      : null;
+
     return {
       ...record,
       revision: record.revision ?? 0,
@@ -270,6 +277,7 @@ export const getRecordDetail = authenticatedQuery({
           }
         : null,
       adminUsers: admins,
+      lastUpdateUser,
     };
   },
 });
@@ -387,6 +395,7 @@ export const createRecord = familyBoundMutation({
       tags: args.tags,
       revision: 0,
       updatedAt: now,
+      updatedByAccountId: user._id,
     });
 
     // credentials テーブルへ挿入
@@ -404,6 +413,17 @@ export const createRecord = familyBoundMutation({
         updatedAt: now,
       });
     }
+
+    await logAuditEvent(ctx, {
+      actor: user,
+      recordId,
+      ownerType: isFamily ? "family" : "user",
+      ownerFamilyId: isFamily ? user.familyId : undefined,
+      action: "RECORD_CREATE",
+      metadata: {
+        targetTitle: args.title,
+      },
+    });
 
     return recordId;
   },
@@ -456,10 +476,14 @@ export const updateRecord = familyBoundMutation({
         throw new Error("REVISION_REQUIRED: revision is required");
       }
       if (!Number.isSafeInteger(args.revision) || args.revision < 0) {
-        throw new Error("REVISION_INVALID: revision must be a non-negative integer");
+        throw new Error(
+          "REVISION_INVALID: revision must be a non-negative integer",
+        );
       }
       if ((record.revision ?? 0) !== args.revision) {
-        throw new Error("CONFLICT: レコードが他のユーザーによって更新されました");
+        throw new Error(
+          "CONFLICT: レコードが他のユーザーによって更新されました",
+        );
       }
     }
 
@@ -477,6 +501,7 @@ export const updateRecord = familyBoundMutation({
       tags: args.data.tags,
       revision: (record.revision ?? 0) + 1,
       updatedAt: now,
+      updatedByAccountId: ctx.user._id,
     };
 
     // ソートキーの更新
@@ -575,11 +600,54 @@ export const updateRecord = familyBoundMutation({
     if (existingSession) {
       await ctx.db.delete(existingSession._id);
     }
+
+    const diffFields: string[] = [];
+    if (record.title !== args.data.title) diffFields.push("title");
+    if (record.titleReading !== args.data.titleReading)
+      diffFields.push("titleReading");
+    if (record.url !== args.data.url) diffFields.push("url");
+    if (record.memo !== args.data.memo) diffFields.push("memo");
+    if (record.ownerType !== args.data.ownerType) diffFields.push("ownerType");
+    if (
+      JSON.stringify(record.tags.sort()) !==
+      JSON.stringify(args.data.tags.sort())
+    )
+      diffFields.push("tags");
+    if (
+      (!record.credentials && args.data.credentials.length > 0) ||
+      (record.credentials &&
+        (record.credentials.length !== args.data.credentials.length ||
+          !args.data.credentials.every((c) =>
+            Object.keys(c).every((k) =>
+              record.credentials?.every(
+                (rc) => c[k as keyof typeof c] === rc[k as keyof typeof rc],
+              ),
+            ),
+          )))
+    )
+      diffFields.push("credentials");
+    await logAuditEvent(ctx, {
+      actor: ctx.user,
+      record,
+      recordId: args.id,
+      ownerType: currentOwnerType,
+      ownerFamilyId:
+        currentOwnerType === "family" ? ctx.user.familyId : undefined,
+      targetAccountId: currentOwnerType === "family" ? undefined : ctx.user._id,
+      action: "RECORD_UPDATE",
+      metadata: {
+        targetTitle: record.title,
+        changedFields: diffFields,
+      },
+    });
   },
 });
 
 // === クレデンシャル単位の個別CRUD ===
 
+/**
+ * テスト用
+ */
 export const createCredential = familyBoundMutation({
   args: {
     recordId: v.id("serviceRecords"),
@@ -630,6 +698,9 @@ export const createCredential = familyBoundMutation({
   },
 });
 
+/**
+ * テスト用
+ */
 export const updateCredential = familyBoundMutation({
   args: {
     id: v.id("credentials"),
@@ -665,6 +736,9 @@ export const updateCredential = familyBoundMutation({
   },
 });
 
+/**
+ * テスト用
+ */
 export const deleteCredential = familyBoundMutation({
   args: { id: v.id("credentials") },
   handler: async (ctx, args) => {
@@ -689,9 +763,28 @@ export const deleteRecord = familyBoundMutation({
     // 個人所有者または家族管理者のみ削除可能
     requireAdminAccess(ctx.user, record);
 
+    const recordTitle = `${record.title}`;
+    const ownerType = getEffectiveOwnerType(record);
+    const ownerFamilyId =
+      ownerType === "family" ? record.ownerFamilyId : undefined;
+    const targetAccountId = ownerType === "user" ? record.accountId : undefined;
+
     // カスケード削除
     await deleteCredentialsForRecord(ctx, args.id);
     await ctx.db.delete(args.id);
+
+    //ログ記録
+    await logAuditEvent(ctx, {
+      actor: ctx.user,
+      recordId: args.id,
+      ownerType,
+      ownerFamilyId,
+      targetAccountId,
+      action: "RECORD_DELETE",
+      metadata: {
+        targetTitle: recordTitle,
+      },
+    });
   },
 });
 
@@ -702,9 +795,29 @@ export const deleteRecords = familyBoundMutation({
       const record = await ctx.db.get(id);
       if (!record) continue;
 
+      const recordTitle = `${record.title}`;
+      const ownerType = getEffectiveOwnerType(record);
+      const ownerFamilyId =
+        ownerType === "family" ? record.ownerFamilyId : undefined;
+      const targetAccountId =
+        ownerType === "user" ? record.accountId : undefined;
+
       requireAdminAccess(ctx.user, record);
       await deleteCredentialsForRecord(ctx, id);
       await ctx.db.delete(id);
+
+      //ログ記録
+      await logAuditEvent(ctx, {
+        actor: ctx.user,
+        recordId: id,
+        ownerType,
+        ownerFamilyId,
+        targetAccountId,
+        action: "RECORD_DELETE",
+        metadata: {
+          targetTitle: recordTitle,
+        },
+      });
     }
   },
 });
@@ -729,6 +842,19 @@ export const shareRecord = familyBoundMutation({
       ownerFamilyId: ctx.user.familyId,
       admins: [ctx.user._id],
       updatedAt: Date.now(),
+    });
+
+    //ログ記録
+    await logAuditEvent(ctx, {
+      actor: ctx.user,
+      recordId: args.id,
+      ownerType: "family",
+      ownerFamilyId: ctx.user.familyId,
+      targetAccountId: undefined,
+      action: "SHARE_SETTING_CHANGED",
+      metadata: {
+        changedFields: ["ownerType", "ownerFamilyId", "admins"],
+      },
     });
 
     const family = await ctx.db.get(ctx.familyId);
@@ -774,6 +900,19 @@ export const unshareRecord = familyBoundMutation({
       ownerFamilyId: undefined,
       admins: [],
       updatedAt: Date.now(),
+    });
+
+    //ログ記録
+    await logAuditEvent(ctx, {
+      actor: ctx.user,
+      recordId: args.id,
+      ownerType: "user",
+      ownerFamilyId: undefined,
+      targetAccountId: ctx.user._id,
+      action: "SHARE_SETTING_CHANGED",
+      metadata: {
+        changedFields: ["ownerType", "ownerFamilyId", "admins"],
+      },
     });
 
     const family = await ctx.db.get(ctx.familyId);
@@ -826,6 +965,20 @@ export const addRecordAdmin = familyBoundMutation({
       await ctx.db.patch(args.id, {
         admins: newAdmins,
         updatedAt: Date.now(),
+      });
+
+      //ログ記録
+      await logAuditEvent(ctx, {
+        actor: ctx.user,
+        recordId: args.id,
+        ownerType: "family",
+        ownerFamilyId: ctx.user.familyId,
+        targetAccountId: undefined,
+        action: "ADMIN_CHANGED",
+        metadata: {
+          changedFields: ["admins"],
+          detail: `管理者追加: ${targetUser.displayName}`,
+        },
       });
 
       const family = await ctx.db.get(ctx.familyId);
@@ -895,6 +1048,20 @@ export const removeRecordAdmin = familyBoundMutation({
     await ctx.db.patch(args.id, {
       admins: newAdmins,
       updatedAt: Date.now(),
+    });
+
+    //ログ記録
+    await logAuditEvent(ctx, {
+      actor: ctx.user,
+      recordId: args.id,
+      ownerType: "family",
+      ownerFamilyId: ctx.user.familyId,
+      targetAccountId: undefined,
+      action: "ADMIN_CHANGED",
+      metadata: {
+        changedFields: ["admins"],
+        detail: `管理者削除: ${targetUser.displayName}`,
+      },
     });
 
     const family = await ctx.db.get(ctx.familyId);
@@ -1430,5 +1597,165 @@ export const cleanupExpiredEditingSessionsInternal = internalMutation({
     }
 
     return { deletedCount: expiredSessions.length };
+  },
+});
+
+// パスワードヒント閲覧履歴の記録
+export const logRecordHintView = familyBoundMutation({
+  args: {
+    recordId: v.id("serviceRecords"),
+  },
+  handler: async (ctx, args) => {
+    const record = await ctx.db.get(args.recordId);
+    if (!record) throw new Error("Record not found");
+
+    // 閲覧権限のチェック (個人レコードまたは家族共有)
+    requireContentAccess(ctx.user, record);
+
+    const now = Date.now();
+    await ctx.db.patch(record._id, {
+      lastViewedAt: now,
+      lastViewedByAccountId: ctx.user._id,
+    });
+
+    await logAuditEvent(ctx, {
+      actor: ctx.user,
+      record,
+      ownerType: record.ownerType ?? "user",
+      ownerFamilyId: record.ownerFamilyId,
+      targetAccountId: record.accountId,
+      action: "HINT_VIEW",
+      metadata: {
+        targetTitle: record.title,
+      },
+    });
+
+    return { success: true, viewedAt: now };
+  },
+});
+
+// 家族全体の監査ログ取得（家族共有レコードの操作ログを時系列で取得）
+export const getFamilyAuditLogs = familyBoundQuery({
+  args: {
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    const { familyId } = ctx;
+
+    const paginatedLogs = await ctx.db
+      .query("auditLogs")
+      .withIndex("by_family_createdAt", (q) => q.eq("familyId", familyId))
+      .order("desc")
+      .paginate(args.paginationOpts);
+
+    const pageWithActors = await Promise.all(
+      paginatedLogs.page.map(async (log) => {
+        let actorName = log.actorDisplayName;
+        if (log.accountId) {
+          const actorDoc = await ctx.db.get(log.accountId);
+          if (actorDoc) {
+            actorName = actorDoc.displayName || actorDoc.email || actorName;
+          }
+        }
+        return {
+          ...log,
+          actorDisplayName: actorName,
+        };
+      }),
+    );
+
+    return {
+      ...paginatedLogs,
+      page: pageWithActors,
+    };
+  },
+});
+
+// 単一レコードのアクセス履歴タイムライン取得
+export const getRecordAuditLogs = authenticatedQuery({
+  args: {
+    recordId: v.id("serviceRecords"),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const record = await ctx.db.get(args.recordId);
+    if (!record) throw new Error("Record not found");
+
+    requireContentAccess(ctx.user, record);
+
+    const limit = Math.min(Math.max(args.limit ?? 20, 1), 50);
+
+    const logs = await ctx.db
+      .query("auditLogs")
+      .withIndex("by_recordId_createdAt", (q) =>
+        q.eq("recordId", args.recordId),
+      )
+      .order("desc")
+      .take(limit);
+
+    return await Promise.all(
+      logs.map(async (log) => {
+        let actorName = log.actorDisplayName;
+        if (log.accountId) {
+          const actorDoc = await ctx.db.get(log.accountId);
+          if (actorDoc) {
+            actorName = actorDoc.displayName || actorDoc.email || actorName;
+          }
+        }
+        return {
+          ...log,
+          actorDisplayName: actorName,
+        };
+      }),
+    );
+  },
+});
+
+// 長期間未更新のレコードを取得（180日以上）
+export const getStaleRecords = authenticatedQuery({
+  args: {
+    staleDays: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const days = args.staleDays ?? 180;
+    const threshold = Date.now() - days * 24 * 60 * 60 * 1000;
+
+    const visibleRecords = await collectVisibleRecords(ctx, ctx.user);
+    const staleRecords = visibleRecords.filter(
+      (record) => !record.isSample && record.updatedAt < threshold,
+    );
+
+    return staleRecords.map((r) => ({
+      _id: r._id,
+      title: r.title,
+      ownerType: r.ownerType ?? "user",
+      updatedAt: r.updatedAt,
+      staleDays: Math.floor((Date.now() - r.updatedAt) / (1000 * 60 * 60 * 24)),
+    }));
+  },
+});
+
+// 監査ログのクリーンアップ（180日以上経過したログを削除）
+export const cleanupOldAuditLogsInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const RETENTION_MS = 180 * 24 * 60 * 60 * 1000;
+    const cutoff = Date.now() - RETENTION_MS;
+    const oldLogs = await ctx.db
+      .query("auditLogs")
+      .withIndex("by_createdAt", (q) => q.lt("createdAt", cutoff))
+      .take(100);
+
+    for (const log of oldLogs) {
+      await ctx.db.delete(log._id);
+    }
+
+    if (oldLogs.length === 100) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.records.cleanupOldAuditLogsInternal,
+        {},
+      );
+    }
   },
 });

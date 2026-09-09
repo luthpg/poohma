@@ -14,10 +14,7 @@ import {
   familyBoundMutation,
   familyBoundQuery,
 } from "./customBuilders";
-import {
-  deleteCredentialsForRecord,
-  getCredentialsForRecord,
-} from "./records";
+import { deleteCredentialsForRecord, getCredentialsForRecord } from "./records";
 
 /**
  * メンバーが家族を離脱または削除された際、共有レコードの管理者リストを調停

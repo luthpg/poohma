@@ -288,5 +288,35 @@ export async function asyncMapBounded<T, U>(
 - **有界並行性（Bounded Concurrency）**: 無制限な `Promise.all(records.map(...))` を廃止し、64 件チャンク単位で並行処理することで、レコード数が数百〜数千件に増加しても関数内の同時 I/O を常に安全な範囲内に抑え込む。
 - **一覧プロジェクション（暗号化フィールド除外）**: 一覧取得（`getRecords`）において、詳細表示・編集に必要な暗号化データ（`passwordHint`, `passwordHintIv`, `passwordHintDekEncrypted`, `passwordHintDekIv`）をあえて結合せず、表示・検索に必要なプロパティ（`_id`, `id`, `label`, `loginId`）のみを返却する。これにより転送データ量を激減させ、不要な暗号化データのクライアント漏洩を防ぐ（最小権限の原則）。詳細画面（`/records/$id`）は独立した `getRecordDetail` で完全なクレデンシャルを取得する。
 
+---
 
+## 16. 監査ログ記録パターン (`auditLogs.ts` / `logAuditEvent`)
 
+PoohMa では操作ログを**専用ユーティリティ関数 `logAuditEvent`** に集約し、各 Mutation から呼び出す一貫パターンを採用している。
+
+```typescript
+// convex/auditLogs.ts - 共通ヘルパー（Mutation内からのみ呼出し可）
+import { logAuditEvent } from "./auditLogs";
+
+// records.ts 内の Mutation
+await logAuditEvent(ctx, {
+  actor: ctx.user,           // Doc<"users"> - actorDisplayName を自動抽出
+  recordId: args.id,
+  ownerType: "family",
+  ownerFamilyId: ctx.user.familyId,
+  targetAccountId: undefined,
+  action: "RECORD_UPDATE",
+  metadata: {
+    targetTitle: record.title,
+    changedFields: diffFields, // 変更フィールド名配列
+  },
+});
+```
+
+### 設計上のポイント
+
+- **操作時点の表示名を保存**: `actor.displayName || actor.email || "メンバー"` を `actorDisplayName` に記録。脱退・削除後の参照切れに対応。
+- **`familyId` の設定ルール**: `ownerType === "family"` のときのみ `familyId` を設定し、`by_family_createdAt` インデックスで家族ログ取得に使用する。個人レコード（`ownerType: "user"`）操作は `familyId` を持たない。
+- **ヒント閲覧は `serviceRecords` も同時更新**: `logRecordHintView` では `auditLogs` への記録に加え、`serviceRecords.lastViewedAt` / `lastViewedByAccountId` も `patch` する。
+- **UI への影響ゼロ保証**: クライアント側（`CredentialCard`）からの `logRecordHintView` 呼び出しは `.catch(() => {})` で失敗をサイレント無視し、ログ記録の失敗が復号表示をブロックしないようにする。
+- **180日 TTL + 再帰バッチ削除**: 24時間cron で `by_createdAt` インデックスを使って100件ずつ削除し、件数上限到達時は `ctx.scheduler.runAfter(0, ...)` で自己スケジュールして全削除を完結させる。

@@ -34,7 +34,7 @@ PoohMaは、フロントエンドとサーバーサイド処理を単一のTanSt
   ├─ Query / Mutation (families / users / records)
   ├─ Action (actions.ts: OGP取得, ふりがな取得, メール送信)
   ├─ HTTP Action (http.ts: getUserByFirebaseUid ─ 内部シークレット認証)
-  ├─ Cron (crons.ts: 期限切れ家族移行データの定期クリーンアップ)
+  ├─ Cron (crons.ts: 期限切れ家族移行データ・Export Vault・家族招待・編集セッション・監査ログの定期クリーンアップ)
   └─ 外部連携
        ├─ Resend (メール送信)
        ├─ Yahoo!テキスト解析API (ふりがな取得)
@@ -109,11 +109,12 @@ poohma/                    … プロジェクトルート（Turborepo / pnpm wo
 │       │   ├── _generated/ … Convexが自動生成する型・APIクライアント
 │       │   ├── actions.ts  … OGP取得・ふりがな取得・メール送信 (Node runtime)
 │       │   ├── auth.config.ts … Firebase IDトークンの信頼プロバイダ設定
+│       │   ├── auditLogs.ts … 監査ログ書き込みヘルパー (logAuditEvent)
 │       │   ├── crons.ts    … 定期バッチ定義
 │       │   ├── customBuilders.ts … 認証・認可レベル別のQuery/Mutationビルダー
 │       │   ├── families.ts … 家族グループ・参加申請・家族移行ロジック
 │       │   ├── http.ts     … 内部HTTPエンドポイント (getUserByFirebaseUid)
-│       │   ├── records.ts  … サービスレコードCRUD・検索・タグ・一括操作
+│       │   ├── records.ts  … サービスレコードCRUD・検索・タグ・一括操作・監査ログ記録
 │       │   ├── rls.ts      … レコード単位アクセス制御 (requireRecordAccess)
 │       │   ├── schema.ts   … DBスキーマ定義
 │       │   └── users.ts    … ユーザー同期・プロフィール・退会
@@ -165,6 +166,9 @@ users     1 ── * pendingExportVaults  (pendingExportVaults.accountId → use
 users     1 ── * recordEditingSessions (recordEditingSessions.accountId → users._id)
 serviceRecords 1 ── * credentials    (credentials.recordId → serviceRecords._id)
 serviceRecords 1 ── * recordEditingSessions (recordEditingSessions.recordId → serviceRecords._id)
+serviceRecords 0..* ── * auditLogs    (auditLogs.recordId → serviceRecords._id, optional)
+families  0..* ── * auditLogs         (auditLogs.familyId → families._id, optional)
+users     0..* ── * auditLogs         (auditLogs.accountId → users._id, optional / 削除後も参照切れ考慮)
 ```
 
 ### 4.2 テーブル定義
@@ -306,12 +310,14 @@ serviceRecords 1 ── * recordEditingSessions (recordEditingSessions.recordId 
 | needsUpdate | boolean | 「要更新」フラグ（デフォルトfalse、FR-REC-17） |
 | updateRequestedBy | string(optional) | 更新リクエストを送ったユーザーID |
 | updateRequestedAt | number(optional) | 更新リクエスト日時 |
-| lastViewedAt / lastViewedBy | number(optional) / string(optional) | 直近の閲覧日時・閲覧者（FR-REC-16、簡易サマリ用。詳細な履歴は recordAccessLog を参照） |
+| lastViewedAt | number(optional) | 最終ヒント閲覧日時（epoch ms）。`logRecordHintView` 実行時に更新 |
+| lastViewedByAccountId | Id<users>(optional) | 最終ヒント閲覧者のPoohMa Account ID |
+| updatedByAccountId | Id<users>(optional) | 最終更新を行ったPoohMa Account ID（`createRecord` / `updateRecord` 時に記録） |
 | revision | number(optional) | 楽観的ロック用リビジョン番号（0から開始、保存成功ごとに+1インクリメント） |
 | isSample | boolean(optional) | サンプルデータフラグ（オンボーディング用のサンプルレコードはtrue） |
 | updatedAt | number | 更新日時 |
 
-インデックス: by_family_sortKey, by_family_isSample, by_ownerType_accountId, by_ownerType_ownerFamilyId, by_userId, by_accountId
+インデックス: by_family_sortKey, by_family_isSample, by_ownerType_accountId, by_ownerType_ownerFamilyId, by_userId, by_accountId, by_family_updatedAt, by_ownerType_accountId_updatedAt
 
 #### credentials
 
@@ -331,16 +337,25 @@ serviceRecords 1 ── * recordEditingSessions (recordEditingSessions.recordId 
 
 インデックス: by\_recordId
 
-#### recordAccessLog（新設、FR-REC-16）
+#### auditLogs（監査ログ）
+
+レコードの作成・更新・削除・ヒント閲覧・共有設定変更・管理者変更の全操作を家族単位で記録する監査テーブル。脱退・削除後のメンバー表示維持のため操作時点の表示名を `actorDisplayName` に保存する。180日経過したログは `cleanupOldAuditLogsInternal` により自動削除される。
 
 | フィールド | 型 | 説明 |
 | --------- | --------------------- | --------- |
-| recordId | Id<serviceRecords> | 対象レコード |
-| userId | string | 操作者 |
-| action | "VIEWED" \| "UPDATED" | 閲覧か更新かの区分 |
-| createdAt | number | 発生日時 |
+| familyId | Id<families>(optional) | 家族共有レコード操作または家族内操作の場合に設定 |
+| accountId | Id<users>(optional) | 操作者のPoohMa Account ID（削除後は参照切れ考慮） |
+| userId | string | 操作者のFirebase UID |
+| actorDisplayName | string | 操作時点の表示名（脱退・削除後のログ表示維持用） |
+| recordId | Id<serviceRecords>(optional) | 対象レコードID（削除後も特定可能） |
+| ownerType | "user" \| "family" | 操作時点の所有種別 |
+| ownerFamilyId | Id<families>(optional) | ownerType === "family" の対象家族ID |
+| targetAccountId | Id<users>(optional) | ownerType === "user" の所有者Account ID |
+| action | "RECORD_CREATE" \| "RECORD_UPDATE" \| "RECORD_DELETE" \| "HINT_VIEW" \| "SHARE_SETTING_CHANGED" \| "ADMIN_CHANGED" | 操作種別 |
+| metadata | object(optional) | 補足情報（targetTitle: レコード名, changedFields: 変更フィールド配列, detail: 付加情報） |
+| createdAt | number | 記録日時（epoch ms） |
 
-インデックス: by\_recordId（新しい順に取得しタイムラインを表示）。一定期間分（例：直近50件）を超えたログは、レコード削除時と合わせてバッチで間引く運用を想定。
+インデックス: by_family_createdAt（家族ログ取得）, by_recordId_createdAt（レコード別履歴）, by_targetAccountId_createdAt（個人レコード操作履歴）, by_createdAt（定期パージ用）。
 
 #### recoveryOtps（FR-CRYPT-07）
 
@@ -830,7 +845,12 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
 | getRecordAccessLog | Query | authenticated | 対象レコードのrecordAccessLogをタイムラインとして取得（rls.tsチェック、FR-REC-16） |
 | startEditingSession / heartbeatEditingSession / endEditingSession | Mutation | familyBound | recordEditingSessionsの作成・更新・削除（FR-REC-15、TTL 5分、ハートビート30秒） |
 | getActiveEditors | Query | authenticated | 対象レコードを編集中のユーザー一覧を取得（Convexのリアクティブクエリでクライアントが購読、TTL 5分超過分は自動除外） |
-| cleanupExpiredEditingSessionsInternal | InternalMut | internal | 5分TTLを超過した期限切れ編集セッションの定期クリーンアップ（1分間隔cronから実行、1回最大500件のバッチ削除でトランザクション上限を回避） |
+| cleanupExpiredEditingSessionsInternal | InternalMutation | internal（Cron） | 5分TTLを超過した期限切れ編集セッションの定期クリーンアップ（1分間隔cronから実行、1回最大500件のバッチ削除でトランザクション上限を回避） |
+| logRecordHintView | Mutation | familyBound | パスワードヒント閲覧時の監査ログ記録。`serviceRecords.lastViewedAt` / `lastViewedByAccountId` を更新し、`auditLogs` に `HINT_VIEW` を記録する |
+| getFamilyAuditLogs | Query | familyBound | 家族全体の監査ログをページネーションで取得（`by_family_createdAt` インデックス使用、降順）。actorDisplayNameをDBから最新化して返す |
+| getRecordAuditLogs | Query | authenticated | 単一レコードのアクセス履歴タイムラインを取得（最大50件、`by_recordId_createdAt` インデックス使用） |
+| getStaleRecords | Query | authenticated | 指定日数（デフォルト180日）以上更新されていないレコードを取得（サンプルレコード除外） |
+| cleanupOldAuditLogsInternal | InternalMutation | internal（Cron） | 180日以上経過した監査ログを削除（24時間間隔cronから実行、1回100件バッチ、件数上限到達時は再帰実行） |
 
 ### 7.4 convex/actions.ts（Node runtime, "use node"）
 
@@ -879,7 +899,10 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
 (app)/     … 認証必須。Client-First AuthGuard（useAuth）により保護。未認証確定時は /login へリダイレクト、
               家族未所属時は /family 以外を /family へ強制リダイレクト。
               家族所属済みの場合のみ AppHeader を表示。
-  dashboard.tsx, records/new.tsx, records/$id.tsx, family.tsx, settings.tsx
+  dashboard.tsx, records/new.tsx,
+  records/$id.tsx …… レコード詳細・編集。CredentialCard でパスワードヒント復号時に logRecordHintView を呼び出し監査ログ記録。RecordAuditHistoryAccordion で getRecordAuditLogs（最大30件）を購読してアクセス・変更履歴を表示。
+  family.tsx …… 家族管理画面。FamilyAuditLogSection で getFamilyAuditLogs（ページネーション）を購読して家族のアクティビティログをアコーディオン表示。
+  settings.tsx
 
 __root.tsx … 全体のHTML/head/Provider階層を定義。
               beforeLoadでgetAuthUserを実行し、以降の全ルートで
@@ -1084,15 +1107,28 @@ convex用にID型を拡張した上でそのまま再利用し、クライアン
 ## 12. バッチ・スケジューラ設計
 
 ```txt
-convex/crons.ts:
-  cronJobs().interval("cleanup expired family migrations", { hours: 1 },
-    internal.families.cleanupExpiredMigrationsInternal)
+convex/crons.ts に登録されている定期ジョブ一覧:
 
-cleanupExpiredMigrationsInternal:
-  - status=PREPARED かつ expiresAt < 現在時刻 の familyMigrations を抽出
-  - 各対象を status=EXPIRED に更新
-  - 移行先家族(targetFamilyId)がメンバー0件・レコード0件であれば、
-    その空家族グループ自体を削除する
+1. cleanup expired family migrations（1時間間隔）
+   → internal.families.cleanupExpiredMigrationsInternal
+   - status=PREPARED かつ expiresAt < 現在時刻 の familyMigrations を EXPIRED に更新
+   - 移行先家族(targetFamilyId)がメンバー0件・レコード0件であれば空家族グループを削除
+
+2. cleanup expired export vaults（1時間間隔）
+   → internal.families.cleanupExpiredExportVaultsInternal
+   - 30日TTLを超過した pendingExportVaults を削除
+
+3. cleanup expired family invites（24時間間隔）
+   → internal.families.cleanupExpiredFamilyInvitesInternal
+   - 30日以上前の期限切れ・失効済み招待コードを削除
+
+4. cleanup expired editing sessions（1分間隔）
+   → internal.records.cleanupExpiredEditingSessionsInternal
+   - 5分TTLを超過した recordEditingSessions を削除（1回最大500件バッチ）
+
+5. cleanup old audit logs（24時間間隔）
+   → internal.records.cleanupOldAuditLogsInternal
+   - 180日以上経過した auditLogs を削除（1回100件バッチ、上限到達時は再帰実行）
 ```
 
 ## 13. 外部サービス連携設計
