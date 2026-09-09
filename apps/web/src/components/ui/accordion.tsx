@@ -3,12 +3,14 @@ import { ChevronDownIcon } from "lucide-react";
 import { Accordion as AccordionPrimitive } from "radix-ui";
 import type * as React from "react";
 
+/** Radix UI のルート要素をアプリ共通の属性付きで描画する。 */
 function Accordion({
   ...props
 }: React.ComponentProps<typeof AccordionPrimitive.Root>) {
   return <AccordionPrimitive.Root data-slot="accordion" {...props} />;
 }
 
+/** アコーディオン内の区切られた項目を描画する。 */
 function AccordionItem({
   className,
   ...props
@@ -22,6 +24,7 @@ function AccordionItem({
   );
 }
 
+/** 項目の開閉操作と状態アイコンを含むトリガーを描画する。 */
 function AccordionTrigger({
   className,
   children,
@@ -44,6 +47,7 @@ function AccordionTrigger({
   );
 }
 
+/** 開閉アニメーション付きのアコーディオン本文を描画する。 */
 function AccordionContent({
   className,
   children,

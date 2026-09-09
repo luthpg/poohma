@@ -1600,7 +1600,7 @@ export const cleanupExpiredEditingSessionsInternal = internalMutation({
   },
 });
 
-// パスワードヒント閲覧履歴の記録
+/** パスワードヒントの閲覧履歴と最終閲覧者を記録する。 */
 export const logRecordHintView = familyBoundMutation({
   args: {
     recordId: v.id("serviceRecords"),
@@ -1634,7 +1634,7 @@ export const logRecordHintView = familyBoundMutation({
   },
 });
 
-// 家族全体の監査ログ取得（家族共有レコードの操作ログを時系列で取得）
+/** 家族共有レコードの監査ログを新しい順に取得する。 */
 export const getFamilyAuditLogs = familyBoundQuery({
   args: {
     paginationOpts: paginationOptsValidator,
@@ -1671,7 +1671,7 @@ export const getFamilyAuditLogs = familyBoundQuery({
   },
 });
 
-// 単一レコードのアクセス履歴タイムライン取得
+/** 閲覧権限を確認し、単一レコードの監査ログを新しい順に取得する。 */
 export const getRecordAuditLogs = authenticatedQuery({
   args: {
     recordId: v.id("serviceRecords"),
@@ -1711,7 +1711,7 @@ export const getRecordAuditLogs = authenticatedQuery({
   },
 });
 
-// 長期間未更新のレコードを取得（180日以上）
+/** 指定日数以上更新されていない、閲覧可能なレコードを取得する。 */
 export const getStaleRecords = authenticatedQuery({
   args: {
     staleDays: v.optional(v.number()),
@@ -1735,7 +1735,7 @@ export const getStaleRecords = authenticatedQuery({
   },
 });
 
-// 監査ログのクリーンアップ（180日以上経過したログを削除）
+/** 保持期間を超えた監査ログをバッチ単位で削除する。 */
 export const cleanupOldAuditLogsInternal = internalMutation({
   args: {},
   handler: async (ctx) => {

@@ -2505,6 +2505,7 @@ const ACTION_CONFIG = {
   },
 };
 
+/** 家族共有レコードの監査ログをページネーション付きで表示する。 */
 export function FamilyAuditLogSection({
   activeAccountId,
 }: {
@@ -2516,6 +2517,7 @@ export function FamilyAuditLogSection({
     { initialNumItems: 15 },
   );
 
+  /** 監査イベントの日時を日本語ロケールで表示できる形式にする。 */
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleString("ja-JP", {
       year: "numeric",

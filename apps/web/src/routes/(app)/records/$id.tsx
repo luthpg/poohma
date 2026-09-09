@@ -1510,7 +1510,7 @@ const ACTION_CONFIG = {
   },
 };
 
-// --- レコード詳細内の履歴表示コンポーネント ---
+/** レコードのアクセス・変更履歴を折りたたみ可能な一覧で表示する。 */
 function RecordAuditHistoryAccordion({
   recordId,
 }: {
@@ -1523,6 +1523,7 @@ function RecordAuditHistoryAccordion({
     limit: 30,
   });
 
+  /** 監査イベントの日時を秒単位の日本語表記に整形する。 */
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleString("ja-JP", {
       year: "numeric",

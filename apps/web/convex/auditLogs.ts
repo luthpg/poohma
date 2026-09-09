@@ -22,6 +22,9 @@ export interface LogAuditParams {
   };
 }
 
+/**
+ * 監査イベントを、操作時点の実行者情報と対象レコード情報とともに記録する。
+ */
 export async function logAuditEvent(
   ctx: MutationCtx,
   params: LogAuditParams,
