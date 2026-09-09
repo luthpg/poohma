@@ -163,7 +163,7 @@ erDiagram
 
 ### FAMILY_INVITES / JOIN_REQUESTS
 
-- 招待コード（`familyInvites`）と参加申請（`joinRequests`）は明確に分離されたテーブルであり、招待コード自体は「参加申請を送る権利」のみを表す（Issue #132）。実際の参加確定には `joinRequests.status` が `approved` になった上での別操作（`joinFamily`）が必要。
+- 招待コード（`familyInvites`）と参加申請（`joinRequests`）は明確に分離されたテーブルであり、招待コード自体は「参加申請を送る権利」のみを表す（Issue #132）。実際の参加確定には `joinRequests.status` が `approved` になった上での別操作が必要。
 
 ### FAMILY_MIGRATIONS
 

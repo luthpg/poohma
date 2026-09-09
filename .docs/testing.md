@@ -120,6 +120,17 @@ flowchart TD
 | FAM-21 | 削除メンバーの `familyId` 即時解除・Export Vault 退避 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
 | FAM-22 | 削除後の旧家族データアクセス拒否 | E2E | P0 | ⏳ 未実装 | （統合テスト FAM-21 で保証） |
 | FAM-23 | 家族未所属ユーザーのアクセス制御（リダイレクト） | E2E | P0 | ✅ 実装済 | `e2e/public-routes.spec.ts` |
+| FAM-24 | 承認後の家族参加 migration 完了 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+
+### 家族参加・家族移行の責務分離
+
+家族参加・家族変更に伴うデータ移行は、`prepareFamilyMigration → getMigrationForEncryption → commitFamilyMigration` の移行フローを利用する。
+
+- `convex-family.spec.ts`: 家族参加・家族変更というユーザー操作の文脈から、migration が正しく開始・完了することを検証
+- `convex-migrations.spec.ts`: migration 自体の状態遷移、認可、対象データ、コミット、abort、expire、旧Family削除などを詳細に検証
+- ブラウザテスト: クライアント側での再暗号化・復号を含む実際のE2EE動作を検証
+
+単体・統合テストでは実際の暗号化処理を再現せず、migration 対象の境界とDB上の整合性を検証する。
 
 ### 4.3 家族移行 (Family Migration)
 

@@ -789,7 +789,6 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
 | -------------------------------------- | ---------------- | ------------- | --------------------------------------------------------------------------------------------------------------------- |
 | getFamilyMembers | Query | authenticated | 自分の所属家族のメンバー一覧取得 |
 | createFamily | Mutation | authenticated | 家族グループ新規作成＋通知メール送信 |
-| joinFamily | Mutation | authenticated | 承認済み参加申請をもとに家族へ参加確定 |
 | getFamilyInfoByFamilyId | Query | authenticated | 家族IDから家族の暗号鍵情報を取得（メンバー or 承認済み申請者のみ） |
 | getFamilyPublicInfo | Query | authenticated | 招待コードから家族名等の公開情報のみ取得 |
 | createJoinRequest | Mutation | authenticated | 参加申請の送信＋既存メンバーへの通知メール |
@@ -802,7 +801,6 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
 | getMigrationForEncryption | Query | authenticated | 移行対象データ（暗号化済みDEK等）の取得 |
 | commitFamilyMigration | Mutation | authenticated | 移行の確定（再暗号化データの反映）。prepare時点とcommit時点のレコード一覧を照合する楽観的ロック（競合検知）を適用 |
 | abortFamilyMigration | Mutation | authenticated | 移行の中断 |
-| changeFamily | Mutation | authenticated | 準備・確定を一括で行う簡易版の家族変更 |
 | rotatePasscode | Mutation | familyBound | パスコードのみの変更（masterKeyEncrypted/Iv/Salt/kdfIterationsのみ更新、6.5） |
 | issueRecoveryKey | Mutation | familyBound | リカバリーキーの発行／再発行（masterKeyRecoveryEncrypted等を保存、6.6） |
 | recoverWithRecoveryKey | Mutation | authenticated | リカバリーキー経由でのマスターキー復元後、新パスコードでの再wrap結果を保存（6.6） |
