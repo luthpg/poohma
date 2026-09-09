@@ -44,8 +44,10 @@ describe("監査ログ (Audit Log) & 最終更新者機能の統合テスト", (
         {
           label: "Master Account",
           loginId: "admin",
-          passwordHint: dummyCipher,
+          passwordHint: secretPlainHint,
           passwordHintIv: dummyIv,
+          passwordHintDekEncrypted: dummyCipher,
+          passwordHintDekIv: dummyIv,
         },
       ],
       tags: ["security"],
@@ -62,8 +64,10 @@ describe("監査ログ (Audit Log) & 最終更新者機能の統合テスト", (
           {
             label: "Master Account",
             loginId: "admin_updated",
-            passwordHint: dummyCipher,
+            passwordHint: secretPlainHint,
             passwordHintIv: dummyIv,
+            passwordHintDekEncrypted: dummyCipher,
+            passwordHintDekIv: dummyIv,
           },
         ],
         tags: ["security", "updated"],

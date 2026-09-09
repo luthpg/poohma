@@ -512,6 +512,61 @@ export const updateRecord = familyBoundMutation({
 
     // ownerType の変更制御
     const currentOwnerType = getEffectiveOwnerType(record);
+
+    // credentials の同期前スナップショットを取得し、監査ログの差分判定に使用する
+    const existingCreds = await ctx.db
+      .query("credentials")
+      .withIndex("by_recordId", (i) => i.eq("recordId", args.id))
+      .collect();
+    const existingMap = new Map(existingCreds.map((c) => [c._id as string, c]));
+
+    const diffFields: string[] = [];
+    if (record.title !== args.data.title) diffFields.push("title");
+    if (
+      record.titleReading !==
+      (args.data.titleReading !== undefined
+        ? args.data.titleReading
+        : record.titleReading)
+    )
+      diffFields.push("titleReading");
+    if (record.url !== args.data.url) diffFields.push("url");
+    if (record.memo !== args.data.memo) diffFields.push("memo");
+    if (
+      args.data.ownerType !== undefined &&
+      currentOwnerType !== args.data.ownerType
+    )
+      diffFields.push("ownerType");
+    if (
+      JSON.stringify([...record.tags].sort()) !==
+      JSON.stringify([...args.data.tags].sort())
+    )
+      diffFields.push("tags");
+
+    const seenCredentialIds = new Set<string>();
+    const credentialsChanged =
+      existingCreds.length !== args.data.credentials.length ||
+      args.data.credentials.some((credential, index) => {
+        const normalizedId = credential.id
+          ? ctx.db.normalizeId("credentials", credential.id)
+          : null;
+        if (!normalizedId || seenCredentialIds.has(normalizedId)) return true;
+
+        seenCredentialIds.add(normalizedId);
+        const existing = existingMap.get(normalizedId);
+        return (
+          !existing ||
+          existing.order !== index ||
+          existing.label !== credential.label ||
+          existing.loginId !== credential.loginId ||
+          existing.passwordHint !== credential.passwordHint ||
+          existing.passwordHintIv !== credential.passwordHintIv ||
+          existing.passwordHintDekEncrypted !==
+            credential.passwordHintDekEncrypted ||
+          existing.passwordHintDekIv !== credential.passwordHintDekIv
+        );
+      });
+    if (credentialsChanged) diffFields.push("credentials");
+
     if (
       args.data.ownerType !== undefined &&
       args.data.ownerType !== currentOwnerType
@@ -539,12 +594,6 @@ export const updateRecord = familyBoundMutation({
     await ctx.db.patch(args.id, patchData);
 
     // credentials の同期
-    const existingCreds = await ctx.db
-      .query("credentials")
-      .withIndex("by_recordId", (i) => i.eq("recordId", args.id))
-      .collect();
-
-    const existingMap = new Map(existingCreds.map((c) => [c._id as string, c]));
     const retainedIds = new Set<string>();
 
     for (let i = 0; i < args.data.credentials.length; i++) {
@@ -601,31 +650,6 @@ export const updateRecord = familyBoundMutation({
       await ctx.db.delete(existingSession._id);
     }
 
-    const diffFields: string[] = [];
-    if (record.title !== args.data.title) diffFields.push("title");
-    if (record.titleReading !== args.data.titleReading)
-      diffFields.push("titleReading");
-    if (record.url !== args.data.url) diffFields.push("url");
-    if (record.memo !== args.data.memo) diffFields.push("memo");
-    if (record.ownerType !== args.data.ownerType) diffFields.push("ownerType");
-    if (
-      JSON.stringify(record.tags.sort()) !==
-      JSON.stringify(args.data.tags.sort())
-    )
-      diffFields.push("tags");
-    if (
-      (!record.credentials && args.data.credentials.length > 0) ||
-      (record.credentials &&
-        (record.credentials.length !== args.data.credentials.length ||
-          !args.data.credentials.every((c) =>
-            Object.keys(c).every((k) =>
-              record.credentials?.every(
-                (rc) => c[k as keyof typeof c] === rc[k as keyof typeof rc],
-              ),
-            ),
-          )))
-    )
-      diffFields.push("credentials");
     await logAuditEvent(ctx, {
       actor: ctx.user,
       record,
@@ -906,9 +930,9 @@ export const unshareRecord = familyBoundMutation({
     await logAuditEvent(ctx, {
       actor: ctx.user,
       recordId: args.id,
-      ownerType: "user",
-      ownerFamilyId: undefined,
-      targetAccountId: ctx.user._id,
+      ownerType: "family",
+      ownerFamilyId: ctx.user.familyId,
+      targetAccountId: undefined,
       action: "SHARE_SETTING_CHANGED",
       metadata: {
         changedFields: ["ownerType", "ownerFamilyId", "admins"],

@@ -216,9 +216,8 @@ export const test = base.extend({
 `convex-test` を用いた監査ログ機能の結合テストスイート。以下の観点を検証する：
 
 - **Zero-Knowledge保証**: `auditLogs.metadata` に平文ヒントや暗号資材（passwordHint, passwordHintIv, DEK等）が記録されないこと
-- **全アクション記録**: createRecord / updateRecord / deleteRecord / logRecordHintView / shareRecord / addRecordAdmin 実行時に正しい `action` のログが生成されること
+- **監査ログ生成**: createRecord / updateRecord / logRecordHintView 実行時にログが生成されること
 - **アクセス制御（IDOR防止）**: 他家族のメンバーが `getFamilyAuditLogs` / `getRecordAuditLogs` で他家族のログを取得できないこと
-- **フィールド更新**: `updatedByAccountId`, `lastViewedAt`, `lastViewedByAccountId` が各操作で正しく更新されること
 - **TTLクリーンアップ**: `cleanupOldAuditLogsInternal` が180日超過ログのみを削除し、直近ログを保持すること
 
 ### E2E テスト実行前のバックエンド反映ルール (`convex dev --once`)

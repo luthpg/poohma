@@ -1548,7 +1548,11 @@ function RecordAuditHistoryAccordion({
               <span>アクセス・変更履歴</span>
               {auditLogs !== undefined && (
                 <span className="text-xs font-normal text-muted-foreground ml-1">
-                  ({auditLogs.length}件)
+                  (
+                  {auditLogs.length === 30
+                    ? "30件以上"
+                    : `${auditLogs.length}件`}
+                  )
                 </span>
               )}
             </div>

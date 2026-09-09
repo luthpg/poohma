@@ -2546,7 +2546,10 @@ export function FamilyAuditLogSection({
             <span className="text-xs text-muted-foreground hidden sm:block">
               直近の変更・閲覧証跡
             </span>
-            <AccordionTrigger className="py-0 px-1 hover:no-underline" />
+            <AccordionTrigger
+              className="py-0 px-1 hover:no-underline"
+              aria-label="家族のアクティビティログを展開または折りたたむ"
+            />
           </div>
         </div>
         <p className="text-[12px] text-muted-foreground mb-3">
@@ -2605,7 +2608,10 @@ export function FamilyAuditLogSection({
                             {formatDate(log.createdAt)}
                           </time>
                           {hasMetadata ? (
-                            <AccordionTrigger className="py-0 px-1 hover:no-underline" />
+                            <AccordionTrigger
+                              className="py-0 px-1 hover:no-underline"
+                              aria-label="個別ログの詳細を展開または折りたたむ"
+                            />
                           ) : null}
                         </div>
                       </div>
