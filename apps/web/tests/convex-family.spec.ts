@@ -22,6 +22,12 @@ const seedTwoUserFamily_ = async (t: ReturnType<typeof convexTest>) => {
       passwordHintDekEncrypted: "SGVsbG9Xb3JsZAd0",
       passwordHintDekIv: "SGVsbG9Xb3JsZAd0",
     },
+    aReencrypted: {
+      passwordHint: "SGVsbG9Xb3JsZAd1",
+      passwordHintIv: "SGVsbG9Xb3JsZAd1",
+      passwordHintDekEncrypted: "SGVsbG9Xb3JsZAd1",
+      passwordHintDekIv: "SGVsbG9Xb3JsZAd1",
+    },
     b: {
       passwordHint: "SGVsbG9Xb3JsZAd2",
       passwordHintIv: "SGVsbG9Xb3JsZAd2",
@@ -223,10 +229,11 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
             {
               id: credAId,
               recordId: recordAId,
-              passwordHint: dummyData.a.passwordHint,
-              passwordHintIv: dummyData.a.passwordHintIv,
-              passwordHintDekEncrypted: dummyData.a.passwordHintDekEncrypted,
-              passwordHintDekIv: dummyData.a.passwordHintDekIv,
+              passwordHint: dummyData.aReencrypted.passwordHint,
+              passwordHintIv: dummyData.aReencrypted.passwordHintIv,
+              passwordHintDekEncrypted:
+                dummyData.aReencrypted.passwordHintDekEncrypted,
+              passwordHintDekIv: dummyData.aReencrypted.passwordHintDekIv,
             },
           ],
         },
@@ -253,13 +260,17 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         // userA のcredentialが更新されていること
         const updatedCredA = await ctx.db.get(credAId);
 
-        expect(updatedCredA?.passwordHint).toBe(dummyData.a.passwordHint);
-        expect(updatedCredA?.passwordHintIv).toBe(dummyData.a.passwordHintIv);
+        expect(updatedCredA?.passwordHint).toBe(
+          dummyData.aReencrypted.passwordHint,
+        );
+        expect(updatedCredA?.passwordHintIv).toBe(
+          dummyData.aReencrypted.passwordHintIv,
+        );
         expect(updatedCredA?.passwordHintDekEncrypted).toBe(
-          dummyData.a.passwordHintDekEncrypted,
+          dummyData.aReencrypted.passwordHintDekEncrypted,
         );
         expect(updatedCredA?.passwordHintDekIv).toBe(
-          dummyData.a.passwordHintDekIv,
+          dummyData.aReencrypted.passwordHintDekIv,
         );
 
         // userB の所属Familyは変更されていないこと
