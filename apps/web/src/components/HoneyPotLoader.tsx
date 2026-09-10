@@ -1,4 +1,4 @@
-import { type SVGProps, useId } from "react";
+import { type CSSProperties, type SVGProps, useId } from "react";
 import { cn } from "@/lib/utils";
 
 type HoneyPotLoaderSize = "sm" | "md" | "lg";
@@ -162,16 +162,20 @@ const stageAnimations = [0, 1, 2, 3]
  * @param option.size ローダーのサイズ。デフォルト：md
  * @param option.animationDurationSeconds アニメーション1サイクル全体の再生速度（秒）。デフォルト：4
  * @param option.className 追加のCSSクラス
- * @param option.ariaLabel アクセシブルなローディング状態のラベル。デフォルト：Loading
+ * @param aria-label アクセシブルなローディング状態のラベル。デフォルト：Loading
  */
 function HoneyPotLoader({
   size = "md",
   animationDurationSeconds = 4,
   className,
   "aria-label": ariaLabel = "Loading",
+  style,
   ...props
 }: HoneyPotLoaderProps) {
   const id = useId();
+  const instanceId = id.replaceAll(":", "");
+  const instanceClassName = `honey-pot-loader-${instanceId}`;
+  const animationDurationVariable = `--honey-pot-loader-animation-duration-${instanceId}`;
   const honeyGradientId = `${id}-honey`;
   const lidGradientId = `${id}-lid`;
   const clipId = `${id}-clip`;
@@ -181,7 +185,13 @@ function HoneyPotLoader({
       viewBox="0 0 512 512"
       role="status"
       aria-label={ariaLabel}
-      className={cn(sizeClassName[size], className)}
+      className={cn(sizeClassName[size], instanceClassName, className)}
+      style={
+        {
+          [animationDurationVariable]: `${animationDurationSeconds}s`,
+          ...style,
+        } as CSSProperties
+      }
       xmlns="http://www.w3.org/2000/svg"
       {...props}
     >
@@ -189,9 +199,9 @@ function HoneyPotLoader({
         {`
           ${stageAnimations}
 
-          .honey-pot-loader__stage {
+          .${instanceClassName} .honey-pot-loader__stage {
             opacity: 0;
-            animation-duration: ${animationDurationSeconds.toString()}s;
+            animation-duration: var(${animationDurationVariable});
             animation-timing-function: linear;
             animation-iteration-count: infinite;
           }

@@ -77,10 +77,16 @@ export const DarkMode: Story = {
 export const LightAndDark: Story = {
   render: () => (
     <div className="grid grid-cols-2 gap-4">
-      <div className="flex min-h-48 items-center justify-center rounded-lg bg-white p-8">
+      <div
+        className="flex min-h-48 items-center justify-center rounded-lg bg-white p-8"
+        style={{ "--background": "#ffffff" } as React.CSSProperties}
+      >
         <HoneyPotLoader size="lg" />
       </div>
-      <div className="flex min-h-48 items-center justify-center rounded-lg bg-slate-900 p-8">
+      <div
+        className="flex min-h-48 items-center justify-center rounded-lg bg-slate-900 p-8"
+        style={{ "--background": "#0f172a" } as React.CSSProperties}
+      >
         <HoneyPotLoader size="lg" />
       </div>
     </div>
