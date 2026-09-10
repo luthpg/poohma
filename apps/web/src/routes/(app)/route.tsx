@@ -8,7 +8,7 @@ import {
 import { useEffect, useRef } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { useAuth } from "@/components/AuthProvider";
-import { Spinner } from "@/components/ui/spinner";
+import { HoneyPotLoader } from "@/components/HoneyPotLoader";
 import { useAccount } from "@/hooks/useAccount";
 
 export const Route = createFileRoute("/(app)")({
@@ -57,7 +57,7 @@ function RouteComponent() {
   if (isAuthLoading || !isAuthenticated) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <Spinner className="h-8 w-8 text-orange-500" />
+        <HoneyPotLoader size="lg" animationDurationSeconds={1.5} />
       </div>
     );
   }
