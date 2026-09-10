@@ -7,6 +7,113 @@ import { computeSortKey } from "../src/utils/index-group";
 
 const modules = import.meta.glob("../convex/**/*.ts");
 
+const seedTwoUserFamily_ = async (t: ReturnType<typeof convexTest>) => {
+  let oldFamilyId!: Id<"families">;
+  let userAId!: Id<"users">;
+  let userBId!: Id<"users">;
+  let recordAId!: Id<"serviceRecords">;
+  let recordBId!: Id<"serviceRecords">;
+  let credAId!: Id<"credentials">;
+  let credBId!: Id<"credentials">;
+  const dummyData = {
+    a: {
+      passwordHint: "SGVsbG9Xb3JsZAd0",
+      passwordHintIv: "SGVsbG9Xb3JsZAd0",
+      passwordHintDekEncrypted: "SGVsbG9Xb3JsZAd0",
+      passwordHintDekIv: "SGVsbG9Xb3JsZAd0",
+    },
+    b: {
+      passwordHint: "SGVsbG9Xb3JsZAd2",
+      passwordHintIv: "SGVsbG9Xb3JsZAd2",
+      passwordHintDekEncrypted: "SGVsbG9Xb3JsZAd2",
+      passwordHintDekIv: "SGVsbG9Xb3JsZAd2",
+    },
+  };
+
+  await t.run(async (ctx) => {
+    oldFamilyId = await ctx.db.insert("families", {
+      name: "F1",
+      masterKeyEncrypted: "SGVsbG9Xb3JsZA==",
+      masterKeyIv: "SGVsbG9Xb3JsZA==",
+      masterKeySalt: "SGVsbG9Xb3JsZA==",
+      updatedAt: Date.now(),
+    });
+
+    userAId = await ctx.db.insert("users", {
+      userId: "ua",
+      email: "a@a.com",
+      familyId: oldFamilyId,
+      updatedAt: Date.now(),
+    });
+
+    userBId = await ctx.db.insert("users", {
+      userId: "ub",
+      email: "b@b.com",
+      familyId: oldFamilyId,
+      updatedAt: Date.now(),
+    });
+
+    recordAId = await ctx.db.insert("serviceRecords", {
+      userId: "ua",
+      accountId: userAId,
+      familyId: oldFamilyId,
+      title: "RA",
+      sortKey: computeSortKey("RA"),
+      ownerType: "user",
+      admins: [],
+      tags: [],
+      updatedAt: Date.now(),
+    });
+
+    credAId = await ctx.db.insert("credentials", {
+      recordId: recordAId,
+      label: "LabelA",
+      loginId: "LoginA",
+      passwordHint: dummyData.a.passwordHint,
+      passwordHintIv: dummyData.a.passwordHintIv,
+      passwordHintDekEncrypted: dummyData.a.passwordHintDekEncrypted,
+      passwordHintDekIv: dummyData.a.passwordHintDekIv,
+      order: 0,
+      updatedAt: Date.now(),
+    });
+
+    recordBId = await ctx.db.insert("serviceRecords", {
+      userId: "ub",
+      accountId: userBId,
+      familyId: oldFamilyId,
+      title: "RB",
+      sortKey: computeSortKey("RB"),
+      ownerType: "user",
+      admins: [],
+      tags: [],
+      updatedAt: Date.now(),
+    });
+
+    credBId = await ctx.db.insert("credentials", {
+      recordId: recordBId,
+      label: "LabelB",
+      loginId: "LoginB",
+      passwordHint: dummyData.b.passwordHint,
+      passwordHintIv: dummyData.b.passwordHintIv,
+      passwordHintDekEncrypted: dummyData.b.passwordHintDekEncrypted,
+      passwordHintDekIv: dummyData.b.passwordHintDekIv,
+      order: 0,
+      updatedAt: Date.now(),
+    });
+  });
+
+  return {
+    oldFamilyId,
+    userAId,
+    userBId,
+    recordAId,
+    recordBId,
+    credAId,
+    credBId,
+    dummyData,
+  };
+};
+
 describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Convex版)", () => {
   describe("2.1.1 家族の作成と所属ユーザーの更新", () => {
     it("家族作成時にトランザクションが機能し、作成したユーザーのfamilyIdが紐づくこと", async () => {
@@ -52,81 +159,8 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
     it("自分が所有するレコードのみが移行対象となり、他人のレコードは更新されないこと", async () => {
       const t = convexTest(schema, modules);
 
-      let oldFamilyId!: Id<"families">;
-      let userAId!: Id<"users">;
-      let userBId!: Id<"users">;
-      let recordAId!: Id<"serviceRecords">;
-      let recordBId!: Id<"serviceRecords">;
-      let credAId!: Id<"credentials">;
-      let credBId!: Id<"credentials">;
-
-      await t.run(async (ctx) => {
-        oldFamilyId = await ctx.db.insert("families", {
-          name: "F1",
-          masterKeyEncrypted: "SGVsbG9Xb3JsZA==",
-          masterKeyIv: "SGVsbG9Xb3JsZA==",
-          masterKeySalt: "SGVsbG9Xb3JsZA==",
-          updatedAt: Date.now(),
-        });
-
-        userAId = await ctx.db.insert("users", {
-          userId: "ua",
-          email: "a@a.com",
-          familyId: oldFamilyId,
-          updatedAt: Date.now(),
-        });
-
-        userBId = await ctx.db.insert("users", {
-          userId: "ub",
-          email: "b@b.com",
-          familyId: oldFamilyId,
-          updatedAt: Date.now(),
-        });
-
-        recordAId = await ctx.db.insert("serviceRecords", {
-          userId: "ua",
-          accountId: userAId,
-          familyId: oldFamilyId,
-          title: "RA",
-          sortKey: computeSortKey("RA"),
-          ownerType: "user",
-          admins: [],
-          tags: [],
-          updatedAt: Date.now(),
-        });
-
-        credAId = await ctx.db.insert("credentials", {
-          recordId: recordAId,
-          label: "LabelA",
-          loginId: "LoginA",
-          passwordHint: "OLD_A",
-          passwordHintIv: "OLD_A_IV",
-          order: 0,
-          updatedAt: Date.now(),
-        });
-
-        recordBId = await ctx.db.insert("serviceRecords", {
-          userId: "ub",
-          accountId: userBId,
-          familyId: oldFamilyId,
-          title: "RB",
-          sortKey: computeSortKey("RB"),
-          ownerType: "user",
-          admins: [],
-          tags: [],
-          updatedAt: Date.now(),
-        });
-
-        credBId = await ctx.db.insert("credentials", {
-          recordId: recordBId,
-          label: "LabelB",
-          loginId: "LoginB",
-          passwordHint: "OLD_B",
-          passwordHintIv: "OLD_B_IV",
-          order: 0,
-          updatedAt: Date.now(),
-        });
-      });
+      const { oldFamilyId, recordAId, recordBId, credAId, credBId, dummyData } =
+        await seedTwoUserFamily_(t);
 
       const userA = t.withIdentity({
         subject: "ua",
@@ -189,10 +223,10 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
             {
               id: credAId,
               recordId: recordAId,
-              passwordHint: "NEW_A",
-              passwordHintIv: "NEW_A_IV",
-              passwordHintDekEncrypted: "NEW_A_DEK",
-              passwordHintDekIv: "NEW_A_DEK_IV",
+              passwordHint: dummyData.a.passwordHint,
+              passwordHintIv: dummyData.a.passwordHintIv,
+              passwordHintDekEncrypted: dummyData.a.passwordHintDekEncrypted,
+              passwordHintDekIv: dummyData.a.passwordHintDekIv,
             },
           ],
         },
@@ -219,10 +253,14 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         // userA のcredentialが更新されていること
         const updatedCredA = await ctx.db.get(credAId);
 
-        expect(updatedCredA?.passwordHint).toBe("NEW_A");
-        expect(updatedCredA?.passwordHintIv).toBe("NEW_A_IV");
-        expect(updatedCredA?.passwordHintDekEncrypted).toBe("NEW_A_DEK");
-        expect(updatedCredA?.passwordHintDekIv).toBe("NEW_A_DEK_IV");
+        expect(updatedCredA?.passwordHint).toBe(dummyData.a.passwordHint);
+        expect(updatedCredA?.passwordHintIv).toBe(dummyData.a.passwordHintIv);
+        expect(updatedCredA?.passwordHintDekEncrypted).toBe(
+          dummyData.a.passwordHintDekEncrypted,
+        );
+        expect(updatedCredA?.passwordHintDekIv).toBe(
+          dummyData.a.passwordHintDekIv,
+        );
 
         // userB の所属Familyは変更されていないこと
         const updatedUserB = await ctx.db
@@ -240,89 +278,22 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         // userB のcredentialは変更されていないこと
         const updatedCredB = await ctx.db.get(credBId);
 
-        expect(updatedCredB?.passwordHint).toBe("OLD_B");
-        expect(updatedCredB?.passwordHintIv).toBe("OLD_B_IV");
+        expect(updatedCredB?.passwordHint).toBe(dummyData.b.passwordHint);
+        expect(updatedCredB?.passwordHintIv).toBe(dummyData.b.passwordHintIv);
+        expect(updatedCredB?.passwordHintDekEncrypted).toBe(
+          dummyData.b.passwordHintDekEncrypted,
+        );
+        expect(updatedCredB?.passwordHintDekIv).toBe(
+          dummyData.b.passwordHintDekIv,
+        );
       });
     });
 
     it("他ユーザーのcredential IDを直接指定したcommitを行っても、他ユーザーのデータが変更されないこと", async () => {
       const t = convexTest(schema, modules);
 
-      let oldFamilyId!: Id<"families">;
-      let userAId!: Id<"users">;
-      let userBId!: Id<"users">;
-      let recordAId!: Id<"serviceRecords">;
-      let recordBId!: Id<"serviceRecords">;
-      let credAId!: Id<"credentials">;
-      let credBId!: Id<"credentials">;
-
-      await t.run(async (ctx) => {
-        oldFamilyId = await ctx.db.insert("families", {
-          name: "F1",
-          masterKeyEncrypted: "SGVsbG9Xb3JsZA==",
-          masterKeyIv: "AAAAAAAAAAAAAAAA",
-          masterKeySalt: "AAAAAAAAAAAAAAAA",
-          updatedAt: Date.now(),
-        });
-
-        userAId = await ctx.db.insert("users", {
-          userId: "ua",
-          email: "a@a.com",
-          familyId: oldFamilyId,
-          updatedAt: Date.now(),
-        });
-
-        userBId = await ctx.db.insert("users", {
-          userId: "ub",
-          email: "b@b.com",
-          familyId: oldFamilyId,
-          updatedAt: Date.now(),
-        });
-
-        recordAId = await ctx.db.insert("serviceRecords", {
-          userId: "ua",
-          accountId: userAId,
-          familyId: oldFamilyId,
-          title: "RA",
-          sortKey: computeSortKey("RA"),
-          ownerType: "user",
-          admins: [],
-          tags: [],
-          updatedAt: Date.now(),
-        });
-
-        credAId = await ctx.db.insert("credentials", {
-          recordId: recordAId,
-          label: "LabelA",
-          loginId: "LoginA",
-          passwordHint: "OLD_A",
-          passwordHintIv: "BBBBBBBBBBBBBBBB",
-          order: 0,
-          updatedAt: Date.now(),
-        });
-
-        recordBId = await ctx.db.insert("serviceRecords", {
-          userId: "ub",
-          accountId: userBId,
-          familyId: oldFamilyId,
-          title: "RB",
-          sortKey: computeSortKey("RB"),
-          ownerType: "user",
-          admins: [],
-          tags: [],
-          updatedAt: Date.now(),
-        });
-
-        credBId = await ctx.db.insert("credentials", {
-          recordId: recordBId,
-          label: "LabelB",
-          loginId: "LoginB",
-          passwordHint: "OLD_B",
-          passwordHintIv: "CCCCCCCCCCCCCCCC",
-          order: 0,
-          updatedAt: Date.now(),
-        });
-      });
+      const { recordAId, recordBId, credAId, credBId, dummyData } =
+        await seedTwoUserFamily_(t);
 
       const userA = t.withIdentity({
         subject: "ua",
@@ -387,8 +358,14 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         // Bのcredentialは攻撃payloadによって変更されない。
         const unchangedCredB = await ctx.db.get(credBId);
 
-        expect(unchangedCredB?.passwordHint).toBe("OLD_B");
-        expect(unchangedCredB?.passwordHintIv).toBe("CCCCCCCCCCCCCCCC");
+        expect(unchangedCredB?.passwordHint).toBe(dummyData.b.passwordHint);
+        expect(unchangedCredB?.passwordHintIv).toBe(dummyData.b.passwordHintIv);
+        expect(unchangedCredB?.passwordHintDekEncrypted).toBe(
+          dummyData.b.passwordHintDekEncrypted,
+        );
+        expect(unchangedCredB?.passwordHintDekIv).toBe(
+          dummyData.b.passwordHintDekIv,
+        );
       });
     });
   });
