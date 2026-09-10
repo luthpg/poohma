@@ -7,6 +7,119 @@ import { computeSortKey } from "../src/utils/index-group";
 
 const modules = import.meta.glob("../convex/**/*.ts");
 
+const seedTwoUserFamily_ = async (t: ReturnType<typeof convexTest>) => {
+  let oldFamilyId!: Id<"families">;
+  let userAId!: Id<"users">;
+  let userBId!: Id<"users">;
+  let recordAId!: Id<"serviceRecords">;
+  let recordBId!: Id<"serviceRecords">;
+  let credAId!: Id<"credentials">;
+  let credBId!: Id<"credentials">;
+  const dummyData = {
+    a: {
+      passwordHint: "SGVsbG9Xb3JsZAd0",
+      passwordHintIv: "SGVsbG9Xb3JsZAd0",
+      passwordHintDekEncrypted: "SGVsbG9Xb3JsZAd0",
+      passwordHintDekIv: "SGVsbG9Xb3JsZAd0",
+    },
+    aReencrypted: {
+      passwordHint: "SGVsbG9Xb3JsZAd1",
+      passwordHintIv: "SGVsbG9Xb3JsZAd1",
+      passwordHintDekEncrypted: "SGVsbG9Xb3JsZAd1",
+      passwordHintDekIv: "SGVsbG9Xb3JsZAd1",
+    },
+    b: {
+      passwordHint: "SGVsbG9Xb3JsZAd2",
+      passwordHintIv: "SGVsbG9Xb3JsZAd2",
+      passwordHintDekEncrypted: "SGVsbG9Xb3JsZAd2",
+      passwordHintDekIv: "SGVsbG9Xb3JsZAd2",
+    },
+  };
+
+  await t.run(async (ctx) => {
+    oldFamilyId = await ctx.db.insert("families", {
+      name: "F1",
+      masterKeyEncrypted: "SGVsbG9Xb3JsZA==",
+      masterKeyIv: "SGVsbG9Xb3JsZA==",
+      masterKeySalt: "SGVsbG9Xb3JsZA==",
+      updatedAt: Date.now(),
+    });
+
+    userAId = await ctx.db.insert("users", {
+      userId: "ua",
+      email: "a@a.com",
+      familyId: oldFamilyId,
+      updatedAt: Date.now(),
+    });
+
+    userBId = await ctx.db.insert("users", {
+      userId: "ub",
+      email: "b@b.com",
+      familyId: oldFamilyId,
+      updatedAt: Date.now(),
+    });
+
+    recordAId = await ctx.db.insert("serviceRecords", {
+      userId: "ua",
+      accountId: userAId,
+      familyId: oldFamilyId,
+      title: "RA",
+      sortKey: computeSortKey("RA"),
+      ownerType: "user",
+      admins: [],
+      tags: [],
+      updatedAt: Date.now(),
+    });
+
+    credAId = await ctx.db.insert("credentials", {
+      recordId: recordAId,
+      label: "LabelA",
+      loginId: "LoginA",
+      passwordHint: dummyData.a.passwordHint,
+      passwordHintIv: dummyData.a.passwordHintIv,
+      passwordHintDekEncrypted: dummyData.a.passwordHintDekEncrypted,
+      passwordHintDekIv: dummyData.a.passwordHintDekIv,
+      order: 0,
+      updatedAt: Date.now(),
+    });
+
+    recordBId = await ctx.db.insert("serviceRecords", {
+      userId: "ub",
+      accountId: userBId,
+      familyId: oldFamilyId,
+      title: "RB",
+      sortKey: computeSortKey("RB"),
+      ownerType: "user",
+      admins: [],
+      tags: [],
+      updatedAt: Date.now(),
+    });
+
+    credBId = await ctx.db.insert("credentials", {
+      recordId: recordBId,
+      label: "LabelB",
+      loginId: "LoginB",
+      passwordHint: dummyData.b.passwordHint,
+      passwordHintIv: dummyData.b.passwordHintIv,
+      passwordHintDekEncrypted: dummyData.b.passwordHintDekEncrypted,
+      passwordHintDekIv: dummyData.b.passwordHintDekIv,
+      order: 0,
+      updatedAt: Date.now(),
+    });
+  });
+
+  return {
+    oldFamilyId,
+    userAId,
+    userBId,
+    recordAId,
+    recordBId,
+    credAId,
+    credBId,
+    dummyData,
+  };
+};
+
 describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Convex版)", () => {
   describe("2.1.1 家族の作成と所属ユーザーの更新", () => {
     it("家族作成時にトランザクションが機能し、作成したユーザーのfamilyIdが紐づくこと", async () => {
@@ -49,147 +162,233 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
   });
 
   describe("2.1.2 家族グループ変更時のレコード再暗号化（IDOR対策の検証）", () => {
-    it("自分が所有するレコードのみが更新され、他人のレコードIDを混入させてもスキップされること", async () => {
+    it("自分が所有するレコードのみが移行対象となり、他人のレコードは更新されないこと", async () => {
       const t = convexTest(schema, modules);
 
-      let family1Id!: Id<"families">;
-      let userAId!: Id<"users">;
-      let userBId!: Id<"users">;
-      let credADocId!: Id<"credentials">;
-      let credBDocId!: Id<"credentials">;
-
-      // 1. 初期シードデータのインサート
-      await t.run(async (ctx) => {
-        // 初期家族
-        family1Id = await ctx.db.insert("families", {
-          name: "F1",
-          masterKeyEncrypted: "SGVsbG9Xb3JsZA==",
-          masterKeyIv: "SGVsbG9Xb3JsZA==",
-          masterKeySalt: "SGVsbG9Xb3JsZA==",
-          updatedAt: Date.now(),
-        });
-
-        // ユーザーA と ユーザーB
-        userAId = await ctx.db.insert("users", {
-          userId: "ua",
-          email: "a@a.com",
-          familyId: family1Id,
-          updatedAt: Date.now(),
-        });
-
-        userBId = await ctx.db.insert("users", {
-          userId: "ub",
-          email: "b@b.com",
-          familyId: family1Id,
-          updatedAt: Date.now(),
-        });
-
-        // ユーザーAのサービスレコードとクレデンシャル
-        const recA = await ctx.db.insert("serviceRecords", {
-          userId: "ua",
-          accountId: userAId,
-          familyId: family1Id,
-          title: "RA",
-          sortKey: computeSortKey("RA"),
-          ownerType: "user",
-          admins: [],
-          tags: [],
-          updatedAt: Date.now(),
-        });
-
-        credADocId = await ctx.db.insert("credentials", {
-          recordId: recA,
-          label: "LabelA",
-          loginId: "LoginA",
-          passwordHint: "SGVsbG9Xb3JsZA==",
-          passwordHintIv: "SGVsbG9Xb3JsZA==",
-          order: 0,
-          updatedAt: Date.now(),
-        });
-
-        // ユーザーBのサービスレコードとクレデンシャル
-        const recB = await ctx.db.insert("serviceRecords", {
-          userId: "ub",
-          accountId: userBId,
-          familyId: family1Id,
-          title: "RB",
-          sortKey: computeSortKey("RB"),
-          ownerType: "user",
-          admins: [],
-          tags: [],
-          updatedAt: Date.now(),
-        });
-
-        credBDocId = await ctx.db.insert("credentials", {
-          recordId: recB,
-          label: "LabelB",
-          loginId: "LoginB",
-          passwordHint: "SGVsbG9Xb3JsZA==",
-          passwordHintIv: "SGVsbG9Xb3JsZA==",
-          order: 0,
-          updatedAt: Date.now(),
-        });
-      });
+      const { oldFamilyId, recordAId, recordBId, credAId, credBId, dummyData } =
+        await seedTwoUserFamily_(t);
 
       const userA = t.withIdentity({
         subject: "ua",
         email: "a@a.com",
       });
 
-      // 【悪意のあるペイロード】 他人(ub)のデータを含める
-      const maliciousPayload = {
-        action: "create" as const,
-        name: "新しい家族2",
-        masterKeyEncrypted: "SGVsbG9Xb3JsZA==",
-        masterKeyIv: "SGVsbG9Xb3JsZA==",
-        masterKeySalt: "SGVsbG9Xb3JsZA==",
-        credentials: [
-          {
-            id: credADocId,
-            passwordHint: "TmV3SGludEE=",
-            passwordHintIv: "SGVsbG9Xb3JsZA==",
-          },
-          {
-            id: credBDocId,
-            passwordHint: "TmV3SGludEI=",
-            passwordHintIv: "SGVsbG9Xb3JsZA==",
-          },
-        ],
-      };
-
-      const result = await userA.mutation(
-        api.families.changeFamily,
-        maliciousPayload,
+      // 1. 家族移行を準備する
+      const prepareRes = await userA.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "create",
+          name: "F2",
+          masterKeyEncrypted: "NEW_FAMILY_KEY",
+          masterKeyIv: "NEW_FAMILY_IV",
+          masterKeySalt: "NEW_FAMILY_SALT",
+        },
       );
 
-      expect(result.success).toBe(true);
-      expect(result.familyId).toBeDefined();
+      expect(prepareRes.migrationId).toBeDefined();
+      expect(prepareRes.targetFamilyId).toBeDefined();
 
-      // DBの検証
+      // 2. 再暗号化対象を取得する
+      const migrationData = await userA.query(
+        api.families.getMigrationForEncryption,
+        {
+          migrationId: prepareRes.migrationId,
+        },
+      );
+
+      // userA の個人レコードだけが対象であること
+      expect(migrationData.records).toHaveLength(1);
+      expect(migrationData.records[0].id).toBe(recordAId);
+
+      // userB のレコードは移行対象に含まれないこと
+      expect(
+        migrationData.records.some((record) => record.id === recordBId),
+      ).toBe(false);
+
+      // userA の credential が対象に含まれていること
+      expect(migrationData.records[0].credentials).toHaveLength(1);
+      expect(migrationData.records[0].credentials[0].id).toBe(credAId);
+
+      // userB の credential が対象に含まれないこと
+      expect(
+        migrationData.records[0].credentials.some(
+          (credential) => credential.id === credBId,
+        ),
+      ).toBe(false);
+
+      // 3. クライアント側で再暗号化された結果を commit する
+      //
+      // 実際の暗号化・復号はブラウザE2Eテストで検証するため、
+      // Convex単体テストでは再暗号化済みデータを受け取って
+      // 正しいレコードに反映できることだけを検証する。
+      const commitRes = await userA.mutation(
+        api.families.commitFamilyMigration,
+        {
+          migrationId: prepareRes.migrationId,
+          credentials: [
+            {
+              id: credAId,
+              recordId: recordAId,
+              passwordHint: dummyData.aReencrypted.passwordHint,
+              passwordHintIv: dummyData.aReencrypted.passwordHintIv,
+              passwordHintDekEncrypted:
+                dummyData.aReencrypted.passwordHintDekEncrypted,
+              passwordHintDekIv: dummyData.aReencrypted.passwordHintDekIv,
+            },
+          ],
+        },
+      );
+
+      expect(commitRes.success).toBe(true);
+      expect(commitRes.familyId).toBe(prepareRes.targetFamilyId);
+
+      // 4. DB状態を検証する
       await t.run(async (ctx) => {
-        // ユーザーAの家族IDが新家族のものに更新されていること
+        // userA の所属Familyが変更されていること
         const updatedUserA = await ctx.db
           .query("users")
           .withIndex("by_userId", (q) => q.eq("userId", "ua"))
           .unique();
-        expect(updatedUserA?.familyId).toBe(result.familyId);
 
-        // Aのクレデンシャルは新しいものに更新されていること
-        const credA = await ctx.db.get(credADocId);
-        expect(credA?.passwordHint).toBe("TmV3SGludEE=");
+        expect(updatedUserA?.familyId).toBe(prepareRes.targetFamilyId);
 
-        // Bのクレデンシャルは影響を受けず、古いまま(B64_VALID)であること
-        const credB = await ctx.db.get(credBDocId);
-        expect(credB?.passwordHint).toBe("SGVsbG9Xb3JsZA==");
+        // userA のレコードが新Familyへ移動していること
+        const updatedRecordA = await ctx.db.get(recordAId);
+
+        expect(updatedRecordA?.familyId).toBe(prepareRes.targetFamilyId);
+
+        // userA のcredentialが更新されていること
+        const updatedCredA = await ctx.db.get(credAId);
+
+        expect(updatedCredA?.passwordHint).toBe(
+          dummyData.aReencrypted.passwordHint,
+        );
+        expect(updatedCredA?.passwordHintIv).toBe(
+          dummyData.aReencrypted.passwordHintIv,
+        );
+        expect(updatedCredA?.passwordHintDekEncrypted).toBe(
+          dummyData.aReencrypted.passwordHintDekEncrypted,
+        );
+        expect(updatedCredA?.passwordHintDekIv).toBe(
+          dummyData.aReencrypted.passwordHintDekIv,
+        );
+
+        // userB の所属Familyは変更されていないこと
+        const updatedUserB = await ctx.db
+          .query("users")
+          .withIndex("by_userId", (q) => q.eq("userId", "ub"))
+          .unique();
+
+        expect(updatedUserB?.familyId).toBe(oldFamilyId);
+
+        // userB のレコードは変更されていないこと
+        const updatedRecordB = await ctx.db.get(recordBId);
+
+        expect(updatedRecordB?.familyId).toBe(oldFamilyId);
+
+        // userB のcredentialは変更されていないこと
+        const updatedCredB = await ctx.db.get(credBId);
+
+        expect(updatedCredB?.passwordHint).toBe(dummyData.b.passwordHint);
+        expect(updatedCredB?.passwordHintIv).toBe(dummyData.b.passwordHintIv);
+        expect(updatedCredB?.passwordHintDekEncrypted).toBe(
+          dummyData.b.passwordHintDekEncrypted,
+        );
+        expect(updatedCredB?.passwordHintDekIv).toBe(
+          dummyData.b.passwordHintDekIv,
+        );
+      });
+    });
+
+    it("他ユーザーのcredential IDを直接指定したcommitを行っても、他ユーザーのデータが変更されないこと", async () => {
+      const t = convexTest(schema, modules);
+
+      const { recordAId, recordBId, credAId, credBId, dummyData } =
+        await seedTwoUserFamily_(t);
+
+      const userA = t.withIdentity({
+        subject: "ua",
+        email: "a@a.com",
+      });
+
+      const prepareRes = await userA.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "create",
+          name: "F2",
+          masterKeyEncrypted: "NEW_FAMILY_KEY",
+          masterKeyIv: "DDDDDDDDDDDDDDDD",
+          masterKeySalt: "EEEEEEEEEEEEEEEE",
+        },
+      );
+
+      const migrationData = await userA.query(
+        api.families.getMigrationForEncryption,
+        {
+          migrationId: prepareRes.migrationId,
+        },
+      );
+
+      // Bのrecordがmigration対象に含まれていないことを確認する。
+      expect(
+        migrationData.records.some((record) => record.id === recordBId),
+      ).toBe(false);
+
+      // 攻撃者がBのcredential IDを直接指定してcommit payloadに混入させる。
+      await userA.mutation(api.families.commitFamilyMigration, {
+        migrationId: prepareRes.migrationId,
+        credentials: [
+          {
+            id: credAId,
+            recordId: recordAId,
+            passwordHint: "NEW_A",
+            passwordHintIv: "FFFFFFFFFFFFFFFF",
+            passwordHintDekEncrypted: "NEW_A_DEK",
+            passwordHintDekIv: "GGGGGGGGGGGGGGGG",
+          },
+          {
+            id: credBId,
+            recordId: recordBId,
+            passwordHint: "ATTACKED",
+            passwordHintIv: "HHHHHHHHHHHHHHHH",
+            passwordHintDekEncrypted: "ATTACKED_DEK",
+            passwordHintDekIv: "IIIIIIIIIIIIIIII",
+          },
+        ],
+      });
+
+      await t.run(async (ctx) => {
+        // A自身のcredentialは正常に更新される。
+        const updatedCredA = await ctx.db.get(credAId);
+
+        expect(updatedCredA?.passwordHint).toBe("NEW_A");
+        expect(updatedCredA?.passwordHintIv).toBe("FFFFFFFFFFFFFFFF");
+        expect(updatedCredA?.passwordHintDekEncrypted).toBe("NEW_A_DEK");
+        expect(updatedCredA?.passwordHintDekIv).toBe("GGGGGGGGGGGGGGGG");
+
+        // Bのcredentialは攻撃payloadによって変更されない。
+        const unchangedCredB = await ctx.db.get(credBId);
+
+        expect(unchangedCredB?.passwordHint).toBe(dummyData.b.passwordHint);
+        expect(unchangedCredB?.passwordHintIv).toBe(dummyData.b.passwordHintIv);
+        expect(unchangedCredB?.passwordHintDekEncrypted).toBe(
+          dummyData.b.passwordHintDekEncrypted,
+        );
+        expect(unchangedCredB?.passwordHintDekIv).toBe(
+          dummyData.b.passwordHintDekIv,
+        );
       });
     });
   });
 
   describe("2.1.3 家族の承認制参加フローの検証", () => {
-    it("家族への参加申請、一覧取得、承認、および参加完了ができること", async () => {
+    it("家族への参加申請、一覧取得、承認、およびE2EE対応の参加完了ができること", async () => {
       const t = convexTest(schema, modules);
 
       let familyId!: Id<"families">;
+      let applicantId!: Id<"users">;
+      let recordId!: Id<"serviceRecords">;
+      let credentialId!: Id<"credentials">;
 
       // シードデータ投入
       await t.run(async (ctx) => {
@@ -211,10 +410,34 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         });
 
         // 参加申請を行う新規ユーザー
-        await ctx.db.insert("users", {
+        applicantId = await ctx.db.insert("users", {
           userId: "applicant_b",
           email: "applicant_b@example.com",
           displayName: "申請者B",
+          updatedAt: Date.now(),
+        });
+
+        // 参加者が所有する個人レコード
+        recordId = await ctx.db.insert("serviceRecords", {
+          userId: "applicant_b",
+          accountId: applicantId,
+          familyId: undefined,
+          title: "Applicant Record",
+          sortKey: computeSortKey("Applicant Record"),
+          ownerType: "user",
+          admins: [],
+          tags: [],
+          updatedAt: Date.now(),
+        });
+
+        // 参加者の個人credential
+        credentialId = await ctx.db.insert("credentials", {
+          recordId,
+          label: "Applicant Credential",
+          loginId: "Applicant Login",
+          passwordHint: "OLD_HINT",
+          passwordHintIv: "OLD_IV",
+          order: 0,
           updatedAt: Date.now(),
         });
 
@@ -293,6 +516,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         subject: "stranger",
         email: "stranger@example.com",
       });
+
       await expect(
         stranger.query(api.families.getPendingRequests, {}),
       ).rejects.toThrow("User does not belong to a family");
@@ -309,27 +533,88 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
       );
       expect(infoAfterApproval.masterKeyEncrypted).toBe("SGVsbG9Xb3JsZA==");
 
-      // 10. 承認状態の申請があるため joinFamily で正式に参加できること
-      const joinedFamilyId = await applicantB.mutation(
-        api.families.joinFamily,
-        { familyId },
+      // 10. 承認後にE2EE対応の家族Migrationを準備する
+      const prepareRes = await applicantB.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "join",
+          familyId,
+        },
       );
-      expect(joinedFamilyId).toBe(familyId);
 
-      // 11. 参加後はユーザーの familyId が更新されていること
+      expect(prepareRes.migrationId).toBeDefined();
+      expect(prepareRes.targetFamilyId).toBe(familyId);
+
+      // 11. クライアント側で再暗号化する対象を取得する
+      const migrationData = await applicantB.query(
+        api.families.getMigrationForEncryption,
+        {
+          migrationId: prepareRes.migrationId,
+        },
+      );
+
+      // 参加者自身の個人レコードだけが再暗号化対象であること
+      expect(migrationData.records).toHaveLength(1);
+      expect(migrationData.records[0].id).toBe(recordId);
+
+      // 参加者自身のcredentialが対象に含まれること
+      expect(migrationData.records[0].credentials).toHaveLength(1);
+      expect(migrationData.records[0].credentials[0].id).toBe(credentialId);
+
+      // 12. 再暗号化済みcredentialをcommitする
+      //
+      // 実際の暗号化・復号はブラウザE2Eテストで検証する。
+      // Convex単体テストでは、サーバーがクライアントから受け取った
+      // 再暗号化済みデータを正しいcredentialへ反映できることを検証する。
+      const commitRes = await applicantB.mutation(
+        api.families.commitFamilyMigration,
+        {
+          migrationId: prepareRes.migrationId,
+          credentials: [
+            {
+              id: credentialId,
+              recordId,
+              passwordHint: "NEW_HINT",
+              passwordHintIv: "NEW_IV",
+            },
+          ],
+        },
+      );
+
+      expect(commitRes.success).toBe(true);
+      expect(commitRes.familyId).toBe(familyId);
+
+      // 13. 参加後はユーザーのfamilyIdが更新されていること
       const updatedApplicant = await t.run(async (ctx) => {
         return await ctx.db
           .query("users")
           .withIndex("by_userId", (q) => q.eq("userId", "applicant_b"))
           .unique();
       });
+
       expect(updatedApplicant?.familyId).toBe(familyId);
 
-      // 12. 正式参加後は申請データが削除されていること
+      // 14. 個人レコードが新しいfamilyに所属していること
+      const updatedRecord = await t.run(async (ctx) => {
+        return await ctx.db.get(recordId);
+      });
+
+      expect(updatedRecord?.familyId).toBe(familyId);
+
+      // 15. credentialが再暗号化済みデータに更新されていること
+      const updatedCredential = await t.run(async (ctx) => {
+        return await ctx.db.get(credentialId);
+      });
+
+      expect(updatedCredential?.passwordHint).toBe("NEW_HINT");
+      expect(updatedCredential?.passwordHintIv).toBe("NEW_IV");
+
+      // 16. 正式参加後は申請データが削除されていること
       const myRequestAfterJoin = await applicantB.query(
         api.families.getMyJoinRequest,
         {},
       );
+
       expect(myRequestAfterJoin).toBeNull();
     });
 
@@ -340,14 +625,19 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
           name: "山田家",
+          masterKeyEncrypted: "SGVsbG9Xb3JsZA==",
+          masterKeyIv: "SGVsbG9Xb3JsZA==",
+          masterKeySalt: "SGVsbG9Xb3JsZA==",
           updatedAt: Date.now(),
         });
+
         await ctx.db.insert("users", {
           userId: "member_y",
           email: "y@example.com",
           familyId,
           updatedAt: Date.now(),
         });
+
         await ctx.db.insert("users", {
           userId: "applicant_z",
           email: "z@example.com",
@@ -359,39 +649,49 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         subject: "member_y",
         email: "y@example.com",
       });
+
       const applicantZ = t.withIdentity({
         subject: "applicant_z",
         email: "z@example.com",
       });
 
-      // 招待コードを発行
+      // 0. 招待コードを発行する
       const invite = await memberY.mutation(
         api.families.createFamilyInvite,
         {},
       );
 
-      // 申請
+      expect(invite.code).toBeDefined();
+
+      // 1. 参加申請する
       const requestId = await applicantZ.mutation(
         api.families.createJoinRequest,
         { code: invite.code },
       );
 
-      // 却下
-      await memberY.mutation(api.families.rejectJoinRequest, { requestId });
+      expect(requestId).toBeDefined();
 
-      // 却下された状態を確認
+      // 2. 既存メンバーが申請を却下する
+      await memberY.mutation(api.families.rejectJoinRequest, {
+        requestId,
+      });
+
+      // 3. 却下された状態を確認する
       const status = await applicantZ.query(api.families.getMyJoinRequest, {});
+
       expect(status?.status).toBe("rejected");
 
-      // 却下状態を消去して再申請できるようにする
+      // 4. 却下状態を消去して再申請できるようにする
       await applicantZ.mutation(api.families.dismissRejectedRequest, {
         requestId,
       });
 
+      // 5. 却下済み申請が消えていること
       const statusAfterDismiss = await applicantZ.query(
         api.families.getMyJoinRequest,
         {},
       );
+
       expect(statusAfterDismiss).toBeNull();
     });
   });
