@@ -177,16 +177,15 @@ function FamilyComponent() {
     try {
       try {
         localStorage.setItem(LOGOUT_FLAG_KEY, String(Date.now()));
-      } catch (e) {
-        console.warn("Failed to set logout flag in localStorage", e);
+      } catch (_e) {
+        // localStorage利用不可時は無視
       }
       await logout();
       if (auth) await signOut(auth);
       clearQueryCache();
       queryClient.clear();
       window.location.href = "/";
-    } catch (error) {
-      console.error("Logout failed:", error);
+    } catch (_error) {
       window.location.href = "/";
     }
   };
@@ -244,7 +243,7 @@ function FamilyComponent() {
             return;
           } catch (err) {
             if ((err as Error).name === "AbortError") return;
-            console.error("Share failed, falling back to download", err);
+            // 共有キャンセルのフォールバックとしてダウンロード
           }
         }
 
@@ -259,8 +258,7 @@ function FamilyComponent() {
         URL.revokeObjectURL(url);
         toast.success("QRコード画像を保存しました");
       }, "image/png");
-    } catch (err) {
-      console.error(err);
+    } catch (_err) {
       toast.error("画像の保存に失敗しました");
     }
   };
@@ -280,7 +278,6 @@ function FamilyComponent() {
         });
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
-          console.error(err);
           toast.error("共有に失敗しました");
         }
       }
@@ -288,8 +285,7 @@ function FamilyComponent() {
       try {
         await navigator.clipboard.writeText(inviteUrl);
         toast.success("招待URLをクリップボードにコピーしました");
-      } catch (err) {
-        console.error(err);
+      } catch (_err) {
         toast.error("コピーに失敗しました");
       }
     }
@@ -427,8 +423,7 @@ function FamilyComponent() {
       setKickSuccessNotice({ memberName: kickedName });
       await queryClient.invalidateQueries({ queryKey: ["authUser"] });
       await router.invalidate();
-    } catch (error) {
-      console.error("Failed to kick member:", error);
+    } catch (_error) {
       toast.error("メンバーの削除に失敗しました");
     } finally {
       setIsKicking(false);
@@ -460,8 +455,7 @@ function FamilyComponent() {
       toast.success(
         "旧家族のパスコードを確認しました。新しい家族を作成または参加してください",
       );
-    } catch (error) {
-      console.error("Vault unlock failed:", error);
+    } catch (_error) {
       toast.error("パスコードが一致しません。もう一度お試しください");
     } finally {
       setIsVerifyingVault(false);
@@ -479,8 +473,7 @@ function FamilyComponent() {
       setVaultUnlockedKey(null);
       setVaultPasscode("");
       await router.invalidate();
-    } catch (error) {
-      console.error("Failed to abandon vault:", error);
+    } catch (_error) {
       toast.error("データの破棄に失敗しました");
     } finally {
       setIsAbandoningVault(false);
@@ -500,9 +493,20 @@ function FamilyComponent() {
           "参加申請を送信しました。家族メンバーの承認をお待ちください。",
         );
       } catch (error) {
-        const msg =
-          error instanceof Error ? error.message : "参加申請に失敗しました";
-        toast.error(msg);
+        const rawMsg = error instanceof Error ? error.message : "";
+        if (rawMsg.includes("Invalid invite code")) {
+          toast.error("招待コードが無効です。内容をご確認ください。");
+        } else if (rawMsg.includes("revoked")) {
+          toast.error("この招待リンクは無効化されています。");
+        } else if (rawMsg.includes("expired")) {
+          toast.error("この招待リンクは有効期限が切れています。");
+        } else if (rawMsg.includes("already a member")) {
+          toast.error("すでにこの家族グループに参加しています。");
+        } else if (rawMsg.includes("pending")) {
+          toast.error("すでに申請中の参加リクエストがあります。");
+        } else {
+          toast.error("参加申請に失敗しました。もう一度お試しください。");
+        }
       } finally {
         setIsLoading(false);
       }
@@ -602,18 +606,17 @@ function FamilyComponent() {
       setVaultUnlockedKey(null);
       setVaultPasscode("");
       await router.invalidate();
-    } catch (error) {
+    } catch (_error) {
       if (currentMigrationId) {
         try {
           await abortFamilyMigrationMut({
             accountId: activeAccountId || undefined,
             migrationId: currentMigrationId,
           });
-        } catch (abortError) {
-          console.error("Failed to abort migration:", abortError);
+        } catch (_abortError) {
+          // abort失敗時は何もしない
         }
       }
-      console.error(error);
       toast.error(
         "家族の変更に失敗しました（パスコードが間違っている可能性があります）",
       );
@@ -724,18 +727,17 @@ function FamilyComponent() {
         setVaultUnlockedKey(null);
         setVaultPasscode("");
         await router.invalidate();
-      } catch (error) {
+      } catch (_error) {
         if (currentMigrationId) {
           try {
             await abortFamilyMigrationMut({
               accountId: activeAccountId || undefined,
               migrationId: currentMigrationId,
             });
-          } catch (abortError) {
-            console.error("Failed to abort migration:", abortError);
+          } catch (_abortError) {
+            // abort失敗時は何もしない
           }
         }
-        console.error(error);
         toast.error("家族の変更に失敗しました");
       } finally {
         setIsLoading(false);
@@ -821,7 +823,7 @@ function FamilyComponent() {
       }
       const masterKey = getMasterKey();
       if (!masterKey) {
-        toast.error("マスターキーの取得に失敗しました");
+        toast.error("暗号データの読み込みに失敗しました");
         return;
       }
 
@@ -837,8 +839,7 @@ function FamilyComponent() {
 
       try {
         await unwrapMasterKey(wrapped.encrypted, wrapped.iv, newWrappingKey);
-      } catch (error) {
-        console.error("Self-check failed:", error);
+      } catch (_error) {
         toast.error("鍵の再暗号化に失敗しました。もう一度お試しください");
         return;
       }
@@ -859,8 +860,7 @@ function FamilyComponent() {
         if (hasBiometric) {
           try {
             await updateBiometricPasscode(targetId, newPasscode);
-          } catch (error) {
-            console.error("Biometric passcode update failed:", error);
+          } catch (_error) {
             toast.error(
               "生体認証のロック解除情報の更新に失敗しました。設定画面から再設定してください。",
             );
@@ -876,11 +876,10 @@ function FamilyComponent() {
       setNewPasscodeConfirm("");
       setShowRotatePasscodeForm(false);
     } catch (error) {
-      console.error(error);
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes("CONFLICT")) {
         toast.error(
-          "他の操作と競合しました。ページを再読み込みしてやり直してください",
+          "他のご家族の操作と重なりました。画面を再読み込みしてやり直してください",
         );
       } else {
         toast.error("パスコードの変更に失敗しました");
@@ -1032,7 +1031,7 @@ function FamilyComponent() {
               </DialogTitle>
             </div>
             <DialogDescription className="text-[14px] leading-relaxed">
-              旧家族で登録していた「自分のみ」のデータは復号する手段がなくなり、実質的に二度と閲覧できなくなります。この操作は取り消せません。
+              旧家族で登録していた「自分のみ」のデータを開く手段がなくなり、二度と閲覧できなくなります。この操作は取り消せません。
             </DialogDescription>
             <div className="flex justify-end gap-3 pt-2">
               <button

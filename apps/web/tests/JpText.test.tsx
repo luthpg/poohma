@@ -27,6 +27,33 @@ describe("JpText", () => {
     consoleSpy.mockRestore();
   });
 
+  it("句点（。）の直後に自動的に <br /> タグが挿入され、文末の句点には余計な <br /> が挿入されないこと", () => {
+    const { container } = render(
+      <JpText>これは1文目です。これは2文目です。</JpText>,
+    );
+
+    const brs = container.querySelectorAll("br");
+    expect(brs.length).toBe(1);
+  });
+
+  it("句点（。）の直後に明示的な改行(\\n)が存在する場合に二重改行されないこと", () => {
+    const { container } = render(
+      <JpText>{"これは1文目です。\nこれは2文目です。"}</JpText>,
+    );
+
+    const brs = container.querySelectorAll("br");
+    expect(brs.length).toBe(1);
+  });
+
+  it("複数の句点がある場合にそれぞれの文末で <br /> タグが挿入されること", () => {
+    const { container } = render(
+      <JpText>1文目です。2文目です。3文目です。</JpText>,
+    );
+
+    const brs = container.querySelectorAll("br");
+    expect(brs.length).toBe(2);
+  });
+
   it("ネストされた JSX 要素に対して再帰的に BudouX パースを適用できること", () => {
     const { container } = render(
       <JpText>

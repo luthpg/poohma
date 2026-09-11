@@ -141,8 +141,8 @@ export function useRecordForm(initialValues?: Partial<RecordFormValues>) {
             setValues((prev) => ({ ...prev, titleReading: reading }));
             return reading;
           }
-        } catch (e) {
-          console.error("Failed to fetch furigana", e);
+        } catch (_e) {
+          // ふりがな取得失敗時は何もしない
         } finally {
           if (currentReqId === furiganaReqIdRef.current) {
             setIsFetchingFurigana(false);
@@ -207,8 +207,8 @@ export function useRecordForm(initialValues?: Partial<RecordFormValues>) {
           await fetchFuriganaForTitle(shouldFetchFuriganaFor);
         }
         return ogp;
-      } catch (e) {
-        console.error("Failed to fetch OGP info", e);
+      } catch (_e) {
+        // OGP取得失敗時はnullを返却
         return null;
       } finally {
         setIsFetchingOgp(false);
@@ -367,7 +367,6 @@ export function useRecordForm(initialValues?: Partial<RecordFormValues>) {
           toast.error(err.message);
           return false;
         }
-        console.error("保存エラー:", err);
         toast.error("保存に失敗しました。");
         return false;
       } finally {

@@ -74,7 +74,7 @@ export function CmsRichText({ htmlContent }: CmsRichTextProps) {
         // 見出し H2 (Geist風にタイトな文字間隔を設定)
         if (domNode.name === "h2") {
           return (
-            <h2 className="mt-8 mb-4 text-[24px] font-semibold tracking-[-0.96px] text-foreground border-b border-gray-100 pb-2">
+            <h2 className="mt-8 mb-4 text-[24px] font-semibold tracking-[-0.96px] text-foreground border-b border-border pb-2">
               {domToReact(domNode.children as DOMNode[], options)}
             </h2>
           );
@@ -90,7 +90,7 @@ export function CmsRichText({ htmlContent }: CmsRichTextProps) {
         // 段落 P
         if (domNode.name === "p") {
           return (
-            <p className="mb-4 text-[16px] leading-7 text-gray-600 dark:text-gray-400 font-normal">
+            <p className="mb-4 text-[16px] leading-7 text-muted-foreground font-normal">
               {domToReact(domNode.children as DOMNode[], options)}
             </p>
           );
@@ -98,7 +98,7 @@ export function CmsRichText({ htmlContent }: CmsRichTextProps) {
         // インラインコードタグ (`code`)
         if (domNode.name === "code") {
           return (
-            <code className="rounded bg-gray-50 px-1.5 py-0.5 font-mono text-[13px] text-orange-600 dark:bg-gray-900/40">
+            <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[13px] text-orange-600 dark:text-orange-400">
               {domToReact(domNode.children as DOMNode[], options)}
             </code>
           );
@@ -106,9 +106,17 @@ export function CmsRichText({ htmlContent }: CmsRichTextProps) {
         // 箇条書きリスト
         if (domNode.name === "ul") {
           return (
-            <ul className="mb-4 ml-6 list-disc text-gray-600 dark:text-gray-400 space-y-1.5">
+            <ul className="mb-4 ml-6 list-disc text-muted-foreground space-y-1.5">
               {domToReact(domNode.children as DOMNode[], options)}
             </ul>
+          );
+        }
+        // 番号付きリスト
+        if (domNode.name === "ol") {
+          return (
+            <ol className="mb-4 ml-6 list-decimal text-muted-foreground space-y-1.5">
+              {domToReact(domNode.children as DOMNode[], options)}
+            </ol>
           );
         }
         // リンク (href属性のみ許可、javascript:等の危険なスキームは除外)

@@ -200,8 +200,7 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
         setMasterKey(key);
 
         return true;
-      } catch (error) {
-        console.error("Unlock failed:", error);
+      } catch {
         if (!options?.silent) {
           toast.error("パスコードが正しくないか、エラーが発生しました。");
         }
@@ -282,7 +281,7 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
           ...context,
         }),
       )
-      .catch((e) => console.warn("Failed to send biometric removed email:", e));
+      .catch(() => {});
   }, [targetUserId, currentAccount, notifyBiometricEventMut]);
 
   const handleUnlockSubmit = async (e: React.SubmitEvent) => {
@@ -316,21 +315,22 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
                 ...context,
               }),
             )
-            .catch((e) =>
-              console.warn("Failed to send biometric registered email:", e),
-            );
+            .catch(() => {});
         } catch (error) {
-          console.error("Biometric registration failed:", error);
           if (error instanceof Error) {
             if (
               error.name === "NotAllowedError" ||
               error.name === "AbortError"
             ) {
               // ユーザーによるキャンセル
+            } else if (
+              error.message?.includes("PRF") ||
+              error.message?.includes("高度な暗号化保護")
+            ) {
+              toast.error(error.message);
             } else {
               toast.error(
-                error.message ||
-                  "生体認証の登録に失敗しました。パスコード認証をご利用ください。",
+                "生体認証の登録に失敗しました。パスコード認証をご利用ください。",
               );
             }
           } else {
@@ -405,14 +405,11 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
         }, 50);
       }
     } catch (error) {
-      console.error("Biometric unlock failed:", error);
       if (error instanceof Error) {
         if (error.name === "NotAllowedError" || error.name === "AbortError") {
           // ユーザーキャンセル
         } else {
-          toast.error(
-            error.message || "生体認証によるロック解除に失敗しました。",
-          );
+          toast.error("生体認証によるロック解除に失敗しました。");
         }
       }
       // パスコード入力欄へ自然にフォールバック

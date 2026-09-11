@@ -52,7 +52,9 @@ export function OnboardingModal({
           </div>
           <div className="flex items-center gap-2">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
-            <span>パスワードヒントがどう暗号化・復号されるか確認できます</span>
+            <span>
+              パスワードヒントがどのように安全に保護・表示されるか確認できます
+            </span>
           </div>
         </div>
 

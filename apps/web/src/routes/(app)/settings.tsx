@@ -72,8 +72,7 @@ function SettingsComponent() {
       await disableBiometric();
       setHasBiometric(false);
       toast.success("この端末の生体認証データを削除しました");
-    } catch (error) {
-      console.error(error);
+    } catch {
       toast.error("生体認証データの削除に失敗しました");
     }
   };
@@ -118,8 +117,7 @@ function SettingsComponent() {
       await queryClient.invalidateQueries({ queryKey: ["authUser"] });
       toast.success("プロフィールを更新しました");
       await router.invalidate();
-    } catch (error) {
-      console.error(error);
+    } catch {
       toast.error("プロフィールの更新に失敗しました");
     } finally {
       setIsSaving(false);
@@ -132,8 +130,7 @@ function SettingsComponent() {
     try {
       await deletePoohMaAccount(activeAccountId);
       toast.success("アカウントを削除しました");
-    } catch (error) {
-      console.error(error);
+    } catch {
       toast.error("アカウントの削除に失敗しました");
     } finally {
       setIsDeletingSubAccount(false);
@@ -155,8 +152,7 @@ function SettingsComponent() {
           prompt: "select_account",
         });
         await reauthenticateWithPopup(currentUser, provider);
-      } catch (reauthError) {
-        console.error("Re-authentication failed:", reauthError);
+      } catch {
         throw new Error("再認証に失敗しました。操作をキャンセルします。");
       }
 
@@ -173,23 +169,24 @@ function SettingsComponent() {
       await router.invalidate();
       await router.navigate({ to: "/" });
     } catch (error) {
-      console.error(error);
       const err = error as { code?: string; message?: string };
       if (err?.code === "auth/requires-recent-login") {
         toast.error(
           "セキュリティ保護のため、最近ログインしていない場合はこの操作を実行できません。一度ログアウトし、再ログインしてからやり直してください。",
         );
       } else {
-        toast.error(err?.message || "退会処理に失敗しました");
+        toast.error(
+          "退会処理に失敗しました。時間をおいてもう一度お試しください。",
+        );
       }
       setIsDeleting(false);
     }
   };
 
   return (
-    <div className="mx-auto max-w-2xl p-6">
+    <div className="mx-auto max-w-2xl p-4 sm:p-6">
       {/* 戻るボタン */}
-      <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-6 bg-background/95 px-6 pb-4 pt-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="sticky top-0 z-20 -mx-4 -mt-4 mb-6 bg-background/95 px-4 pb-4 pt-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:-mx-6 sm:-mt-6 sm:px-6 sm:pt-6">
         <button
           type="button"
           onClick={() => {
@@ -417,11 +414,10 @@ function SettingsComponent() {
                           あなたが登録したアカウント情報はすべて削除されます。
                         </li>
                         <li>
-                          家族と「共有
-                          (Shared)」に設定している情報も、他の家族から見られなくなります。
+                          家族と「共有」に設定している情報も、他の家族から見られなくなります。
                         </li>
                         <li>
-                          退会操作は取り消せません。事前にCSVエクスポートをおすすめします。
+                          退会操作は取り消せません。事前にCSVファイルでの保存をおすすめします。
                         </li>
                       </ul>
                     </div>
@@ -436,12 +432,12 @@ function SettingsComponent() {
                         {isExporting ? (
                           <>
                             <Spinner className="mr-2 h-4 w-4" />
-                            エクスポート中...
+                            ダウンロード中...
                           </>
                         ) : (
                           <>
                             <Download className="mr-2 h-4 w-4" />
-                            CSVエクスポートする
+                            CSVファイルをダウンロードする
                           </>
                         )}
                       </button>

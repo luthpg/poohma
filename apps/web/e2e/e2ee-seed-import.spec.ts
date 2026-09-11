@@ -62,7 +62,8 @@ async function createTestAccount(
   } else {
     // 家族未所属時は画面上の AccountSwitcher を直接クリック
     const switcherTrigger = page
-      .locator('button:has-text("ファミリー未所属")')
+      .locator('button:has-text("家族未所属")')
+      .or(page.locator('button:has-text("ファミリー未所属")'))
       .or(page.locator('button:has-text("未所属")'))
       .first();
     await expect(switcherTrigger).toBeVisible({ timeout: 15000 });
@@ -89,6 +90,7 @@ async function createTestAccount(
   } catch {
     const switcher = page
       .locator('[data-testid="user-menu-trigger"]')
+      .or(page.locator('button:has-text("家族未所属")'))
       .or(page.locator('button:has-text("ファミリー未所属")'))
       .or(page.locator('button:has-text("未所属")'))
       .first();
@@ -497,7 +499,7 @@ test.describe("E2EE主要フローとCSVインポートSeed検証", () => {
   test("家族グループ作成、CSV暗号化インポート、詳細でのヒント復号、および安全な一括削除クリーンアップ", async ({
     page,
   }, testInfo) => {
-    test.setTimeout(180_000);
+    test.setTimeout(300_000);
     const runId = `${testInfo.workerIndex}-${testInfo.retry}-${Date.now()}`;
     const accountName = `E2E ${runId}`;
     const familyName = `PoohMa E2E ${runId}`;

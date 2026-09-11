@@ -130,23 +130,21 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     return { user };
   },
 
-  errorComponent: (props) => {
+  errorComponent: (_props) => {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-6 text-center">
-        <h1 className="mb-4 text-[32px] font-semibold tracking-geist-hero text-red-500">
-          Error
+        <h1 className="mb-4 text-[28px] sm:text-[32px] font-semibold tracking-geist-hero text-destructive">
+          エラーが発生しました
         </h1>
-        <p className="mb-8 text-[16px] text-muted-foreground">
-          {props.error instanceof Error
-            ? props.error.message
-            : "予期せぬエラーが発生しました。"}
+        <p className="mb-8 text-[15px] sm:text-[16px] text-muted-foreground max-w-md">
+          ページの読み込み中に問題が発生しました。時間をおいてもう一度お試しいただくか、トップページへお戻りください。
         </p>
         <button
           type="button"
           onClick={() => {
             window.location.href = "/";
           }}
-          className="rounded-md bg-foreground px-6 py-2 text-[14px] font-medium text-background shadow-border transition hover:bg-gray-800"
+          className="rounded-md bg-foreground px-6 py-2.5 text-[14px] font-medium text-background shadow-border transition hover:bg-foreground/90 cursor-pointer"
         >
           トップページへ戻る
         </button>
@@ -156,18 +154,18 @@ export const Route = createRootRouteWithContext<RouterContext>()({
   notFoundComponent: () => {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-6 text-center">
-        <h1 className="mb-4 text-[32px] font-semibold tracking-geist-hero text-foreground">
-          404 Not Found
+        <h1 className="mb-4 text-[28px] sm:text-[32px] font-semibold tracking-geist-hero text-foreground">
+          ページが見つかりません
         </h1>
-        <p className="mb-8 text-[16px] text-muted-foreground">
-          お探しのページは見つかりませんでした。
+        <p className="mb-8 text-[15px] sm:text-[16px] text-muted-foreground max-w-md">
+          お探しのページは移動または削除された可能性があります。
         </p>
         <button
           type="button"
           onClick={() => {
             window.location.href = "/";
           }}
-          className="rounded-md bg-foreground px-6 py-2 text-[14px] font-medium text-background shadow-border transition hover:bg-gray-800"
+          className="rounded-md bg-foreground px-6 py-2.5 text-[14px] font-medium text-background shadow-border transition hover:bg-foreground/90 cursor-pointer"
         >
           トップページへ戻る
         </button>

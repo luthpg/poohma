@@ -53,9 +53,8 @@ async function syncSessionCookieInBackground(user: FirebaseUser) {
     }
 
     await refreshSessionCookie({ data: { idToken } });
-  } catch (e) {
+  } catch (_e) {
     lastSessionSyncTime = 0;
-    console.warn("Background session cookie sync failed:", e);
   }
 }
 
@@ -85,8 +84,7 @@ export function useConvexFirebaseAuth() {
           }
           await signInWithCustomToken(firebaseAuth, result.customToken);
           return true;
-        } catch (error) {
-          console.error("Silent re-auth failed:", error);
+        } catch (_error) {
           return false;
         } finally {
           recoveryPromiseRef.current = null;
@@ -187,8 +185,7 @@ export function useConvexFirebaseAuth() {
             markPwaAsInitialized();
           }
           return token;
-        } catch (error) {
-          console.error("Failed to fetch access token:", error);
+        } catch (_error) {
           return null;
         }
       },

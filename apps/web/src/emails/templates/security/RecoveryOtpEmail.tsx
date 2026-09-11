@@ -49,7 +49,7 @@ export function RecoveryOtpEmail({
     <Layout preview={`[PoohMa] 家族復元用の認証コード: ${otpCode}`}>
       <Text style={text}>{displayName} さん</Text>
       <Text style={text}>
-        家族「{familyName}」のマスターキー復元リクエストを受け付けました。
+        家族「{familyName}」のデータ復旧リクエストを受け付けました。
       </Text>
       <Text style={text}>
         復元画面にて以下の6桁の認証コード（OTP）を入力してください。
@@ -72,7 +72,7 @@ export const recoveryOtpEmail = defineEmailTemplate({
   key: "recoveryOtp",
   props,
   subject: ({ otpCode }: Props) =>
-    `[PoohMa] マスターキー復元の認証コード: ${otpCode}`,
+    `[PoohMa] 家族データ復旧の認証コード: ${otpCode}`,
   Component: RecoveryOtpEmail,
 });
 

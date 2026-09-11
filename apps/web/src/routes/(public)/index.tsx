@@ -52,12 +52,8 @@ function RouteComponent() {
               </div>
 
               <p className="mt-6 max-w-xl text-base text-[#4d4d4d] dark:text-zinc-400 sm:text-lg leading-relaxed">
-                <JpText as="span">
-                  PoohMa（プーマ）は、実際のパスワードを1文字もサーバーに預けません。
-                </JpText>
-                <br />
-                <JpText as="span">
-                  ご家族にしか分からない「ヒント」を安全に共有する、家族みんなで使うアカウント管理帳です。
+                <JpText>
+                  PoohMa（プーマ）は、実際のパスワードを1文字もサーバーに預けません。ご家族にしか分からない「ヒント」を安全に共有する、家族みんなで使うアカウント管理帳です。
                 </JpText>
               </p>
 
@@ -127,10 +123,10 @@ function RouteComponent() {
                   </div>
                   <div className="flex flex-col pr-2">
                     <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-wider">
-                      Security
+                      安全性
                     </span>
                     <span className="text-xs font-extrabold text-[#171717] dark:text-zinc-100 tracking-tight">
-                      E2E Encrypted
+                      端末間で暗号化
                     </span>
                   </div>
                 </div>
@@ -438,12 +434,12 @@ function RouteComponent() {
                           <Download className="h-6 w-6" />
                         </div>
                         <h3 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-geist-h2 text-[#171717] dark:text-zinc-100 leading-tight">
-                          いつでもCSVエクスポート可能
+                          いつでもCSV形式で手元に保存可能
                         </h3>
                         <ul className="text-[#4d4d4d] dark:text-zinc-400 text-sm md:text-base leading-relaxed list-disc">
                           {[
                             "サービスを解約したいけれどデータが残るのが不安という心配は不要",
-                            "登録したすべてのデータはいつでも安全なCSV/プレーンテキストとして手元にエクスポートして退会できます",
+                            "登録したすべてのデータはいつでも安全なCSVファイルとしてお手元にダウンロードして退会できます",
                           ].map((item) => (
                             <JpText as="li" key={item}>
                               {item}
@@ -584,7 +580,7 @@ function RouteComponent() {
             <div className="mb-14 bg-orange-50/50 dark:bg-orange-500/5 border border-orange-200/50 dark:border-orange-500/20 rounded-2xl p-5 sm:p-6 md:p-8 text-center max-w-3xl mx-auto overflow-hidden">
               <h3 className="text-lg sm:text-xl font-extrabold text-[#f97316] dark:text-orange-400 tracking-geist-h2 mb-2">
                 <JpText>
-                  ゼロ知識設計により、開発チームを含め誰もパスワードを復号できません
+                  運営側でも内容を確認できない安心の設計により、誰もヒントを見ることはできません
                 </JpText>
               </h3>
               <JpText
@@ -760,7 +756,9 @@ function RouteComponent() {
                     サーバー保管
                   </h4>
                   <p className="text-xs text-[#666666] dark:text-zinc-400 leading-relaxed">
-                    <JpText>復号するパスコードは家族しか知らないため、</JpText>
+                    <JpText>
+                      暗号を解除するパスコードは家族しか知らないため、
+                    </JpText>
                     <strong className="font-extrabold">
                       <JpText>
                         開発チームであっても中身を開けられません。

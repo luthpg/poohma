@@ -13,9 +13,9 @@ export type JpTextProps<T extends React.ElementType = "span"> = {
   as?: T;
 } & Omit<React.ComponentPropsWithoutRef<T>, "children" | "className" | "as">;
 
-// 単一文字列に対して \n での改行分割と BudouX パースを行う関数
+// 単一文字列に対して 句点（。）による文章区切りと \n での改行分割、BudouX パースを行う関数
 const processString = (text: string) => {
-  const lines = text.split(/\r\n|\r|\n/);
+  const lines = text.replace(/。(?=[^\r\n])/g, "。\n").split(/\r\n|\r|\n/);
   return lines.map((line, index) => {
     const lineKey = `line-${index}-${line}`;
     const tokens = parser.parse(line);

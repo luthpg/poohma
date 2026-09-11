@@ -39,8 +39,7 @@ export function CreateAccountDialog({
       setName("");
       onOpenChange(false);
       onSuccess?.();
-    } catch (error) {
-      console.error(error);
+    } catch {
       toast.error("アカウントの作成に失敗しました");
     } finally {
       setIsSubmitting(false);
@@ -55,7 +54,7 @@ export function CreateAccountDialog({
             新しいPoohMaアカウントの作成
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
-            用途ごとに独立したアカウントとファミリー環境を作成できます。
+            用途ごとに独立したアカウントと家族グループを作成できます。
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 pt-2">

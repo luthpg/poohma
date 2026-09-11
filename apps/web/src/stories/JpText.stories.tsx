@@ -59,6 +59,23 @@ export const WithNewLine: Story = {
   ],
 };
 
+// 句点（。）による自動改行のサンプル
+export const WithPeriods: Story = {
+  args: {
+    children:
+      "句点を含む複数文のテキストです。文末の句点ごとに自動的に改行が挿入されます。これにより、長文でも読みやすいレイアウトが保たれます。",
+  },
+  decorators: [
+    (Story) => (
+      <div
+        style={{ width: "280px", border: "1px dashed #ccc", padding: "16px" }}
+      >
+        <Story />
+      </div>
+    ),
+  ],
+};
+
 // <br /> や <strong> などの JSX 要素を含むサンプル
 export const WithJsxElements: Story = {
   render: (args) => (

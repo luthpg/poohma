@@ -267,7 +267,6 @@ function RecordDetailComponent({
         setTimeout(() => setShareSuccess(false), 2000);
       } catch (err) {
         if ((err as Error)?.name !== "AbortError") {
-          console.error("シェア処理に失敗しました:", err);
           toast.error("共有に失敗しました");
         }
       }
@@ -277,8 +276,7 @@ function RecordDetailComponent({
         setCopied(true);
         toast.success("URLをクリップボードにコピーしました");
         setTimeout(() => setCopied(false), 2000);
-      } catch (err) {
-        console.error("クリップボードコピーに失敗しました:", err);
+      } catch {
         toast.error("URLのコピーに失敗しました");
       }
     }
@@ -305,9 +303,7 @@ function RecordDetailComponent({
       heartbeatEditingSession({
         recordId: record._id,
         accountId: activeAccountId || undefined,
-      }).catch((e) => {
-        console.error("Heartbeat failed:", e);
-      });
+      }).catch(() => {});
     }, 30_000);
 
     // タブ・アプリ復帰（visibilitychange: visible）時の即時ハートビート
@@ -316,9 +312,7 @@ function RecordDetailComponent({
         heartbeatEditingSession({
           recordId: record._id,
           accountId: activeAccountId || undefined,
-        }).catch((e) => {
-          console.error("Heartbeat on visible failed:", e);
-        });
+        }).catch(() => {});
       }
     };
 
@@ -382,8 +376,7 @@ function RecordDetailComponent({
                 loginId: c.loginId || "",
                 passwordHint: plain,
               };
-            } catch (e) {
-              console.error("Failed to decrypt on edit start", e);
+            } catch {
               return {
                 id: c.id,
                 label: c.label || "",
@@ -429,8 +422,8 @@ function RecordDetailComponent({
         recordId: record._id,
         accountId: activeAccountId || undefined,
       });
-    } catch (e) {
-      console.error("Failed to start editing session:", e);
+    } catch {
+      // 編集セッション開始失敗はサイレントに処理
     }
   };
 
@@ -445,8 +438,8 @@ function RecordDetailComponent({
         recordId: record._id,
         accountId: activeAccountId || undefined,
       });
-    } catch (e) {
-      console.error("Failed to end editing session:", e);
+    } catch {
+      // 編集セッション終了失敗はサイレントに処理
     }
   }, [endEditingSession, record._id, activeAccountId]);
 
@@ -516,8 +509,7 @@ function RecordDetailComponent({
       setInitialRevision(null);
       await router.invalidate();
       setIsEditing(false);
-    } catch (err) {
-      console.error("強制上書き保存に失敗しました:", err);
+    } catch {
       toast.error("保存に失敗しました");
     } finally {
       setIsLoading(false);
@@ -534,8 +526,7 @@ function RecordDetailComponent({
       });
       toast.success("レコードを削除しました");
       await navigate({ to: "/dashboard" });
-    } catch (error) {
-      console.error("削除エラー:", error);
+    } catch {
       toast.error("削除に失敗しました");
     } finally {
       setIsLoading(false);
@@ -551,7 +542,7 @@ function RecordDetailComponent({
 
     if (isRecordStale) {
       toast.error(
-        "他のメンバーによってレコードが更新されました。保存時に競合が発生します。",
+        "他のご家族によってレコードが更新されました。保存内容が上書きされる可能性があります。",
         {
           id: "record-stale-toast",
           duration: Number.POSITIVE_INFINITY,
@@ -584,7 +575,7 @@ function RecordDetailComponent({
         .map((e) => e.displayName || e.email || "メンバー")
         .join("、 ");
       toast.warning(
-        `${editorsText} もこのレコードを編集中です（保存競合にご注意ください）`,
+        `${editorsText} もこのレコードを編集中です（他のご家族の変更と重ならないようご注意ください）`,
         {
           id: "editing-presence-toast",
           duration: Number.POSITIVE_INFINITY,
@@ -637,7 +628,7 @@ function RecordDetailComponent({
                     `${e.displayName || e.email || "メンバー"} (${formatLastActive(e.updatedAt)})`,
                 )
                 .join("、 ")}{" "}
-              もこのレコードを編集中です。保存時の競合にご注意ください。
+              もこのレコードを編集中です（他のご家族の変更と重ならないようご注意ください）。
             </div>
           </div>
         )}
@@ -648,7 +639,7 @@ function RecordDetailComponent({
             <span className="text-base leading-none">⚠️</span>
             <div>
               <span className="font-semibold">内容が更新されました:</span>{" "}
-              編集を開始した後に、他のメンバーによってこのレコードが更新されました。このまま保存すると競合が発生します。
+              編集を開始した後に、他のご家族によってこのレコードが更新されました。このまま保存すると編集内容が上書きされる可能性があります。
             </div>
           </div>
         )}
@@ -669,13 +660,13 @@ function RecordDetailComponent({
         >
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>編集の競合が発生しました</AlertDialogTitle>
+              <AlertDialogTitle>同時に編集が行われました</AlertDialogTitle>
               <AlertDialogDescription className="space-y-2 text-sm text-muted-foreground">
                 <span className="block">
-                  あなたが編集中に、他の家族メンバーによってこのレコードが更新されました。
+                  あなたが編集中に、他のご家族によってこのレコードが更新されました。
                 </span>
                 <span className="block">
-                  現在の変更内容で上書き保存するか、最新の内容を再読み込みするかを選択してください。
+                  現在の入力内容で上書き保存するか、最新の内容を再読み込みするかを選択してください。
                 </span>
               </AlertDialogDescription>
             </AlertDialogHeader>
@@ -773,7 +764,7 @@ function RecordDetailComponent({
                     `${e.displayName || e.email || "メンバー"} (${formatLastActive(e.updatedAt)})`,
                 )
                 .join("、 ")}{" "}
-              が現在このレコードを編集しています。編集を開始する場合や更新時は競合にご注意ください。
+              が現在このレコードを編集しています。編集を開始する場合や更新時は、変更内容の重複にご注意ください。
             </p>
           </div>
         </div>
@@ -827,17 +818,16 @@ function RecordDetailComponent({
                         tags: record.tags,
                       },
                     });
-                    toast.success("OGP情報を更新しました");
+                    toast.success("サイト情報を更新しました");
                     await router.invalidate();
                   } catch (e: unknown) {
-                    console.error(e);
                     const msg = e instanceof Error ? e.message : "";
                     if (msg.includes("CONFLICT")) {
                       toast.error(
-                        "他のユーザーによる更新と競合したためOGPを更新できませんでした",
+                        "他のご家族の更新と重なったため、サイト情報を更新できませんでした",
                       );
                     } else {
-                      toast.error("OGP情報の更新に失敗しました");
+                      toast.error("サイト情報の更新に失敗しました");
                     }
                   } finally {
                     setIsLoading(false);
@@ -847,7 +837,7 @@ function RecordDetailComponent({
                 className="rounded-full bg-black/60 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm hover:bg-black/80 transition flex items-center gap-2 disabled:opacity-50"
               >
                 {isLoading ? <Spinner className="h-4 w-4" /> : "↻"}
-                OGP更新
+                サイト情報を更新
               </button>
               <a
                 href={record.url}
@@ -902,8 +892,7 @@ function RecordDetailComponent({
                       });
                       toast.success("家族と共有しました");
                       await router.invalidate();
-                    } catch (e) {
-                      console.error(e);
+                    } catch {
                       toast.error("共有に失敗しました");
                     } finally {
                       setIsLoading(false);
@@ -1111,8 +1100,7 @@ function ShareSettingsDialog({
       toast.success("管理者を設定しました");
       setSelectedMemberId("");
       await onRecordUpdated();
-    } catch (e) {
-      console.error(e);
+    } catch {
       toast.error("管理者の追加に失敗しました");
     } finally {
       setIsSubmitting(false);
@@ -1130,7 +1118,6 @@ function ShareSettingsDialog({
       toast.success("管理者を解除しました");
       await onRecordUpdated();
     } catch (e: unknown) {
-      console.error(e);
       const raw = e instanceof Error ? e.message : "";
       toast.error(
         raw.includes("管理者が0人になるため削除できません")
@@ -1152,8 +1139,7 @@ function ShareSettingsDialog({
       toast.success("共有を解除し、個人用レコードにしました");
       setIsOpen(false);
       await onRecordUpdated();
-    } catch (e) {
-      console.error(e);
+    } catch {
       toast.error("共有解除に失敗しました");
     } finally {
       setIsSubmitting(false);
@@ -1368,7 +1354,7 @@ function CredentialCard({
         // ログ記録失敗は UI に影響させない
       });
     } catch {
-      toast.error("復号に失敗しました");
+      toast.error("ヒントの読み込みに失敗しました");
     } finally {
       setIsDecrypting(false);
     }
@@ -1415,7 +1401,7 @@ function CredentialCard({
               {isDecrypting ? (
                 <>
                   <Spinner className="h-3 w-3" />
-                  復号中...
+                  読み込み中...
                 </>
               ) : (
                 "🔒 クリックして表示"

@@ -349,8 +349,7 @@ function RouteComponent() {
       setSelectedIds([]);
       setIsSelectMode(false);
       setActiveModal(null);
-    } catch (err) {
-      console.error(err);
+    } catch (_err) {
       toast.error("削除に失敗しました");
     }
   };
@@ -374,8 +373,7 @@ function RouteComponent() {
       setSelectedIds([]);
       setIsSelectMode(false);
       setActiveModal(null);
-    } catch (err) {
-      console.error(err);
+    } catch (_err) {
       toast.error("タグの追加に失敗しました");
     }
   };
@@ -391,8 +389,7 @@ function RouteComponent() {
       setSelectedIds([]);
       setIsSelectMode(false);
       setActiveModal(null);
-    } catch (err: unknown) {
-      console.error(err);
+    } catch (_err: unknown) {
       toast.error("一括共有に失敗しました");
     }
   };
@@ -414,8 +411,7 @@ function RouteComponent() {
       setSelectedIds([]);
       setIsSelectMode(false);
       setActiveModal(null);
-    } catch (err: unknown) {
-      console.error(err);
+    } catch (_err: unknown) {
       toast.error("一括共有解除に失敗しました");
     }
   };
