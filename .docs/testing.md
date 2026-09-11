@@ -186,6 +186,7 @@ flowchart TD
 | REC-15, 16 | Record 更新・他人 Record 更新拒否・楽観的ロック | 統合 | P0 | ✅ 実装済 | `tests/convex-records.spec.ts` |
 | REC-17〜19 | Record 単体・複数一括削除・権限拒否 | 統合 | P0 | ✅ 実装済 | `tests/convex-records.spec.ts` |
 | REC-20, 21 | 一括更新（タグ・共有切替）・他人レコード混入防止 | 統合 | P0 | ✅ 実装済 | `tests/convex-records.spec.ts` |
+| REC-25 | 一括公開設定変更の確認ステップ（件数・変更方向明示・キャンセル時の不実行・確定時実行） | 単体/UI | P1 | ✅ 実装済 | `tests/bulk-visibility-modal.spec.tsx` |
 | REC-22〜24 | Credential 追加・削除・上限（10件） | 統合 | P1 | ✅ 実装済 | `tests/convex-records.spec.ts` |
 | SEARCH-01〜07 | タイトル・メモ・ログインID等による複合検索 | 統合 | P1 | ✅ 実装済 | `tests/convex-records.spec.ts` |
 | SEARCH-08 | タグによるトグル絞り込み | 統合 | P1 | ✅ 実装済 | `tests/convex-records.spec.ts` |

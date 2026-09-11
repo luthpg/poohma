@@ -43,21 +43,31 @@ async function createTestAccount(
   // オンボーディングモーダルが表示された場合はスキップして消えるまで待機
   await ensureOnboardingCompleted(page);
 
-  // ① ユーザーメニューアバターをクリック
+  // ① ユーザーメニュー（ヘッダーアバター）またはアカウントスイッチャーをクリック
   const userMenuTrigger = page
     .locator('[data-testid="user-menu-trigger"]')
     .filter({ visible: true })
     .first();
-  await expect(userMenuTrigger).toBeVisible({ timeout: 25000 });
-  await userMenuTrigger.click();
 
-  // ② Googleアカウント情報欄をクリック
-  const accountSubTrigger = page
-    .locator('[data-slot="dropdown-menu-sub-trigger"]')
-    .or(page.locator('button:has-text("切替")'))
-    .first();
-  await expect(accountSubTrigger).toBeVisible({ timeout: 5000 });
-  await accountSubTrigger.click();
+  if (await userMenuTrigger.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await userMenuTrigger.click();
+
+    // ② Googleアカウント情報欄をクリック
+    const accountSubTrigger = page
+      .locator('[data-slot="dropdown-menu-sub-trigger"]')
+      .or(page.locator('button:has-text("切替")'))
+      .first();
+    await expect(accountSubTrigger).toBeVisible({ timeout: 5000 });
+    await accountSubTrigger.click();
+  } else {
+    // 家族未所属時は画面上の AccountSwitcher を直接クリック
+    const switcherTrigger = page
+      .locator('button:has-text("ファミリー未所属")')
+      .or(page.locator('button:has-text("未所属")'))
+      .first();
+    await expect(switcherTrigger).toBeVisible({ timeout: 15000 });
+    await switcherTrigger.click();
+  }
 
   // ③ サブメニュー内の「新しいアカウントを作成」をクリック
   const createBtn = page.getByText("新しいアカウントを作成", { exact: true });
@@ -68,10 +78,24 @@ async function createTestAccount(
   const nameInput = page.locator("input#create-account-name-input").first();
   await expect(nameInput).toBeVisible({ timeout: 5000 });
   await nameInput.fill(accountName);
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "作成する", exact: true })
-    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "作成する", exact: true }).click();
+  await expect(dialog).toBeHidden({ timeout: 10000 });
+
+  // 作成したアカウントがアクティブとして反映されるのを待機
+  const accountActiveIndicator = page.getByText(accountName).first();
+  try {
+    await expect(accountActiveIndicator).toBeVisible({ timeout: 5000 });
+  } catch {
+    const switcher = page
+      .locator('[data-testid="user-menu-trigger"]')
+      .or(page.locator('button:has-text("ファミリー未所属")'))
+      .or(page.locator('button:has-text("未所属")'))
+      .first();
+    await switcher.click();
+    await page.getByText(accountName, { exact: true }).first().click();
+    await expect(accountActiveIndicator).toBeVisible({ timeout: 10000 });
+  }
 }
 
 /**
@@ -224,6 +248,127 @@ async function verifyRecordDecryption(
   // 暗号化されていたパスワードヒントが平文に復号されて表示されていることを検証
   const decryptedHint = page.locator(`text="${expectedHint}"`);
   await expect(decryptedHint).toBeVisible({ timeout: 15000 });
+}
+
+/**
+ * 一括公開設定変更の確認ステップおよび共有・解除フローを検証
+ */
+async function verifyBulkVisibilityFlow(
+  page: Page,
+  recordIds: string[],
+): Promise<void> {
+  await page.goto("/dashboard");
+  await expect(page).toHaveURL(/.*\/dashboard/, { timeout: 20000 });
+  await ensureOnboardingCompleted(page);
+
+  // テスト対象レコード（最初の3件）
+  const targetIds = recordIds.slice(0, 3);
+  expect(targetIds.length).toBeGreaterThan(0);
+
+  // --- 1. 一括操作モード起動とレコード選択 ---
+  const bulkOpButton = page.locator('button:has-text("一括操作")').first();
+  await expect(bulkOpButton).toBeVisible({ timeout: 15000 });
+  await bulkOpButton.click();
+
+  for (const recordId of targetIds) {
+    const recordLink = page.locator(`a[href="/records/${recordId}"]`).first();
+    await expect(recordLink).toBeVisible({ timeout: 5000 });
+    await recordLink.click();
+  }
+  await expect(page.getByText(`${targetIds.length} 件選択中`)).toBeVisible();
+
+  // --- 2. 公開設定モーダル起動 ---
+  const visibilityTriggerBtn = page
+    .locator('button:has-text("公開設定")')
+    .first();
+  await expect(visibilityTriggerBtn).toBeVisible({ timeout: 5000 });
+  await visibilityTriggerBtn.click();
+
+  const modal = page.locator('[data-testid="bulk-visibility-modal"]');
+  await expect(modal).toBeVisible({ timeout: 5000 });
+  await expect(modal.getByText("選択したレコードの共有設定")).toBeVisible();
+
+  // --- 3. 「家族に共有」を選択して確認画面の表示検証 ---
+  const shareOption = modal.locator('[data-testid="select-share-option"]');
+  await expect(shareOption).toBeVisible({ timeout: 5000 });
+  await shareOption.click();
+
+  // 確認画面の要素（タイトル、変更方向、件数）を確認
+  await expect(modal.getByText("家族共有への一括変更確認")).toBeVisible();
+  await expect(modal.getByText("自分のみ")).toBeVisible();
+  await expect(modal.getByText("家族全員に共有")).toBeVisible();
+  await expect(
+    modal.getByText(`${targetIds.length} 件`, { exact: true }),
+  ).toBeVisible();
+
+  // --- 4. 「戻る」ボタンの検証（キャンセル・復帰動作） ---
+  const backBtn = modal.locator('[data-testid="back-to-select-button"]');
+  await expect(backBtn).toBeVisible({ timeout: 5000 });
+  await backBtn.click();
+  await expect(modal.getByText("選択したレコードの共有設定")).toBeVisible();
+
+  // --- 5. 再度「家族に共有」➔ 確定実行 ---
+  await modal.locator('[data-testid="select-share-option"]').click();
+  const confirmShareBtn = modal.locator('[data-testid="confirm-share-button"]');
+  await expect(confirmShareBtn).toBeVisible({ timeout: 5000 });
+  await confirmShareBtn.click();
+
+  // 成功トーストの確認
+  const shareSuccessToast = page.locator(
+    "text=/\\d+\\s*件のレコードを家族と共有しました/",
+  );
+  await expect(shareSuccessToast).toBeVisible({ timeout: 20000 });
+  await shareSuccessToast
+    .waitFor({ state: "hidden", timeout: 15000 })
+    .catch(() => {});
+
+  // --- 6. 続けて「共有解除（自分のみ）」の確認フローを検証 ---
+  await page.waitForTimeout(500);
+  // 選択モードが解除されているため再度起動
+  await expect(bulkOpButton).toBeVisible({ timeout: 15000 });
+  await bulkOpButton.click();
+
+  for (const recordId of targetIds) {
+    const recordLink = page.locator(`a[href="/records/${recordId}"]`).first();
+    await expect(recordLink).toBeVisible({ timeout: 5000 });
+    await recordLink.click();
+  }
+  await expect(page.getByText(`${targetIds.length} 件選択中`)).toBeVisible();
+
+  await visibilityTriggerBtn.click();
+  await expect(modal).toBeVisible({ timeout: 5000 });
+
+  // 「自分のみ」を選択
+  const unshareOption = modal.locator('[data-testid="select-unshare-option"]');
+  await expect(unshareOption).toBeVisible({ timeout: 5000 });
+  await unshareOption.click();
+
+  // 確認画面（タイトル、変更方向、件数）を確認
+  await expect(
+    modal.getByText("共有解除（個人用）への一括変更確認"),
+  ).toBeVisible();
+  await expect(modal.getByText("家族全員に共有")).toBeVisible();
+  await expect(modal.getByText("自分のみ（個人用）")).toBeVisible();
+  await expect(
+    modal.getByText(`${targetIds.length} 件`, { exact: true }),
+  ).toBeVisible();
+
+  // 確定ボタンをクリック
+  const confirmUnshareBtn = modal.locator(
+    '[data-testid="confirm-unshare-button"]',
+  );
+  await expect(confirmUnshareBtn).toBeVisible({ timeout: 5000 });
+  await confirmUnshareBtn.click();
+
+  // 成功トーストの確認
+  const unshareSuccessToast = page.locator(
+    "text=/\\d+\\s*件のレコードの共有を解除しました/",
+  );
+  await expect(unshareSuccessToast).toBeVisible({ timeout: 20000 });
+  await unshareSuccessToast
+    .waitFor({ state: "hidden", timeout: 15000 })
+    .catch(() => {});
+  await page.waitForTimeout(500);
 }
 
 /**
@@ -412,6 +557,13 @@ test.describe("E2EE主要フローとCSVインポートSeed検証", () => {
       });
 
       // =====================================================================
+      // Step 3.5: 一括操作モードによる公開設定変更の確認ステップ・共有切替検証
+      // =====================================================================
+      await test.step("Step 3.5: 一括操作モードによる公開設定変更の確認ステップ検証 (/dashboard)", async () => {
+        await verifyBulkVisibilityFlow(page, importedRecordIds);
+      });
+
+      // =====================================================================
       // Step 4: 一括操作モードによるインポートレコード削除
       // =====================================================================
       await test.step("Step 4: 一括操作モードによるインポートレコード削除 (/dashboard)", async () => {
@@ -419,7 +571,7 @@ test.describe("E2EE主要フローとCSVインポートSeed検証", () => {
       });
     } finally {
       // =====================================================================
-      // Step 5: クリーンアップ (テスト成否にかかわらず実行専用アカウントを削除)
+      // Step 5: クリーンアップ (テスト成否にかかわらず実行専用サブアカウントを削除)
       // =====================================================================
       if (accountCreated) {
         await test.step("Step 5: テスト専用アカウントおよび家族の削除 (/settings)", async () => {

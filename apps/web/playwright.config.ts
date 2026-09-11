@@ -56,6 +56,11 @@ export default defineConfig({
     {
       name: "setup",
       testMatch: /auth\.setup\.ts/,
+      teardown: "teardown",
+    },
+    {
+      name: "teardown",
+      testMatch: /auth\.teardown\.ts/,
     },
     {
       name: "public",
@@ -69,6 +74,7 @@ export default defineConfig({
       testIgnore: [
         /.*public.*\.spec\.ts/,
         /auth\.setup\.ts/,
+        /auth\.teardown\.ts/,
         /logout\.spec\.ts/,
       ],
       use: {

@@ -6,7 +6,7 @@ import {
   useSearch,
 } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
-import { Globe, LayoutGrid, List, Lock, Tag, Trash2, X } from "lucide-react";
+import { Globe, LayoutGrid, List, Tag, Trash2, X } from "lucide-react";
 import {
   type SubmitEvent,
   Suspense,
@@ -23,6 +23,7 @@ import { IndexScrollBar } from "@/components/IndexScrollBar";
 import { OnboardingBanner } from "@/components/onboarding/OnboardingBanner";
 import { OnboardingModal } from "@/components/onboarding/OnboardingModal";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
+import { BulkVisibilityModal } from "@/components/records/BulkVisibilityModal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TagInput } from "@/components/ui/tag-input";
 import { useAccount } from "@/hooks/useAccount";
@@ -290,6 +291,48 @@ function RouteComponent() {
   >(null);
   const [bulkTagInput, setBulkTagInput] = useState<string[]>([]);
 
+  // 選択中レコードの情報・内訳
+  const selectedRecords = useMemo(
+    () => records?.filter((r) => selectedIds.includes(r._id)) ?? [],
+    [records, selectedIds],
+  );
+
+  const selectedPrivateCount = useMemo(
+    () => selectedRecords.filter((r) => r.ownerType === "user").length,
+    [selectedRecords],
+  );
+
+  const selectedSharedCount = useMemo(
+    () => selectedRecords.filter((r) => r.ownerType === "family").length,
+    [selectedRecords],
+  );
+
+  // 共有解除可能なレコード（自分が管理者である家族共有レコード）
+  const unshareableRecords = useMemo(
+    () =>
+      selectedRecords.filter(
+        (r) =>
+          r.ownerType === "family" &&
+          Boolean(
+            activeAccountId && (r.admins ?? []).includes(activeAccountId),
+          ),
+      ),
+    [selectedRecords, activeAccountId],
+  );
+
+  // 管理者権限がないため共有解除の対象外となるレコード
+  const excludedUnshareRecords = useMemo(
+    () =>
+      selectedRecords
+        .filter(
+          (r) =>
+            r.ownerType === "family" &&
+            !(activeAccountId && (r.admins ?? []).includes(activeAccountId)),
+        )
+        .map((r) => ({ id: r._id, title: r.title })),
+    [selectedRecords, activeAccountId],
+  );
+
   const deleteRecordsMut = useMutation(api.records.deleteRecords);
   const bulkUpdateRecordsMut = useMutation(api.records.bulkUpdateRecords);
   const bulkShareMut = useMutation(api.records.bulkShareRecords);
@@ -355,11 +398,17 @@ function RouteComponent() {
   };
 
   const handleBulkUnshare = async () => {
-    if (selectedIds.length === 0) return;
+    const targetIds = unshareableRecords.map(
+      (r) => r._id as Id<"serviceRecords">,
+    );
+    if (targetIds.length === 0) {
+      toast.error("共有解除可能なレコードがありません");
+      return;
+    }
     try {
       const result = await bulkUnshareMut({
         accountId: activeAccountId || undefined,
-        ids: selectedIds as Id<"serviceRecords">[],
+        ids: targetIds,
       });
       toast.success(`${result.count} 件のレコードの共有を解除しました`);
       setSelectedIds([]);
@@ -548,52 +597,17 @@ function RouteComponent() {
       )}
 
       {/* 共有設定モーダル */}
-      {activeModal === "visibility" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-lg animate-in fade-in duration-200">
-            <h3 className="text-lg font-semibold mb-2">
-              選択したレコードの共有設定
-            </h3>
-            <p className="text-sm text-muted-foreground mb-6">
-              選択した {selectedIds.length}{" "}
-              件のレコードの共有状態を一括で変更します。
-            </p>
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <button
-                type="button"
-                onClick={handleBulkUnshare}
-                className="flex flex-col items-center gap-2 p-4 rounded-lg border border-border hover:border-orange-500 hover:bg-orange-500/5 transition text-center cursor-pointer"
-              >
-                <Lock className="h-6 w-6 text-muted-foreground" />
-                <span className="font-semibold text-sm">自分のみ</span>
-                <span className="text-xs text-muted-foreground">
-                  共有を解除（個人用）
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={handleBulkShare}
-                className="flex flex-col items-center gap-2 p-4 rounded-lg border border-border hover:border-orange-500 hover:bg-orange-500/5 transition text-center cursor-pointer"
-              >
-                <Globe className="h-6 w-6 text-blue-500" />
-                <span className="font-semibold text-sm">家族に共有</span>
-                <span className="text-xs text-muted-foreground">
-                  家族全員で共有
-                </span>
-              </button>
-            </div>
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => setActiveModal(null)}
-                className="rounded-md border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-accent transition cursor-pointer"
-              >
-                キャンセル
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <BulkVisibilityModal
+        isOpen={activeModal === "visibility"}
+        selectedCount={selectedIds.length}
+        privateCount={selectedPrivateCount}
+        sharedCount={selectedSharedCount}
+        unshareableCount={unshareableRecords.length}
+        excludedUnshareRecords={excludedUnshareRecords}
+        onShare={handleBulkShare}
+        onUnshare={handleBulkUnshare}
+        onClose={() => setActiveModal(null)}
+      />
 
       {/* 削除確認モーダル */}
       {activeModal === "delete" && (

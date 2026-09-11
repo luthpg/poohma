@@ -13,20 +13,22 @@ test.describe("ログアウトフローの検証", () => {
     });
 
     // 2. ログアウト操作を実行（画面直下ボタン、またはUserMenuアバターからのドロップダウン）
-    const directLogout = page.locator("button:has-text('ログアウト')").first();
-    const hasDirectLogout = await directLogout
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
+    const directLogout = page
+      .getByRole("button", { name: "ログアウト" })
+      .first();
+    const userMenuTrigger = page
+      .locator('[data-testid="user-menu-trigger"]')
+      .filter({ visible: true })
+      .first();
 
-    if (hasDirectLogout) {
+    // 画面直下のログアウトボタン、または UserMenu トリガーの描画を待機
+    await expect(directLogout.or(userMenuTrigger).first()).toBeVisible({
+      timeout: 15000,
+    });
+
+    if (await directLogout.isVisible()) {
       await directLogout.click();
     } else {
-      // 家族所属時など画面上に直接ボタンがない場合は AppHeader の UserMenu を開く
-      const userMenuTrigger = page
-        .locator('[data-testid="user-menu-trigger"]')
-        .filter({ visible: true })
-        .first();
-      await userMenuTrigger.waitFor({ state: "visible", timeout: 15000 });
       await userMenuTrigger.click();
 
       const menuLogout = page
@@ -34,7 +36,7 @@ test.describe("ログアウトフローの検証", () => {
           '[role="menuitem"]:has-text("ログアウト"), button:has-text("ログアウト")',
         )
         .first();
-      await menuLogout.waitFor({ state: "visible", timeout: 5000 });
+      await expect(menuLogout).toBeVisible({ timeout: 5000 });
       await menuLogout.click();
     }
 
