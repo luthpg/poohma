@@ -1472,7 +1472,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
       });
 
       for (let i = 0; i < 5; i++) {
-        await ctx.db.insert("serviceRecords", {
+        const recordId = await ctx.db.insert("serviceRecords", {
           userId: "user_limit_a",
           accountId: userAId,
           familyId,
@@ -1482,6 +1482,12 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
           ownerFamilyId: familyId,
           admins: [userAId],
           tags: ["limit-test"],
+          updatedAt: Date.now() + i,
+        });
+
+        await ctx.db.insert("credentials", {
+          recordId,
+          label: `Limit Credential ${i}`,
           updatedAt: Date.now() + i,
         });
       }
@@ -1494,10 +1500,19 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
 
     const records = await userA.query(api.records.getRecords, {
       tag: "limit-test",
+      sort: "date-desc",
       limit: 2,
     });
 
     expect(records).toHaveLength(2);
+    expect(records.map((record) => record.title)).toEqual([
+      "Limit Service 4",
+      "Limit Service 3",
+    ]);
+    expect(records.map((record) => record.credentials[0]?.label)).toEqual([
+      "Limit Credential 4",
+      "Limit Credential 3",
+    ]);
   });
 
   it("getRecordsPaginated が Convex ページネーションに準拠してページ分割と credentials 取得を実行できること", async () => {

@@ -34,8 +34,8 @@ flowchart TB
     end
 
     subgraph DataEncryptionLayer["📄 データ暗号化層 (レコード単位)"]
-        DEK["<b>個別 DEK (Data Encryption Key)</b><br/>AES-GCM 256<br/>(credentials[].passwordHintDekEncrypted)"]:::dekNode
-        Hint["🔒 <b>暗号化済みパスワードヒント</b><br/>(credentials[].passwordHint)"]:::hintNode
+        DEK["<b>個別 DEK (Data Encryption Key)</b><br/>AES-GCM 256<br/>(credentials.passwordHintDekEncrypted)"]:::dekNode
+        Hint["🔒 <b>暗号化済みパスワードヒント</b><br/>(credentials.passwordHint)"]:::hintNode
     end
 
     Passcode -->|PBKDF2 導出| KEK
@@ -70,8 +70,8 @@ flowchart TB
 
 ### DEK（Data Encryption Key）
 
-- 認証情報1件ごとに生成される AES-GCM 256 鍵。`credentials.passwordHintDekEncrypted` / `passwordHintDekIv` としてマスターキーでラップされた状態で保存される。
-- このDEKでパスワードヒント本体を暗号化し、`credentials.passwordHint` / `passwordHintIv` として保存する。
+- 認証情報1件ごとに生成される AES-GCM 256 鍵。`credentials.passwordHintDekEncrypted` / `credentials.passwordHintDekIv` としてマスターキーでラップされた状態で保存される。
+- このDEKでパスワードヒント本体を暗号化し、`credentials.passwordHint` / `credentials.passwordHintIv` として保存する。
 - エンベロープ暗号化は全レコードで必須であり、暗号化・復号・再暗号化のいずれにおいても DEK を必須とする（マスターキー直接暗号化・復号へのフォールバックは行わない）。
 
 ## Encryption / Decryption Flow
@@ -123,7 +123,7 @@ sequenceDiagram
 
 | 区分 | 参照可能 | 参照不可 |
 | --- | --- | --- |
-| パスワードヒント平文 | | 不可（`credentials[].passwordHint` は常に暗号化済み） |
+| パスワードヒント平文 | | 不可（`credentials.passwordHint` は常に暗号化済み） |
 | マスターキー・DEK平文 | | 不可（`masterKeyEncrypted` / `passwordHintDekEncrypted` は常に暗号化済み） |
 | 家族パスコード | | 不可（サーバーに送信されない） |
 | リカバリーコード | 可（復元時に平文を送信してハッシュ照合。平文は非保存） | |

@@ -145,6 +145,29 @@ export async function asyncMapBounded<T, U>(
   return results;
 }
 
+function sortRecords<T extends Doc<"serviceRecords">>(
+  records: T[],
+  sort: string | undefined,
+): void {
+  records.sort((a, b) => {
+    if (sort === "name-asc")
+      return (a.titleReading || a.title).localeCompare(
+        b.titleReading || b.title,
+      );
+    if (sort === "name-desc")
+      return (b.titleReading || b.title).localeCompare(
+        a.titleReading || a.title,
+      );
+    if (sort === "url-asc") return (a.url || "").localeCompare(b.url || "");
+    if (sort === "url-desc") return (b.url || "").localeCompare(a.url || "");
+    if (sort === "date-asc" || sort === "updatedAt-asc")
+      return a.updatedAt - b.updatedAt;
+    if (sort === "date-desc" || sort === "updatedAt-desc")
+      return b.updatedAt - a.updatedAt;
+    return (a.sortKey || a.title).localeCompare(b.sortKey || b.title);
+  });
+}
+
 // === Queries ===
 
 export const getRecords = authenticatedQuery({
@@ -161,6 +184,14 @@ export const getRecords = authenticatedQuery({
 
     if (args.tag) {
       records = records.filter((r) => r.tags.includes(args.tag as string));
+    }
+
+    // クレデンシャル検索が不要な場合は、結合前に必要件数まで絞り込む
+    if (!args.q) {
+      sortRecords(records, args.sort);
+      if (args.limit !== undefined && args.limit > 0) {
+        records = records.slice(0, args.limit);
+      }
     }
 
     // 各レコードに紐づく credentials を小さなバッチ（Bounded Concurrency: 32件）で取得
@@ -200,29 +231,12 @@ export const getRecords = authenticatedQuery({
       );
     }
 
-    // ソート（args.sort 未指定時も sortKey による既定ソートを適用）
-    filtered.sort((a, b) => {
-      if (args.sort === "name-asc")
-        return (a.titleReading || a.title).localeCompare(
-          b.titleReading || b.title,
-        );
-      if (args.sort === "name-desc")
-        return (b.titleReading || b.title).localeCompare(
-          a.titleReading || a.title,
-        );
-      if (args.sort === "url-asc")
-        return (a.url || "").localeCompare(b.url || "");
-      if (args.sort === "url-desc")
-        return (b.url || "").localeCompare(a.url || "");
-      if (args.sort === "date-asc" || args.sort === "updatedAt-asc")
-        return a.updatedAt - b.updatedAt;
-      if (args.sort === "date-desc" || args.sort === "updatedAt-desc")
-        return b.updatedAt - a.updatedAt;
-      return (a.sortKey || a.title).localeCompare(b.sortKey || b.title);
-    });
-
-    if (args.limit !== undefined && args.limit > 0) {
-      filtered = filtered.slice(0, args.limit);
+    if (args.q) {
+      // ソート（args.sort 未指定時も sortKey による既定ソートを適用）
+      sortRecords(filtered, args.sort);
+      if (args.limit !== undefined && args.limit > 0) {
+        filtered = filtered.slice(0, args.limit);
+      }
     }
 
     return filtered;
