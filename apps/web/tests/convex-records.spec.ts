@@ -1452,4 +1452,158 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
       ).toBeUndefined();
     }
   });
+
+  it("getRecords が limit 引数を尊重し、指定された件数に制限して返却すること", async () => {
+    const t = convexTest(schema, modules);
+    let familyId!: Id<"families">;
+    let userAId!: Id<"users">;
+
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        name: "Limit Test Family",
+        updatedAt: Date.now(),
+      });
+
+      userAId = await ctx.db.insert("users", {
+        userId: "user_limit_a",
+        email: "limit_a@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+
+      for (let i = 0; i < 5; i++) {
+        const recordId = await ctx.db.insert("serviceRecords", {
+          userId: "user_limit_a",
+          accountId: userAId,
+          familyId,
+          title: `Limit Service ${i}`,
+          sortKey: `01_service_${i}`,
+          ownerType: "family",
+          ownerFamilyId: familyId,
+          admins: [userAId],
+          tags: ["limit-test"],
+          updatedAt: Date.now() + i,
+        });
+
+        await ctx.db.insert("credentials", {
+          recordId,
+          label: `Limit Credential ${i}`,
+          updatedAt: Date.now() + i,
+        });
+      }
+    });
+
+    const userA = t.withIdentity({
+      subject: "user_limit_a",
+      email: "limit_a@example.com",
+    });
+
+    const records = await userA.query(api.records.getRecords, {
+      tag: "limit-test",
+      sort: "date-desc",
+      limit: 2,
+    });
+
+    expect(records).toHaveLength(2);
+    expect(records.map((record) => record.title)).toEqual([
+      "Limit Service 4",
+      "Limit Service 3",
+    ]);
+    expect(records.map((record) => record.credentials[0]?.label)).toEqual([
+      "Limit Credential 4",
+      "Limit Credential 3",
+    ]);
+  });
+
+  it("getRecordsPaginated が Convex ページネーションに準拠してページ分割と credentials 取得を実行できること", async () => {
+    const t = convexTest(schema, modules);
+    let familyId!: Id<"families">;
+    let userAId!: Id<"users">;
+
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        name: "Paginated Test Family",
+        updatedAt: Date.now(),
+      });
+
+      userAId = await ctx.db.insert("users", {
+        userId: "user_paginated_a",
+        email: "paginated_a@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+
+      for (let i = 0; i < 5; i++) {
+        const recId = await ctx.db.insert("serviceRecords", {
+          userId: "user_paginated_a",
+          accountId: userAId,
+          familyId,
+          title: `Paginated Service ${i}`,
+          sortKey: `01_service_${i}`,
+          ownerType: "family",
+          ownerFamilyId: familyId,
+          admins: [userAId],
+          tags: ["paginated-test"],
+          updatedAt: Date.now() + i,
+        });
+
+        await ctx.db.insert("credentials", {
+          recordId: recId,
+          label: `Cred ${i}`,
+          loginId: `user${i}@example.com`,
+          passwordHint: `hint-${i}`,
+          order: 0,
+          updatedAt: Date.now() + i,
+        });
+      }
+    });
+
+    const userA = t.withIdentity({
+      subject: "user_paginated_a",
+      email: "paginated_a@example.com",
+    });
+
+    // 1ページ目: 2件取得
+    const page1 = await userA.query(api.records.getRecordsPaginated, {
+      tag: "paginated-test",
+      paginationOpts: {
+        numItems: 2,
+        cursor: null,
+      },
+    });
+
+    expect(page1.page).toHaveLength(2);
+    expect(page1.isDone).toBe(false);
+    expect(page1.continueCursor).toBeDefined();
+    expect(page1.page[0].credentials).toHaveLength(1);
+    expect(page1.page[0].credentials[0].label).toBe("Cred 0");
+    expect(
+      (page1.page[0].credentials[0] as Record<string, unknown>).passwordHint,
+    ).toBeUndefined();
+
+    // 2ページ目: 前回の continueCursor を渡して 2件取得
+    const page2 = await userA.query(api.records.getRecordsPaginated, {
+      tag: "paginated-test",
+      paginationOpts: {
+        numItems: 2,
+        cursor: page1.continueCursor,
+      },
+    });
+
+    expect(page2.page).toHaveLength(2);
+    expect(page2.isDone).toBe(false);
+    expect(page2.continueCursor).toBeDefined();
+
+    // 3ページ目: 残り 1件取得
+    const page3 = await userA.query(api.records.getRecordsPaginated, {
+      tag: "paginated-test",
+      paginationOpts: {
+        numItems: 2,
+        cursor: page2.continueCursor,
+      },
+    });
+
+    expect(page3.page).toHaveLength(1);
+    expect(page3.isDone).toBe(true);
+  });
 });

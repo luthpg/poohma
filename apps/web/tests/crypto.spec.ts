@@ -238,40 +238,6 @@ describe("1.1 暗号化コアロジックの単体テスト (src/lib/crypto.ts)"
       ).rejects.toThrow();
     });
 
-    it("旧形式（マスターキーによる直接暗号化）と新形式（DEK暗号化）の両方から正しくデータを復号できること（互換性の検証）", async () => {
-      const masterKey = await generateMasterKey();
-
-      // 1. 旧形式: マスターキーで直接暗号化
-      const oldEncrypted = await encrypt(SECRET_DATA, masterKey);
-
-      // 2. 新形式: DEKで暗号化
-      const dek = await generateDEK();
-      const wrappedDEK = await wrapDEK(dek, masterKey);
-      const newEncrypted = await encrypt(SECRET_DATA, dek);
-
-      // 復号関数を利用して、それぞれ復号できることを確認
-      // 旧形式
-      const oldDecrypted = await decrypt(
-        oldEncrypted.encrypted,
-        oldEncrypted.iv,
-        masterKey,
-      );
-      expect(oldDecrypted).toBe(SECRET_DATA);
-
-      // 新形式
-      const unwrappedDEK = await unwrapDEK(
-        wrappedDEK.encrypted,
-        wrappedDEK.iv,
-        masterKey,
-      );
-      const newDecrypted = await decrypt(
-        newEncrypted.encrypted,
-        newEncrypted.iv,
-        unwrappedDEK,
-      );
-      expect(newDecrypted).toBe(SECRET_DATA);
-    });
-
     it("マスターキーのローテーション時、アンラップされたDEKから再ラップが行えること", async () => {
       const oldMasterKey = await generateMasterKey();
       const newMasterKey = await generateMasterKey();

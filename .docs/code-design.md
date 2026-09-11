@@ -303,7 +303,6 @@ users     0..* ── * auditLogs         (auditLogs.accountId → users._id, op
 | userId | string | 作成者の Firebase UID |
 | accountId | Id<users> | 作成者の PoohMa Account ID（所有権・個人レコード境界） |
 | familyId | Id<families>(optional) | 暗号化スコープ・所属家族ID |
-| credentials | object\[](optional) | 旧埋め込み形式から独立 `credentials` テーブルへ移行するためだけに一時許容する互換フィールド。`migrateCredentialsToTable` の移行元としてのみ参照し、通常の作成・更新・取得では使用しない。移行後は物理削除する |
 | tags | string\[] | タグ |
 | isPinned | boolean | ピン留め状態（デフォルトfalse、FR-REC-18） |
 | isArchived | boolean | アーカイブ（非表示）状態（デフォルトfalse、FR-REC-23） |
@@ -589,9 +588,7 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
   マスターキー（パスコード経路と同一のものに到達する）
 ```
 
-備考：DEKが存在しない旧形式のレコード（passwordHintDekEncrypted未設定）は、
-decryptHint でのみマスターキーを直接使用して復号する読み取り互換を維持する。
-encryptHint と家族移行時の再暗号化にマスターキー直接暗号化へのフォールバックはなく、DEKを必須とする。
+備考：エンベロープ暗号化は全レコードで必須であり、暗号化（encryptHint）・復号（decryptHint）・家族移行時の再ラップ（reWrapCredential）のいずれにおいても DEK を必須とする（マスターキー直接暗号化・復号へのフォールバックは行わない）。
 
 ### 6.2 実装関数（src/lib/crypto.ts, src/utils/passcode-strength.ts）
 
@@ -819,7 +816,9 @@ encryptHint と家族移行時の再暗号化にマスターキー直接暗号�
 
 | 関数 | 種別 | 認可 | 概要 |
 | ----------------------------------------------------------------- | ------------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| getRecords | Query | authenticated | 一覧取得。家族所属時は by\_family\_sortKey インデックスで同一家族レコードを取得し、非所属時は by\_ownerType\_accountId で個人レコードを取得。フルテーブルスキャンを完全排除（Issue #137）。検索・タグ・所有者フィルタ・並び替えに対応。既定でisArchived=falseのみ返す |
+| getRecords | Query | authenticated | 一覧取得。家族所属時は by\_family\_sortKey インデックスで同一家族レコードを取得し、非所属時は by\_ownerType\_accountId で個人レコードを取得。フルテーブルスキャンを完全排除（Issue #137）。検索・タグ・所有者フィルタ・並び替え・取得上限（limit）に対応。credentials読み取りは有界並行（32件バッチ）で実行。既定でisArchived=falseのみ返す |
+| getRecordsPaginated | Query | authenticated | ページネーション対応の一覧取得（Convex usePaginatedQuery準拠）。ページ内レコードに対してのみcredentialsを有界並行バッチで結合し、同時I/O上限を回避 |
+
 | getArchivedRecords | Query | authenticated | アーカイブ済みレコードの一覧取得（FR-REC-23） |
 | getRecordDetail | Query | authenticated | 詳細取得（rls.tsによるrequireContentAccess制御）。取得時にrecordAccessLogへVIEWEDを記録し、lastViewedAt/Byを更新 |
 | getAvailableTags | Query | authenticated | 閲覧可能レコードから使用中タグ一覧を抽出（by\_family\_sortKey経由） |

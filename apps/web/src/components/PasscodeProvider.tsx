@@ -223,12 +223,11 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
       const masterKey = masterKeyRef.current;
       if (!masterKey) throw new Error("Master key is not available");
 
-      // エンベロープ暗号方式: DEKが提供されていればDEKを復号して使う、なければ（過去データ）マスターキーを直接使う
-      let decryptionKey = masterKey;
-      if (dekEncrypted && dekIv) {
-        decryptionKey = await unwrapDEK(dekEncrypted, dekIv, masterKey);
+      if (!dekEncrypted || !dekIv) {
+        throw new Error("DEK is required for hint decryption");
       }
 
+      const decryptionKey = await unwrapDEK(dekEncrypted, dekIv, masterKey);
       return await decrypt(encrypted, iv, decryptionKey);
     },
     [],

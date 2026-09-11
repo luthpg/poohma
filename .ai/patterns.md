@@ -320,3 +320,30 @@ await logAuditEvent(ctx, {
 - **ヒント閲覧は `serviceRecords` も同時更新**: `logRecordHintView` では `auditLogs` への記録に加え、`serviceRecords.lastViewedAt` / `lastViewedByAccountId` も `patch` する。
 - **UI への影響ゼロ保証**: クライアント側（`CredentialCard`）からの `logRecordHintView` 呼び出しは `.catch(() => {})` で失敗をサイレント無視し、ログ記録の失敗が復号表示をブロックしないようにする。
 - **180日 TTL + 再帰バッチ削除**: 24時間cron で `by_createdAt` インデックスを使って100件ずつ削除し、件数上限到達時は `ctx.scheduler.runAfter(0, ...)` で自己スケジュールして全削除を完結させる。
+
+---
+
+## 17. Convex 有界並行 I/O & ページネーションパターン (`records.ts`)
+
+Convex の同時 I/O 上限（1,000 ops）およびトランザクション実行時間・読み取り上限を回避するための標準パターン。
+
+```typescript
+// 1回の Promise.all による同時 I/O をチャンクサイズ（32件）に制限
+export async function asyncMapBounded<T, U>(
+  items: T[],
+  fn: (item: T) => Promise<U>,
+  chunkSize = 32,
+): Promise<U[]> {
+  const results: U[] = [];
+  for (let i = 0; i < items.length; i += chunkSize) {
+    const chunk = items.slice(i, i + chunkSize);
+    const chunkResults = await Promise.all(chunk.map(fn));
+    results.push(...chunkResults);
+  }
+  return results;
+}
+```
+
+- `getRecordsPaginated` でページネーションを行い、ページ内レコードに対してのみ `asyncMapBounded` を適用することで、大量データ環境下でもトランザクション上限と同時 I/O 上限を確実に回避する。
+
+
