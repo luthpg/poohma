@@ -161,9 +161,6 @@ export default defineSchema({
     // タグを配列として埋め込み
     tags: v.array(v.string()),
 
-    // マイグレーション用（旧スキーマ移行中の一時的互換性許容）
-    credentials: v.optional(v.array(v.any())),
-
     revision: v.optional(v.number()), // 楽観的ロック用（既存レコードは 0 として扱う）
     isSample: v.optional(v.boolean()), // オンボーディング用サンプルデータ識別フラグ
     updatedAt: v.number(),

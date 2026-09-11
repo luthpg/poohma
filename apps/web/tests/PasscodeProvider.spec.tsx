@@ -392,18 +392,13 @@ describe("PasscodeProvider - decryptHint (Envelope Encryption Branching)", () =>
     expect(decrypted).toBe("decrypted_hint_text");
   });
 
-  it("【旧方式フォールバック】dekEncrypted がない場合、unwrapDEK を呼ばずに直接 masterKey で復号されること", async () => {
+  it("dekEncrypted または dekIv がない場合、DEK必須エラーがスローされること", async () => {
     // 0. 事前にアンロックに必要な鍵導出関数をスパイ・モック化
     const mockMasterKey = { tag: "mock-master-key" } as unknown as CryptoKey;
     vi.spyOn(cryptoUtils, "deriveKeyFromPasscode").mockResolvedValue(
       {} as CryptoKey,
     );
     vi.spyOn(cryptoUtils, "unwrapMasterKey").mockResolvedValue(mockMasterKey);
-
-    const unwrapDEKSpy = vi.spyOn(cryptoUtils, "unwrapDEK");
-    const decryptSpy = vi
-      .spyOn(cryptoUtils, "decrypt")
-      .mockResolvedValue("legacy_decrypted_hint_text");
 
     let resultContext!: ReturnType<typeof usePasscode>;
     function TestComponent() {
@@ -417,23 +412,14 @@ describe("PasscodeProvider - decryptHint (Envelope Encryption Branching)", () =>
       </PasscodeProvider>,
     );
 
-    // 🔥 2.5. テスト実行前に unlock を呼び出して masterKey をセットする
+    // テスト実行前に unlock を呼び出して masterKey をセットする
     await act(async () => {
       await resultContext?.unlock("dummy-passcode");
     });
 
-    const decrypted = await resultContext?.decryptHint(
-      "legacy_encrypted_data",
-      "legacy_iv_data",
-    );
-
-    expect(unwrapDEKSpy).not.toHaveBeenCalled();
-    expect(decryptSpy).toHaveBeenCalledWith(
-      "legacy_encrypted_data",
-      "legacy_iv_data",
-      mockMasterKey, // 旧方式なのでマスターキーが直接復号に使われるか検証
-    );
-    expect(decrypted).toBe("legacy_decrypted_hint_text");
+    await expect(
+      resultContext?.decryptHint("encrypted_data", "iv_data"),
+    ).rejects.toThrow("DEK is required for hint decryption");
   });
 });
 

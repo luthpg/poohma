@@ -152,6 +152,7 @@ export const getRecords = authenticatedQuery({
     q: v.optional(v.string()),
     tag: v.optional(v.string()),
     sort: v.optional(v.string()),
+    limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const { user } = ctx;
@@ -162,7 +163,7 @@ export const getRecords = authenticatedQuery({
       records = records.filter((r) => r.tags.includes(args.tag as string));
     }
 
-    // 各レコードに紐づく credentials をチャンク分割（Bounded Concurrency）で取得
+    // 各レコードに紐づく credentials を小さなバッチ（Bounded Concurrency: 32件）で取得
     // 一覧表示・検索に必要なフィールド（_id, label, loginId）のみを結合し、暗号化データは除外してペイロードを軽量化
     const recordsWithCredentials = await asyncMapBounded(
       records,
@@ -180,7 +181,7 @@ export const getRecords = authenticatedQuery({
           credentials: mappedCreds,
         };
       },
-      64,
+      32,
     );
 
     let filtered = recordsWithCredentials;
@@ -220,7 +221,96 @@ export const getRecords = authenticatedQuery({
       return (a.sortKey || a.title).localeCompare(b.sortKey || b.title);
     });
 
+    if (args.limit !== undefined && args.limit > 0) {
+      filtered = filtered.slice(0, args.limit);
+    }
+
     return filtered;
+  },
+});
+
+/**
+ * 大量レコードを安全に分割取得するためのページネーション対応クエリ
+ * Convex の usePaginatedQuery に準拠し、1回の実行でページ内のレコードのみ credential 読み取りを実行する
+ */
+export const getRecordsPaginated = authenticatedQuery({
+  args: {
+    paginationOpts: paginationOptsValidator,
+    q: v.optional(v.string()),
+    tag: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { user } = ctx;
+
+    const baseQuery = user.familyId
+      ? ctx.db
+          .query("serviceRecords")
+          .withIndex("by_family_sortKey", (i) =>
+            i.eq("familyId", user.familyId),
+          )
+      : ctx.db
+          .query("serviceRecords")
+          .withIndex("by_accountId", (i) => i.eq("accountId", user._id));
+
+    const paginated = await baseQuery.paginate(args.paginationOpts);
+
+    // 家族内での閲覧権限（他人の個人レコードを除外）をフィルタリング
+    const visiblePage = paginated.page.filter((r) => {
+      const ownerType = getEffectiveOwnerType(r);
+      const ownerFamilyId = getEffectiveOwnerFamilyId(r);
+      if (user.familyId) {
+        return (
+          (ownerType === "family" && ownerFamilyId === user.familyId) ||
+          (ownerType === "user" && r.accountId === user._id)
+        );
+      }
+      return ownerType === "user" && r.accountId === user._id;
+    });
+
+    let records = visiblePage;
+    if (args.tag) {
+      records = records.filter((r) => r.tags.includes(args.tag as string));
+    }
+
+    // ページ内レコードの credentials のみを小さなバッチ（32件）で取得
+    const recordsWithCredentials = await asyncMapBounded(
+      records,
+      async (record) => {
+        const creds = await getCredentialsForRecord(ctx, record._id);
+        const mappedCreds = creds.map((c) => ({
+          _id: c._id,
+          id: c._id,
+          label: c.label,
+          loginId: c.loginId,
+        }));
+        return {
+          ...record,
+          revision: record.revision ?? 0,
+          credentials: mappedCreds,
+        };
+      },
+      32,
+    );
+
+    let filtered = recordsWithCredentials;
+    if (args.q) {
+      const q = args.q.toLowerCase();
+      filtered = filtered.filter(
+        (r) =>
+          r.title.toLowerCase().includes(q) ||
+          r.memo?.toLowerCase().includes(q) ||
+          r.credentials.some(
+            (c) =>
+              c.label?.toLowerCase().includes(q) ||
+              c.loginId?.toLowerCase().includes(q),
+          ),
+      );
+    }
+
+    return {
+      ...paginated,
+      page: filtered,
+    };
   },
 });
 

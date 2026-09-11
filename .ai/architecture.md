@@ -60,7 +60,7 @@ poohma/
 - `rls.ts`: レコード単位のアクセス制御関数（`requireContentAccess`, `requireAdminAccess`, レガシー互換ヘルパー）
 - `convex.config.ts`: Convex Components 設定（`@convex-dev/rate-limiter` の登録）
 - `auditLogs.ts`: 監査ログ書き込みヘルパー（`logAuditEvent` 関数）。Mutation 内から呼び出し専用の内部ユーティリティ。`records.ts` が参照する
-- `records.ts`: サービスレコード CRUD、検索、タグ、一括操作、同時編集セッション管理（`recordEditingSessions`、1分cron上限500件バッチ自動削除）、`updateRecord` revision方式楽観的ロック競合防止（FR-REC-15）、**監査ログ記録**（RECORD_CREATE/UPDATE/DELETE/HINT_VIEW/SHARE_SETTING_CHANGED/ADMIN_CHANGED → `auditLogs` テーブル）、`getFamilyAuditLogs`/`getRecordAuditLogs`/`getStaleRecords`、監査ログ自動クリーンアップ（180日cron）
+- `records.ts`: サービスレコード CRUD、検索、タグ、一括操作、同時編集セッション管理（`recordEditingSessions`、1分cron上限500件バッチ自動削除）、`updateRecord` revision方式楽観的ロック競合防止（FR-REC-15）、**監査ログ記録**（RECORD_CREATE/UPDATE/DELETE/HINT_VIEW/SHARE_SETTING_CHANGED/ADMIN_CHANGED → `auditLogs` テーブル）、`getFamilyAuditLogs`/`getRecordAuditLogs`/`getStaleRecords`、ページネーション対応クエリ（`getRecordsPaginated`）、監査ログ自動クリーンアップ（180日cron）
 - `families.ts`: 家族グループ、家族招待（`familyInvites`）、参加申請（`joinRequests`）、家族移行（`familyMigrations`）、パスコードローテーション、メンバーキック・データ持ち出し（`pendingExportVaults`）
 - `users.ts`: ユーザー同期、アカウント作成・切り替え・削除、ログイン履歴記録、SSR用ユーザー/アカウント（family暗号化メタデータ含む）取得
 - `contacts.ts`: お問い合わせ受付（`createContact` mutation）、Honeypot スパム防御、多層レート制限（①Convex公式 `@convex-dev/rate-limiter` トークンバケット ＋ ②同一メール短時間連投制限 `by_email_createdAt`）、管理者メール通知（`sendNotificationEmail` internalAction、`ADMIN_EMAIL` 宛て Resend 送信、replyTo: 問い合わせ者メール）
@@ -68,6 +68,7 @@ poohma/
 - `actions.ts`: Node.js ランタイムでの外部連携（OGP取得、ふりがなAPI、Resend メール送信）
 - `http.ts`: 内部 HTTP エンドポイント（`getUserByFirebaseUid`、内部共有シークレット認証）
 - `crons.ts`: 定期バッチジョブ（期限切れ編集セッション・移行データ・期限切れ Export Vault・家族招待・**古い監査ログ**のクリーンアップ）
+
 
 ---
 
