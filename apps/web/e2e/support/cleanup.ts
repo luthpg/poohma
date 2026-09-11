@@ -45,6 +45,9 @@ export async function purgeAllTestData(page?: Page): Promise<number> {
   if (!convexUrl) {
     throw new Error("VITE_CONVEX_URL が設定されていません");
   }
+  if (!convexUrl.startsWith("https://")) {
+    throw new Error("VITE_CONVEX_URL は HTTPS プロトコルである必要があります");
+  }
 
   // 1. ブラウザページが利用可能な場合はブラウザのログインセッション経由を優先
   if (page && !page.isClosed()) {

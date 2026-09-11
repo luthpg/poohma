@@ -1,4 +1,4 @@
-import { ArrowRight, Globe, Lock } from "lucide-react";
+import { AlertTriangle, ArrowRight, Globe, Lock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,8 @@ export interface BulkVisibilityModalProps {
   selectedCount: number;
   privateCount: number;
   sharedCount: number;
+  unshareableCount?: number;
+  excludedUnshareRecords?: Array<{ id: string; title: string }>;
   onShare: () => Promise<void>;
   onUnshare: () => Promise<void>;
   onClose: () => void;
@@ -29,6 +31,8 @@ export function BulkVisibilityModal({
   selectedCount,
   privateCount,
   sharedCount,
+  unshareableCount,
+  excludedUnshareRecords = [],
   onShare,
   onUnshare,
   onClose,
@@ -244,26 +248,62 @@ export function BulkVisibilityModal({
               </div>
 
               {/* 件数と説明 */}
-              <div className="text-sm space-y-1.5 bg-secondary/50 p-3.5 rounded-lg border border-border">
-                <p className="font-medium text-foreground">
-                  対象レコード:{" "}
-                  <span className="text-orange-600 dark:text-orange-400 font-bold">
-                    {selectedCount} 件
-                  </span>
-                </p>
-                {privateCount > 0 ? (
-                  <p className="text-xs text-muted-foreground">
-                    ※ 選択された {selectedCount} 件のうち {privateCount}{" "}
-                    件はすでに個人用設定のため、家族共有レコード（{sharedCount}{" "}
-                    件）の共有が解除されます。
+              {(() => {
+                const actualUnshareCount = unshareableCount ?? sharedCount;
+                return (
+                  <div className="text-sm space-y-1.5 bg-secondary/50 p-3.5 rounded-lg border border-border">
+                    <p className="font-medium text-foreground">
+                      共有解除の対象:{" "}
+                      <span className="text-orange-600 dark:text-orange-400 font-bold">
+                        {actualUnshareCount} 件
+                      </span>
+                    </p>
+                    {actualUnshareCount === 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        選択されたレコードの中に、あなたが管理者権限を持つ家族共有レコードはありません。
+                      </p>
+                    ) : privateCount > 0 ||
+                      excludedUnshareRecords.length > 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        ※ 選択された {selectedCount}{" "}
+                        件のうち、あなたが管理者の家族共有レコード（
+                        {actualUnshareCount} 件）の共有が解除されます。
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        選択したすべてのレコード（{actualUnshareCount}{" "}
+                        件）の共有が解除され、自分のみが閲覧可能になります。
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* 管理者権限不足で除外されたレコード一覧 */}
+              {excludedUnshareRecords.length > 0 && (
+                <div
+                  data-testid="excluded-records-alert"
+                  className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs space-y-1.5"
+                >
+                  <div className="flex items-center gap-1.5 font-semibold text-amber-700 dark:text-amber-400">
+                    <AlertTriangle className="size-3.5 shrink-0" />
+                    <span>
+                      管理者権限がないため共有解除の対象外（
+                      {excludedUnshareRecords.length} 件）
+                    </span>
+                  </div>
+                  <p className="text-muted-foreground">
+                    以下のレコードはあなたが管理者ではないため、共有解除の対象外です（共有状態は維持されます）:
                   </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    選択したすべてのレコード（{selectedCount}{" "}
-                    件）の共有が解除され、自分のみが閲覧可能になります。
-                  </p>
-                )}
-              </div>
+                  <ul className="list-disc list-inside space-y-0.5 text-foreground max-h-24 overflow-y-auto pl-1 font-medium">
+                    {excludedUnshareRecords.map((r) => (
+                      <li key={r.id} className="truncate">
+                        {r.title}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               <p className="text-xs text-muted-foreground leading-relaxed">
                 共有を解除すると、家族メンバーはこのレコードを閲覧できなくなります。
@@ -283,8 +323,11 @@ export function BulkVisibilityModal({
               <Button
                 type="button"
                 data-testid="confirm-unshare-button"
-                disabled={isSubmitting}
-                className="bg-orange-600 hover:bg-orange-700 text-white"
+                disabled={
+                  isSubmitting ||
+                  (unshareableCount !== undefined && unshareableCount === 0)
+                }
+                className="bg-orange-600 hover:bg-orange-700 text-white disabled:opacity-50"
                 onClick={handleConfirmUnshare}
               >
                 {isSubmitting ? (

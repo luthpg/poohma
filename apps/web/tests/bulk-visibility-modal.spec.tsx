@@ -91,10 +91,10 @@ describe("BulkVisibilityModal Component", () => {
       ),
     ).toBeTruthy();
 
-    // 変更方向（SHARED → PRIVATE）と件数
+    // 変更方向（SHARED → PRIVATE）と件数（sharedCount: 2 が解除対象）
     expect(screen.getByText("家族全員に共有")).toBeTruthy();
     expect(screen.getByText("自分のみ（個人用）")).toBeTruthy();
-    expect(screen.getByText("5 件")).toBeTruthy();
+    expect(screen.getByText("2 件")).toBeTruthy();
 
     // 確定ボタンの存在
     expect(screen.getByTestId("confirm-unshare-button")).toBeTruthy();
@@ -181,5 +181,67 @@ describe("BulkVisibilityModal Component", () => {
     await waitFor(() => {
       expect(screen.queryByText(/解除中/)).toBeNull();
     });
+  });
+
+  it("excludedUnshareRecords が渡された場合、共有解除確認画面で除外アラートとレコード一覧が表示されること", () => {
+    const excluded = [
+      { id: "rec-1", title: "家族メンバーのワクチン記録" },
+      { id: "rec-2", title: "パートナーの健診記録" },
+    ];
+
+    render(
+      <BulkVisibilityModal
+        {...defaultProps}
+        unshareableCount={3}
+        excludedUnshareRecords={excluded}
+      />,
+    );
+
+    // 共有解除確認画面へ遷移
+    fireEvent.click(screen.getByTestId("select-unshare-option"));
+
+    // 除外アラートの表示確認
+    expect(
+      screen.getByText("管理者権限がないため共有解除の対象外（2 件）"),
+    ).toBeTruthy();
+    expect(screen.getByText("家族メンバーのワクチン記録")).toBeTruthy();
+    expect(screen.getByText("パートナーの健診記録")).toBeTruthy();
+
+    // 実際の解除対象件数（3 件）の表示確認
+    expect(screen.getByText("3 件")).toBeTruthy();
+
+    // 確定ボタンは有効であること
+    const confirmButton = screen.getByTestId(
+      "confirm-unshare-button",
+    ) as HTMLButtonElement;
+    expect(confirmButton.disabled).toBe(false);
+  });
+
+  it("unshareableCount が 0 の場合、警告メッセージが表示され確定ボタンが無効化されること", () => {
+    const excluded = [{ id: "rec-1", title: "家族メンバーのワクチン記録" }];
+
+    render(
+      <BulkVisibilityModal
+        {...defaultProps}
+        unshareableCount={0}
+        excludedUnshareRecords={excluded}
+      />,
+    );
+
+    // 共有解除確認画面へ遷移
+    fireEvent.click(screen.getByTestId("select-unshare-option"));
+
+    // 対象なしメッセージの確認
+    expect(
+      screen.getByText(
+        "選択されたレコードの中に、あなたが管理者権限を持つ家族共有レコードはありません。",
+      ),
+    ).toBeTruthy();
+
+    // 確定ボタンが無効化されていること
+    const confirmButton = screen.getByTestId(
+      "confirm-unshare-button",
+    ) as HTMLButtonElement;
+    expect(confirmButton.disabled).toBe(true);
   });
 });

@@ -307,6 +307,32 @@ function RouteComponent() {
     [selectedRecords],
   );
 
+  // 共有解除可能なレコード（自分が管理者である家族共有レコード）
+  const unshareableRecords = useMemo(
+    () =>
+      selectedRecords.filter(
+        (r) =>
+          r.ownerType === "family" &&
+          Boolean(
+            activeAccountId && (r.admins ?? []).includes(activeAccountId),
+          ),
+      ),
+    [selectedRecords, activeAccountId],
+  );
+
+  // 管理者権限がないため共有解除の対象外となるレコード
+  const excludedUnshareRecords = useMemo(
+    () =>
+      selectedRecords
+        .filter(
+          (r) =>
+            r.ownerType === "family" &&
+            !(activeAccountId && (r.admins ?? []).includes(activeAccountId)),
+        )
+        .map((r) => ({ id: r._id, title: r.title })),
+    [selectedRecords, activeAccountId],
+  );
+
   const deleteRecordsMut = useMutation(api.records.deleteRecords);
   const bulkUpdateRecordsMut = useMutation(api.records.bulkUpdateRecords);
   const bulkShareMut = useMutation(api.records.bulkShareRecords);
@@ -372,11 +398,17 @@ function RouteComponent() {
   };
 
   const handleBulkUnshare = async () => {
-    if (selectedIds.length === 0) return;
+    const targetIds = unshareableRecords.map(
+      (r) => r._id as Id<"serviceRecords">,
+    );
+    if (targetIds.length === 0) {
+      toast.error("共有解除可能なレコードがありません");
+      return;
+    }
     try {
       const result = await bulkUnshareMut({
         accountId: activeAccountId || undefined,
-        ids: selectedIds as Id<"serviceRecords">[],
+        ids: targetIds,
       });
       toast.success(`${result.count} 件のレコードの共有を解除しました`);
       setSelectedIds([]);
@@ -570,6 +602,8 @@ function RouteComponent() {
         selectedCount={selectedIds.length}
         privateCount={selectedPrivateCount}
         sharedCount={selectedSharedCount}
+        unshareableCount={unshareableRecords.length}
+        excludedUnshareRecords={excludedUnshareRecords}
         onShare={handleBulkShare}
         onUnshare={handleBulkUnshare}
         onClose={() => setActiveModal(null)}
