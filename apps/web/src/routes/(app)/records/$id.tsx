@@ -159,6 +159,7 @@ function RecordDetailComponent({
     userId: string;
     email?: string;
     displayName?: string;
+    familyRole?: "admin" | "viewer";
   }[];
 }) {
   const effectiveAccountId = activeAccountId || record.accountId;
@@ -166,11 +167,14 @@ function RecordDetailComponent({
     (record.ownerType ?? "user") === "user" &&
     record.accountId === effectiveAccountId;
   const isShared = record.ownerType === "family";
+  const currentMember = familyMembers.find((m) => m.id === effectiveAccountId);
+  const isFamilyAdmin = currentMember?.familyRole === "admin";
   const isAdmin =
     isOwner ||
     (isShared &&
-      (record.admins ?? []).includes(effectiveAccountId as Id<"users">));
-  const isEditable = isOwner || isShared;
+      (isFamilyAdmin ||
+        (record.admins ?? []).includes(effectiveAccountId as Id<"users">)));
+  const isEditable = isAdmin;
 
   const navigate = useNavigate();
   const router = useRouter();
@@ -1065,6 +1069,7 @@ function ShareSettingsDialog({
     userId: string;
     email?: string;
     displayName?: string;
+    familyRole?: "admin" | "viewer";
   }[];
   activeAccountId?: Id<"users"> | null;
   isAdmin: boolean;
@@ -1125,9 +1130,11 @@ function ShareSettingsDialog({
     } catch (e: unknown) {
       const raw = e instanceof Error ? e.message : "";
       toast.error(
-        raw.includes("管理者が0人になるため削除できません")
-          ? "管理者が0人になるため削除できません"
-          : "管理者の解除に失敗しました",
+        raw.includes("デフォルト管理者は解除できません")
+          ? "デフォルト管理者は解除できません"
+          : raw.includes("管理者が0人になるため削除できません")
+            ? "管理者が0人になるため削除できません"
+            : "管理者の解除に失敗しました",
       );
     } finally {
       setIsSubmitting(false);
@@ -1181,35 +1188,48 @@ function ShareSettingsDialog({
               現在の管理者 ({activeAdminUsers.length}名)
             </h3>
             <div className="space-y-2 max-h-40 overflow-y-auto">
-              {activeAdminUsers.map((admin) => (
-                <div
-                  key={admin._id}
-                  className="flex items-center justify-between p-2 rounded-md bg-muted/40 text-sm"
-                >
-                  <div>
-                    <div className="font-medium text-foreground">
-                      {admin.displayName || "メンバー"}
-                      {admin._id === activeAccountId && " (あなた)"}
-                    </div>
-                    {admin.email && (
-                      <div className="text-xs text-muted-foreground">
-                        {admin.email}
+              {activeAdminUsers.map((admin) => {
+                const member = familyMembers.find((m) => m.id === admin._id);
+                const isDefaultAdmin = member?.familyRole === "admin";
+                return (
+                  <div
+                    key={admin._id}
+                    className="flex items-center justify-between p-2 rounded-md bg-muted/40 text-sm"
+                  >
+                    <div>
+                      <div className="font-medium text-foreground flex items-center gap-2">
+                        {admin.displayName || "メンバー"}
+                        {admin._id === activeAccountId && " (あなた)"}
+                        {isDefaultAdmin ? (
+                          <span className="rounded bg-secondary text-secondary-foreground text-[10px] px-1.5 py-0.5 font-medium">
+                            デフォルト管理者
+                          </span>
+                        ) : (
+                          <span className="rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] px-1.5 py-0.5 font-medium">
+                            個別管理者
+                          </span>
+                        )}
                       </div>
+                      {admin.email && (
+                        <div className="text-xs text-muted-foreground">
+                          {admin.email}
+                        </div>
+                      )}
+                    </div>
+                    {isAdmin && !isDefaultAdmin && (
+                      <button
+                        type="button"
+                        disabled={isSubmitting}
+                        onClick={() => handleRemoveAdmin(admin._id)}
+                        className="text-xs text-red-500 hover:text-red-600 disabled:opacity-50 p-1 cursor-pointer"
+                        title="管理者から外す"
+                      >
+                        解除
+                      </button>
                     )}
                   </div>
-                  {isAdmin && activeAdminUsers.length > 1 && (
-                    <button
-                      type="button"
-                      disabled={isSubmitting}
-                      onClick={() => handleRemoveAdmin(admin._id)}
-                      className="text-xs text-red-500 hover:text-red-600 disabled:opacity-50 p-1 cursor-pointer"
-                      title="管理者から外す"
-                    >
-                      解除
-                    </button>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -1221,6 +1241,7 @@ function ShareSettingsDialog({
             <div className="space-y-2 max-h-40 overflow-y-auto">
               {familyMembers.map((member) => {
                 const isMemberAdmin = activeAdminIds.includes(member.id);
+                const isDefaultAdmin = member.familyRole === "admin";
                 return (
                   <div
                     key={member.id}
@@ -1237,11 +1258,21 @@ function ShareSettingsDialog({
                         </div>
                       )}
                     </div>
-                    {isMemberAdmin && (
-                      <span className="rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] px-1.5 py-0.5 font-medium">
-                        管理者
-                      </span>
-                    )}
+                    <div>
+                      {isDefaultAdmin ? (
+                        <span className="rounded bg-secondary text-secondary-foreground text-[10px] px-1.5 py-0.5 font-medium">
+                          デフォルト管理者
+                        </span>
+                      ) : isMemberAdmin ? (
+                        <span className="rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] px-1.5 py-0.5 font-medium">
+                          個別管理者
+                        </span>
+                      ) : (
+                        <span className="rounded border border-border text-muted-foreground text-[10px] px-1.5 py-0.5 font-medium">
+                          閲覧専用
+                        </span>
+                      )}
+                    </div>
                   </div>
                 );
               })}

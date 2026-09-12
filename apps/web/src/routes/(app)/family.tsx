@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Ban,
   Check,
+  ChevronDown,
   Clock,
   Copy,
   Eye,
@@ -46,14 +47,20 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
@@ -338,9 +345,43 @@ function FamilyComponent() {
   const rejectJoinRequestMut = useMutation(api.families.rejectJoinRequest);
   const rotatePasscodeMut = useMutation(api.families.rotatePasscode);
   const kickMemberMut = useMutation(api.families.kickMember);
+  const updateMemberRoleMut = useMutation(api.families.updateMemberRole);
   const abandonPendingExportVaultMut = useMutation(
     api.families.abandonPendingExportVault,
   );
+
+  const [isUpdatingRole, setIsUpdatingRole] = useState(false);
+
+  const currentMember = family?.users.find((u) => u.id === activeAccountId);
+  const isFamilyAdmin = currentMember?.familyRole === "admin";
+  const adminCount =
+    family?.users.filter((u) => u.familyRole === "admin").length ?? 0;
+
+  const handleRoleChange = async (
+    targetAccountId: Id<"users">,
+    newRole: "admin" | "viewer",
+  ) => {
+    if (!activeAccountId) return;
+    setIsUpdatingRole(true);
+    try {
+      await updateMemberRoleMut({
+        accountId: activeAccountId as Id<"users">,
+        targetAccountId,
+        role: newRole,
+      });
+      toast.success(
+        newRole === "admin"
+          ? "デフォルト管理者に変更しました"
+          : "閲覧専用に変更しました",
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "ロールの変更に失敗しました",
+      );
+    } finally {
+      setIsUpdatingRole(false);
+    }
+  };
 
   // キック実行用 state
   const [memberToKick, setMemberToKick] = useState<{
@@ -1630,25 +1671,101 @@ function FamilyComponent() {
                         {u.email}
                       </span>
                     </div>
-                    {!isCurrentAccount && !isMyOtherAccount && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setMemberToKick({
-                            id: u.id,
-                            userId: u.userId,
-                            displayName: u.displayName || "メンバー",
-                            email: u.email,
-                          })
-                        }
-                        className="flex items-center gap-1 text-[12px] font-medium text-red-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 px-2.5 py-1.5 rounded-md transition cursor-pointer"
-                        title="家族グループから削除"
-                        data-testid={`kick-member-btn-${u.id}`}
-                      >
-                        <UserMinus className="h-3.5 w-3.5" />
-                        削除
-                      </button>
-                    )}
+                    <div className="flex items-center gap-3">
+                      {isFamilyAdmin ? (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={isUpdatingRole}
+                              className="h-8 gap-1 text-xs"
+                              data-testid={`role-dropdown-btn-${u.id}`}
+                            >
+                              <Badge
+                                variant={
+                                  u.familyRole === "admin"
+                                    ? "secondary"
+                                    : "outline"
+                                }
+                                className="text-[11px]"
+                              >
+                                {u.familyRole === "admin"
+                                  ? "デフォルト管理者"
+                                  : "閲覧専用"}
+                              </Badge>
+                              <ChevronDown className="h-3 w-3 opacity-50" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              disabled={
+                                u.familyRole === "admin" || isUpdatingRole
+                              }
+                              onClick={() => handleRoleChange(u.id, "admin")}
+                            >
+                              デフォルト管理者にする
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              disabled={
+                                u.familyRole === "viewer" ||
+                                (u.familyRole === "admin" && adminCount <= 1) ||
+                                isUpdatingRole
+                              }
+                              onClick={() => handleRoleChange(u.id, "viewer")}
+                            >
+                              {u.familyRole === "admin" && adminCount <= 1
+                                ? "最後の管理者のため変更不可"
+                                : "閲覧専用にする"}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      ) : (
+                        <Badge
+                          variant={
+                            u.familyRole === "admin" ? "secondary" : "outline"
+                          }
+                          className="text-[11px]"
+                        >
+                          {u.familyRole === "admin"
+                            ? "デフォルト管理者"
+                            : "閲覧専用"}
+                        </Badge>
+                      )}
+
+                      {!isCurrentAccount &&
+                        !isMyOtherAccount &&
+                        isFamilyAdmin && (
+                          <button
+                            type="button"
+                            disabled={
+                              u.familyRole === "admin" && adminCount <= 1
+                            }
+                            onClick={() =>
+                              setMemberToKick({
+                                id: u.id,
+                                userId: u.userId,
+                                displayName: u.displayName || "メンバー",
+                                email: u.email,
+                              })
+                            }
+                            className={`flex items-center gap-1 text-[12px] font-medium px-2.5 py-1.5 rounded-md transition ${
+                              u.familyRole === "admin" && adminCount <= 1
+                                ? "text-muted-foreground/50 cursor-not-allowed"
+                                : "text-red-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 cursor-pointer"
+                            }`}
+                            title={
+                              u.familyRole === "admin" && adminCount <= 1
+                                ? "最後の管理者は削除できません"
+                                : "家族グループから削除"
+                            }
+                            data-testid={`kick-member-btn-${u.id}`}
+                          >
+                            <UserMinus className="h-3.5 w-3.5" />
+                            削除
+                          </button>
+                        )}
+                    </div>
                   </li>
                 );
               })}

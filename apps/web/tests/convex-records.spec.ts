@@ -51,6 +51,7 @@ describe("2.2.1 閲覧権限（ownerType）の境界値テスト (Convex版)", (
 
       // ユーザーA と ユーザーB (家族1所属)
       userAId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_a",
         email: "a@example.com",
         familyId: family1Id,
@@ -58,6 +59,7 @@ describe("2.2.1 閲覧権限（ownerType）の境界値テスト (Convex版)", (
       });
 
       await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_b",
         email: "b@example.com",
         familyId: family1Id,
@@ -66,6 +68,7 @@ describe("2.2.1 閲覧権限（ownerType）の境界値テスト (Convex版)", (
 
       // ユーザーC (家族未所属)
       await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_c",
         email: "c@example.com",
         updatedAt: Date.now(),
@@ -193,6 +196,7 @@ describe("2.2.3 CSVインポートのバリデーションと境界値 (Convex�
       });
 
       await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "csv_user",
         email: "csv@example.com",
         familyId,
@@ -264,6 +268,7 @@ describe("2.2.3 CSVインポートのバリデーションと境界値 (Convex�
       });
 
       await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "limit_user",
         email: "limit@example.com",
         familyId,
@@ -293,6 +298,7 @@ describe("2.2.3 CSVインポートのバリデーションと境界値 (Convex�
 
     await t.run(async (ctx) => {
       await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "no_family_user",
         email: "nofamily@example.com",
         updatedAt: Date.now(),
@@ -330,6 +336,7 @@ describe("2.2.3 CSVインポートのバリデーションと境界値 (Convex�
       });
 
       await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "tag_limit_user",
         email: "taglimit@example.com",
         familyId,
@@ -382,6 +389,7 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
       });
 
       userAId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_a",
         email: "a@example.com",
         familyId: family1Id,
@@ -389,6 +397,7 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
       });
 
       userBId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_b",
         email: "b@example.com",
         familyId: family1Id,
@@ -449,6 +458,7 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
       });
 
       userAId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_a",
         email: "a@example.com",
         familyId,
@@ -456,6 +466,7 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
       });
 
       await ctx.db.insert("users", {
+        familyRole: "viewer",
         userId: "user_b",
         email: "b@example.com",
         familyId,
@@ -520,6 +531,7 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
       });
 
       userAId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_a",
         email: "a@example.com",
         familyId,
@@ -527,6 +539,7 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
       });
 
       userBId = await ctx.db.insert("users", {
+        familyRole: "viewer",
         userId: "user_b",
         email: "b@example.com",
         familyId,
@@ -587,6 +600,7 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
       });
 
       userAId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_a",
         email: "a@example.com",
         familyId,
@@ -629,12 +643,15 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
     await t.run(async (ctx) => {
       const r1 = await ctx.db.get(r1Id);
       expect(r1?.ownerType).toBe("family");
-      expect(r1?.admins).toContain(userAId);
 
       const r2 = await ctx.db.get(r2Id);
       expect(r2?.ownerType).toBe("family");
-      expect(r2?.admins).toContain(userAId);
     });
+
+    const detail1 = await userA.query(api.records.getRecordDetail, {
+      id: r1Id,
+    });
+    expect(detail1.adminUsers?.some((u) => u._id === userAId)).toBe(true);
 
     // 一括解除
     const unshareRes = await userA.mutation(api.records.bulkUnshareRecords, {
@@ -664,6 +681,7 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
       });
 
       await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_a",
         email: "a@example.com",
         familyId: family1Id,
@@ -712,6 +730,7 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
       });
 
       userAId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_a",
         email: "a@example.com",
         familyId,
@@ -763,6 +782,7 @@ describe("件数境界値テスト", () => {
         updatedAt: Date.now(),
       });
       await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_cap",
         email: "cap@example.com",
         familyId,
@@ -796,6 +816,7 @@ describe("件数境界値テスト", () => {
         updatedAt: Date.now(),
       });
       await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_cap2",
         email: "cap2@example.com",
         familyId,
@@ -831,6 +852,7 @@ describe("件数境界値テスト", () => {
         updatedAt: Date.now(),
       });
       const accountId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_order",
         email: "order@example.com",
         familyId,
@@ -902,6 +924,7 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
       });
 
       userAId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_export_a",
         email: "export_a@example.com",
         displayName: "エクスポートA",
@@ -910,6 +933,7 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
       });
 
       userBId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_export_b",
         email: "export_b@example.com",
         displayName: "エクスポートB",
@@ -1017,12 +1041,14 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
 
     await t.run(async (ctx) => {
       await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_legit_a",
         email: "legit_a@example.com",
         updatedAt: Date.now(),
       });
 
       userBId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_victim_b",
         email: "victim_b@example.com",
         updatedAt: Date.now(),
@@ -1059,6 +1085,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
       });
 
       userAId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_a",
         email: "a@example.com",
         displayName: "ユーザーA",
@@ -1067,6 +1094,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
       });
 
       userBId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_b",
         email: "b@example.com",
         displayName: "ユーザーB",
@@ -1151,6 +1179,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
       });
 
       userAId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_a",
         email: "a@example.com",
         familyId,
@@ -1205,6 +1234,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
         updatedAt: now,
       });
       const accountId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "cleanup_user",
         email: "cleanup@example.com",
         familyId,
@@ -1262,6 +1292,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
       });
 
       userAId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_a",
         email: "a@example.com",
         displayName: "ユーザーA",
@@ -1270,6 +1301,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
       });
 
       await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_b",
         email: "b@example.com",
         displayName: "ユーザーB",
@@ -1384,6 +1416,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
       });
 
       userAId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_chunk_a",
         email: "chunk_a@example.com",
         familyId,
@@ -1465,6 +1498,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
       });
 
       userAId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_limit_a",
         email: "limit_a@example.com",
         familyId,
@@ -1527,6 +1561,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
       });
 
       userAId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_paginated_a",
         email: "paginated_a@example.com",
         familyId,
@@ -1605,5 +1640,92 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
 
     expect(page3.page).toHaveLength(1);
     expect(page3.isDone).toBe(true);
+  });
+
+  it("bulkSetRecordAdmin: 共有レコードに対して閲覧者メンバーの管理者設定・解除が一括で動作すること", async () => {
+    const t = convexTest(schema, modules);
+    let familyId!: Id<"families">;
+    let userAId!: Id<"users">;
+    let viewerId!: Id<"users">;
+    let rec1Id!: Id<"serviceRecords">;
+    let rec2Id!: Id<"serviceRecords">;
+
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        name: "Bulk Admin Family",
+        updatedAt: Date.now(),
+      });
+      userAId = await ctx.db.insert("users", {
+        familyRole: "admin",
+        userId: "user_a",
+        email: "a@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+      viewerId = await ctx.db.insert("users", {
+        familyRole: "viewer",
+        userId: "viewer_b",
+        email: "b@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+
+      rec1Id = await ctx.db.insert("serviceRecords", {
+        userId: "user_a",
+        accountId: userAId,
+        familyId,
+        ownerFamilyId: familyId,
+        title: "Shared 1",
+        sortKey: computeSortKey("Shared 1"),
+        ownerType: "family",
+        admins: [],
+        tags: [],
+        updatedAt: Date.now(),
+      });
+      rec2Id = await ctx.db.insert("serviceRecords", {
+        userId: "user_a",
+        accountId: userAId,
+        familyId,
+        ownerFamilyId: familyId,
+        title: "Shared 2",
+        sortKey: computeSortKey("Shared 2"),
+        ownerType: "family",
+        admins: [],
+        tags: [],
+        updatedAt: Date.now(),
+      });
+    });
+
+    const userA = t.withIdentity({ subject: "user_a", email: "a@example.com" });
+
+    // 一括で viewerId を管理者に追加
+    const addRes = await userA.mutation(api.records.bulkSetRecordAdmin, {
+      ids: [rec1Id, rec2Id],
+      targetAccountId: viewerId,
+      makeAdmin: true,
+    });
+    expect(addRes.count).toBe(2);
+
+    await t.run(async (ctx) => {
+      const r1 = await ctx.db.get(rec1Id);
+      expect(r1?.admins).toContain(viewerId);
+      const r2 = await ctx.db.get(rec2Id);
+      expect(r2?.admins).toContain(viewerId);
+    });
+
+    // 一括で viewerId を管理者から解除
+    const removeRes = await userA.mutation(api.records.bulkSetRecordAdmin, {
+      ids: [rec1Id, rec2Id],
+      targetAccountId: viewerId,
+      makeAdmin: false,
+    });
+    expect(removeRes.count).toBe(2);
+
+    await t.run(async (ctx) => {
+      const r1 = await ctx.db.get(rec1Id);
+      expect(r1?.admins).not.toContain(viewerId);
+      const r2 = await ctx.db.get(rec2Id);
+      expect(r2?.admins).not.toContain(viewerId);
+    });
   });
 });

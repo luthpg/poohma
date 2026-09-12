@@ -21,6 +21,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
         updatedAt: Date.now(),
       });
       await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_sato",
         email: "sato@example.com",
         displayName: "佐藤太郎",
@@ -106,6 +107,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
         updatedAt: Date.now(),
       });
       await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_legacy_recovery_kit",
         email: "legacy@example.com",
         familyId,
@@ -154,6 +156,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
         updatedAt: Date.now(),
       });
       await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_suzuki",
         email: "suzuki@example.com",
         displayName: "鈴木一郎",
@@ -313,6 +316,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 
     await t.run(async (ctx) => {
       await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_nofam",
         email: "nofam@example.com",
         updatedAt: Date.now(),
@@ -325,6 +329,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
         updatedAt: Date.now(),
       });
       await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_fam_nokit",
         email: "famnokit@example.com",
         familyId: familyNoKitId,
@@ -343,6 +348,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
         updatedAt: Date.now(),
       });
       await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_fam_with_kit_no_otp",
         email: "famkitnootp@example.com",
         familyId: familyWithKitNoOtpId,
@@ -409,6 +415,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
         updatedAt: Date.now(),
       });
       userWithKitId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_takahashi",
         email: "takahashi@example.com",
         familyId: familyWithKitId,
@@ -462,6 +469,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
         updatedAt: Date.now(),
       });
       accountAId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: sharedFirebaseUid,
         email: "multi@example.com",
         displayName: "田中アカウントA",
@@ -478,6 +486,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
         updatedAt: Date.now(),
       });
       accountBId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: sharedFirebaseUid,
         email: "multi@example.com",
         displayName: "田中アカウントB",

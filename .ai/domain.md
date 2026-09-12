@@ -105,7 +105,7 @@ flowchart TD
     VaultCreated -->|"30日タイムアウト / クローンジョブ<br/>(cleanupExpiredExportVaultsInternal)"| ExpiredVault["EXPIRED (物理削除)"]
 ```
 
-- **キック実行**: 家族メンバーが他メンバーを除名（`kickMember`）。自己キックや別アカウントの指定は拒否。
+- **キック実行**: デフォルト管理者が他メンバーを除名（`kickMember`、`familyAdminMutation`）。自己キック、別アカウントの指定、および家族内最後の管理者のキックは拒否。
 - **データ分離**: 共有レコード（`ownerType: "family"`）は旧家族資産として残り、被キックユーザーの `familyId` を即時クリア。管理者であった場合は `reconcileAdminsOnLeave` で残存メンバーへ調停。
 - **Export Vault 退避**: 個人レコード（`ownerType: "user"`）の持ち出しを可能にするため、旧家族の `masterKeyEncrypted`, `masterKeyIv`, `masterKeySalt`, `kdfIterations`, `cryptoVersion` を `pendingExportVaults` へ原子的に退避。
 - **持ち出し完了または破棄**: 被キックユーザーが旧パスコードでアンラップして新家族へ持ち出し完了（`commitFamilyMigration`）するか、手動破棄（`abandonPendingExportVault`）、または 30日経過による自動クリーンアップ（1時間ごとの Cron）によって Vault は物理削除される。
@@ -134,15 +134,37 @@ flowchart TD
 
 ---
 
+### 2.6 家族ロール（`familyRole`）のライフサイクル
+
+```mermaid
+flowchart TD
+    CreateFam["家族グループ新規作成 (createFamily)"] --> AdminRole["作成者: familyRole = 'admin'<br/>(デフォルト管理者)"]
+    JoinFam["家族参加申請承認 (approveJoinRequest)"] --> ViewerRole["新規参加者: familyRole = 'viewer'<br/>(閲覧専用メンバー)"]
+    
+    AdminRole -->|"updateMemberRole (降格)"| ViewerRole
+    ViewerRole -->|"updateMemberRole (昇格)"| AdminRole
+    
+    AdminRole -.->|"最後の1人の管理者を降格しようとした場合"| BlockDemote["BLOCK (最低1名の管理者を保持)"]
+    AdminRole -.->|"最後の1人の管理者をキックしようとした場合"| BlockKick["BLOCK (最後の管理者のキック不可)"]
+```
+
+- **初期付与**: 家族を新規作成したアカウントは `"admin"`、招待承認で新規参加したアカウントは安全のため `"viewer"` となる。未設定の既存ユーザーは後方互換として `"admin"` にフォールバックする。
+- **権限昇格・降格**: デフォルト管理者のみが他メンバーのロールを変更できる（`updateMemberRole`、`familyAdminMutation`）。
+- **最後の管理者保護**: 家族内に最低1名のデフォルト管理者（`admin`）が存在することを必須とし、最後の管理者の降格およびキックはサーバー側で厳格に拒否する。
+
+---
+
 ## 3. レコード所有権モデルとアクセス権マトリクス
+
+管理者判定（`isRecordAdmin`）は、**デフォルト管理者（`familyRole === "admin"`）** または **対象レコードの `admins` 配列に含まれる個別管理者** のいずれかを満たす場合に成立する（動的マージ ACL）。
 
 | 操作 | 個人レコード (`ownerType: "user"`) | 共有レコード (`ownerType: "family"`) |
 | --- | --- | --- |
-| **閲覧・復号** | 所有アカウント (`accountId === user._id`) のみ | 同一 Family に所属する PoohMa Account 全員 |
-| **編集 (タイトル/メモ/タグ等)** | 所有アカウントのみ | 同一 Family に所属する PoohMa Account 全員 |
-| **ヒント更新 (DEK再暗号化)** | 所有アカウントのみ | 同一 Family に所属する PoohMa Account 全員 (家族マスターキーでDEK再ラップ) |
-| **共有解除 (個人へ戻す)** | 対象外 | レコード管理者 (`admins.includes(user._id)`) のみ |
-| **管理者変更 (admins追加/削除)** | 対象外 | レコード管理者のみ |
+| **閲覧・復号** | 所有アカウント (`accountId === user._id`) のみ | 同一 Family に所属する全メンバー（`viewer` 含む） |
+| **編集 (タイトル/メモ/タグ等)** | 所有アカウントのみ | レコード管理者（デフォルト管理者または個別管理者）のみ |
+| **ヒント更新 (DEK再暗号化)** | 所有アカウントのみ | レコード管理者（デフォルト管理者または個別管理者）のみ |
+| **共有解除 (個人へ戻す)** | 対象外 | レコード管理者のみ |
+| **管理者変更 (admins追加/解除)** | 対象外 | レコード管理者のみ（デフォルト管理者は全レコード管理権限を持つためadmins追加不要） |
 | **削除** | 所有アカウントのみ | レコード管理者のみ |
 
 ---

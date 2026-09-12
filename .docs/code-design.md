@@ -217,6 +217,7 @@ users     0..* ── * auditLogs         (auditLogs.accountId → users._id, op
 | displayName | string(optional) | 表示名（アカウント識別子としても機能。createAccountで必須、syncUserでは初期補完に使用） |
 | photoURL | string(optional) | プロフィール画像URL |
 | familyId | Id<families>(optional) | 所属家族グループ（アカウントごとに独立） |
+| familyRole | ("admin" \| "viewer")(optional) | 家族内ロール（"admin": デフォルト管理者, "viewer": 閲覧専用）。未設定時は既存ユーザー互換として "admin" フォールバック |
 | onboardingVersion | number(optional) | オンボーディング進捗バージョン（未開始: 0または未設定、完了: 1以上） |
 | createdAt | number(optional) | 作成日時 |
 | updatedAt | number | 更新日時 |
@@ -299,7 +300,7 @@ users     0..* ── * auditLogs         (auditLogs.accountId → users._id, op
 | memo | string(optional) | メモ（最大10,000文字） |
 | ownerType | ("user" \| "family")(optional) | 所有者種別（"user": 個人所有, "family": 家族共有）。backfill 完了までは optional |
 | ownerFamilyId | Id<families>(optional) | 共有レコードが属する家族ID（ownerType === "family" の場合） |
-| admins | Id<users>[](optional) | レコード管理者（PoohMa accountId）配列。共有解除や削除、管理者変更権限を持つ。backfill 完了までは optional |
+| admins | Id<users>[](optional) | レコードの追加管理者（PoohMa accountId）配列。デフォルト管理者（familyRole === "admin"）は動的に管理者権限を持つため本配列には含めず、個別管理者として任命された閲覧専用メンバー（または個人レコード作成者）のみを格納する。backfill 完了までは optional |
 | userId | string | 作成者の Firebase UID |
 | accountId | Id<users> | 作成者の PoohMa Account ID（所有権・個人レコード境界） |
 | familyId | Id<families>(optional) | 暗号化スコープ・所属家族ID |
@@ -458,10 +459,12 @@ Convex 側は auth.config.ts の Issuer 設定 (securetoken.google.com/poohma) �
 | identityVerifiedQuery / Mutation | Firebase Identity の存在のみ検証 | ユーザー新規同期処理など |
 | authenticatedQuery / Mutation | Identity検証 + `resolveAccount` によるアカウント解決（所有権検証） | 一般的な認証必須API |
 | familyBoundQuery / Mutation | 上記 + 対象アカウントの `user.familyId` が設定されていること | 家族所属が前提の機能（招待承認、家族固有クエリ等） |
+| familyAdminMutation | 上記 + 対象アカウントの `familyRole === "admin"`（または未設定フォールバック）であること | 家族設定・メンバーロール変更・キック等の管理者限定機能 |
+| recordAdminMutation | familyBound + 対象レコード（`args.id`）が存在し `requireAdminAccess` を満たすこと（`ctx.record` 注入） | レコード個別管理者追加・解除等のレコード管理者限定機能 |
 
 #### アカウント解決（resolveAccount）の仕組み
 
-`authenticatedQuery` / `authenticatedMutation` / `familyBoundQuery` / `familyBoundMutation` は共通引数として `accountId?: v.optional(v.id("users"))` をサポートします。
+`authenticatedQuery` / `authenticatedMutation` / `familyBoundQuery` / `familyBoundMutation` / `familyAdminMutation` / `recordAdminMutation` は共通引数として `accountId?: v.optional(v.id("users"))` をサポートします。
 
 1. `accountId` が明示的に渡された場合：
    - DB から当該 `users` レコードを取得。
@@ -480,7 +483,7 @@ export const updateRecord = familyBoundMutation({
     if (!record) throw new Error("Record not found");
 
     // RLSバリデーターによる認可検証（5.4）
-    requireRecordAccess(ctx.user, record);
+    requireAdminAccess(ctx.user, record);
 
     await ctx.db.patch(args.id, { ...args.data, updatedAt: Date.now() });
   },
@@ -495,22 +498,23 @@ requireContentAccess(user, record):
   if record.familyId !== undefined && record.familyId !== user.familyId:
     Access denied エラーを送出
 
-  // 閲覧・編集権限チェック: 家族共有レコード、または本人の個人レコード
+  // 閲覧権限チェック: 家族共有レコード、または本人の個人レコード
   isOwner = record.ownerType === "user" && record.accountId === user._id
   isFamilyShared = record.ownerType === "family" && record.ownerFamilyId === user.familyId
   isOwner または isFamilyShared でなければ Access denied エラーを送出
 
 requireAdminAccess(user, record):
-  // 削除・共有解除・管理者変更権限チェック
+  // 編集・削除・共有解除・管理者変更権限チェック
   if record.ownerType === "user":
     if record.accountId !== user._id:
       Access denied エラーを送出
   else: // ownerType === "family"
-    if record.ownerFamilyId !== user.familyId || !(record.admins ?? []).includes(user._id):
+    isAdmin = getEffectiveFamilyRole(user) === "admin" || (record.admins ?? []).includes(user._id)
+    if record.ownerFamilyId !== user.familyId || !isAdmin:
       Access denied エラーを送出
 
-サーバー側の getRecordDetail / updateRecord は requireContentAccess、
-deleteRecord / deleteRecords / unshareRecord / addRecordAdmin / removeRecordAdmin は requireAdminAccess を必ず経由する。
+サーバー側の getRecordDetail は requireContentAccess、
+updateRecord / deleteRecord / deleteRecords / unshareRecord / addRecordAdmin / removeRecordAdmin は requireAdminAccess を必ず経由する。
 ```
 
 ### 5.5 セッション失効時の入力保護（FR-AUTH-07）
@@ -805,7 +809,8 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 | createFamilyInvite | Mutation | familyBound | 有効期限付き招待コードの発行（TTL: 15分〜30日、デフォルト7日） |
 | revokeFamilyInvite | Mutation | familyBound | 自家族の招待コードの手動失効 |
 | getFamilyInvites | Query | familyBound | 自家族の招待コード一覧取得（ステータス: active/expired/revoked付き） |
-| kickMember | Mutation | familyBound | メンバーのキック（強制削除）。Export Vaultへのマスターキー退避（TTL: 30日）、admins調停、所属解除、通知メール送信（6.7） |
+| updateMemberRole | Mutation | familyAdmin | メンバーのロール（admin/viewer）の更新。デフォルト管理者のみ実行可能。家族内に最低1名のデフォルト管理者が残るよう検証（最後の管理者の降格を防止） |
+| kickMember | Mutation | familyAdmin | メンバーのキック（強制削除）。デフォルト管理者のみ実行可能。最後のデフォルト管理者のキックは防止。Export Vaultへのマスターキー退避（TTL: 30日）、admins調停、所属解除、通知メール送信（6.7） |
 | getMyPendingExportVault | Query | authenticated | 被キックユーザーの有効なExport Vault取得（期限切れ時はnull） |
 | abandonPendingExportVault | Mutation | authenticated | 被キックユーザーによるExport Vaultの明示的破棄（データ持ち出し放棄） |
 | cleanupExpiredMigrationsInternal | InternalMutation | 内部限定（Cron） | 期限切れ移行データの自動クリーンアップ |
@@ -820,17 +825,18 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 | getRecordsPaginated | Query | authenticated | ページネーション対応の一覧取得（Convex usePaginatedQuery準拠）。ページ内レコードに対してのみcredentialsを有界並行バッチで結合し、同時I/O上限を回避 |
 
 | getArchivedRecords | Query | authenticated | アーカイブ済みレコードの一覧取得（FR-REC-23） |
-| getRecordDetail | Query | authenticated | 詳細取得（rls.tsによるrequireContentAccess制御）。取得時にrecordAccessLogへVIEWEDを記録し、lastViewedAt/Byを更新 |
+| getRecordDetail | Query | authenticated | 詳細取得（rls.tsによるrequireContentAccess制御）。adminUsersをデフォルト管理者＋admins配列から動的マージして返却。取得時にrecordAccessLogへVIEWEDを記録し、lastViewedAt/Byを更新 |
 | getAvailableTags | Query | authenticated | 閲覧可能レコードから使用中タグ一覧を抽出（by\_family\_sortKey経由） |
 | getOwnedRecords | Query | authenticated | 自分が管理可能な全レコード取得（個人レコード＋自分が管理者の共有レコード、CSVエクスポート用） |
 | fetchRecordsForExport | Mutation | authenticated | CSVエクスポート用レコード一括取得（サーバー側でCSVエクスポート通知メールもスケジュール送信） |
-| shareRecord | Mutation | familyBound | ワンタップで個人レコードを家族共有レコード（ownerType: "family", admins: [user._id]）に昇格（共有変更通知メール送信） |
+| shareRecord | Mutation | familyBound | ワンタップで個人レコードを家族共有レコード（ownerType: "family"）に昇格。共有者が閲覧者の場合はadminsに追加、デフォルト管理者の場合は空配列（共有変更通知メール送信） |
 | unshareRecord | Mutation | familyBound | ワンタップで共有レコードを個人レコード（ownerType: "user", admins: []）に戻す（管理者限定・共有変更通知メール送信） |
-| addRecordAdmin / removeRecordAdmin | Mutation | familyBound | 共有レコードの共同管理者の追加・解除（管理者限定・管理者変更通知メール送信） |
-| bulkShareRecords / bulkUnshareRecords | Mutation | familyBound | 選択した個人レコードの一括共有 / 共有レコードの一括共有解除 |
+| addRecordAdmin / removeRecordAdmin | Mutation | recordAdmin | 共有レコードの個別管理者（閲覧専用メンバー）の追加・解除（管理者限定・管理者変更通知メール送信。デフォルト管理者の冗長追加は防止） |
+| bulkSetRecordAdmin | Mutation | familyBound | 選択した共有レコード群に対して個別管理者の追加／解除を一括適用（管理者限定） |
+| bulkShareRecords / bulkUnshareRecords | Mutation | familyBound | 選択した個人レコードの一括共有 / 共有レコードの一括共有解除（isRecordAdminで認可検証） |
 | previewCsvImport | Query/Action | familyBound | インポート予定のCSV行と既存データ（URL＋タイトルで突合）を比較し、行ごとに新規／上書き／スキップを判定して返す（FR-CSV-07、9.7参照） |
 | createRecord | Mutation | familyBound | レコード新規作成（zodによるサーバー再検証、sortKey自動算出、ownerType: "user" \| "family"、credentials最大10件チェック、revision: 0初期化） |
-| updateRecord | Mutation | familyBound | レコード更新（rls.tsチェック、sortKey再算出、共有解除時は管理者権限を要求、revisionによる楽観的ロック競合検証、forceフラグによる強制上書き、完了時セッション自動削除） |
+| updateRecord | Mutation | familyBound | レコード更新（requireAdminAccessチェックにより閲覧専用メンバーによる更新を防止、sortKey再算出、共有解除時は管理者権限を要求、revisionによる楽観的ロック競合検証、forceフラグによる強制上書き、完了時セッション自動削除） |
 | deleteRecord / deleteRecords | Mutation | familyBound | 単体／一括削除（requireAdminAccessチェック、非管理者の共有レコード削除を防止） |
 | importRecords | Mutation | familyBound | CSVインポート（最大500件、家族内メールアドレスの厳格突合、行ごとのバリデーション結果を返却、revision: 0初期化） |
 | bulkUpdateRecords | Mutation | familyBound | 一括タグ付与／所有設定変更（所有設定変更は確認モーダルを経由） |

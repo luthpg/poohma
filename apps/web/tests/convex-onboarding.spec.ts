@@ -13,6 +13,7 @@ describe("オンボーディング Convexバックエンドテスト", () => {
     let userId!: Id<"users">;
     await t.run(async (ctx) => {
       userId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_test",
         email: "user@example.com",
         updatedAt: Date.now(),
@@ -64,6 +65,7 @@ describe("オンボーディング Convexバックエンドテスト", () => {
         updatedAt: Date.now(),
       });
       userId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_family_member",
         email: "member@example.com",
         familyId,

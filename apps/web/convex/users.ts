@@ -128,6 +128,7 @@ export const syncUser = identityVerifiedMutation({
       email,
       displayName,
       photoURL,
+      familyRole: "viewer",
       createdAt: now,
       updatedAt: now,
     });
@@ -220,6 +221,7 @@ export const createAccount = identityVerifiedMutation({
       email,
       displayName: trimmedName,
       photoURL: identity.pictureUrl,
+      familyRole: "viewer",
       createdAt: now,
       updatedAt: now,
     });
