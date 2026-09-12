@@ -113,7 +113,7 @@ export function UserMenu({
     activeAccount?.displayName || user?.displayName || "ユーザー";
   const photoURL = activeAccount?.photoURL || user?.photoURL || undefined;
   const email = user?.email || activeAccount?.email || "";
-  const familyName = activeAccount?.family?.name || "ファミリー未所属";
+  const familyName = activeAccount?.family?.name || "家族未所属";
 
   const handleLogout = async () => {
     try {

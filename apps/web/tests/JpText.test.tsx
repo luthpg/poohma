@@ -54,6 +54,31 @@ describe("JpText", () => {
     expect(brs.length).toBe(2);
   });
 
+  it("句点（。）で終わるテキストの直後に JSX 要素 (strong等) が続く場合でも文境界で <br /> が挿入されること", () => {
+    const { container } = render(
+      <JpText>
+        これは1文目です。<strong>これは2文目です。</strong>
+      </JpText>,
+    );
+
+    const brs = container.querySelectorAll("br");
+    expect(brs.length).toBe(1);
+    // strong の直前に br が挿入されていること
+    const strong = container.querySelector("strong");
+    expect(strong?.previousSibling?.nodeName.toLowerCase()).toBe("br");
+  });
+
+  it("句点（。）で終わる JSX 要素の直後にテキストが続く場合にも文境界で <br /> が挿入されること", () => {
+    const { container } = render(
+      <JpText>
+        <strong>これは1文目です。</strong>これは2文目です。
+      </JpText>,
+    );
+
+    const brs = container.querySelectorAll("br");
+    expect(brs.length).toBe(1);
+  });
+
   it("ネストされた JSX 要素に対して再帰的に BudouX パースを適用できること", () => {
     const { container } = render(
       <JpText>

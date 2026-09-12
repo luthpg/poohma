@@ -46,13 +46,13 @@ export function RecoveryOtpEmail({
   familyName,
 }: Props) {
   return (
-    <Layout preview={`[PoohMa] 家族復元用の認証コード: ${otpCode}`}>
+    <Layout preview={`[PoohMa] 家族データ復旧用の認証コード: ${otpCode}`}>
       <Text style={text}>{displayName} さん</Text>
       <Text style={text}>
         家族「{familyName}」のデータ復旧リクエストを受け付けました。
       </Text>
       <Text style={text}>
-        復元画面にて以下の6桁の認証コード（OTP）を入力してください。
+        復旧画面にて以下の6桁の認証コード（OTP）を入力してください。
       </Text>
       <Section style={codeBox}>
         <Text style={codeStyle}>{otpCode}</Text>
@@ -62,7 +62,7 @@ export function RecoveryOtpEmail({
         </Text>
       </Section>
       <Text style={text}>
-        この復元リクエストに心当たりがない場合は、第三者があなたのリカバリーコードを入力した可能性があります。アカウントの安全のため家族パスコードの変更やリカバリーキットの再発行をご検討ください。
+        この復旧リクエストに心当たりがない場合は、第三者があなたのリカバリーコードを入力した可能性があります。アカウントの安全のため家族パスコードの変更やリカバリーキットの再発行をご検討ください。
       </Text>
     </Layout>
   );

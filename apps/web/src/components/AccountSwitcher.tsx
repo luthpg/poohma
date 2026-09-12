@@ -30,7 +30,7 @@ export function AccountSwitcher({ className = "" }: AccountSwitcherProps) {
     : activeAccount?.displayName || activeAccount?.name || "アカウント";
   const currentFamilyName = isLoading
     ? "読み込み中..."
-    : activeAccount?.family?.name || "ファミリー未所属";
+    : activeAccount?.family?.name || "家族未所属";
 
   return (
     <>
