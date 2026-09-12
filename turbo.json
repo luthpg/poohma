@@ -29,6 +29,10 @@
       "dependsOn": ["^build"],
       "cache": false
     },
+    "test:e2e:show": {
+      "dependsOn": ["^build"],
+      "cache": false
+    },
     "dev": {
       "cache": false,
       "persistent": true

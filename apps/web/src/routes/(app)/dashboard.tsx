@@ -104,11 +104,14 @@ function TagCloud({
   );
 
   if (availableTags === undefined) return <TagCloudSkeleton />;
-  if (availableTags.length === 0) return null;
+  const validTags = Array.isArray(availableTags)
+    ? availableTags.filter((t): t is string => typeof t === "string")
+    : [];
+  if (validTags.length === 0) return null;
 
   return (
     <div className="mt-4 flex overflow-x-auto py-1.5 gap-2.5 no-scrollbar scroll-smooth items-center">
-      {availableTags.map((t: string) => {
+      {validTags.map((t: string) => {
         const isActive = activeTag === t;
         return (
           <button

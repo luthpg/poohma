@@ -40,6 +40,10 @@ AI Agent が誤りやすい点、過去に問題となった点、実装上の�
 - **問題**: `ConvexHttpClient` に `setAuth(token)` を呼ぶとクライアント内部に認証状態が保持されるため、モジュールグローバルで共有するとマルチユーザー間で認証情報が混混する。
 - **回避法**: Server Functions 内でリクエストごとに `new ConvexHttpClient()` を生成する。
 
+### Convex FunctionReference（`api.*`）の Proxy 構造とキャッシュキーの衝突
+- **問題**: `useQuery(api.records.getRecords)` などに渡す `FunctionReference` は内部的に Proxy オブジェクトである。`"_path" in query` は `false` を返し、`JSON.stringify(query)` は `"{}"` を返すため、安易にオブジェクト走査や JSON 文字列化でキャッシュキーを生成すると、すべてのクエリ関数の識別子が `"{}"` となり同一キーでキャッシュが上書き・汚染される。これにより、同引数（`{ accountId }`）を持つ配列クエリ（`getRecords`）の結果が別クエリ（`getAvailableTags`）に混入し、React 子要素にオブジェクトが渡ってクラッシュ（React error #31）する原因となる。
+- **回避法**: `FunctionReference` の関数名解決にはグローバルシンボル `query[Symbol.for("functionName")]` を参照する。`apps/web/src/hooks/usePersistentQuery.ts` の `getQueryFunctionKey` ヘルパーを利用し、安全にクエリパス（例: `"records:getRecords"`）を取得する。
+
 ### 生の Convex query / mutation の直接 export
 
 - **問題**: 認可チェックや `resolveAccount` を通さずに Convex 関数を公開すると、未認証アクセスや IDOR 脆弱性の原因になる。
