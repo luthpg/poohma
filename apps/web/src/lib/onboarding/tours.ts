@@ -34,9 +34,9 @@ export const recordDetailSteps: DriveStep[] = [
   {
     element: '[data-tour="hint-reveal-btn"]',
     popover: {
-      title: "実際にヒントを復号してみましょう",
+      title: "実際にヒントを表示してみましょう",
       description:
-        "「🔒 クリックして表示」を押すと、あなたの合言葉を使って端末内だけで瞬時に平文に復号されます。ぜひ試してみてください！",
+        "「🔒 クリックして表示」を押すと、あなたのパスコードを使って端末内だけで安全にロック解除され、ヒントが表示されます。ぜひ試してみてください！",
       side: "bottom",
       align: "start",
       nextBtnText: "表示を確認したら次へ",

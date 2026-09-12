@@ -8,6 +8,7 @@ import {
   Smartphone,
   UserPlus,
 } from "lucide-react";
+import { JpText } from "@/components/JpText";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/(public)/usage")({
@@ -21,21 +22,21 @@ function UsagePage() {
       number: "01",
       title: "家族グループの作成・参加",
       description:
-        "アプリにログイン後、新しい「家族」を作成するか、共有された招待コードを入力して家族グループに参加します。このとき、家族専用の「マスターキー」が安全に生成されます。",
+        "アプリにログイン後、新しい「家族」を作成するか、共有された招待コードを入力して家族グループに参加します。このとき、家族データを保護するための暗号鍵が自動的に生成されます。",
       icon: UserPlus,
     },
     {
       number: "02",
       title: "アカウントとヒントの登録",
       description:
-        "動画配信サービスやWi-Fiなどの「ログインID」と、家族だけが推測できる「パスワードのヒント」を入力して保存します。実パスワードそのものは一切入力・保存しません。",
+        "動画配信サービスやWi-Fiなどの「ログインID」と、家族だけが推測できる「パスワードのヒント」を入力して保存します。実際のパスワードは一切入力・保存しません。",
       icon: KeyRound,
     },
     {
       number: "03",
       title: "パスコードロックと安全な閲覧",
       description:
-        "登録したヒントを見るには、各自が設定した「画面ロック用パスコード」の入力が必要です。これにより、スマホを置き忘れた際などの身近な覗き見を完全に防ぎます。",
+        "登録したヒントを見るには、各自が設定した「パスコード」の入力が必要です。これにより、スマホを置き忘れた際などの身近な覗き見を防ぎます。",
       icon: Lock,
     },
   ];
@@ -43,21 +44,20 @@ function UsagePage() {
   // よく読まれる個別トピック・応用ガイド
   const topics = [
     {
-      title: "実パスワードを保存しない理由",
+      title: "実際のパスワードを保存しない理由",
       description:
-        "PoohMaがなぜ安全なのか、ヒント管理による心理的・技術的なセキュリティの仕組みを解説します。",
+        "PoohMaがなぜ安全なのか、ヒント管理がもたらす安心感と安全性の仕組みを解説します。",
       category: "セキュリティ",
     },
     {
-      title: "マスターキーの管理と注意点",
-      description:
-        "エンドツーエンド暗号化（E2EE）の要となるマスターキーの仕組みと、安全な運用のコツ。",
+      title: "暗号鍵の管理と注意点",
+      description: "家族専用の暗号鍵による保護の仕組みと、安全な運用のコツ。",
       category: "高度な設定",
     },
     {
       title: "機種変更時のデータの引き継ぎ",
       description:
-        "スマートフォンを新しく買い替えた際に、家族のデータを安全に同期・復元する手順について。",
+        "スマートフォンを新しく買い替えた際に、家族のデータを安全に引き継ぎ・復元する手順について。",
       category: "サポート",
     },
   ];
@@ -75,7 +75,9 @@ function UsagePage() {
             使い方ガイド
           </h1>
           <p className="text-[15px] md:text-[16px] text-muted-foreground max-w-[540px] mx-auto leading-relaxed">
-            PoohMa（プーマ）は、家族のアカウント情報を「パスワードのヒント」で安全に共有するサービスです。初期設定から日々の使い方までをご案内します。
+            <JpText>
+              PoohMa（プーマ）は、家族のアカウント情報を「パスワードのヒント」で安全に共有するサービスです。初期設定から普段の使い方までをご案内します。
+            </JpText>
           </p>
         </div>
       </section>
@@ -84,10 +86,12 @@ function UsagePage() {
       <section className="mx-auto max-w-[1200px] w-full px-4 py-16 md:py-24">
         <div className="mb-12 text-center md:text-left">
           <h2 className="text-[20px] md:text-[24px] font-semibold tracking-[-0.6px] text-foreground mb-2">
-            3ステップで始める共有管理
+            3ステップで始める家族共有
           </h2>
           <p className="text-[14px] text-muted-foreground">
-            まずはこの3つの手順に沿って、家族との安全なパスワードヒント共有をスタートしましょう。
+            <JpText>
+              まずはこの3つの手順に沿って、家族との安全なパスワードヒント共有をスタートしましょう。
+            </JpText>
           </p>
         </div>
 
@@ -112,7 +116,7 @@ function UsagePage() {
                   {step.title}
                 </h3>
                 <p className="text-[14px] text-muted-foreground leading-relaxed flex-1">
-                  {step.description}
+                  <JpText>{step.description}</JpText>
                 </p>
               </div>
             );
@@ -130,13 +134,15 @@ function UsagePage() {
                 詳細な解説と応用
               </h2>
               <p className="text-[14px] text-muted-foreground leading-relaxed">
-                セキュリティの仕様や、より高度な管理方法について知りたい方は、こちらのトピックをご覧ください。
+                <JpText>
+                  セキュリティの仕様や、より詳しい管理方法について知りたい方は、こちらのトピックをご覧ください。
+                </JpText>
               </p>
               <div className="pt-2 hidden md:block">
                 <Button asChild variant="outline" className="gap-2 text-[13px]">
                   <Link to="/faq">
                     <HelpCircle className="h-4 w-4" />
-                    よくある質問（FAQ）へ
+                    よくある質問へ
                   </Link>
                 </Button>
               </div>
@@ -158,7 +164,7 @@ function UsagePage() {
                         {topic.title}
                       </h3>
                       <p className="text-[13px] text-muted-foreground leading-relaxed">
-                        {topic.description}
+                        <JpText>{topic.description}</JpText>
                       </p>
                     </div>
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted opacity-0 group-hover:opacity-100 transition-opacity">
@@ -178,7 +184,7 @@ function UsagePage() {
               >
                 <Link to="/faq">
                   <HelpCircle className="h-4 w-4" />
-                  よくある質問（FAQ）へ
+                  よくある質問へ
                 </Link>
               </Button>
             </div>
@@ -197,7 +203,9 @@ function UsagePage() {
               さあ、家族ではじめましょう
             </h2>
             <p className="text-[14px] text-muted-foreground leading-relaxed">
-              登録はわずか1分。パスワードを教え合う心理的ストレスや、メモ紛失による漏洩リスクから家族を解放します。
+              <JpText>
+                登録はわずか1分。パスワードを教え合う負担や、メモ紛失による漏洩リスクから家族を守ります。
+              </JpText>
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
               <Button

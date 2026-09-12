@@ -179,8 +179,8 @@ export async function generateRecoveryKitPdf({
         height: 95,
       });
     }
-  } catch (err) {
-    console.error("Failed to generate QR code for PDF:", err);
+  } catch (_err) {
+    // QRコード生成失敗時はスキップして文字コードのみ描画
   }
 
   // リカバリーコードを2行に分けて描画（各16文字/4グループ）
@@ -338,8 +338,8 @@ export async function extractRecoveryCodeFromFile(
           }
         }
       }
-    } catch (err) {
-      console.warn("Failed to extract code from PDF metadata:", err);
+    } catch (_err) {
+      // PDFメタデータ抽出失敗時は画像QRフォールバックへ進む
     }
   }
 

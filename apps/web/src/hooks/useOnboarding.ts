@@ -95,8 +95,8 @@ export function useOnboarding() {
       await queryClient.invalidateQueries({ queryKey: ["authUser"] });
       setPhase("completed");
       clearOnboardingQuery();
-    } catch (e) {
-      console.error("Failed to complete onboarding:", e);
+    } catch (_e) {
+      // 完了ステータスの更新失敗時は静かに無視
     }
   }, [
     activeAccount?._id,
@@ -182,8 +182,7 @@ export function useOnboarding() {
 
       // ダッシュボードツアー（前半）開始
       setPhase("dashboard-tour-1");
-    } catch (e) {
-      console.error("Failed to start onboarding tour:", e);
+    } catch (_e) {
       toast.error(
         "サンプルデータの作成に失敗しました。もう一度お試しください。",
       );
@@ -267,8 +266,7 @@ export function useOnboarding() {
       });
       sampleRecordIdsRef.current = [];
       toast.success(`${result.deletedCount}件のサンプルデータを削除しました。`);
-    } catch (e) {
-      console.error("Failed to purge sample data:", e);
+    } catch (_e) {
       toast.error("サンプルデータの削除に失敗しました。");
     } finally {
       setIsPurging(false);

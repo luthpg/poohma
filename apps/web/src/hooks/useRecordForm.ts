@@ -3,7 +3,11 @@ import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import { usePasscode } from "@/components/PasscodeProvider";
-import { validateRecordFormValues } from "@/utils/record-form-validation";
+import {
+  RECORD_FORM_VALIDATION_MESSAGES,
+  type RecordFormValidationCode,
+  validateRecordFormValues,
+} from "@/utils/record-form-validation";
 import {
   MAX_CREDENTIALS_PER_RECORD,
   MAX_TAGS_PER_RECORD,
@@ -50,7 +54,12 @@ export interface RecordSubmitPayload {
   credentials: EncryptedCredentialPayload[];
 }
 
-export class RecordFormValidationError extends Error {}
+export class RecordFormValidationError extends Error {
+  constructor(public readonly code: RecordFormValidationCode) {
+    super(code);
+    this.name = "RecordFormValidationError";
+  }
+}
 export class RecordFormUnlockCancelledError extends Error {}
 
 const EMPTY_CREDENTIAL: RecordFormCredential = {
@@ -141,8 +150,8 @@ export function useRecordForm(initialValues?: Partial<RecordFormValues>) {
             setValues((prev) => ({ ...prev, titleReading: reading }));
             return reading;
           }
-        } catch (e) {
-          console.error("Failed to fetch furigana", e);
+        } catch (_e) {
+          // ふりがな取得失敗時は何もしない
         } finally {
           if (currentReqId === furiganaReqIdRef.current) {
             setIsFetchingFurigana(false);
@@ -207,8 +216,8 @@ export function useRecordForm(initialValues?: Partial<RecordFormValues>) {
           await fetchFuriganaForTitle(shouldFetchFuriganaFor);
         }
         return ogp;
-      } catch (e) {
-        console.error("Failed to fetch OGP info", e);
+      } catch (_e) {
+        // OGP取得失敗時はnullを返却
         return null;
       } finally {
         setIsFetchingOgp(false);
@@ -364,10 +373,12 @@ export function useRecordForm(initialValues?: Partial<RecordFormValues>) {
           return false;
         }
         if (err instanceof RecordFormValidationError) {
-          toast.error(err.message);
+          toast.error(
+            RECORD_FORM_VALIDATION_MESSAGES[err.code] ??
+              "入力内容をご確認ください。",
+          );
           return false;
         }
-        console.error("保存エラー:", err);
         toast.error("保存に失敗しました。");
         return false;
       } finally {

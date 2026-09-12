@@ -6,21 +6,31 @@ export interface RecordFormValidationInput {
   credentials: { passwordHint?: string }[];
 }
 
+export type RecordFormValidationCode = "memo_too_long" | "hint_too_long";
+
+export const RECORD_FORM_VALIDATION_MESSAGES: Record<
+  RecordFormValidationCode,
+  string
+> = {
+  memo_too_long: `メモは${MEMO_MAX_LENGTH.toLocaleString()}文字以内で入力してください`,
+  hint_too_long: `パスワードヒントは${PASSWORD_HINT_MAX_LENGTH.toLocaleString()}文字以内で入力してください`,
+};
+
 /**
  * レコードフォームの送信前バリデーション（暗号化前の平文に対して行う）。
- * 問題がなければ null、あればエラーメッセージ文字列を返す。
+ * 問題がなければ null、あればバリデーションエラーコードを返す。
  */
 export function validateRecordFormValues(
   input: RecordFormValidationInput,
-): string | null {
+): RecordFormValidationCode | null {
   if (input.memo && input.memo.length > MEMO_MAX_LENGTH) {
-    return `メモは${MEMO_MAX_LENGTH.toLocaleString()}文字以内で入力してください`;
+    return "memo_too_long";
   }
   const invalidHint = input.credentials.find(
     (c) => c.passwordHint && c.passwordHint.length > PASSWORD_HINT_MAX_LENGTH,
   );
   if (invalidHint) {
-    return `パスワードヒントは${PASSWORD_HINT_MAX_LENGTH.toLocaleString()}文字以内で入力してください`;
+    return "hint_too_long";
   }
   return null;
 }

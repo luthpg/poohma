@@ -113,7 +113,7 @@ export function UserMenu({
     activeAccount?.displayName || user?.displayName || "ユーザー";
   const photoURL = activeAccount?.photoURL || user?.photoURL || undefined;
   const email = user?.email || activeAccount?.email || "";
-  const familyName = activeAccount?.family?.name || "ファミリー未所属";
+  const familyName = activeAccount?.family?.name || "家族未所属";
 
   const handleLogout = async () => {
     try {
@@ -124,7 +124,6 @@ export function UserMenu({
       queryClient.clear();
       window.location.href = "/";
     } catch {
-      console.error("ログアウトに失敗しました。");
       window.location.href = "/";
     }
   };
@@ -203,8 +202,8 @@ export function UserMenu({
                   if (ogp.image) newRow.ogpImage = ogp.image;
                   if (ogp.description) newRow.ogpDescription = ogp.description;
                   if (ogp.title && !newRow.Title) newRow.Title = ogp.title;
-                } catch (e) {
-                  console.error(`Failed to fetch OGP for ${newRow.URL}`, e);
+                } catch {
+                  // OGP取得失敗は無視して続行
                 }
               }
 
@@ -217,11 +216,8 @@ export function UserMenu({
                   if (reading && reading !== newRow.Title) {
                     newRow.titleReading = reading;
                   }
-                } catch (e) {
-                  console.error(
-                    `Failed to fetch furigana for ${newRow.Title}`,
-                    e,
-                  );
+                } catch {
+                  // ルビ取得失敗は無視して続行
                 }
               }
 
@@ -333,17 +329,15 @@ export function UserMenu({
             );
           }
           await router.invalidate();
-        } catch (error) {
-          console.error(error);
+        } catch {
           toast.error("インポートに失敗しました", { id: toastId });
         } finally {
           setIsImporting(false);
           if (fileInputRef.current) fileInputRef.current.value = "";
         }
       },
-      error: (err) => {
-        console.error("Papa.parse error:", err);
-        toast.error("CSVファイルの解析に失敗しました", { id: toastId });
+      error: () => {
+        toast.error("CSVファイルの読み込みに失敗しました", { id: toastId });
         setIsImporting(false);
         if (fileInputRef.current) fileInputRef.current.value = "";
       },
@@ -679,7 +673,7 @@ export function UserMenu({
                     <AlertDialogHeader>
                       <AlertDialogTitle>ログアウトしますか？</AlertDialogTitle>
                       <AlertDialogDescription>
-                        セッションが終了し、ログイン画面に戻ります。
+                        ログアウトしてログイン画面に戻ります。
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -716,7 +710,7 @@ export function UserMenu({
                     const isSelected = acc._id === activeAccountId;
                     const accName =
                       acc.displayName || acc.name || "名無しアカウント";
-                    const famName = acc.family?.name || "ファミリー未所属";
+                    const famName = acc.family?.name || "家族未所属";
 
                     return (
                       <button
@@ -818,7 +812,7 @@ export function UserMenu({
                     const isSelected = acc._id === activeAccountId;
                     const accName =
                       acc.displayName || acc.name || "名無しアカウント";
-                    const famName = acc.family?.name || "ファミリー未所属";
+                    const famName = acc.family?.name || "家族未所属";
 
                     return (
                       <DropdownMenuItem
@@ -1000,7 +994,7 @@ export function UserMenu({
                 <AlertDialogHeader>
                   <AlertDialogTitle>ログアウトしますか？</AlertDialogTitle>
                   <AlertDialogDescription>
-                    セッションが終了し、ログイン画面に戻ります。
+                    ログアウトしてログイン画面に戻ります。
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

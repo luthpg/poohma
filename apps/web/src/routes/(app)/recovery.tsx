@@ -113,9 +113,8 @@ function RecoveryPageComponent() {
           "ファイルからQRコードを検出できませんでした。コードを手入力してください。",
         );
       }
-    } catch (err) {
-      console.error("Failed to extract code:", err);
-      toast.error("ファイルの解析中にエラーが発生しました");
+    } catch (_err) {
+      toast.error("ファイルの読み取り中にエラーが発生しました");
     } finally {
       setIsExtractingFile(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -147,13 +146,8 @@ function RecoveryPageComponent() {
       toast.success(
         `登録メールアドレス（${res.email}）に6桁の認証コードを送信しました`,
       );
-    } catch (error) {
-      console.error("Failed to send OTP:", error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "認証コードの送信に失敗しました",
-      );
+    } catch {
+      toast.error("認証コードの送信に失敗しました");
     } finally {
       setIsSendingOtp(false);
     }
@@ -171,13 +165,8 @@ function RecoveryPageComponent() {
       toast.success(
         `登録メールアドレス（${res.email}）に認証コードを再送信しました`,
       );
-    } catch (error) {
-      console.error("Failed to resend OTP:", error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "認証コードの再送信に失敗しました",
-      );
+    } catch {
+      toast.error("認証コードの再送信に失敗しました");
     } finally {
       setIsSendingOtp(false);
     }
@@ -199,7 +188,17 @@ function RecoveryPageComponent() {
         recoveryCode: rawCode,
       });
       if (!res.success) {
-        toast.error(res.error);
+        if (res.remainingAttempts !== undefined) {
+          toast.error(
+            res.remainingAttempts > 0
+              ? `認証コードが正しくありません。残り試行回数: ${res.remainingAttempts} 回`
+              : "認証コードの試行上限回数を超過しました。コードを再送信してください。",
+          );
+        } else {
+          toast.error(
+            "リカバリーコードが正しくありません。入力内容をご確認ください。",
+          );
+        }
         setIsVerifyingOtp(false);
         return;
       }
@@ -224,15 +223,10 @@ function RecoveryPageComponent() {
       setStep(3);
 
       toast.success(
-        "本人確認が完了し、マスターキーの復旧に成功しました。新しいパスコードを設定してください。",
+        "本人確認が完了し、家族データの復旧準備ができました。新しい家族パスコードを設定してください。",
       );
-    } catch (error) {
-      console.error("Verification failed:", error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "リカバリーコードまたは認証コードが正しくありません",
-      );
+    } catch (_error) {
+      toast.error("リカバリーコードまたは認証コードが正しくありません");
     } finally {
       setIsVerifyingOtp(false);
     }
@@ -242,7 +236,9 @@ function RecoveryPageComponent() {
   const handleSetNewPasscode = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!recoveredMasterKey || !sessionToken) {
-      toast.error("復旧されたマスターキーまたは認可セッションが見つかりません");
+      toast.error(
+        "復旧手続きの有効期限が切れたか、情報が見つかりません。最初からやり直してください。",
+      );
       return;
     }
 
@@ -285,13 +281,8 @@ function RecoveryPageComponent() {
 
       setStep(4);
       toast.success("新しい家族パスコードを設定しました");
-    } catch (error) {
-      console.error("Failed to update passcode:", error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "パスコードの更新に失敗しました",
-      );
+    } catch (_error) {
+      toast.error("パスコードの更新に失敗しました");
     } finally {
       setIsSubmittingPasscode(false);
     }
@@ -345,7 +336,7 @@ function RecoveryPageComponent() {
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-                家族マスターキーの復元
+                家族データの復旧
               </h1>
               <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
                 リカバリーキットとメール2段階認証で安全に復旧します
@@ -366,7 +357,7 @@ function RecoveryPageComponent() {
               </h2>
               <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
                 事前に発行・保管した「PoohMa
-                リカバリーキット」のPDFファイルをアップロードするか、記載されている32文字の復元コードを入力してください。
+                リカバリーキット」のPDFファイルをアップロードするか、記載されている32文字の復旧コードを入力してください。
               </p>
             </div>
 
@@ -421,7 +412,7 @@ function RecoveryPageComponent() {
                 htmlFor="recovery-code-input"
                 className="block text-xs sm:text-sm font-medium text-foreground"
               >
-                復元コード（Recovery Code）
+                復旧コード（Recovery Code）
               </label>
               <input
                 id="recovery-code-input"
@@ -472,7 +463,7 @@ function RecoveryPageComponent() {
                 登録メールアドレスでの2段階認証
               </h2>
               <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                第三者による不正復元を防ぐため、ご登録のメールアドレス（
+                第三者による不正な復旧を防ぐため、ご登録のメールアドレス（
                 <strong className="text-foreground">{otpSentEmail}</strong>
                 ）に届いた6桁の認証コードを入力してください。
               </p>
@@ -527,11 +518,11 @@ function RecoveryPageComponent() {
                 {isVerifyingOtp ? (
                   <>
                     <Spinner className="h-4 w-4" />
-                    認証 & 復号中...
+                    確認 & 復旧中...
                   </>
                 ) : (
                   <>
-                    認証して復元する
+                    認証して復旧する
                     <ShieldCheck className="h-4 w-4" />
                   </>
                 )}
@@ -551,7 +542,7 @@ function RecoveryPageComponent() {
                 新しい家族パスコードの設定
               </h2>
               <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                マスターキーが安全に復元されました。今後家族データの閲覧に使用する新しい家族パスコードを設定してください。
+                家族データが安全に復旧されました。今後家族データの閲覧に使用する新しい家族パスコードを設定してください。
               </p>
             </div>
 
@@ -654,7 +645,7 @@ function RecoveryPageComponent() {
           </form>
         )}
 
-        {/* ステップ 4: 復元完了 */}
+        {/* ステップ 4: 復旧完了 */}
         {step === 4 && (
           <div className="py-8 text-center space-y-5">
             <div className="inline-flex p-3 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
@@ -662,10 +653,10 @@ function RecoveryPageComponent() {
             </div>
             <div className="space-y-2">
               <h2 className="text-xl font-bold text-foreground">
-                復元が完了しました
+                復旧が完了しました
               </h2>
               <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
-                家族マスターキーが新しいパスコードで再暗号化され、正常に復旧しました。今後は新しいパスコードでロックを解除してください。
+                家族データが新しいパスコードで再保護され、正常に復旧しました。今後は新しいパスコードでロックを解除してください。
               </p>
             </div>
             <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">

@@ -110,9 +110,8 @@ export async function loadGooglePickerScript(): Promise<boolean> {
         clearTimeout(timeoutId);
         resolve(typeof window.google?.picker !== "undefined");
       });
-    } catch (error) {
+    } catch (_error) {
       clearTimeout(timeoutId);
-      console.error("Failed to load Google Picker:", error);
       resolve(false);
     }
   });
@@ -240,14 +239,12 @@ export async function uploadFileToGoogleDrive({
     );
 
     if (!res.ok) {
-      console.error("Failed to upload to Google Drive:", res.statusText);
       return null;
     }
 
     const result = await res.json();
     return { fileId: result.id, webViewLink: result.webViewLink };
-  } catch (err) {
-    console.error("Google Drive upload error:", err);
+  } catch (_err) {
     return null;
   }
 }
@@ -273,13 +270,11 @@ export async function downloadFileFromGoogleDrive({
     );
 
     if (!res.ok) {
-      console.error("Failed to download from Google Drive:", res.statusText);
       return null;
     }
 
     return await res.blob();
-  } catch (err) {
-    console.error("Google Drive download error:", err);
+  } catch (_err) {
     return null;
   }
 }
@@ -319,14 +314,12 @@ export async function createGoogleDriveFolder({
     );
 
     if (!res.ok) {
-      console.error("Failed to create folder on Google Drive:", res.statusText);
       return null;
     }
 
     const result = await res.json();
     return { folderId: result.id };
-  } catch (err) {
-    console.error("Google Drive create folder error:", err);
+  } catch (_err) {
     return null;
   }
 }

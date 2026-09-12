@@ -14,6 +14,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
+import { JpText } from "@/components/JpText";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -143,13 +144,13 @@ export function RecoveryKitDialog({
       if (!currentMasterKey) {
         const unlocked = await requireUnlock();
         if (!unlocked) {
-          toast.error("マスターキーのアンロックが必要です");
+          toast.error("家族パスコードによるロック解除が必要です");
           return;
         }
         currentMasterKey = getMasterKey();
       }
       if (!currentMasterKey) {
-        toast.error("マスターキーを取得できませんでした");
+        toast.error("暗号鍵の読み込みに失敗しました");
         return;
       }
 
@@ -207,13 +208,8 @@ export function RecoveryKitDialog({
           : "リカバリーキットを発行しました",
       );
       onSuccess?.();
-    } catch (error) {
-      console.error("Failed to generate recovery kit:", error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "リカバリーキットの生成に失敗しました",
-      );
+    } catch {
+      toast.error("リカバリーキットの生成に失敗しました");
       setStep("initial");
     }
   };
@@ -257,7 +253,6 @@ export function RecoveryKitDialog({
       if (err instanceof Error && err.name === "AbortError") {
         return;
       }
-      console.error("Share failed:", err);
       toast.error("共有に失敗しました。ダウンロードをご利用ください。");
     }
   };
@@ -302,8 +297,7 @@ export function RecoveryKitDialog({
           );
         }
         accessToken = await getGoogleDriveAccessToken();
-      } catch (authErr) {
-        console.error("Google Drive auth error:", authErr);
+      } catch {
         toast.error("Google 認証に失敗しました");
         setIsDriveUploading(false);
         return;
@@ -348,8 +342,7 @@ export function RecoveryKitDialog({
             apiKey,
             appId,
           });
-        } catch (pickerErr) {
-          console.error("Google Picker error:", pickerErr);
+        } catch {
           toast.error("フォルダ選択画面の表示に失敗しました");
           setIsDriveUploading(false);
           return;
@@ -389,8 +382,7 @@ export function RecoveryKitDialog({
       } else {
         toast.error("Google Drive へのアップロードに失敗しました");
       }
-    } catch (error) {
-      console.error("Google drive save error:", error);
+    } catch {
       toast.error("Google Drive への保存中にエラーが発生しました");
     } finally {
       setIsDriveUploading(false);
@@ -431,7 +423,9 @@ export function RecoveryKitDialog({
                     リカバリーキットとは？
                   </h4>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    家族パスコードを忘れた場合に、マスターキーを復元してデータを救出するための緊急バックアップPDFです。
+                    <JpText>
+                      家族パスコードを忘れた場合に、家族データを復元・救出するための緊急バックアップPDFです。
+                    </JpText>
                   </p>
                 </div>
               </div>
@@ -443,8 +437,10 @@ export function RecoveryKitDialog({
                     保管に関する注意事項
                   </h4>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    リカバリーコードはサーバーに平文保存されず、再表示できません。生成されるPDFを必ず安全な場所（印刷保管、Google
-                    Drive、パスワード管理ソフト等）に保存してください。
+                    <JpText>
+                      リカバリーコードそのものはサーバーに保存されず、再表示できません。生成されるPDFを必ず安全な場所（印刷保管、Google
+                      Drive、パスワード管理ソフト等）に保存してください。
+                    </JpText>
                   </p>
                 </div>
               </div>

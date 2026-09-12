@@ -60,13 +60,11 @@ export async function getGoogleDriveAccessToken(): Promise<string | null> {
   }
 
   if (!auth) {
-    console.error("Firebase auth is not initialized");
     return null;
   }
 
   const currentUser = auth.currentUser;
   if (!currentUser) {
-    console.error("Firebase user is not signed in");
     return null;
   }
 
@@ -91,7 +89,6 @@ export async function getGoogleDriveAccessToken(): Promise<string | null> {
     ) {
       return null;
     }
-    console.error("Failed to acquire Google Drive access token:", error);
     throw error;
   }
 }

@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
-import { ConvexError } from "convex/values";
 import { onAuthStateChanged } from "firebase/auth";
 import { CheckCircle2, Send } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
@@ -106,13 +105,10 @@ function ContactPage() {
 
       setIsSuccess(true);
       toast.success("お問い合わせを送信しました");
-    } catch (error) {
-      console.error("Failed to send contact:", error);
-      const errorMessage =
-        error instanceof ConvexError && typeof error.data === "string"
-          ? error.data
-          : "お問い合わせの送信に失敗しました。時間をおいて再度お試しください。";
-      toast.error(errorMessage);
+    } catch (_error) {
+      toast.error(
+        "お問い合わせの送信に失敗しました。時間をおいて再度お試しください。",
+      );
     } finally {
       setIsSubmitting(false);
     }

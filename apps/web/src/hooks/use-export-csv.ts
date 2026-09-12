@@ -91,8 +91,7 @@ export function useExportCsv() {
                 );
                 // サニタイズを適用
                 newRow[`PasswordHint${i}`] = sanitizeCsvValue(plainHint);
-              } catch (e) {
-                console.error("Failed to decrypt hint for export", e);
+              } catch (_e) {
                 newRow[`PasswordHint${i}`] = "";
               }
             }

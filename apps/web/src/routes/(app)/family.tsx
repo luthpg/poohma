@@ -177,16 +177,15 @@ function FamilyComponent() {
     try {
       try {
         localStorage.setItem(LOGOUT_FLAG_KEY, String(Date.now()));
-      } catch (e) {
-        console.warn("Failed to set logout flag in localStorage", e);
+      } catch (_e) {
+        // localStorage利用不可時は無視
       }
       await logout();
       if (auth) await signOut(auth);
       clearQueryCache();
       queryClient.clear();
       window.location.href = "/";
-    } catch (error) {
-      console.error("Logout failed:", error);
+    } catch (_error) {
       window.location.href = "/";
     }
   };
@@ -244,7 +243,7 @@ function FamilyComponent() {
             return;
           } catch (err) {
             if ((err as Error).name === "AbortError") return;
-            console.error("Share failed, falling back to download", err);
+            // 共有キャンセルのフォールバックとしてダウンロード
           }
         }
 
@@ -259,8 +258,7 @@ function FamilyComponent() {
         URL.revokeObjectURL(url);
         toast.success("QRコード画像を保存しました");
       }, "image/png");
-    } catch (err) {
-      console.error(err);
+    } catch (_err) {
       toast.error("画像の保存に失敗しました");
     }
   };
@@ -280,7 +278,6 @@ function FamilyComponent() {
         });
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
-          console.error(err);
           toast.error("共有に失敗しました");
         }
       }
@@ -288,8 +285,7 @@ function FamilyComponent() {
       try {
         await navigator.clipboard.writeText(inviteUrl);
         toast.success("招待URLをクリップボードにコピーしました");
-      } catch (err) {
-        console.error(err);
+      } catch (_err) {
         toast.error("コピーに失敗しました");
       }
     }
@@ -304,10 +300,8 @@ function FamilyComponent() {
       });
       setSelectedInviteCode(res.code);
       toast.success("招待コードを発行しました");
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "招待コードの発行に失敗しました",
-      );
+    } catch (_err) {
+      toast.error("招待コードの発行に失敗しました");
     } finally {
       setIsCreatingInvite(false);
     }
@@ -320,10 +314,8 @@ function FamilyComponent() {
         inviteId,
       });
       toast.success("招待コードを無効化しました");
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "招待コードの無効化に失敗しました",
-      );
+    } catch (_err) {
+      toast.error("招待コードの無効化に失敗しました");
     }
   };
 
@@ -427,8 +419,7 @@ function FamilyComponent() {
       setKickSuccessNotice({ memberName: kickedName });
       await queryClient.invalidateQueries({ queryKey: ["authUser"] });
       await router.invalidate();
-    } catch (error) {
-      console.error("Failed to kick member:", error);
+    } catch (_error) {
       toast.error("メンバーの削除に失敗しました");
     } finally {
       setIsKicking(false);
@@ -460,8 +451,7 @@ function FamilyComponent() {
       toast.success(
         "旧家族のパスコードを確認しました。新しい家族を作成または参加してください",
       );
-    } catch (error) {
-      console.error("Vault unlock failed:", error);
+    } catch (_error) {
       toast.error("パスコードが一致しません。もう一度お試しください");
     } finally {
       setIsVerifyingVault(false);
@@ -479,8 +469,7 @@ function FamilyComponent() {
       setVaultUnlockedKey(null);
       setVaultPasscode("");
       await router.invalidate();
-    } catch (error) {
-      console.error("Failed to abandon vault:", error);
+    } catch (_error) {
       toast.error("データの破棄に失敗しました");
     } finally {
       setIsAbandoningVault(false);
@@ -500,9 +489,20 @@ function FamilyComponent() {
           "参加申請を送信しました。家族メンバーの承認をお待ちください。",
         );
       } catch (error) {
-        const msg =
-          error instanceof Error ? error.message : "参加申請に失敗しました";
-        toast.error(msg);
+        const rawMsg = error instanceof Error ? error.message : "";
+        if (rawMsg.includes("Invalid invite code")) {
+          toast.error("招待コードが無効です。内容をご確認ください。");
+        } else if (rawMsg.includes("revoked")) {
+          toast.error("この招待リンクは無効化されています。");
+        } else if (rawMsg.includes("expired")) {
+          toast.error("この招待リンクは有効期限が切れています。");
+        } else if (rawMsg.includes("already a member")) {
+          toast.error("すでにこの家族グループに参加しています。");
+        } else if (rawMsg.includes("pending")) {
+          toast.error("すでに申請中の参加リクエストがあります。");
+        } else {
+          toast.error("参加申請に失敗しました。もう一度お試しください。");
+        }
       } finally {
         setIsLoading(false);
       }
@@ -602,18 +602,17 @@ function FamilyComponent() {
       setVaultUnlockedKey(null);
       setVaultPasscode("");
       await router.invalidate();
-    } catch (error) {
+    } catch (_error) {
       if (currentMigrationId) {
         try {
           await abortFamilyMigrationMut({
             accountId: activeAccountId || undefined,
             migrationId: currentMigrationId,
           });
-        } catch (abortError) {
-          console.error("Failed to abort migration:", abortError);
+        } catch (_abortError) {
+          // abort失敗時は何もしない
         }
       }
-      console.error(error);
       toast.error(
         "家族の変更に失敗しました（パスコードが間違っている可能性があります）",
       );
@@ -724,18 +723,17 @@ function FamilyComponent() {
         setVaultUnlockedKey(null);
         setVaultPasscode("");
         await router.invalidate();
-      } catch (error) {
+      } catch (_error) {
         if (currentMigrationId) {
           try {
             await abortFamilyMigrationMut({
               accountId: activeAccountId || undefined,
               migrationId: currentMigrationId,
             });
-          } catch (abortError) {
-            console.error("Failed to abort migration:", abortError);
+          } catch (_abortError) {
+            // abort失敗時は何もしない
           }
         }
-        console.error(error);
         toast.error("家族の変更に失敗しました");
       } finally {
         setIsLoading(false);
@@ -821,7 +819,7 @@ function FamilyComponent() {
       }
       const masterKey = getMasterKey();
       if (!masterKey) {
-        toast.error("マスターキーの取得に失敗しました");
+        toast.error("暗号データの読み込みに失敗しました");
         return;
       }
 
@@ -837,8 +835,7 @@ function FamilyComponent() {
 
       try {
         await unwrapMasterKey(wrapped.encrypted, wrapped.iv, newWrappingKey);
-      } catch (error) {
-        console.error("Self-check failed:", error);
+      } catch (_error) {
         toast.error("鍵の再暗号化に失敗しました。もう一度お試しください");
         return;
       }
@@ -859,8 +856,7 @@ function FamilyComponent() {
         if (hasBiometric) {
           try {
             await updateBiometricPasscode(targetId, newPasscode);
-          } catch (error) {
-            console.error("Biometric passcode update failed:", error);
+          } catch (_error) {
             toast.error(
               "生体認証のロック解除情報の更新に失敗しました。設定画面から再設定してください。",
             );
@@ -876,11 +872,10 @@ function FamilyComponent() {
       setNewPasscodeConfirm("");
       setShowRotatePasscodeForm(false);
     } catch (error) {
-      console.error(error);
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes("CONFLICT")) {
         toast.error(
-          "他の操作と競合しました。ページを再読み込みしてやり直してください",
+          "他のご家族の操作と重なりました。画面を再読み込みしてやり直してください",
         );
       } else {
         toast.error("パスコードの変更に失敗しました");
@@ -1032,14 +1027,14 @@ function FamilyComponent() {
               </DialogTitle>
             </div>
             <DialogDescription className="text-[14px] leading-relaxed">
-              旧家族で登録していた「自分のみ」のデータは復号する手段がなくなり、実質的に二度と閲覧できなくなります。この操作は取り消せません。
+              旧家族で登録していた「自分のみ」のデータを開く手段がなくなり、二度と閲覧できなくなります。この操作は取り消せません。
             </DialogDescription>
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-2">
               <button
                 type="button"
                 disabled={isAbandoningVault}
                 onClick={() => setShowAbandonConfirm(false)}
-                className="rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium text-foreground hover:bg-accent transition cursor-pointer"
+                className="w-full sm:w-auto rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium text-foreground hover:bg-accent transition cursor-pointer text-center"
               >
                 キャンセル
               </button>
@@ -1047,7 +1042,7 @@ function FamilyComponent() {
                 type="button"
                 disabled={isAbandoningVault}
                 onClick={handleAbandonVault}
-                className="flex items-center gap-2 rounded-md bg-red-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-red-700 transition disabled:opacity-50 cursor-pointer"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-md bg-red-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-red-700 transition disabled:opacity-50 cursor-pointer"
               >
                 {isAbandoningVault && <Spinner className="h-4 w-4" />}
                 データを破棄して進む
@@ -1686,7 +1681,7 @@ function FamilyComponent() {
                         {new Date(req.createdAt).toLocaleString("ja-JP")}
                       </span>
                     </div>
-                    <div className="flex gap-2 shrink-0">
+                    <div className="flex flex-col sm:flex-row gap-2 shrink-0 w-full sm:w-auto">
                       <button
                         type="button"
                         disabled={isLoading}
@@ -1706,7 +1701,7 @@ function FamilyComponent() {
                             setIsLoading(false);
                           }
                         }}
-                        className="flex items-center gap-1.5 rounded-md bg-green-600 px-4 py-2 text-[13px] font-medium text-white shadow-border transition hover:bg-green-700 disabled:opacity-50 cursor-pointer"
+                        className="flex items-center justify-center gap-1.5 rounded-md bg-green-600 px-4 py-2 text-[13px] font-medium text-white shadow-border transition hover:bg-green-700 disabled:opacity-50 cursor-pointer w-full sm:w-auto"
                       >
                         <Check className="h-3.5 w-3.5" />
                         承認
@@ -1730,7 +1725,7 @@ function FamilyComponent() {
                             setIsLoading(false);
                           }
                         }}
-                        className="flex items-center gap-1.5 rounded-md bg-card px-4 py-2 text-[13px] font-medium text-red-500 shadow-border transition hover:bg-accent disabled:opacity-50 cursor-pointer"
+                        className="flex items-center justify-center gap-1.5 rounded-md bg-card px-4 py-2 text-[13px] font-medium text-red-500 shadow-border transition hover:bg-accent disabled:opacity-50 cursor-pointer w-full sm:w-auto"
                       >
                         <X className="h-3.5 w-3.5" />
                         却下
@@ -1747,24 +1742,24 @@ function FamilyComponent() {
             id="rotate-passcode-section"
             className="mt-8 border-t border-border pt-6"
           >
-            <div className="flex items-center justify-between mb-4">
-              <div>
+            <div className="mb-4 space-y-1">
+              <div className="flex items-center justify-between gap-3">
                 <h3 className="text-[14px] font-medium text-foreground">
                   家族パスコードの変更
                 </h3>
-                <p className="text-[12px] text-muted-foreground mt-0.5">
-                  家族グループやメンバー構成は変更せず、パスコードのみを変更します。
-                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShowRotatePasscodeForm(!showRotatePasscodeForm)
+                  }
+                  className="rounded-md bg-card px-3 py-1.5 text-[13px] font-medium text-foreground shadow-border hover:bg-accent transition shrink-0 cursor-pointer"
+                >
+                  {showRotatePasscodeForm ? "閉じる" : "パスコードを変更"}
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() =>
-                  setShowRotatePasscodeForm(!showRotatePasscodeForm)
-                }
-                className="rounded-md bg-card px-3 py-1.5 text-[13px] font-medium text-foreground shadow-border hover:bg-accent transition shrink-0 cursor-pointer"
-              >
-                {showRotatePasscodeForm ? "閉じる" : "パスコードを変更"}
-              </button>
+              <p className="text-[12px] text-muted-foreground leading-relaxed">
+                家族グループやメンバー構成は変更せず、パスコードのみを変更します。
+              </p>
             </div>
 
             {showRotatePasscodeForm && (
@@ -1895,7 +1890,7 @@ function FamilyComponent() {
                     </div>
                   </div>
 
-                  <div className="pt-2 flex justify-end gap-2">
+                  <div className="pt-2 flex flex-col-reverse sm:flex-row justify-end gap-2">
                     <button
                       type="button"
                       onClick={() => {
@@ -1904,7 +1899,7 @@ function FamilyComponent() {
                         setNewPasscode("");
                         setNewPasscodeConfirm("");
                       }}
-                      className="rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium shadow-sm transition hover:bg-accent text-foreground cursor-pointer"
+                      className="w-full sm:w-auto rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium shadow-sm transition hover:bg-accent text-foreground cursor-pointer text-center"
                     >
                       キャンセル
                     </button>
@@ -1916,7 +1911,7 @@ function FamilyComponent() {
                         !newPasscode ||
                         !newPasscodeConfirm
                       }
-                      className="flex items-center rounded-md bg-foreground px-6 py-2 text-[13px] font-medium text-background shadow-lg transition hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                      className="w-full sm:w-auto flex items-center justify-center rounded-md bg-foreground px-6 py-2 text-[13px] font-medium text-background shadow-lg transition hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     >
                       {isChangingPasscode ? (
                         <>
@@ -1933,14 +1928,14 @@ function FamilyComponent() {
             )}
           </div>
 
-          {/* リカバリーキット（復元コード） */}
+          {/* リカバリーキット（復旧コード） */}
           <div className="mt-8 border-t border-border pt-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <div>
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="h-4 w-4 text-primary" />
                   <h3 className="text-[14px] font-medium text-foreground">
-                    リカバリーキット（復元コード）
+                    リカバリーキット（復旧コード）
                   </h3>
                   {recoveryStatus?.hasRecoveryKit ? (
                     <span className="text-[11px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium px-2 py-0.5 rounded-full border border-emerald-500/20">
@@ -1953,28 +1948,28 @@ function FamilyComponent() {
                   )}
                 </div>
                 <p className="text-[12px] text-muted-foreground mt-1">
-                  家族パスコードを忘れた場合にMasterKeyを安全に復元するためのPDFキットを発行・保管します。
+                  家族パスコードを忘れた場合に暗号鍵セットを安全に復旧するためのPDFキットを発行・保管します。
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
-                <Link
-                  to="/recovery"
-                  className="flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-[13px] font-medium text-foreground shadow-sm hover:bg-muted transition cursor-pointer"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  リカバリーキットから復元
-                </Link>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0 w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={() => setIsRecoveryKitModalOpen(true)}
-                  className="flex items-center gap-1.5 rounded-md bg-foreground px-3.5 py-1.5 text-[13px] font-medium text-background shadow-sm hover:bg-foreground/90 transition cursor-pointer"
+                  className="flex items-center justify-center gap-1.5 rounded-md bg-foreground px-3.5 py-2 sm:py-1.5 text-[13px] font-medium text-background shadow-sm hover:bg-foreground/90 transition cursor-pointer w-full sm:w-auto order-1 sm:order-2"
                 >
                   <KeyRound className="h-3.5 w-3.5" />
                   {recoveryStatus?.hasRecoveryKit
                     ? "再発行する"
                     : "キットを発行"}
                 </button>
+                <Link
+                  to="/recovery"
+                  className="flex items-center justify-center gap-1.5 rounded-md border border-border bg-background px-3 py-2 sm:py-1.5 text-[13px] font-medium text-foreground shadow-sm hover:bg-muted transition cursor-pointer w-full sm:w-auto order-2 sm:order-1"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  リカバリーキットから復旧
+                </Link>
               </div>
             </div>
 
@@ -2201,7 +2196,7 @@ function FamilyComponent() {
                     <PasscodeStrengthMeter passcode={createPasscode} />
                   )}
                   <p className="mt-1.5 text-[12px] text-muted-foreground">
-                    暗号化に使用します。忘れるとヒントを復元できません。
+                    暗号化に使用します。忘れるとヒントを復旧できません。
                   </p>
                 </div>
                 <div>
@@ -2381,12 +2376,12 @@ function FamilyComponent() {
                   </ul>
                 </div>
               </DialogDescription>
-              <div className="flex justify-end gap-3 pt-2">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-2">
                 <button
                   type="button"
                   disabled={isKicking}
                   onClick={() => setMemberToKick(null)}
-                  className="rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium text-foreground hover:bg-accent transition cursor-pointer"
+                  className="w-full sm:w-auto rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium text-foreground hover:bg-accent transition cursor-pointer text-center"
                 >
                   キャンセル
                 </button>
@@ -2394,7 +2389,7 @@ function FamilyComponent() {
                   type="button"
                   disabled={isKicking}
                   onClick={handleKickMember}
-                  className="flex items-center gap-2 rounded-md bg-red-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-red-700 transition disabled:opacity-50 cursor-pointer"
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-md bg-red-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-red-700 transition disabled:opacity-50 cursor-pointer"
                   data-testid="confirm-kick-btn"
                 >
                   {isKicking && <Spinner className="h-4 w-4" />}
@@ -2433,11 +2428,11 @@ function FamilyComponent() {
                 <strong>今すぐパスコードを変更（ローテーション）</strong>
                 することをお勧めします。
               </DialogDescription>
-              <div className="flex justify-end gap-3 pt-2">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setKickSuccessNotice(null)}
-                  className="rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium text-foreground hover:bg-accent transition cursor-pointer"
+                  className="w-full sm:w-auto rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium text-foreground hover:bg-accent transition cursor-pointer text-center"
                 >
                   あとで行う
                 </button>
@@ -2452,7 +2447,7 @@ function FamilyComponent() {
                         ?.scrollIntoView({ behavior: "smooth" });
                     }, 100);
                   }}
-                  className="flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-[13px] font-medium text-white hover:bg-orange-600 transition cursor-pointer"
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-[13px] font-medium text-white hover:bg-orange-600 transition cursor-pointer"
                 >
                   <KeyRound className="h-4 w-4" />
                   今すぐパスコードを変更
@@ -2535,23 +2530,22 @@ export function FamilyAuditLogSection({
       className="mt-8 border-t border-border pt-6"
     >
       <AccordionItem value="audit-log" className="border-none">
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-2">
-            <History className="h-4 w-4 text-orange-500" />
-            <h3 className="text-[14px] font-medium text-foreground">
-              家族のアクティビティログ
-            </h3>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-muted-foreground hidden sm:block">
+        <AccordionTrigger
+          className="py-0 mb-1 hover:no-underline"
+          aria-label="家族のアクティビティログを展開または折りたたむ"
+        >
+          <div className="flex items-center justify-between flex-1">
+            <div className="flex items-center gap-2">
+              <History className="h-4 w-4 text-orange-500" />
+              <h3 className="text-[14px] font-medium text-foreground">
+                家族のアクティビティログ
+              </h3>
+            </div>
+            <span className="text-xs text-muted-foreground hidden sm:block mr-2">
               直近の変更・閲覧証跡
             </span>
-            <AccordionTrigger
-              className="py-0 px-1 hover:no-underline"
-              aria-label="家族のアクティビティログを展開または折りたたむ"
-            />
           </div>
-        </div>
+        </AccordionTrigger>
         <p className="text-[12px] text-muted-foreground mb-3">
           家族共有レコードに対する登録・更新・ヒント閲覧・削除の履歴を確認できます。
         </p>
@@ -2584,37 +2578,66 @@ export function FamilyAuditLogSection({
                       value={log._id}
                       className="rounded-lg border border-border/50 bg-card px-3.5 shadow-xs"
                     >
-                      <div className="flex items-center justify-between py-2.5 gap-2">
-                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                          <span
-                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border shrink-0 ${config.badgeClass}`}
-                          >
-                            <Icon className="h-3.5 w-3.5" />
-                            {config.label}
-                          </span>
-                          <div className="min-w-0 truncate">
-                            <span className="font-semibold text-foreground text-xs mr-2">
-                              {log.actorDisplayName}:{" "}
+                      {hasMetadata ? (
+                        <AccordionTrigger
+                          className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-2.5 gap-1.5 sm:gap-2 hover:no-underline"
+                          aria-label="個別ログの詳細を展開または折りたたむ"
+                        >
+                          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
+                            <span
+                              className={`inline-flex items-center gap-1 px-1.5 sm:px-2.5 py-0.5 rounded-full text-xs font-semibold border shrink-0 ${config.badgeClass}`}
+                            >
+                              <Icon className="h-3.5 w-3.5" />
+                              <span className="hidden sm:inline">
+                                {config.label}
+                              </span>
                             </span>
-                            <span className="text-xs text-muted-foreground truncate">
-                              {log.metadata?.targetTitle
-                                ? `${log.metadata.targetTitle}`
-                                : "対象レコード"}
+                            <div className="min-w-0 text-left">
+                              <span className="font-semibold text-foreground text-xs mr-1 sm:mr-2">
+                                {log.actorDisplayName}:
+                              </span>
+                              <span className="text-xs text-muted-foreground break-all sm:break-normal">
+                                {log.metadata?.targetTitle
+                                  ? `${log.metadata.targetTitle}`
+                                  : "対象レコード"}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 pl-7 sm:pl-0">
+                            <time className="text-[11px] text-muted-foreground font-mono">
+                              {formatDate(log.createdAt)}
+                            </time>
+                          </div>
+                        </AccordionTrigger>
+                      ) : (
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-2.5 gap-1.5 sm:gap-2">
+                          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
+                            <span
+                              className={`inline-flex items-center gap-1 px-1.5 sm:px-2.5 py-0.5 rounded-full text-xs font-semibold border shrink-0 ${config.badgeClass}`}
+                            >
+                              <Icon className="h-3.5 w-3.5" />
+                              <span className="hidden sm:inline">
+                                {config.label}
+                              </span>
                             </span>
+                            <div className="min-w-0 text-left">
+                              <span className="font-semibold text-foreground text-xs mr-1 sm:mr-2">
+                                {log.actorDisplayName}:
+                              </span>
+                              <span className="text-xs text-muted-foreground break-all sm:break-normal">
+                                {log.metadata?.targetTitle
+                                  ? `${log.metadata.targetTitle}`
+                                  : "対象レコード"}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center shrink-0 pl-7 sm:pl-0">
+                            <time className="text-[11px] text-muted-foreground font-mono">
+                              {formatDate(log.createdAt)}
+                            </time>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <time className="text-[11px] text-muted-foreground font-mono">
-                            {formatDate(log.createdAt)}
-                          </time>
-                          {hasMetadata ? (
-                            <AccordionTrigger
-                              className="py-0 px-1 hover:no-underline"
-                              aria-label="個別ログの詳細を展開または折りたたむ"
-                            />
-                          ) : null}
-                        </div>
-                      </div>
+                      )}
 
                       {hasMetadata ? (
                         <AccordionContent className="pt-2 pb-3 text-xs text-muted-foreground border-t border-border/40">

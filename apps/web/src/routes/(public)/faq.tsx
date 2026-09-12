@@ -39,7 +39,7 @@ function RouteComponent() {
           よくある質問
         </h1>
         <p className="text-[15px] sm:text-[16px] text-muted-foreground">
-          PoohMaの仕組みや暗号化、セキュリティに関するFAQです。
+          PoohMaの仕組みやセキュリティ、使い方に関するよくある質問をまとめました。
         </p>
       </div>
 
@@ -52,8 +52,8 @@ function RouteComponent() {
             type="search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="FAQを検索..."
-            aria-label="FAQを検索"
+            placeholder="質問を検索..."
+            aria-label="質問を検索"
             className="h-11 w-full rounded-lg border border-border bg-background pl-10 pr-10 text-base md:text-[14px] text-foreground placeholder:text-muted-foreground/70 focus:border-foreground/30 focus:outline-hidden focus:ring-2 focus:ring-ring/20 transition-colors shadow-xs"
           />
         </div>

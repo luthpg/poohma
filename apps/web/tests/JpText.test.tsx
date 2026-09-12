@@ -27,6 +27,58 @@ describe("JpText", () => {
     consoleSpy.mockRestore();
   });
 
+  it("句点（。）の直後に自動的に <br /> タグが挿入され、文末の句点には余計な <br /> が挿入されないこと", () => {
+    const { container } = render(
+      <JpText>これは1文目です。これは2文目です。</JpText>,
+    );
+
+    const brs = container.querySelectorAll("br");
+    expect(brs.length).toBe(1);
+  });
+
+  it("句点（。）の直後に明示的な改行(\\n)が存在する場合に二重改行されないこと", () => {
+    const { container } = render(
+      <JpText>{"これは1文目です。\nこれは2文目です。"}</JpText>,
+    );
+
+    const brs = container.querySelectorAll("br");
+    expect(brs.length).toBe(1);
+  });
+
+  it("複数の句点がある場合にそれぞれの文末で <br /> タグが挿入されること", () => {
+    const { container } = render(
+      <JpText>1文目です。2文目です。3文目です。</JpText>,
+    );
+
+    const brs = container.querySelectorAll("br");
+    expect(brs.length).toBe(2);
+  });
+
+  it("句点（。）で終わるテキストの直後に JSX 要素 (strong等) が続く場合でも文境界で <br /> が挿入されること", () => {
+    const { container } = render(
+      <JpText>
+        これは1文目です。<strong>これは2文目です。</strong>
+      </JpText>,
+    );
+
+    const brs = container.querySelectorAll("br");
+    expect(brs.length).toBe(1);
+    // strong の直前に br が挿入されていること
+    const strong = container.querySelector("strong");
+    expect(strong?.previousSibling?.nodeName.toLowerCase()).toBe("br");
+  });
+
+  it("句点（。）で終わる JSX 要素の直後にテキストが続く場合にも文境界で <br /> が挿入されること", () => {
+    const { container } = render(
+      <JpText>
+        <strong>これは1文目です。</strong>これは2文目です。
+      </JpText>,
+    );
+
+    const brs = container.querySelectorAll("br");
+    expect(brs.length).toBe(1);
+  });
+
   it("ネストされた JSX 要素に対して再帰的に BudouX パースを適用できること", () => {
     const { container } = render(
       <JpText>
@@ -71,5 +123,47 @@ describe("JpText", () => {
 
     element.click();
     expect(handleClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("strongタグで終わる句点の直後にaタグが続く場合、文境界でbrタグが正常に挿入されること", () => {
+    const { container } = render(
+      <JpText>
+        <strong>重要なお知らせです。</strong>
+        <a href="#details">詳細はこちら</a>
+      </JpText>,
+    );
+
+    const brs = container.querySelectorAll("br");
+    expect(brs.length).toBe(1);
+    const strong = container.querySelector("strong");
+    expect(strong?.querySelector("br")).not.toBeNull();
+  });
+
+  it("複数階層に深くネストされたJSX要素でも再帰的にBudouXパースが適用されること", () => {
+    const { container } = render(
+      <JpText>
+        <div>
+          <span>
+            <strong>深くネストされた日本語の文章です。</strong>
+          </span>
+        </div>
+      </JpText>,
+    );
+
+    const strong = container.querySelector("strong");
+    expect(strong?.querySelectorAll("wbr").length).toBeGreaterThan(0);
+  });
+
+  it("句点（。）の直後に明示的な <br /> タグが存在する場合に二重改行されないこと", () => {
+    const { container } = render(
+      <JpText>
+        これは1文目です。
+        <br />
+        これは2文目です。
+      </JpText>,
+    );
+
+    const brs = container.querySelectorAll("br");
+    expect(brs.length).toBe(1);
   });
 });

@@ -21,15 +21,15 @@ describe("validateRecordFormValues", () => {
     expect(result).toBeNull();
   });
 
-  it("メモが上限を超える場合はエラーメッセージを返すこと", () => {
+  it("メモが上限を超える場合は memo_too_long エラーコードを返すこと", () => {
     const result = validateRecordFormValues({
       memo: "a".repeat(MEMO_MAX_LENGTH + 1),
       credentials: [],
     });
-    expect(result).toContain("メモ");
+    expect(result).toBe("memo_too_long");
   });
 
-  it("いずれかのcredentialのヒントが上限を超える場合はエラーメッセージを返すこと", () => {
+  it("いずれかのcredentialのヒントが上限を超える場合は hint_too_long エラーコードを返すこと", () => {
     const result = validateRecordFormValues({
       memo: "",
       credentials: [
@@ -37,6 +37,6 @@ describe("validateRecordFormValues", () => {
         { passwordHint: "a".repeat(PASSWORD_HINT_MAX_LENGTH + 1) },
       ],
     });
-    expect(result).toContain("パスワードヒント");
+    expect(result).toBe("hint_too_long");
   });
 });

@@ -53,8 +53,7 @@ function LoginPage() {
       try {
         // biome-ignore lint/style/noNonNullAssertion: authはuseEffectの時点でnullでないことが保証されている
         await getRedirectResult(auth!);
-      } catch (err) {
-        console.error("Redirect login error:", err);
+      } catch (_err) {
         setError("ログインに失敗しました。もう一度お試しください。");
       } finally {
         redirectChecked = true;
@@ -101,10 +100,11 @@ function LoginPage() {
           } catch {
             await router.navigate({ to: "/dashboard" });
           }
-        } catch (err) {
-          console.error("Authentication flow error:", err);
+        } catch (_err) {
           if (isComponentMounted) {
-            setError("認証プロセスでエラーが発生しました。");
+            setError(
+              "ログイン処理中にエラーが発生しました。もう一度お試しください。",
+            );
             setIsLoading(false);
           }
         }
@@ -121,7 +121,9 @@ function LoginPage() {
 
   const handleGoogleLogin = async () => {
     if (!auth || !googleProvider) {
-      setError("Firebaseの初期化に失敗しました。");
+      setError(
+        "ログイン機能の準備に失敗しました。時間をおいてもう一度お試しください。",
+      );
       return;
     }
 
@@ -133,8 +135,7 @@ function LoginPage() {
         localStorage.setItem("postLoginRedirect", search.redirect);
       }
       await signInWithRedirect(auth, googleProvider);
-    } catch (err) {
-      console.error("Login redirect error:", err);
+    } catch (_err) {
       setError("ログイン画面への遷移に失敗しました。もう一度お試しください。");
       setIsLoading(false);
     }

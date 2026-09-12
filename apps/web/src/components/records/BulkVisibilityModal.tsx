@@ -187,7 +187,7 @@ export function BulkVisibilityModal({
               </div>
 
               <p className="text-xs text-muted-foreground leading-relaxed">
-                家族メンバー全員がこのレコードのサービス名やメモ等を閲覧できるようになります。パスワードヒントは家族マスターキーで保護されます。
+                家族メンバー全員がこのレコードのサービス名やメモ等を閲覧できるようになります。パスワードヒントは家族専用の暗号鍵で保護されます。
               </p>
             </div>
 
