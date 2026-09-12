@@ -89,7 +89,9 @@ function TagCloudSkeleton() {
   );
 }
 
-// タグクラウドコンポーネント
+/**
+ * 利用可能なタグを表示し、選択されたタグを通知するタグクラウド。
+ */
 function TagCloud({
   activeTag,
   onTagClick,
