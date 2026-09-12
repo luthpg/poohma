@@ -145,6 +145,7 @@ function RecordDetailWrapper() {
   );
 }
 
+/** レコードの閲覧と、権限に応じた編集・共有管理を提供する詳細画面。 */
 function RecordDetailComponent({
   record,
   availableTags,
@@ -1054,6 +1055,7 @@ function RecordDetailComponent({
   );
 }
 
+/** 家族共有レコードの公開範囲と個別管理者を設定するダイアログ。 */
 function ShareSettingsDialog({
   record,
   familyMembers,

@@ -34,6 +34,7 @@ export interface BulkAdminModalProps {
   onSuccess: () => Promise<void> | void;
 }
 
+/** 選択した家族共有レコードの個別管理者権限を一括設定するダイアログ。 */
 export function BulkAdminModal({
   isOpen,
   selectedRecords,

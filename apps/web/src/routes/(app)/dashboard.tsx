@@ -180,6 +180,7 @@ type SortParam =
   | "updatedAt-asc"
   | "updatedAt-desc";
 
+/** レコードの検索・並び替え・一括操作を提供するダッシュボード画面。 */
 function RouteComponent() {
   const { prefs, searchParams } = routeApi.useLoaderData();
   const navigate = useNavigate({ from: "/dashboard" });

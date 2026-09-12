@@ -144,6 +144,7 @@ function FamilyPending() {
   );
 }
 
+/** 家族グループの作成、参加、メンバー管理を提供する設定画面。 */
 function FamilyComponent() {
   const { isAuthenticated } = useConvexAuth();
   const { activeAccountId, activeAccount } = useAccount();
