@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import { errors, type Page } from "@playwright/test";
 
 /**
  * E2Eテスト用ヘルパー:
@@ -14,13 +14,18 @@ export async function ensureOnboardingCompleted(page: Page): Promise<void> {
 
   try {
     await modalTitle.waitFor({ state: "visible", timeout: 4000 });
-    if (await skipButton.isVisible()) {
-      await skipButton.click({ force: true });
-    } else if (await closeButton.isVisible()) {
-      await closeButton.click({ force: true });
+  } catch (error) {
+    if (error instanceof errors.TimeoutError) {
+      // すでにスキップ済みでモーダルが表示されなかった場合はスルー
+      return;
     }
-    await modalTitle.waitFor({ state: "hidden", timeout: 8000 });
-  } catch {
-    // すでにスキップ済みでモーダルが表示されなかった場合はスルー
+    throw error;
   }
+
+  if (await skipButton.isVisible()) {
+    await skipButton.click({ force: true });
+  } else if (await closeButton.isVisible()) {
+    await closeButton.click({ force: true });
+  }
+  await modalTitle.waitFor({ state: "hidden", timeout: 8000 });
 }

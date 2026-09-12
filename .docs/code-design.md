@@ -855,7 +855,7 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 | -------------------------------- | ---------------- | -------------------- | -------------------------------------- |
 | getOgpInfo | Action | 要ログイン（内部でidentity検証） | 指定URLのOGP情報取得（SSRF対策済みfetch＋cheerio解析） |
 | getFurigana | Action | 要ログイン | Yahoo!テキスト解析APIによるふりがな取得 |
-| sendEmailReq / sendEmailInternal | (Internal)Action | 内部限定 | Resend経由のメール送信（React EmailテンプレートのHTML化・配信）。環境変数 `DISABLE_EMAIL_DELIVERY=true` の場合は外部配信をスキップし成功扱いとする |
+| sendEmailReq / sendTemplatedEmailInternal | (Internal)Action | 内部限定 | Resend経由のメール送信（React EmailテンプレートのHTML化・配信）。環境変数 `DISABLE_EMAIL_DELIVERY=true` の場合は外部配信をスキップし成功扱いとする |
 
 ### 7.5 convex/http.ts
 
