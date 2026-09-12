@@ -1746,24 +1746,24 @@ function FamilyComponent() {
             id="rotate-passcode-section"
             className="mt-8 border-t border-border pt-6"
           >
-            <div className="flex items-center justify-between mb-4">
-              <div>
+            <div className="mb-4 space-y-1">
+              <div className="flex items-center justify-between gap-3">
                 <h3 className="text-[14px] font-medium text-foreground">
                   家族パスコードの変更
                 </h3>
-                <p className="text-[12px] text-muted-foreground mt-0.5">
-                  家族グループやメンバー構成は変更せず、パスコードのみを変更します。
-                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShowRotatePasscodeForm(!showRotatePasscodeForm)
+                  }
+                  className="rounded-md bg-card px-3 py-1.5 text-[13px] font-medium text-foreground shadow-border hover:bg-accent transition shrink-0 cursor-pointer"
+                >
+                  {showRotatePasscodeForm ? "閉じる" : "パスコードを変更"}
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() =>
-                  setShowRotatePasscodeForm(!showRotatePasscodeForm)
-                }
-                className="rounded-md bg-card px-3 py-1.5 text-[13px] font-medium text-foreground shadow-border hover:bg-accent transition shrink-0 cursor-pointer"
-              >
-                {showRotatePasscodeForm ? "閉じる" : "パスコードを変更"}
-              </button>
+              <p className="text-[12px] text-muted-foreground leading-relaxed">
+                家族グループやメンバー構成は変更せず、パスコードのみを変更します。
+              </p>
             </div>
 
             {showRotatePasscodeForm && (

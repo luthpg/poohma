@@ -935,9 +935,9 @@ function RecordDetailComponent({
               {record.lastUpdateUser?.displayName && (
                 <div className="flex items-baseline gap-2">
                   <span className="w-16 shrink-0 font-medium">最終更新:</span>
-                  <span className="min-w-0 flex-1 break-all">
+                  <span className="min-w-0 flex-1 break-all whitespace-pre-line">
                     {record.ownerType === "family"
-                      ? `${record.lastUpdateUser.displayName} (${record.lastUpdateUser.email}) - `
+                      ? `${record.lastUpdateUser.displayName} (${record.lastUpdateUser.email})\n - `
                       : null}
                     {new Date(record.updatedAt).toLocaleString()}
                   </span>
