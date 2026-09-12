@@ -116,17 +116,21 @@ describe("usePersistentQuery", () => {
       });
       mockUseQueryResults.set(recordsKey, [{ _id: "rec_1" }]);
 
-      renderHook(() => usePersistentQuery(api.records.getRecords, args));
+      const { result, rerender } = renderHook(() =>
+        usePersistentQuery(api.records.getRecords, args),
+      );
 
       // 未認証状態に変化
       mockIsAuthenticated = false;
       mockUseQueryResults.delete(recordsKey);
+      rerender();
 
-      const { result } = renderHook(() =>
-        usePersistentQuery(api.records.getRecords, args),
-      );
+      // 未認証中はクエリをスキップする
+      expect(result.current).toBeUndefined();
 
-      // キャッシュがクリアされているため undefined が返る
+      // 再認証後もクエリがローディング中なら、前セッションのキャッシュは返さない
+      mockIsAuthenticated = true;
+      rerender();
       expect(result.current).toBeUndefined();
     });
   });

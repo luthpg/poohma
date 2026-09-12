@@ -91,11 +91,8 @@ test.describe("認証済みルートのアクセス検証", () => {
 
       // 2. ヘッダーのロゴリンクをクリックして /dashboard へ SPA ソフト遷移
       const logoLink = page.locator('header a[href="/dashboard"]').first();
-      if (await logoLink.isVisible()) {
-        await logoLink.click();
-      } else {
-        await page.goto("/dashboard");
-      }
+      await expect(logoLink).toBeVisible({ timeout: 10000 });
+      await logoLink.click();
 
       await page.waitForURL(/.*\/dashboard/, { timeout: 15000 });
 
