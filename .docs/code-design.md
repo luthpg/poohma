@@ -855,7 +855,7 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 | -------------------------------- | ---------------- | -------------------- | -------------------------------------- |
 | getOgpInfo | Action | 要ログイン（内部でidentity検証） | 指定URLのOGP情報取得（SSRF対策済みfetch＋cheerio解析） |
 | getFurigana | Action | 要ログイン | Yahoo!テキスト解析APIによるふりがな取得 |
-| sendEmailReq / sendEmailInternal | (Internal)Action | 内部限定 | Resend経由のメール送信（React EmailテンプレートのHTML化・配信） |
+| sendEmailReq / sendEmailInternal | (Internal)Action | 内部限定 | Resend経由のメール送信（React EmailテンプレートのHTML化・配信）。環境変数 `DISABLE_EMAIL_DELIVERY=true` の場合は外部配信をスキップし成功扱いとする |
 
 ### 7.5 convex/http.ts
 
@@ -1169,6 +1169,7 @@ convex/crons.ts に登録されている定期ジョブ一覧:
 | ------------------------------------------------------------ | ---------------------------------------------- |
 | FIREBASE_SERVICE_ACCOUNT / FIREBASE_ADMINSDK_CREDENTIALS | Firebase Admin初期化用サービスアカウント（JSON文字列 or ファイルパス） |
 | RESEND_API_KEY / RESEND_MAIL_FROM | メール送信設定 |
+| DISABLE_EMAIL_DELIVERY | （任意）外部メール配送スキップフラグ。`true` の場合、E2Eテスト時等にResendへの外部配信を行わず成功扱いとする |
 | YAHOO_CLIENT_ID | ふりがな取得API用アプリケーションID |
 
 ### バックアップ環境（Cloudflare Workers Secret: workers/backup）

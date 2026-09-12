@@ -7,22 +7,20 @@ import type { Page } from "@playwright/test";
  */
 export async function ensureOnboardingCompleted(page: Page): Promise<void> {
   const modalTitle = page.locator("text=PoohMaへようこそ！");
-  const isModalVisible = await modalTitle
-    .waitFor({ state: "visible", timeout: 1200 })
-    .then(() => true)
-    .catch(() => false);
+  const skipButton = page.getByRole("button", {
+    name: "スキップして空のまま始める",
+  });
+  const closeButton = page.getByRole("button", { name: "スキップ" });
 
-  if (isModalVisible) {
-    const skipButton = page.getByRole("button", {
-      name: "スキップして空のまま始める",
-    });
-    const closeButton = page.getByRole("button", { name: "スキップ" });
-
+  try {
+    await modalTitle.waitFor({ state: "visible", timeout: 4000 });
     if (await skipButton.isVisible()) {
       await skipButton.click({ force: true });
     } else if (await closeButton.isVisible()) {
       await closeButton.click({ force: true });
     }
-    await modalTitle.waitFor({ state: "hidden", timeout: 5000 });
+    await modalTitle.waitFor({ state: "hidden", timeout: 8000 });
+  } catch {
+    // すでにスキップ済みでモーダルが表示されなかった場合はスルー
   }
 }

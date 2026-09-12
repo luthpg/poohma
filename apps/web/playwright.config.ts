@@ -82,6 +82,7 @@ export default defineConfig({
         storageState: STORAGE_STATE,
       },
       dependencies: ["setup"],
+      workers: 1,
     },
     {
       name: "logout",
