@@ -17,6 +17,37 @@ function setCache(key: string, value: unknown) {
   queryCache.set(key, value);
 }
 
+const FUNCTION_NAME_SYMBOL = Symbol.for("functionName");
+const TO_REFERENCE_PATH_SYMBOL = Symbol.for("toReferencePath");
+
+/**
+ * Convex の FunctionReference またはクエリ識別子から一意な関数キーを抽出するヘルパー
+ */
+export function getQueryFunctionKey(query: unknown): string {
+  if (typeof query === "string") {
+    return query;
+  }
+  if (query && typeof query === "object") {
+    const fnName = (query as Record<symbol, unknown>)[FUNCTION_NAME_SYMBOL];
+    if (typeof fnName === "string") {
+      return fnName;
+    }
+    const refPath = (query as Record<symbol, unknown>)[
+      TO_REFERENCE_PATH_SYMBOL
+    ];
+    if (typeof refPath === "string") {
+      return refPath;
+    }
+    if (
+      "_path" in query &&
+      typeof (query as Record<string, unknown>)._path === "string"
+    ) {
+      return (query as Record<string, unknown>)._path as string;
+    }
+  }
+  return JSON.stringify(query);
+}
+
 /**
  * A wrapper hook around Convex's useQuery that caches the last successful result in memory.
  * If the query is in a loading/undefined state, it returns the cached result if available.
@@ -39,15 +70,7 @@ export function usePersistentQuery<T>(
     isAuthenticated ? (args === undefined ? {} : args) : "skip",
   );
   // Create a unique key based on the query function and its arguments
-  let queryKey = "";
-  if (query && typeof query === "object") {
-    queryKey =
-      "_path" in query
-        ? String((query as Record<string, unknown>)._path)
-        : JSON.stringify(query);
-  } else {
-    queryKey = String(query);
-  }
+  const queryKey = getQueryFunctionKey(query);
   const cacheKey = JSON.stringify({ query: queryKey, args });
 
   useEffect(() => {
@@ -55,6 +78,10 @@ export function usePersistentQuery<T>(
       setCache(cacheKey, result);
     }
   }, [result, cacheKey]);
+
+  if (!isAuthenticated) {
+    return undefined;
+  }
 
   if (result === undefined) {
     return queryCache.get(cacheKey) as T | undefined;
