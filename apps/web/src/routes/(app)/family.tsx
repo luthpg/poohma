@@ -1952,7 +1952,7 @@ function FamilyComponent() {
                   )}
                 </div>
                 <p className="text-[12px] text-muted-foreground mt-1">
-                  家族パスコードを忘れた場合にMasterKeyを安全に復元するためのPDFキットを発行・保管します。
+                  家族パスコードを忘れた場合に暗号鍵セットを安全に復元するためのPDFキットを発行・保管します。
                 </p>
               </div>
 
@@ -2534,23 +2534,22 @@ export function FamilyAuditLogSection({
       className="mt-8 border-t border-border pt-6"
     >
       <AccordionItem value="audit-log" className="border-none">
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-2">
-            <History className="h-4 w-4 text-orange-500" />
-            <h3 className="text-[14px] font-medium text-foreground">
-              家族のアクティビティログ
-            </h3>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-muted-foreground hidden sm:block">
+        <AccordionTrigger
+          className="py-0 mb-1 hover:no-underline"
+          aria-label="家族のアクティビティログを展開または折りたたむ"
+        >
+          <div className="flex items-center justify-between flex-1">
+            <div className="flex items-center gap-2">
+              <History className="h-4 w-4 text-orange-500" />
+              <h3 className="text-[14px] font-medium text-foreground">
+                家族のアクティビティログ
+              </h3>
+            </div>
+            <span className="text-xs text-muted-foreground hidden sm:block mr-2">
               直近の変更・閲覧証跡
             </span>
-            <AccordionTrigger
-              className="py-0 px-1 hover:no-underline"
-              aria-label="家族のアクティビティログを展開または折りたたむ"
-            />
           </div>
-        </div>
+        </AccordionTrigger>
         <p className="text-[12px] text-muted-foreground mb-3">
           家族共有レコードに対する登録・更新・ヒント閲覧・削除の履歴を確認できます。
         </p>
@@ -2583,37 +2582,66 @@ export function FamilyAuditLogSection({
                       value={log._id}
                       className="rounded-lg border border-border/50 bg-card px-3.5 shadow-xs"
                     >
-                      <div className="flex items-center justify-between py-2.5 gap-2">
-                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                          <span
-                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border shrink-0 ${config.badgeClass}`}
-                          >
-                            <Icon className="h-3.5 w-3.5" />
-                            {config.label}
-                          </span>
-                          <div className="min-w-0 truncate">
-                            <span className="font-semibold text-foreground text-xs mr-2">
-                              {log.actorDisplayName}:{" "}
+                      {hasMetadata ? (
+                        <AccordionTrigger
+                          className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-2.5 gap-1.5 sm:gap-2 hover:no-underline"
+                          aria-label="個別ログの詳細を展開または折りたたむ"
+                        >
+                          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
+                            <span
+                              className={`inline-flex items-center gap-1 px-1.5 sm:px-2.5 py-0.5 rounded-full text-xs font-semibold border shrink-0 ${config.badgeClass}`}
+                            >
+                              <Icon className="h-3.5 w-3.5" />
+                              <span className="hidden sm:inline">
+                                {config.label}
+                              </span>
                             </span>
-                            <span className="text-xs text-muted-foreground truncate">
-                              {log.metadata?.targetTitle
-                                ? `${log.metadata.targetTitle}`
-                                : "対象レコード"}
+                            <div className="min-w-0 text-left">
+                              <span className="font-semibold text-foreground text-xs mr-1 sm:mr-2">
+                                {log.actorDisplayName}:
+                              </span>
+                              <span className="text-xs text-muted-foreground break-all sm:break-normal">
+                                {log.metadata?.targetTitle
+                                  ? `${log.metadata.targetTitle}`
+                                  : "対象レコード"}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 pl-7 sm:pl-0">
+                            <time className="text-[11px] text-muted-foreground font-mono">
+                              {formatDate(log.createdAt)}
+                            </time>
+                          </div>
+                        </AccordionTrigger>
+                      ) : (
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-2.5 gap-1.5 sm:gap-2">
+                          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
+                            <span
+                              className={`inline-flex items-center gap-1 px-1.5 sm:px-2.5 py-0.5 rounded-full text-xs font-semibold border shrink-0 ${config.badgeClass}`}
+                            >
+                              <Icon className="h-3.5 w-3.5" />
+                              <span className="hidden sm:inline">
+                                {config.label}
+                              </span>
                             </span>
+                            <div className="min-w-0 text-left">
+                              <span className="font-semibold text-foreground text-xs mr-1 sm:mr-2">
+                                {log.actorDisplayName}:
+                              </span>
+                              <span className="text-xs text-muted-foreground break-all sm:break-normal">
+                                {log.metadata?.targetTitle
+                                  ? `${log.metadata.targetTitle}`
+                                  : "対象レコード"}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center shrink-0 pl-7 sm:pl-0">
+                            <time className="text-[11px] text-muted-foreground font-mono">
+                              {formatDate(log.createdAt)}
+                            </time>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <time className="text-[11px] text-muted-foreground font-mono">
-                            {formatDate(log.createdAt)}
-                          </time>
-                          {hasMetadata ? (
-                            <AccordionTrigger
-                              className="py-0 px-1 hover:no-underline"
-                              aria-label="個別ログの詳細を展開または折りたたむ"
-                            />
-                          ) : null}
-                        </div>
-                      </div>
+                      )}
 
                       {hasMetadata ? (
                         <AccordionContent className="pt-2 pb-3 text-xs text-muted-foreground border-t border-border/40">
