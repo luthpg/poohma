@@ -920,26 +920,29 @@ function RecordDetailComponent({
             </div>
           </div>
 
-          {/* オーナー情報 */}
-          {record.user?.displayName && (
-            <div className="mb-6 flex items-center gap-2 text-[13px] text-muted-foreground">
-              <span className="font-medium">作成者:</span>
-              <span>
-                {record.user.displayName} ({record.user.email})
-              </span>
-            </div>
-          )}
+          {/* オーナー・更新者情報 */}
+          {(record.user?.displayName || record.lastUpdateUser?.displayName) && (
+            <div className="mb-6 space-y-1.5 text-[13px] text-muted-foreground">
+              {record.user?.displayName && (
+                <div className="flex items-baseline gap-2">
+                  <span className="w-16 shrink-0 font-medium">作成者:</span>
+                  <span className="min-w-0 flex-1 break-all">
+                    {record.user.displayName} ({record.user.email})
+                  </span>
+                </div>
+              )}
 
-          {/* 更新者情報 */}
-          {record.lastUpdateUser?.displayName && (
-            <div className="mb-6 flex items-center gap-2 text-[13px] text-muted-foreground">
-              <span className="font-medium">最終更新:</span>
-              <span>
-                {record.ownerType === "family"
-                  ? `${record.lastUpdateUser.displayName} (${record.lastUpdateUser.email}) - `
-                  : null}
-                {new Date(record.updatedAt).toLocaleString()}
-              </span>
+              {record.lastUpdateUser?.displayName && (
+                <div className="flex items-baseline gap-2">
+                  <span className="w-16 shrink-0 font-medium">最終更新:</span>
+                  <span className="min-w-0 flex-1 break-all">
+                    {record.ownerType === "family"
+                      ? `${record.lastUpdateUser.displayName} (${record.lastUpdateUser.email}) - `
+                      : null}
+                    {new Date(record.updatedAt).toLocaleString()}
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
