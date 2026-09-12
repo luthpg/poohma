@@ -580,7 +580,7 @@ function RouteComponent() {
             <div className="mb-14 bg-orange-50/50 dark:bg-orange-500/5 border border-orange-200/50 dark:border-orange-500/20 rounded-2xl p-5 sm:p-6 md:p-8 text-center max-w-3xl mx-auto overflow-hidden">
               <h3 className="text-lg sm:text-xl font-extrabold text-[#f97316] dark:text-orange-400 tracking-geist-h2 mb-2">
                 <JpText>
-                  運営側でも内容を確認できない安心の設計により、誰もヒントを見ることはできません
+                  運営側でもヒントの内容を確認できない、安心の暗号化設計
                 </JpText>
               </h3>
               <JpText

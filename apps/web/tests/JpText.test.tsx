@@ -124,4 +124,46 @@ describe("JpText", () => {
     element.click();
     expect(handleClick).toHaveBeenCalledTimes(1);
   });
+
+  it("strongタグで終わる句点の直後にaタグが続く場合、文境界でbrタグが正常に挿入されること", () => {
+    const { container } = render(
+      <JpText>
+        <strong>重要なお知らせです。</strong>
+        <a href="#details">詳細はこちら</a>
+      </JpText>,
+    );
+
+    const brs = container.querySelectorAll("br");
+    expect(brs.length).toBe(1);
+    const strong = container.querySelector("strong");
+    expect(strong?.querySelector("br")).not.toBeNull();
+  });
+
+  it("複数階層に深くネストされたJSX要素でも再帰的にBudouXパースが適用されること", () => {
+    const { container } = render(
+      <JpText>
+        <div>
+          <span>
+            <strong>深くネストされた日本語の文章です。</strong>
+          </span>
+        </div>
+      </JpText>,
+    );
+
+    const strong = container.querySelector("strong");
+    expect(strong?.querySelectorAll("wbr").length).toBeGreaterThan(0);
+  });
+
+  it("句点（。）の直後に明示的な <br /> タグが存在する場合に二重改行されないこと", () => {
+    const { container } = render(
+      <JpText>
+        これは1文目です。
+        <br />
+        これは2文目です。
+      </JpText>,
+    );
+
+    const brs = container.querySelectorAll("br");
+    expect(brs.length).toBe(1);
+  });
 });

@@ -300,10 +300,8 @@ function FamilyComponent() {
       });
       setSelectedInviteCode(res.code);
       toast.success("招待コードを発行しました");
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "招待コードの発行に失敗しました",
-      );
+    } catch (_err) {
+      toast.error("招待コードの発行に失敗しました");
     } finally {
       setIsCreatingInvite(false);
     }
@@ -316,10 +314,8 @@ function FamilyComponent() {
         inviteId,
       });
       toast.success("招待コードを無効化しました");
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "招待コードの無効化に失敗しました",
-      );
+    } catch (_err) {
+      toast.error("招待コードの無効化に失敗しました");
     }
   };
 
@@ -1932,14 +1928,14 @@ function FamilyComponent() {
             )}
           </div>
 
-          {/* リカバリーキット（復元コード） */}
+          {/* リカバリーキット（復旧コード） */}
           <div className="mt-8 border-t border-border pt-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <div>
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="h-4 w-4 text-primary" />
                   <h3 className="text-[14px] font-medium text-foreground">
-                    リカバリーキット（復元コード）
+                    リカバリーキット（復旧コード）
                   </h3>
                   {recoveryStatus?.hasRecoveryKit ? (
                     <span className="text-[11px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium px-2 py-0.5 rounded-full border border-emerald-500/20">
@@ -1952,7 +1948,7 @@ function FamilyComponent() {
                   )}
                 </div>
                 <p className="text-[12px] text-muted-foreground mt-1">
-                  家族パスコードを忘れた場合に暗号鍵セットを安全に復元するためのPDFキットを発行・保管します。
+                  家族パスコードを忘れた場合に暗号鍵セットを安全に復旧するためのPDFキットを発行・保管します。
                 </p>
               </div>
 
@@ -1972,7 +1968,7 @@ function FamilyComponent() {
                   className="flex items-center justify-center gap-1.5 rounded-md border border-border bg-background px-3 py-2 sm:py-1.5 text-[13px] font-medium text-foreground shadow-sm hover:bg-muted transition cursor-pointer w-full sm:w-auto order-2 sm:order-1"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
-                  リカバリーキットから復元
+                  リカバリーキットから復旧
                 </Link>
               </div>
             </div>
@@ -2200,7 +2196,7 @@ function FamilyComponent() {
                     <PasscodeStrengthMeter passcode={createPasscode} />
                   )}
                   <p className="mt-1.5 text-[12px] text-muted-foreground">
-                    暗号化に使用します。忘れるとヒントを復元できません。
+                    暗号化に使用します。忘れるとヒントを復旧できません。
                   </p>
                 </div>
                 <div>

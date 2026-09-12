@@ -438,7 +438,7 @@ export function RecoveryKitDialog({
                   </h4>
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     <JpText>
-                      リカバリーコードはサーバーにも保存されず、再表示できません。生成されるPDFを必ず安全な場所（印刷保管、Google
+                      リカバリーコードそのものはサーバーに保存されず、再表示できません。生成されるPDFを必ず安全な場所（印刷保管、Google
                       Drive、パスワード管理ソフト等）に保存してください。
                     </JpText>
                   </p>

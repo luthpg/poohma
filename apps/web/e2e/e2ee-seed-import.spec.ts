@@ -63,8 +63,6 @@ async function createTestAccount(
     // 家族未所属時は画面上の AccountSwitcher を直接クリック
     const switcherTrigger = page
       .locator('button:has-text("家族未所属")')
-      .or(page.locator('button:has-text("ファミリー未所属")'))
-      .or(page.locator('button:has-text("未所属")'))
       .first();
     await expect(switcherTrigger).toBeVisible({ timeout: 15000 });
     await switcherTrigger.click();
@@ -91,8 +89,6 @@ async function createTestAccount(
     const switcher = page
       .locator('[data-testid="user-menu-trigger"]')
       .or(page.locator('button:has-text("家族未所属")'))
-      .or(page.locator('button:has-text("ファミリー未所属")'))
-      .or(page.locator('button:has-text("未所属")'))
       .first();
     await switcher.click();
     await page.getByText(accountName, { exact: true }).first().click();

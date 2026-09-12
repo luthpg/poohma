@@ -28,6 +28,7 @@ import {
   useInactivityLock,
 } from "@/hooks/useInactivityLock";
 import {
+  BiometricPrfNotSupportedError,
   decryptPasscodeWithBiometrics,
   disableBiometricUnlock,
   isBiometricEnabledForUser,
@@ -323,11 +324,10 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
               error.name === "AbortError"
             ) {
               // ユーザーによるキャンセル
-            } else if (
-              error.message?.includes("PRF") ||
-              error.message?.includes("高度な暗号化保護")
-            ) {
-              toast.error(error.message);
+            } else if (error instanceof BiometricPrfNotSupportedError) {
+              toast.error(
+                "このデバイスは高度な暗号化保護（PRF拡張）に対応していません。",
+              );
             } else {
               toast.error(
                 "生体認証の登録に失敗しました。パスコード認証をご利用ください。",
@@ -636,7 +636,7 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
                 className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition underline underline-offset-4"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
-                家族パスコードを忘れた場合はこちら（リカバリーキット復元）
+                家族パスコードを忘れた場合はこちら（リカバリーキット復旧）
               </Link>
             </div>
           </form>

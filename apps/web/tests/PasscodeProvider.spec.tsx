@@ -47,13 +47,17 @@ vi.mock("sonner", () => ({
   },
 }));
 
-vi.mock("@/lib/biometric", () => ({
-  isBiometricSupported: vi.fn().mockResolvedValue(true),
-  isBiometricEnabledForUser: vi.fn().mockResolvedValue(false),
-  decryptPasscodeWithBiometrics: vi.fn(),
-  disableBiometricUnlock: vi.fn(),
-  registerBiometricUnlock: vi.fn(),
-}));
+vi.mock("@/lib/biometric", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/biometric")>();
+  return {
+    ...actual,
+    isBiometricSupported: vi.fn().mockResolvedValue(true),
+    isBiometricEnabledForUser: vi.fn().mockResolvedValue(false),
+    decryptPasscodeWithBiometrics: vi.fn(),
+    disableBiometricUnlock: vi.fn(),
+    registerBiometricUnlock: vi.fn(),
+  };
+});
 
 vi.mock("@/lib/crypto", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/crypto")>();
@@ -774,9 +778,7 @@ describe("PasscodeProvider - 生体認証ロック解除とパスコード変更
       type: "secret",
     } as unknown as CryptoKey);
     vi.mocked(biometricLib.registerBiometricUnlock).mockRejectedValue(
-      new Error(
-        "このデバイスは高度な暗号化保護（PRF拡張）に対応していません。",
-      ),
+      new biometricLib.BiometricPrfNotSupportedError(),
     );
 
     let requireUnlockRef: (() => Promise<boolean>) | null = null;

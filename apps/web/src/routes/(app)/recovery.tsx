@@ -188,7 +188,17 @@ function RecoveryPageComponent() {
         recoveryCode: rawCode,
       });
       if (!res.success) {
-        toast.error(res.error);
+        if (res.remainingAttempts !== undefined) {
+          toast.error(
+            res.remainingAttempts > 0
+              ? `認証コードが正しくありません。残り試行回数: ${res.remainingAttempts} 回`
+              : "認証コードの試行上限回数を超過しました。コードを再送信してください。",
+          );
+        } else {
+          toast.error(
+            "リカバリーコードが正しくありません。入力内容をご確認ください。",
+          );
+        }
         setIsVerifyingOtp(false);
         return;
       }
@@ -347,7 +357,7 @@ function RecoveryPageComponent() {
               </h2>
               <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
                 事前に発行・保管した「PoohMa
-                リカバリーキット」のPDFファイルをアップロードするか、記載されている32文字の復元コードを入力してください。
+                リカバリーキット」のPDFファイルをアップロードするか、記載されている32文字の復旧コードを入力してください。
               </p>
             </div>
 
@@ -402,7 +412,7 @@ function RecoveryPageComponent() {
                 htmlFor="recovery-code-input"
                 className="block text-xs sm:text-sm font-medium text-foreground"
               >
-                復元コード（Recovery Code）
+                復旧コード（Recovery Code）
               </label>
               <input
                 id="recovery-code-input"
@@ -453,7 +463,7 @@ function RecoveryPageComponent() {
                 登録メールアドレスでの2段階認証
               </h2>
               <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                第三者による不正復元を防ぐため、ご登録のメールアドレス（
+                第三者による不正な復旧を防ぐため、ご登録のメールアドレス（
                 <strong className="text-foreground">{otpSentEmail}</strong>
                 ）に届いた6桁の認証コードを入力してください。
               </p>
@@ -512,7 +522,7 @@ function RecoveryPageComponent() {
                   </>
                 ) : (
                   <>
-                    認証して復元する
+                    認証して復旧する
                     <ShieldCheck className="h-4 w-4" />
                   </>
                 )}
@@ -635,7 +645,7 @@ function RecoveryPageComponent() {
           </form>
         )}
 
-        {/* ステップ 4: 復元完了 */}
+        {/* ステップ 4: 復旧完了 */}
         {step === 4 && (
           <div className="py-8 text-center space-y-5">
             <div className="inline-flex p-3 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
@@ -643,7 +653,7 @@ function RecoveryPageComponent() {
             </div>
             <div className="space-y-2">
               <h2 className="text-xl font-bold text-foreground">
-                復元が完了しました
+                復旧が完了しました
               </h2>
               <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
                 家族データが新しいパスコードで再保護され、正常に復旧しました。今後は新しいパスコードでロックを解除してください。
