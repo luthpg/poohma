@@ -939,7 +939,7 @@ function RecordDetailComponent({
                     {record.ownerType === "family"
                       ? `${record.lastUpdateUser.displayName} (${record.lastUpdateUser.email})\n - `
                       : null}
-                    {new Date(record.updatedAt).toLocaleString()}
+                    {new Date(record.updatedAt).toLocaleString("ja-JP")}
                   </span>
                 </div>
               )}

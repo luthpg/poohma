@@ -272,7 +272,7 @@ export function RecordForm({
         <button
           type="submit"
           disabled={isBusy}
-          className="flex items-center rounded-md bg-orange-500 px-5 py-2 text-[14px] font-medium text-white shadow-border hover:bg-orange-600 disabled:opacity-50 transition cursor-pointer"
+          className="flex items-center rounded-md bg-orange-500 px-5 py-2 text-[14px] font-medium text-white shadow-border hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50 transition cursor-pointer"
         >
           {form.isSubmitting ? (
             <>
