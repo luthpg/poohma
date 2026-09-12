@@ -260,18 +260,19 @@ export function RecordForm({
         </div>
       </section>
 
-      <div className="flex justify-end gap-4 border-t border-border pt-6">
+      {/* 下部固定アクションバー */}
+      <div className="sticky bottom-0 z-20 -mx-6 -mb-6 mt-8 border-t border-border bg-background/95 backdrop-blur px-6 py-3.5 flex items-center justify-end gap-3 sm:gap-4 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] dark:shadow-[0_-4px_12px_rgba(0,0,0,0.3)]">
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-md bg-card px-6 py-2 text-[14px] font-medium text-foreground shadow-border hover:bg-accent transition"
+          className="rounded-md bg-card px-5 py-2 text-[14px] font-medium text-foreground shadow-border hover:bg-accent transition cursor-pointer"
         >
           キャンセル
         </button>
         <button
           type="submit"
           disabled={isBusy}
-          className="flex items-center rounded-md bg-orange-500 px-6 py-2 text-[14px] font-medium text-white shadow-border hover:bg-orange-600 disabled:opacity-50 transition"
+          className="flex items-center rounded-md bg-orange-500 px-5 py-2 text-[14px] font-medium text-white shadow-border hover:bg-orange-600 disabled:opacity-50 transition cursor-pointer"
         >
           {form.isSubmitting ? (
             <>

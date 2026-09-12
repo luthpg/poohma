@@ -1033,12 +1033,12 @@ function FamilyComponent() {
             <DialogDescription className="text-[14px] leading-relaxed">
               旧家族で登録していた「自分のみ」のデータを開く手段がなくなり、二度と閲覧できなくなります。この操作は取り消せません。
             </DialogDescription>
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-2">
               <button
                 type="button"
                 disabled={isAbandoningVault}
                 onClick={() => setShowAbandonConfirm(false)}
-                className="rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium text-foreground hover:bg-accent transition cursor-pointer"
+                className="w-full sm:w-auto rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium text-foreground hover:bg-accent transition cursor-pointer text-center"
               >
                 キャンセル
               </button>
@@ -1046,7 +1046,7 @@ function FamilyComponent() {
                 type="button"
                 disabled={isAbandoningVault}
                 onClick={handleAbandonVault}
-                className="flex items-center gap-2 rounded-md bg-red-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-red-700 transition disabled:opacity-50 cursor-pointer"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-md bg-red-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-red-700 transition disabled:opacity-50 cursor-pointer"
               >
                 {isAbandoningVault && <Spinner className="h-4 w-4" />}
                 データを破棄して進む
@@ -1685,7 +1685,7 @@ function FamilyComponent() {
                         {new Date(req.createdAt).toLocaleString("ja-JP")}
                       </span>
                     </div>
-                    <div className="flex gap-2 shrink-0">
+                    <div className="flex flex-col sm:flex-row gap-2 shrink-0 w-full sm:w-auto">
                       <button
                         type="button"
                         disabled={isLoading}
@@ -1705,7 +1705,7 @@ function FamilyComponent() {
                             setIsLoading(false);
                           }
                         }}
-                        className="flex items-center gap-1.5 rounded-md bg-green-600 px-4 py-2 text-[13px] font-medium text-white shadow-border transition hover:bg-green-700 disabled:opacity-50 cursor-pointer"
+                        className="flex items-center justify-center gap-1.5 rounded-md bg-green-600 px-4 py-2 text-[13px] font-medium text-white shadow-border transition hover:bg-green-700 disabled:opacity-50 cursor-pointer w-full sm:w-auto"
                       >
                         <Check className="h-3.5 w-3.5" />
                         承認
@@ -1729,7 +1729,7 @@ function FamilyComponent() {
                             setIsLoading(false);
                           }
                         }}
-                        className="flex items-center gap-1.5 rounded-md bg-card px-4 py-2 text-[13px] font-medium text-red-500 shadow-border transition hover:bg-accent disabled:opacity-50 cursor-pointer"
+                        className="flex items-center justify-center gap-1.5 rounded-md bg-card px-4 py-2 text-[13px] font-medium text-red-500 shadow-border transition hover:bg-accent disabled:opacity-50 cursor-pointer w-full sm:w-auto"
                       >
                         <X className="h-3.5 w-3.5" />
                         却下
@@ -1894,7 +1894,7 @@ function FamilyComponent() {
                     </div>
                   </div>
 
-                  <div className="pt-2 flex justify-end gap-2">
+                  <div className="pt-2 flex flex-col-reverse sm:flex-row justify-end gap-2">
                     <button
                       type="button"
                       onClick={() => {
@@ -1903,7 +1903,7 @@ function FamilyComponent() {
                         setNewPasscode("");
                         setNewPasscodeConfirm("");
                       }}
-                      className="rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium shadow-sm transition hover:bg-accent text-foreground cursor-pointer"
+                      className="w-full sm:w-auto rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium shadow-sm transition hover:bg-accent text-foreground cursor-pointer text-center"
                     >
                       キャンセル
                     </button>
@@ -1915,7 +1915,7 @@ function FamilyComponent() {
                         !newPasscode ||
                         !newPasscodeConfirm
                       }
-                      className="flex items-center rounded-md bg-foreground px-6 py-2 text-[13px] font-medium text-background shadow-lg transition hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                      className="w-full sm:w-auto flex items-center justify-center rounded-md bg-foreground px-6 py-2 text-[13px] font-medium text-background shadow-lg transition hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     >
                       {isChangingPasscode ? (
                         <>
@@ -1956,24 +1956,24 @@ function FamilyComponent() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
-                <Link
-                  to="/recovery"
-                  className="flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-[13px] font-medium text-foreground shadow-sm hover:bg-muted transition cursor-pointer"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  リカバリーキットから復元
-                </Link>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0 w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={() => setIsRecoveryKitModalOpen(true)}
-                  className="flex items-center gap-1.5 rounded-md bg-foreground px-3.5 py-1.5 text-[13px] font-medium text-background shadow-sm hover:bg-foreground/90 transition cursor-pointer"
+                  className="flex items-center justify-center gap-1.5 rounded-md bg-foreground px-3.5 py-2 sm:py-1.5 text-[13px] font-medium text-background shadow-sm hover:bg-foreground/90 transition cursor-pointer w-full sm:w-auto order-1 sm:order-2"
                 >
                   <KeyRound className="h-3.5 w-3.5" />
                   {recoveryStatus?.hasRecoveryKit
                     ? "再発行する"
                     : "キットを発行"}
                 </button>
+                <Link
+                  to="/recovery"
+                  className="flex items-center justify-center gap-1.5 rounded-md border border-border bg-background px-3 py-2 sm:py-1.5 text-[13px] font-medium text-foreground shadow-sm hover:bg-muted transition cursor-pointer w-full sm:w-auto order-2 sm:order-1"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  リカバリーキットから復元
+                </Link>
               </div>
             </div>
 
@@ -2380,12 +2380,12 @@ function FamilyComponent() {
                   </ul>
                 </div>
               </DialogDescription>
-              <div className="flex justify-end gap-3 pt-2">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-2">
                 <button
                   type="button"
                   disabled={isKicking}
                   onClick={() => setMemberToKick(null)}
-                  className="rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium text-foreground hover:bg-accent transition cursor-pointer"
+                  className="w-full sm:w-auto rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium text-foreground hover:bg-accent transition cursor-pointer text-center"
                 >
                   キャンセル
                 </button>
@@ -2393,7 +2393,7 @@ function FamilyComponent() {
                   type="button"
                   disabled={isKicking}
                   onClick={handleKickMember}
-                  className="flex items-center gap-2 rounded-md bg-red-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-red-700 transition disabled:opacity-50 cursor-pointer"
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-md bg-red-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-red-700 transition disabled:opacity-50 cursor-pointer"
                   data-testid="confirm-kick-btn"
                 >
                   {isKicking && <Spinner className="h-4 w-4" />}
@@ -2432,11 +2432,11 @@ function FamilyComponent() {
                 <strong>今すぐパスコードを変更（ローテーション）</strong>
                 することをお勧めします。
               </DialogDescription>
-              <div className="flex justify-end gap-3 pt-2">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setKickSuccessNotice(null)}
-                  className="rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium text-foreground hover:bg-accent transition cursor-pointer"
+                  className="w-full sm:w-auto rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium text-foreground hover:bg-accent transition cursor-pointer text-center"
                 >
                   あとで行う
                 </button>
@@ -2451,7 +2451,7 @@ function FamilyComponent() {
                         ?.scrollIntoView({ behavior: "smooth" });
                     }, 100);
                   }}
-                  className="flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-[13px] font-medium text-white hover:bg-orange-600 transition cursor-pointer"
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-[13px] font-medium text-white hover:bg-orange-600 transition cursor-pointer"
                 >
                   <KeyRound className="h-4 w-4" />
                   今すぐパスコードを変更

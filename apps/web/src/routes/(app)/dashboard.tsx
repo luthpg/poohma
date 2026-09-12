@@ -534,11 +534,11 @@ function RouteComponent() {
 
       {/* フローティング一括操作アクションバー */}
       {isSelectMode && selectedIds.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-card/95 backdrop-blur border border-border shadow-lg px-6 py-3.5 rounded-xl flex items-center justify-between gap-6 z-30 w-[90%] max-w-2xl animate-in slide-in-from-bottom-4 duration-300">
-          <div className="text-[14px] font-semibold text-foreground whitespace-nowrap">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-card/95 backdrop-blur border border-border shadow-lg px-4 sm:px-6 py-3 sm:py-3.5 rounded-xl flex items-center justify-between gap-3 sm:gap-6 z-30 w-[92%] sm:w-[90%] max-w-2xl animate-in slide-in-from-bottom-4 duration-300">
+          <div className="text-[13px] sm:text-[14px] font-semibold text-foreground whitespace-nowrap shrink-0">
             {selectedIds.length} 件選択中
           </div>
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar min-w-0 flex-1 justify-start py-0.5 overscroll-x-contain">
             <button
               type="button"
               onClick={() => setActiveModal("tag")}
@@ -617,18 +617,18 @@ function RouteComponent() {
               <br />
               この操作は取り消すことができません。
             </p>
-            <div className="flex justify-end gap-3">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3">
               <button
                 type="button"
                 onClick={() => setActiveModal(null)}
-                className="rounded-md border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-accent transition cursor-pointer"
+                className="w-full sm:w-auto rounded-md border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-accent transition cursor-pointer text-center"
               >
                 キャンセル
               </button>
               <button
                 type="button"
                 onClick={handleBulkDelete}
-                className="rounded-md bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 transition cursor-pointer"
+                className="w-full sm:w-auto rounded-md bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 transition cursor-pointer text-center"
               >
                 削除する
               </button>
@@ -709,18 +709,18 @@ function BulkTagModal({
             placeholder="タグを入力 (Enterで確定)..."
           />
         </div>
-        <div className="flex justify-end gap-3">
+        <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3">
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-md border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-accent transition cursor-pointer"
+            className="w-full sm:w-auto rounded-md border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-accent transition cursor-pointer text-center"
           >
             キャンセル
           </button>
           <button
             type="button"
             onClick={onSubmit}
-            className="rounded-md bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition cursor-pointer"
+            className="w-full sm:w-auto rounded-md bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition cursor-pointer text-center"
           >
             追加
           </button>

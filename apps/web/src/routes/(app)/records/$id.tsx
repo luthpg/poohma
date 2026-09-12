@@ -1001,13 +1001,20 @@ function RecordDetailComponent({
 
           {/* アクションボタン (編集権限がある場合のみ) */}
           {isEditable && (
-            <div className="mt-10 flex justify-end gap-4 border-t border-border pt-6">
+            <div className="mt-10 flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 border-t border-border pt-6">
+              <button
+                type="button"
+                onClick={handleEditStart}
+                className="w-full sm:w-auto rounded-md bg-foreground px-6 py-2.5 sm:py-2 text-[14px] font-medium text-background hover:bg-foreground/90 transition text-center order-1 sm:order-2"
+              >
+                編集する
+              </button>
               {isAdmin && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <button
                       type="button"
-                      className="rounded-md px-6 py-2 text-[14px] font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition"
+                      className="w-full sm:w-auto rounded-md px-6 py-2.5 sm:py-2 text-[14px] font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition text-center order-2 sm:order-1"
                     >
                       削除する
                     </button>
@@ -1021,11 +1028,13 @@ function RecordDetailComponent({
                         この操作は取り消せません。本当に削除してもよろしいですか？
                       </AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                    <AlertDialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-0">
+                      <AlertDialogCancel className="w-full sm:w-auto">
+                        キャンセル
+                      </AlertDialogCancel>
                       <AlertDialogAction
                         onClick={handleDelete}
-                        className="bg-red-500 hover:bg-red-600 focus:ring-red-500"
+                        className="w-full sm:w-auto bg-red-500 hover:bg-red-600 focus:ring-red-500"
                       >
                         削除する
                       </AlertDialogAction>
@@ -1033,13 +1042,6 @@ function RecordDetailComponent({
                   </AlertDialogContent>
                 </AlertDialog>
               )}
-              <button
-                type="button"
-                onClick={handleEditStart}
-                className="rounded-md bg-foreground px-6 py-2 text-[14px] font-medium text-background hover:bg-foreground/90 transition"
-              >
-                編集する
-              </button>
             </div>
           )}
         </div>
