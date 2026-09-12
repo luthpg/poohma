@@ -275,6 +275,11 @@ export const sendEmailReq = async ({
   replyTo?: string;
 }): Promise<boolean> => {
   try {
+    if (process.env.DISABLE_EMAIL_DELIVERY === "true") {
+      console.info("Email delivery skipped: DISABLE_EMAIL_DELIVERY=true");
+      return true;
+    }
+
     const mailApiKey = process.env.RESEND_API_KEY;
     const mailFrom = process.env.RESEND_MAIL_FROM;
     if (!mailApiKey || !mailFrom) {

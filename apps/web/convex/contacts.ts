@@ -1,17 +1,13 @@
 import { HOUR, MINUTE, RateLimiter } from "@convex-dev/rate-limiter";
 import { ConvexError, v } from "convex/values";
+import {
+  CONTACT_CATEGORIES,
+  type ContactCategory,
+} from "../src/constants/contacts";
 import { components, internal } from "./_generated/api";
 import { internalAction, mutation } from "./_generated/server";
 
-export const CONTACT_CATEGORIES = [
-  "一般的なお問い合わせ",
-  "機能の要望・提案",
-  "不具合・障害の報告",
-  "セキュリティに関するご報告",
-  "その他",
-] as const;
-
-export type ContactCategory = (typeof CONTACT_CATEGORIES)[number];
+export { CONTACT_CATEGORIES, type ContactCategory };
 
 const rateLimiter = new RateLimiter(components.rateLimiter, {
   // 防衛層 1-A: グローバルなお問い合わせバースト制限（DoS対策: 1分間に最大5件、キャパシティ10件）

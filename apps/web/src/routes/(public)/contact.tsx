@@ -6,9 +6,9 @@ import { type FormEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { api } from "@/../convex/_generated/api";
-import { CONTACT_CATEGORIES } from "@/../convex/contacts";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { CONTACT_CATEGORIES } from "@/constants/contacts";
 import { auth } from "@/utils/firebase";
 
 export const Route = createFileRoute("/(public)/contact")({
@@ -313,5 +313,3 @@ function ContactPage() {
     </div>
   );
 }
-
-export default ContactPage;

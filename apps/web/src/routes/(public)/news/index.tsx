@@ -81,5 +81,3 @@ function NewsListPage() {
     </div>
   );
 }
-
-export default NewsListPage;

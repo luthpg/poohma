@@ -93,5 +93,3 @@ function NewsDetailPage() {
     </div>
   );
 }
-
-export default NewsDetailPage;

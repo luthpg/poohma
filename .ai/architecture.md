@@ -65,7 +65,7 @@ poohma/
 - `users.ts`: ユーザー同期、アカウント作成・切り替え・削除、ログイン履歴記録、SSR用ユーザー/アカウント（family暗号化メタデータ含む）取得
 - `contacts.ts`: お問い合わせ受付（`createContact` mutation）、Honeypot スパム防御、多層レート制限（①Convex公式 `@convex-dev/rate-limiter` トークンバケット ＋ ②同一メール短時間連投制限 `by_email_createdAt`）、管理者メール通知（`sendNotificationEmail` internalAction、`ADMIN_EMAIL` 宛て Resend 送信、replyTo: 問い合わせ者メール）
 - `recovery.ts`: リカバリーキット検証、2段階復元（メールOTP発行・検証、マスターキー再ラップ）
-- `actions.ts`: Node.js ランタイムでの外部連携（OGP取得、ふりがなAPI、Resend メール送信）
+- `actions.ts`: Node.js ランタイムでの外部連携（OGP取得、ふりがなAPI、Resend メール送信。環境変数 `DISABLE_EMAIL_DELIVERY=true` での外部配送スキップ対応）
 - `http.ts`: 内部 HTTP エンドポイント（`getUserByFirebaseUid`、内部共有シークレット認証）
 - `crons.ts`: 定期バッチジョブ（期限切れ編集セッション・移行データ・期限切れ Export Vault・家族招待・**古い監査ログ**のクリーンアップ）
 

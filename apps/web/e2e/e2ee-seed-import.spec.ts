@@ -48,8 +48,16 @@ async function createTestAccount(
     .locator('[data-testid="user-menu-trigger"]')
     .filter({ visible: true })
     .first();
+  const unassignedSwitcher = page
+    .locator('button:has-text("家族未所属")')
+    .first();
 
-  if (await userMenuTrigger.isVisible({ timeout: 3000 }).catch(() => false)) {
+  // どちらかのトリガーが表示されるのを待機
+  await expect(userMenuTrigger.or(unassignedSwitcher).first()).toBeVisible({
+    timeout: 20000,
+  });
+
+  if (await userMenuTrigger.isVisible()) {
     await userMenuTrigger.click();
 
     // ② Googleアカウント情報欄をクリック
@@ -61,15 +69,17 @@ async function createTestAccount(
     await accountSubTrigger.click();
   } else {
     // 家族未所属時は画面上の AccountSwitcher を直接クリック
-    const switcherTrigger = page
-      .locator('button:has-text("家族未所属")')
-      .first();
-    await expect(switcherTrigger).toBeVisible({ timeout: 15000 });
-    await switcherTrigger.click();
+    await expect(unassignedSwitcher).toBeVisible({ timeout: 15000 });
+    await unassignedSwitcher.click();
   }
 
   // ③ サブメニュー内の「新しいアカウントを作成」をクリック
-  const createBtn = page.getByText("新しいアカウントを作成", { exact: true });
+  const createBtn = page
+    .locator(
+      '[role="menuitem"]:has-text("新しいアカウントを作成"), button:has-text("新しいアカウントを作成")',
+    )
+    .filter({ visible: true })
+    .first();
   await expect(createBtn).toBeVisible({ timeout: 5000 });
   await createBtn.click();
 
