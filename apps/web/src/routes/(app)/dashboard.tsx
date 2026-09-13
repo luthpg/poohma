@@ -5,8 +5,16 @@ import {
   useNavigate,
   useSearch,
 } from "@tanstack/react-router";
-import { useMutation } from "convex/react";
-import { Globe, LayoutGrid, List, Tag, Trash2, X } from "lucide-react";
+import { useMutation, useQuery } from "convex/react";
+import {
+  Globe,
+  LayoutGrid,
+  List,
+  ShieldCheck,
+  Tag,
+  Trash2,
+  X,
+} from "lucide-react";
 import {
   type SubmitEvent,
   Suspense,
@@ -23,6 +31,7 @@ import { IndexScrollBar } from "@/components/IndexScrollBar";
 import { OnboardingBanner } from "@/components/onboarding/OnboardingBanner";
 import { OnboardingModal } from "@/components/onboarding/OnboardingModal";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
+import { BulkAdminModal } from "@/components/records/BulkAdminModal";
 import { BulkVisibilityModal } from "@/components/records/BulkVisibilityModal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TagInput } from "@/components/ui/tag-input";
@@ -171,6 +180,7 @@ type SortParam =
   | "updatedAt-asc"
   | "updatedAt-desc";
 
+/** レコードの検索・並び替え・一括操作を提供するダッシュボード画面。 */
 function RouteComponent() {
   const { prefs, searchParams } = routeApi.useLoaderData();
   const navigate = useNavigate({ from: "/dashboard" });
@@ -188,6 +198,9 @@ function RouteComponent() {
   const records = usePersistentQuery<
     NonNullable<typeof api.records.getRecords._returnType>
   >(api.records.getRecords, {
+    accountId: activeAccountId || undefined,
+  });
+  const family = useQuery(api.families.getFamilyMembers, {
     accountId: activeAccountId || undefined,
   });
   const onboarding = useOnboarding();
@@ -292,7 +305,7 @@ function RouteComponent() {
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeModal, setActiveModal] = useState<
-    "tag" | "visibility" | "delete" | null
+    "tag" | "visibility" | "admin" | "delete" | null
   >(null);
   const [bulkTagInput, setBulkTagInput] = useState<string[]>([]);
 
@@ -312,30 +325,39 @@ function RouteComponent() {
     [selectedRecords],
   );
 
+  // 現在のアカウントの家族内ロール判定（ファミリー管理者は全共有レコードの管理者権限を持つ）
+  const currentFamilyMember = useMemo(
+    () => family?.users?.find((u) => u.id === activeAccountId),
+    [family?.users, activeAccountId],
+  );
+  const isFamilyAdmin = currentFamilyMember?.familyRole === "admin";
+
   // 共有解除可能なレコード（自分が管理者である家族共有レコード）
   const unshareableRecords = useMemo(
     () =>
-      selectedRecords.filter(
-        (r) =>
-          r.ownerType === "family" &&
-          Boolean(
-            activeAccountId && (r.admins ?? []).includes(activeAccountId),
-          ),
-      ),
-    [selectedRecords, activeAccountId],
+      selectedRecords.filter((r) => {
+        if (r.ownerType !== "family") return false;
+        if (isFamilyAdmin) return true;
+        return Boolean(
+          activeAccountId && (r.admins ?? []).includes(activeAccountId),
+        );
+      }),
+    [selectedRecords, activeAccountId, isFamilyAdmin],
   );
 
   // 管理者権限がないため共有解除の対象外となるレコード
   const excludedUnshareRecords = useMemo(
     () =>
       selectedRecords
-        .filter(
-          (r) =>
-            r.ownerType === "family" &&
-            !(activeAccountId && (r.admins ?? []).includes(activeAccountId)),
-        )
+        .filter((r) => {
+          if (r.ownerType !== "family") return false;
+          if (isFamilyAdmin) return false;
+          return !(
+            activeAccountId && (r.admins ?? []).includes(activeAccountId)
+          );
+        })
         .map((r) => ({ id: r._id, title: r.title })),
-    [selectedRecords, activeAccountId],
+    [selectedRecords, activeAccountId, isFamilyAdmin],
   );
 
   const deleteRecordsMut = useMutation(api.records.deleteRecords);
@@ -560,6 +582,16 @@ function RouteComponent() {
               <Globe className="h-4 w-4 text-blue-500" />
               公開設定
             </button>
+            {family && selectedSharedCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setActiveModal("admin")}
+                className="rounded-md bg-secondary hover:bg-accent px-3 py-2 h-9 text-[13px] font-medium text-foreground flex items-center gap-1.5 transition shrink-0 cursor-pointer"
+              >
+                <ShieldCheck className="h-4 w-4 text-orange-500" />
+                管理者設定
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setActiveModal("delete")}
@@ -608,6 +640,20 @@ function RouteComponent() {
         onShare={handleBulkShare}
         onUnshare={handleBulkUnshare}
         onClose={() => setActiveModal(null)}
+      />
+
+      {/* 管理者一括設定モーダル */}
+      <BulkAdminModal
+        isOpen={activeModal === "admin"}
+        selectedRecords={selectedRecords}
+        familyMembers={family?.users || []}
+        activeAccountId={activeAccountId}
+        onClose={() => setActiveModal(null)}
+        onSuccess={async () => {
+          setActiveModal(null);
+          setSelectedIds([]);
+          setIsSelectMode(false);
+        }}
       />
 
       {/* 削除確認モーダル */}

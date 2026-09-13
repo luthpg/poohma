@@ -18,20 +18,22 @@
   - `identityVerifiedQuery/Mutation`：Firebase Identity の存在のみ検証（新規ユーザー同期など）
   - `authenticatedQuery/Mutation`：Identity検証に加え `resolveAccount` による所有権検証（下記IDOR対策）
   - `familyBoundQuery/Mutation`：上記に加え、対象アカウントが家族グループに所属していることを検証
+  - `familyAdminMutation`：上記に加え、対象アカウントの家族内ロールがファミリー管理者（`familyRole === "admin"`）であることを検証
+  - `recordAdminMutation`：`familyBound` に加え、対象レコード（`args.id`）が存在し `requireAdminAccess` を満たすことを検証
 - `resolveAccount` は、呼び出し側が任意で渡す `accountId` について、その `users` レコードの `userId`（Firebase UID）が現在ログイン中の `identity.subject` と一致するかを必ず照合し、不一致であれば `Unauthorized` を送出する（他人のアカウントIDを指定してのなりすまし＝IDORの防止）。
 - 上記はコード規約として徹底しており、Lint等による機械的な強制ではない。新規関数追加時のレビュー観点として [Threat Model](./threat-model.md) 6章にも明記している。
 
 ## Family boundary
 
 - レコード単位のアクセス制御は `convex/rls.ts` に集約している。
-  - `requireContentAccess`：レコードの `familyId` とユーザーの `familyId` が一致することに加え、個人所有（`ownerType: "user"` かつ `accountId` 一致）または家族共有（`ownerType: "family"` かつ `ownerFamilyId` 一致）のいずれかであることを検証する。
-  - `requireAdminAccess`：削除・共有解除・管理者変更には、個人レコードなら本人、共有レコードなら `admins` 配列に含まれるメンバーであることを要求する。共有レコードの公開設定（visibility）改ざんによるIDORはIssue #186で修正済み。非管理者でも誰が管理者かは閲覧可能（Issue #211）。
+  - `requireContentAccess`：レコードの `familyId` とユーザーの `familyId` が一致することに加え、個人所有（`ownerType: "user"` かつ `accountId` 一致）または家族共有（`ownerType: "family"` かつ `ownerFamilyId` 一致）のいずれかであることを検証する。一般メンバー（`viewer`）であっても共有レコードの閲覧・ヒント復号は許可される。
+  - `requireAdminAccess`：編集・削除・共有解除・管理者変更には、個人レコードなら本人、共有レコードならファミリー管理者（`getEffectiveFamilyRole(user) === "admin"`）または `admins` 配列に含まれる個別管理者であることを要求する。共有レコードの公開設定（visibility）改ざんによるIDORはIssue #186で修正済み。非管理者でも誰が管理者かは閲覧可能（Issue #211）。
   - なお `serviceRecords.visibility` フィールドは `ownerType` モデル導入前のレガシー値であり、`ownerType` を持たない旧データに対する読み取り専用の後方互換フォールバックとしてのみ参照される（`docs/architecture/data-model.md` 参照）。
 - 現行スキーマは1ユーザー1家族グループ（`users.familyId` が単一値）を前提としており、複数家族の並行所属には対応していない（複数家族対応はIssue #34で一度closeされているが、現行スキーマの制約としては単一家族が前提）。
 
 ## メンバーキックと Export Vault（E2EEデータ保護・持ち出し境界）
 
-- **メンバーキック**: 家族メンバーは他メンバーを強制除名（キック）できる（`kickMember`）。キックされたユーザーの `users.familyId` は即時に未設定（`undefined`）となり、RLS（`convex/rls.ts`）によって旧家族の全共有レコードへのアクセス権が即座に遮断される。
+- **メンバーキック**: ファミリー管理者は他メンバーを強制除名（キック）できる（`kickMember`、一般メンバーによるキックは不可。また家族内最後のファミリー管理者のキックは防止）。キックされたユーザーの `users.familyId` は即時に未設定（`undefined`）となり、RLS（`convex/rls.ts`）によって旧家族の全共有レコードへのアクセス権が即座に遮断される。
 - **共有レコードの保護と管理者調停**: 家族共有レコード（`ownerType: "family"`）は旧家族の不可侵資産として旧家族内に残存し、被キックユーザーが持ち出すことはできない。被キックユーザーが共有レコードの唯一の管理者であった場合は、`reconcileAdminsOnLeave` により旧家族の残存メンバーへ管理者権限が自動移譲される。
 - **個人所有レコードの持ち出し保証（Export Vault）**: 被キックユーザーの個人所有レコード（`ownerType: "user"`）は、作成者個人の資産として保護される。キック実行時に Convex サーバーは旧家族の暗号化マスターキー情報（`masterKeyEncrypted`, `masterKeyIv`, `masterKeySalt`, `kdfIterations`, `cryptoVersion`）を `pendingExportVaults` テーブルへ原子的に退避する。
 - **平文非保持と暗号学的隔離**: サーバーに保存されるのは暗号化されたマスターキー情報のみであり、サーバーはマスターキーやパスコードの平文を一切受け取らない。被キックユーザーは旧パスコードを入力することでクライアント側でのみ旧マスターキーをアンラップし、個人レコードのDEKを復号した上で新家族のマスターキーで再暗号化（DEK再ラップ）してマイグレーションを完了する。

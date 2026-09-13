@@ -44,12 +44,12 @@
 
 ### レコード所有権と RLS の二層防御（Drive型 ACL）
 
-- レコードのコンテンツ閲覧・編集には `requireContentAccess`（`convex/rls.ts`）を必ず経由する:
+- レコードのコンテンツ閲覧には `requireContentAccess`（`convex/rls.ts`）を必ず経由する:
   - 個人所有（`ownerType === "user"`）: `record.accountId === user._id` の本人のみ。
-  - 家族共有（`ownerType === "family"`）: 同一家族メンバー（`record.ownerFamilyId === user.familyId`）全員。
-- レコードの管理操作（削除、共有解除、管理者変更）には `requireAdminAccess` を必ず経由する:
+  - 家族共有（`ownerType === "family"`）: 同一家族メンバー（`record.ownerFamilyId === user.familyId`）全員（閲覧専用メンバー `viewer` 含む）。ヒント復号も全メンバーに許可される。
+- レコードの管理操作および編集（レコード更新、削除、共有解除、管理者変更）には `requireAdminAccess` を必ず経由する:
   - 個人所有: `record.accountId === user._id` の本人のみ。
-  - 家族共有: 同一家族メンバーかつ `admins` 配列に含まれるアカウント（`record.admins.includes(user._id)`）のみ。
+  - 家族共有: 同一家族メンバーかつ「ファミリー管理者（`getEffectiveFamilyRole(user) === "admin"`）」または `admins` 配列に含まれる個別管理者（`record.admins.includes(user._id)`）のみ。一般メンバーによる誤操作・破壊的変更を確実に防止する。
 - 家族境界チェック: レコードの `familyId` とユーザーの `familyId` が不一致の場合は即座に拒否。
 
 ### マルチアカウント境界の隔離
@@ -90,6 +90,12 @@
 - **個人所有レコード（`ownerType: "user"`）の持ち出し保証**: 被キックユーザーの個人所有レコードは作成者の個人資産として保護される。キック実行時に Convex サーバーは旧家族の暗号化マスターキー情報（`masterKeyEncrypted`, `masterKeyIv`, `masterKeySalt`, `kdfIterations`, `cryptoVersion`）を `pendingExportVaults` へ原子的に退避する。
 - **平文非保持の徹底**: `pendingExportVaults` に保存されるのは暗号化されたマスターキー情報のみであり、サーバーはマスターキーやパスコードの平文を一切受け取らない・保存しない。
 - **Export Vault の確実な破棄**: `pendingExportVaults` は 30日の有効期限（`expiresAt`）を持ち、移行完了時（`commitFamilyMigration`）、ユーザーによる明示的破棄（`abandonPendingExportVault`）、または定期クロンジョブ（`cleanupExpiredExportVaultsInternal`）によって確実に物理削除されなければならない。
+
+### 家族ロールと最後の管理者保護
+
+- **最低1名のファミリー管理者保持**: 家族グループ内には常に最低1名のファミリー管理者（`familyRole === "admin"`）が存在しなければならない。最後の管理者の降格（`updateMemberRole`）およびキック（`kickMember`）はサーバー側で厳格に拒否する。
+- **管理者限定操作の保護**: 家族設定変更、招待発行、参加申請の承認・却下、メンバーロール更新、メンバーキックはファミリー管理者（`familyAdminMutation`）に限定される。
+- **安全な初期ロール**: 家族新規作成者は `"admin"`（ファミリー管理者）となるが、招待承認による新規参加者は安全のため `"viewer"`（メンバー）として初期化される。
 
 ---
 

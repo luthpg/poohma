@@ -19,6 +19,7 @@ describe("監査ログ (Audit Log) & 最終更新者機能の統合テスト", (
         updatedAt: Date.now(),
       });
       await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_audit_actor",
         email: "actor@example.com",
         displayName: "監査アクター",
@@ -115,6 +116,7 @@ describe("監査ログ (Audit Log) & 最終更新者機能の統合テスト", (
         updatedAt: Date.now(),
       });
       userAId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_a",
         email: "a@example.com",
         displayName: "ユーザーA",
@@ -122,6 +124,7 @@ describe("監査ログ (Audit Log) & 最終更新者機能の統合テスト", (
         updatedAt: Date.now(),
       });
       await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_b",
         email: "b@example.com",
         displayName: "ユーザーB",
@@ -129,6 +132,7 @@ describe("監査ログ (Audit Log) & 最終更新者機能の統合テスト", (
         updatedAt: Date.now(),
       });
       await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_c_attacker",
         email: "c@example.com",
         displayName: "他家族C",
@@ -230,6 +234,7 @@ describe("監査ログ (Audit Log) & 最終更新者機能の統合テスト", (
         updatedAt: Date.now(),
       });
       deletedUserAccountId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_to_be_deleted",
         email: "deleted@example.com",
         displayName: "退会予定パパ",
@@ -237,6 +242,7 @@ describe("監査ログ (Audit Log) & 最終更新者機能の統合テスト", (
         updatedAt: Date.now(),
       });
       remainingUserAccountId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_remaining",
         email: "remaining@example.com",
         displayName: "残存ママ",
@@ -307,6 +313,7 @@ describe("監査ログ (Audit Log) & 最終更新者機能の統合テスト", (
         updatedAt: now,
       });
       userAccountId = await ctx.db.insert("users", {
+        familyRole: "admin",
         userId: "user_stale",
         email: "stale@example.com",
         familyId,

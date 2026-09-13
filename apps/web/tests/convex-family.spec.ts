@@ -46,6 +46,7 @@ const seedTwoUserFamily_ = async (t: ReturnType<typeof convexTest>) => {
     });
 
     userAId = await ctx.db.insert("users", {
+      familyRole: "admin",
       userId: "ua",
       email: "a@a.com",
       familyId: oldFamilyId,
@@ -53,6 +54,7 @@ const seedTwoUserFamily_ = async (t: ReturnType<typeof convexTest>) => {
     });
 
     userBId = await ctx.db.insert("users", {
+      familyRole: "admin",
       userId: "ub",
       email: "b@b.com",
       familyId: oldFamilyId,
@@ -128,6 +130,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
       // シードデータ（ユーザー）
       await t.run(async (ctx) => {
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_a",
           email: "a@example.com",
           updatedAt: Date.now(),
@@ -402,6 +405,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         });
 
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "member_a",
           email: "member_a@example.com",
           displayName: "メンバーA",
@@ -411,6 +415,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
         // 参加申請を行う新規ユーザー
         applicantId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "applicant_b",
           email: "applicant_b@example.com",
           displayName: "申請者B",
@@ -443,6 +448,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
         // 家族未所属の一般ユーザー
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "stranger",
           email: "stranger@example.com",
           displayName: "よそ者",
@@ -632,6 +638,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         });
 
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "member_y",
           email: "y@example.com",
           familyId,
@@ -639,6 +646,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         });
 
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "applicant_z",
           email: "z@example.com",
           updatedAt: Date.now(),
@@ -707,6 +715,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_sato",
           email: "sato@example.com",
           familyId,
@@ -769,6 +778,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_ttl_validation",
           email: "ttl@example.com",
           familyId,
@@ -807,6 +817,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           useCount: 0,
         });
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "applicant_expired",
           email: "exp@example.com",
           updatedAt: Date.now(),
@@ -851,6 +862,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           useCount: 0,
         });
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "applicant_revoked",
           email: "rev@example.com",
           updatedAt: Date.now(),
@@ -891,12 +903,14 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_a",
           email: "a@example.com",
           familyId: familyAId,
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_b",
           email: "b@example.com",
           familyId: familyBId,
@@ -934,12 +948,14 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "member_suzuki",
           email: "suzuki@example.com",
           familyId,
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "applicant_suzuki",
           email: "suzuki_app@example.com",
           updatedAt: Date.now(),
@@ -987,6 +1003,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           updatedAt: Date.now(),
         });
         userId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "lone_user",
           email: "lone@example.com",
           familyId,
@@ -1066,6 +1083,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           useCount: 1,
         });
         const applicantAccId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "applicant",
           email: "applicant@example.com",
           updatedAt: thirtyOneDaysAgo,
@@ -1137,6 +1155,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
         // ユーザーA (唯一のメンバー)
         userSoloId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_solo",
           email: "solo@example.com",
           familyId: oldFamilyId,
@@ -1285,6 +1304,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           updatedAt: Date.now(),
         });
         userOmitId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_omit",
           email: "omit@example.com",
           familyId: oldFamilyId,
@@ -1360,6 +1380,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         });
 
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_leaving",
           email: "leaving@example.com",
           familyId: oldFamilyId,
@@ -1367,6 +1388,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         });
 
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_staying",
           email: "staying@example.com",
           familyId: oldFamilyId,
@@ -1407,6 +1429,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
       await t.run(async (ctx) => {
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_double",
           email: "double@example.com",
           updatedAt: Date.now(),
@@ -1452,6 +1475,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
       await t.run(async (ctx) => {
         userDupCredId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_dup_cred",
           email: "dup@example.com",
           updatedAt: Date.now(),
@@ -1555,6 +1579,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
       await t.run(async (ctx) => {
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_orphan",
           email: "orphan@example.com",
           updatedAt: Date.now(),
@@ -1612,6 +1637,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
       await t.run(async (ctx) => {
         const userAccId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_cron_test",
           email: "cron@example.com",
           updatedAt: Date.now(),
@@ -1659,6 +1685,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         });
 
         userMidId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_mid",
           email: "mid@example.com",
           familyId: oldFamilyId,
@@ -1788,6 +1815,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
       await t.run(async (ctx) => {
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_abort_test",
           email: "abort@example.com",
           updatedAt: Date.now(),
@@ -1836,6 +1864,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           updatedAt: Date.now(),
         });
         userSoloId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_solo2",
           email: "solo2@example.com",
           familyId: oldFamilyId,
@@ -1940,12 +1969,14 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_migrating",
           email: "migrating@example.com",
           familyId: oldFamilyId,
           updatedAt: Date.now(),
         });
         const stayingId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_staying2",
           email: "staying2@example.com",
           familyId: oldFamilyId,
@@ -2122,12 +2153,14 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
       // 同一 Firebase UID (user_multi) で2つのアカウントを作成
       await t.run(async (ctx) => {
         account1Id = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_multi",
           email: "multi@example.com",
           displayName: "アカウント1",
           updatedAt: Date.now(),
         });
         account2Id = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_multi",
           email: "multi@example.com",
           displayName: "アカウント2",
@@ -2228,6 +2261,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         userLeaveId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_leave",
           email: "leave@example.com",
           familyId: familyOldId,
@@ -2235,6 +2269,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         userRemain1Id = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_remain1",
           email: "remain1@example.com",
           familyId: familyOldId,
@@ -2242,6 +2277,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         userRemain2Id = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_remain2",
           email: "remain2@example.com",
           familyId: familyOldId,
@@ -2309,6 +2345,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
           updatedAt: Date.now(),
         });
         userSoloId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_solo_leave",
           email: "solo_leave@example.com",
           familyId: familyOldId,
@@ -2362,6 +2399,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
       const t = convexTest(schema, modules);
       await t.run(async (ctx) => {
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_kdf",
           email: "kdf@example.com",
           updatedAt: Date.now(),
@@ -2390,6 +2428,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
       const t = convexTest(schema, modules);
       await t.run(async (ctx) => {
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_kdf_omit",
           email: "kdfomit@example.com",
           updatedAt: Date.now(),
@@ -2416,6 +2455,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
       const t = convexTest(schema, modules);
       await t.run(async (ctx) => {
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_kdf_bad",
           email: "kdfbad@example.com",
           updatedAt: Date.now(),
@@ -2441,6 +2481,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
       const t = convexTest(schema, modules);
       await t.run(async (ctx) => {
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_kdf_ver",
           email: "kdfver@example.com",
           updatedAt: Date.now(),
@@ -2466,6 +2507,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
       const t = convexTest(schema, modules);
       await t.run(async (ctx) => {
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_kdf_nan",
           email: "kdfnan@example.com",
           updatedAt: Date.now(),
@@ -2491,6 +2533,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
       const t = convexTest(schema, modules);
       await t.run(async (ctx) => {
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_kdf_inf",
           email: "kdfinf@example.com",
           updatedAt: Date.now(),
@@ -2516,6 +2559,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
       const t = convexTest(schema, modules);
       await t.run(async (ctx) => {
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_kdf_frac",
           email: "kdffrac@example.com",
           updatedAt: Date.now(),
@@ -2600,6 +2644,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         userAId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "ua",
           email: "a@a.com",
           familyId,
@@ -2607,6 +2652,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         userBId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "ub",
           email: "b@b.com",
           familyId,
@@ -2700,6 +2746,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "ua",
           email: "a@a.com",
           familyId,
@@ -2729,6 +2776,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "ua",
           email: "a@a.com",
           familyId,
@@ -2753,6 +2801,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "no_family_user",
           email: "nofam@a.com",
           updatedAt: 1000,
@@ -2795,6 +2844,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_a",
           email: "a@example.com",
           displayName: "佐藤 太郎",
@@ -2803,6 +2853,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         userBId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_b",
           email: "b@example.com",
           displayName: "佐藤 次郎",
@@ -2859,6 +2910,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         userAId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_a",
           email: "a@example.com",
           familyId,
@@ -2867,6 +2919,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
         // 同一UIDの別アカウント
         userA2Id = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_a",
           email: "a-work@example.com",
           familyId,
@@ -2914,6 +2967,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_a",
           email: "a@example.com",
           familyId: family1Id,
@@ -2921,6 +2975,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         userOtherId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_other",
           email: "other@example.com",
           familyId: family2Id,
@@ -2957,6 +3012,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         userAId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_a",
           email: "a@example.com",
           familyId,
@@ -2964,6 +3020,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         userBId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_b",
           email: "b@example.com",
           familyId,
@@ -3015,6 +3072,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_a",
           email: "a@example.com",
           familyId,
@@ -3022,6 +3080,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         userBId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_b",
           email: "b@example.com",
           familyId,
@@ -3081,6 +3140,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         userBId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_b",
           email: "b@example.com",
           updatedAt: Date.now(),
@@ -3141,6 +3201,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_a",
           email: "a@example.com",
           familyId: oldFamilyId,
@@ -3148,6 +3209,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         userBId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_b",
           email: "b@example.com",
           familyId: oldFamilyId,
@@ -3242,6 +3304,360 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         {},
       );
       expect(vaultAfterCommit).toBeNull();
+    });
+  });
+
+  describe("家族ロール管理（updateMemberRole & 認可・不変条件ガード）", () => {
+    it("ファミリー管理者は他のメンバーを昇格・降格できること", async () => {
+      const t = convexTest(schema, modules);
+      let familyId!: Id<"families">;
+      let targetAccId!: Id<"users">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          name: "Role Test Family",
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("users", {
+          familyRole: "admin",
+          userId: "admin_user",
+          email: "admin@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        targetAccId = await ctx.db.insert("users", {
+          familyRole: "viewer",
+          userId: "target_user",
+          email: "target@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+      });
+
+      const adminUser = t.withIdentity({
+        subject: "admin_user",
+        email: "admin@example.com",
+      });
+
+      // 昇格: viewer -> admin
+      await adminUser.mutation(api.families.updateMemberRole, {
+        targetAccountId: targetAccId,
+        role: "admin",
+      });
+
+      await t.run(async (ctx) => {
+        const u = await ctx.db.get(targetAccId);
+        expect(u?.familyRole).toBe("admin");
+      });
+
+      // 降格: admin -> viewer (adminAccId がまだ管理者に残っているため可能)
+      await adminUser.mutation(api.families.updateMemberRole, {
+        targetAccountId: targetAccId,
+        role: "viewer",
+      });
+
+      await t.run(async (ctx) => {
+        const u = await ctx.db.get(targetAccId);
+        expect(u?.familyRole).toBe("viewer");
+      });
+    });
+
+    it("デフォルト閲覧者によるupdateMemberRoleは拒否されること", async () => {
+      const t = convexTest(schema, modules);
+      let familyId!: Id<"families">;
+      let targetAccId!: Id<"users">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          name: "Role Test Family",
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("users", {
+          familyRole: "admin",
+          userId: "admin_user",
+          email: "admin@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        targetAccId = await ctx.db.insert("users", {
+          familyRole: "viewer",
+          userId: "viewer_user",
+          email: "viewer@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+      });
+
+      const viewerUser = t.withIdentity({
+        subject: "viewer_user",
+        email: "viewer@example.com",
+      });
+
+      await expect(
+        viewerUser.mutation(api.families.updateMemberRole, {
+          targetAccountId: targetAccId,
+          role: "admin",
+        }),
+      ).rejects.toThrow("Access denied: Admin role required");
+    });
+
+    it("最後の管理者の降格は拒否されること", async () => {
+      const t = convexTest(schema, modules);
+      let familyId!: Id<"families">;
+      let soleAdminAccId!: Id<"users">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          name: "Role Test Family",
+          updatedAt: Date.now(),
+        });
+        soleAdminAccId = await ctx.db.insert("users", {
+          familyRole: "admin",
+          userId: "sole_admin_user",
+          email: "soleadmin@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("users", {
+          familyRole: "viewer",
+          userId: "viewer_user",
+          email: "viewer@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+      });
+
+      const soleAdmin = t.withIdentity({
+        subject: "sole_admin_user",
+        email: "soleadmin@example.com",
+      });
+
+      await expect(
+        soleAdmin.mutation(api.families.updateMemberRole, {
+          targetAccountId: soleAdminAccId,
+          role: "viewer",
+        }),
+      ).rejects.toThrow("Cannot demote the last admin");
+    });
+
+    it("kickMember: 閲覧者によるキックおよび自分自身のキックは拒否されること", async () => {
+      const t = convexTest(schema, modules);
+      let familyId!: Id<"families">;
+      let adminAccId!: Id<"users">;
+      let viewerAccId!: Id<"users">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          name: "Kick Test Family",
+          updatedAt: Date.now(),
+        });
+        adminAccId = await ctx.db.insert("users", {
+          familyRole: "admin",
+          userId: "admin_user",
+          email: "admin@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        viewerAccId = await ctx.db.insert("users", {
+          familyRole: "viewer",
+          userId: "viewer_user",
+          email: "viewer@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+      });
+
+      const viewerUser = t.withIdentity({
+        subject: "viewer_user",
+        email: "viewer@example.com",
+      });
+      const adminUser = t.withIdentity({
+        subject: "admin_user",
+        email: "admin@example.com",
+      });
+
+      // 閲覧者によるキックは拒否
+      await expect(
+        viewerUser.mutation(api.families.kickMember, {
+          targetAccountId: adminAccId,
+        }),
+      ).rejects.toThrow("Access denied: Admin role required");
+
+      // 自分自身のキックは拒否
+      await expect(
+        adminUser.mutation(api.families.kickMember, {
+          targetAccountId: adminAccId,
+        }),
+      ).rejects.toThrow("Cannot kick yourself");
+
+      // 管理者による閲覧者メンバーのキックは成功
+      await adminUser.mutation(api.families.kickMember, {
+        targetAccountId: viewerAccId,
+      });
+      await t.run(async (ctx) => {
+        const u = await ctx.db.get(viewerAccId);
+        expect(u?.familyId).toBeUndefined();
+      });
+    });
+
+    it("approveJoinRequest / rejectJoinRequest: ファミリー管理者のみ承認・却下でき、閲覧者は拒否されること", async () => {
+      const t = convexTest(schema, modules);
+      let familyId!: Id<"families">;
+      let req1Id!: Id<"joinRequests">;
+      let req2Id!: Id<"joinRequests">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          name: "Join Approval Family",
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("users", {
+          familyRole: "admin",
+          userId: "admin_user",
+          email: "admin@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("users", {
+          familyRole: "viewer",
+          userId: "viewer_user",
+          email: "viewer@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        const app1AccId = await ctx.db.insert("users", {
+          userId: "applicant_1",
+          email: "app1@example.com",
+          familyRole: "viewer",
+          updatedAt: Date.now(),
+        });
+        const app2AccId = await ctx.db.insert("users", {
+          userId: "applicant_2",
+          email: "app2@example.com",
+          familyRole: "viewer",
+          updatedAt: Date.now(),
+        });
+        req1Id = await ctx.db.insert("joinRequests", {
+          familyId,
+          userId: "applicant_1",
+          accountId: app1AccId,
+          status: "pending",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+        req2Id = await ctx.db.insert("joinRequests", {
+          familyId,
+          userId: "applicant_2",
+          accountId: app2AccId,
+          status: "pending",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+      });
+
+      const viewer = t.withIdentity({
+        subject: "viewer_user",
+        email: "viewer@example.com",
+      });
+      const admin = t.withIdentity({
+        subject: "admin_user",
+        email: "admin@example.com",
+      });
+
+      // 閲覧者による承認・却下は Admin role required で拒否されること
+      await expect(
+        viewer.mutation(api.families.approveJoinRequest, {
+          requestId: req1Id,
+        }),
+      ).rejects.toThrow("Access denied: Admin role required");
+
+      await expect(
+        viewer.mutation(api.families.rejectJoinRequest, {
+          requestId: req2Id,
+        }),
+      ).rejects.toThrow("Access denied: Admin role required");
+
+      // 管理者による承認・却下は成功すること
+      await admin.mutation(api.families.approveJoinRequest, {
+        requestId: req1Id,
+      });
+      await admin.mutation(api.families.rejectJoinRequest, {
+        requestId: req2Id,
+      });
+
+      await t.run(async (ctx) => {
+        const r1 = await ctx.db.get(req1Id);
+        expect(r1?.status).toBe("approved");
+        const r2 = await ctx.db.get(req2Id);
+        expect(r2?.status).toBe("rejected");
+      });
+    });
+
+    it("reconcileAdminsOnLeave: ファミリー管理者が残存している場合、adminsが空のレコードで閲覧者は自動昇格しないこと", async () => {
+      const t = convexTest(schema, modules);
+      let familyId!: Id<"families">;
+      let leavingAdminId!: Id<"users">;
+      let remainingAdminId!: Id<"users">;
+      let viewerId!: Id<"users">;
+      let sharedRecId!: Id<"serviceRecords">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          name: "Leave Reconcile Family",
+          updatedAt: Date.now(),
+        });
+        leavingAdminId = await ctx.db.insert("users", {
+          familyRole: "admin",
+          userId: "leaving_admin",
+          email: "leaving@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        remainingAdminId = await ctx.db.insert("users", {
+          familyRole: "admin",
+          userId: "remaining_admin",
+          email: "remaining@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        viewerId = await ctx.db.insert("users", {
+          familyRole: "viewer",
+          userId: "viewer_member",
+          email: "viewer_member@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        sharedRecId = await ctx.db.insert("serviceRecords", {
+          userId: "leaving_admin",
+          accountId: leavingAdminId,
+          familyId,
+          ownerFamilyId: familyId,
+          title: "Shared Without Explicit Admins",
+          sortKey: "shared",
+          ownerType: "family",
+          admins: [], // ファミリー管理者に委ねられている
+          tags: [],
+          updatedAt: Date.now(),
+        });
+      });
+
+      const remainingAdmin = t.withIdentity({
+        subject: "remaining_admin",
+        email: "remaining@example.com",
+      });
+
+      // remainingAdmin が leavingAdmin をキック（家族離脱時の reconcileAdminsOnLeave をトリガー）
+      await remainingAdmin.mutation(api.families.kickMember, {
+        targetAccountId: leavingAdminId,
+      });
+
+      // 残存メンバーに remainingAdmin がいるため、sharedRecId の admins は [] のまま維持され、viewerId は追加されないこと
+      await t.run(async (ctx) => {
+        const rec = await ctx.db.get(sharedRecId);
+        expect(rec?.admins).toEqual([]);
+        expect(rec?.admins).not.toContain(viewerId);
+        expect(rec?.admins).not.toContain(remainingAdminId);
+      });
     });
   });
 });

@@ -23,6 +23,7 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
       let someUserId!: Id<"users">;
       await t.run(async (ctx) => {
         someUserId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "some_user",
           email: "some@example.com",
           updatedAt: Date.now(),
@@ -62,6 +63,7 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
       let userAId!: Id<"users">;
       await t.run(async (ctx) => {
         userAId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_owner",
           email: "owner@example.com",
           updatedAt: Date.now(),
@@ -98,11 +100,13 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
       await t.run(async (ctx) => {
         // ユーザーA と B
         userAId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_a",
           email: "a@example.com",
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_b",
           email: "b@example.com",
           updatedAt: Date.now(),
@@ -144,12 +148,14 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
           updatedAt: Date.now(),
         });
         userAId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_a",
           email: "a@example.com",
           familyId,
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_b",
           email: "b@example.com",
           familyId,
@@ -201,12 +207,14 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
           updatedAt: Date.now(),
         });
         userAId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_a",
           email: "a@example.com",
           familyId,
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_b",
           email: "b@example.com",
           familyId,
@@ -248,12 +256,14 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
           updatedAt: Date.now(),
         });
         userAId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_a",
           email: "a@example.com",
           familyId,
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_b",
           email: "b@example.com",
           familyId,
@@ -301,12 +311,14 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
         });
 
         userF1Id = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_f1",
           email: "f1@example.com",
           familyId: family1,
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_f2",
           email: "f2@example.com",
           familyId: family2,
@@ -349,12 +361,14 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
           updatedAt: Date.now(),
         });
         const userF1Id = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_leak_f1",
           email: "leakf1@example.com",
           familyId: family1,
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_leak_f2",
           email: "leakf2@example.com",
           familyId: family2,
@@ -403,12 +417,14 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
           updatedAt: Date.now(),
         });
         const userAId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_bulk_a",
           email: "bulka@example.com",
           familyId: family1Id,
           updatedAt: Date.now(),
         });
         const userBId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_bulk_b",
           email: "bulkb@example.com",
           familyId: family1Id,
@@ -463,12 +479,14 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
           updatedAt: Date.now(),
         });
         const userAId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_bulk_owner",
           email: "bulkowner@example.com",
           familyId,
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          familyRole: "viewer",
           userId: "user_bulk_member",
           email: "bulkmember@example.com",
           familyId,
@@ -512,6 +530,7 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
           updatedAt: Date.now(),
         });
         const userAId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_bulk_owner",
           email: "bulkowner@example.com",
           familyId,
@@ -556,12 +575,14 @@ describe("4. セキュリティ/アーキテクチャ特化テスト (Convex 認
           updatedAt: Date.now(),
         });
         const user1Id = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "u1",
           email: "u1@example.com",
           familyId: family1Id,
           updatedAt: Date.now(),
         });
         const user2Id = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "u2",
           email: "u2@example.com",
           familyId: family2Id,

@@ -11,14 +11,16 @@ import {
 import {
   authenticatedMutation,
   authenticatedQuery,
+  familyAdminMutation,
   familyBoundMutation,
   familyBoundQuery,
 } from "./customBuilders";
 import { deleteCredentialsForRecord, getCredentialsForRecord } from "./records";
+import { getEffectiveFamilyRole } from "./rls";
 
 /**
  * メンバーが家族を離脱または削除された際、共有レコードの管理者リストを調停
- * 管理者が0人になる場合は残りの家族メンバー全員を自動昇格
+ * ファミリー管理者が不在になる場合のみ残りの家族メンバーを自動昇格
  */
 export async function reconcileAdminsOnLeave(
   ctx: { db: MutationCtx["db"] },
@@ -49,16 +51,35 @@ export async function reconcileAdminsOnLeave(
     return;
   }
 
+  const remainingDefaultAdminIds = remainingFamilyMembers
+    .filter(
+      (u) =>
+        u._id !== leavingAccountId && getEffectiveFamilyRole(u) === "admin",
+    )
+    .map((u) => u._id);
+  const remainingDefaultAdminExists = remainingDefaultAdminIds.length > 0;
+
   for (const record of sharedRecords) {
     const currentAdmins = record.admins ?? [];
     const validRemainingAdmins = currentAdmins.filter(
       (id) => id !== leavingAccountId && remainingAccountIds.includes(id),
     );
 
-    const newAdmins =
-      validRemainingAdmins.length === 0
-        ? remainingAccountIds
-        : validRemainingAdmins;
+    let newAdmins: Id<"users">[];
+    if (currentAdmins.length === 0) {
+      // 元々個別管理者が設定されていない（空）レコードの場合：
+      // ファミリー管理者が残っていれば空のまま維持（動的ACLに委ね、閲覧者を昇格させない）
+      newAdmins = remainingDefaultAdminExists ? [] : remainingAccountIds;
+    } else if (validRemainingAdmins.length > 0) {
+      // 明示的に割り当てられていた残存管理者がいる場合はそれを引き継ぐ
+      newAdmins = validRemainingAdmins;
+    } else {
+      // 個別管理者が0人になってしまう場合：
+      // ファミリー管理者がいればファミリー管理者のみを自動昇格（閲覧者の意図しない昇格を防止）
+      newAdmins = remainingDefaultAdminExists
+        ? remainingDefaultAdminIds
+        : remainingAccountIds;
+    }
 
     const hasChanged =
       newAdmins.length !== currentAdmins.length ||
@@ -122,6 +143,7 @@ export const getFamilyMembersByFamilyId = async (
       userId: u.userId,
       email: u.email,
       displayName: u.displayName,
+      familyRole: u.familyRole ?? "admin",
     })),
     id: family._id,
   };
@@ -219,7 +241,7 @@ export const createFamily = authenticatedMutation({
       updatedAt: Date.now(),
     });
 
-    await ctx.db.patch(user._id, { familyId });
+    await ctx.db.patch(user._id, { familyId, familyRole: "admin" });
 
     const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
     await ctx.scheduler.runAfter(
@@ -1078,23 +1100,26 @@ export const createJoinRequest = authenticatedMutation({
       updatedAt: Date.now(),
     });
 
-    // Send email to all existing family members
+    // 参加申請を承認・却下できるファミリー管理者のみに通知メールを送信
     const familyMembers = await ctx.db
       .query("users")
       .filter((q) => q.eq(q.field("familyId"), family._id))
       .collect();
+    const familyAdmins = familyMembers.filter(
+      (m) => getEffectiveFamilyRole(m) === "admin",
+    );
 
     const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
-    for (const member of familyMembers) {
+    for (const admin of familyAdmins) {
       await ctx.scheduler.runAfter(
         0,
         internal.actions.sendTemplatedEmailInternal,
         {
-          email: member.email,
+          email: admin.email,
           payload: {
             template: "joinRequestReceived",
             props: {
-              displayName: member.displayName || "メンバー",
+              displayName: admin.displayName || "管理者",
               familyName: family.name,
               applicantDisplayName: user.displayName || "名無し",
               applicantEmail: user.email,
@@ -1262,7 +1287,7 @@ export const getPendingRequests = familyBoundQuery({
   },
 });
 
-export const approveJoinRequest = familyBoundMutation({
+export const approveJoinRequest = familyAdminMutation({
   args: { requestId: v.id("joinRequests") },
   handler: async (ctx, args) => {
     const { familyId } = ctx;
@@ -1296,7 +1321,7 @@ export const approveJoinRequest = familyBoundMutation({
         }
       }
 
-      await ctx.db.patch(applicant._id, { familyId });
+      await ctx.db.patch(applicant._id, { familyId, familyRole: "viewer" });
       await ctx.db.patch(request._id, {
         status: "approved",
         updatedAt: Date.now(),
@@ -1350,7 +1375,7 @@ export const approveJoinRequest = familyBoundMutation({
   },
 });
 
-export const rejectJoinRequest = familyBoundMutation({
+export const rejectJoinRequest = familyAdminMutation({
   args: { requestId: v.id("joinRequests") },
   handler: async (ctx, args) => {
     const { familyId } = ctx;
@@ -1438,6 +1463,10 @@ export const kickMember = familyBoundMutation({
       throw new Error("Target user not found");
     }
 
+    if (user.familyRole !== "admin") {
+      throw new Error("Access denied: Admin role required");
+    }
+
     if (targetUser._id === user._id || targetUser.userId === user.userId) {
       throw new Error(
         "Cannot kick yourself. Use family migration to leave voluntarily.",
@@ -1446,6 +1475,23 @@ export const kickMember = familyBoundMutation({
 
     if (targetUser.familyId !== familyId) {
       throw new Error("Target user is not a member of your family");
+    }
+
+    // 最後の管理者のキック防止
+    if (targetUser.familyRole === "admin") {
+      const otherAdmins = await ctx.db
+        .query("users")
+        .filter((q) =>
+          q.and(
+            q.eq(q.field("familyId"), familyId),
+            q.neq(q.field("_id"), targetUser._id),
+            q.eq(q.field("familyRole"), "admin"),
+          ),
+        )
+        .first();
+      if (!otherAdmins) {
+        throw new Error("Cannot kick the last admin of the family");
+      }
     }
 
     const family = await ctx.db.get(familyId);
@@ -1564,5 +1610,55 @@ export const cleanupExpiredExportVaultsInternal = internalMutation({
         await ctx.db.delete(vault._id);
       }
     }
+  },
+});
+
+/**
+ * メンバーの家族ロール（ファミリー管理者 / メンバー）を更新
+ * ファミリー管理者のみ実行可能
+ */
+export const updateMemberRole = familyAdminMutation({
+  args: {
+    targetAccountId: v.id("users"),
+    role: v.union(v.literal("admin"), v.literal("viewer")),
+  },
+  handler: async (ctx, args) => {
+    const { familyId } = ctx;
+
+    const targetUser = await ctx.db.get(args.targetAccountId);
+    if (!targetUser) {
+      throw new Error("Target user not found");
+    }
+
+    if (targetUser.familyId !== familyId) {
+      throw new Error("Target user is not a member of your family");
+    }
+
+    // 既に同じロールの場合は何もしない
+    if (targetUser.familyRole === args.role) {
+      return;
+    }
+
+    // 閲覧者への降格時: 家族内の最後の管理者を降格しようとしていないか検証
+    if (args.role === "viewer" && targetUser.familyRole === "admin") {
+      const otherAdmins = await ctx.db
+        .query("users")
+        .filter((q) =>
+          q.and(
+            q.eq(q.field("familyId"), familyId),
+            q.neq(q.field("_id"), targetUser._id),
+            q.eq(q.field("familyRole"), "admin"),
+          ),
+        )
+        .first();
+      if (!otherAdmins) {
+        throw new Error("Cannot demote the last admin of the family");
+      }
+    }
+
+    await ctx.db.patch(targetUser._id, {
+      familyRole: args.role,
+      updatedAt: Date.now(),
+    });
   },
 });

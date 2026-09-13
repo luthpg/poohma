@@ -63,37 +63,64 @@ export function requireContentAccess(
 }
 
 /**
- * レコードの管理権限（共有解除・管理者変更・削除等）を検証
+ * ユーザーの実効的な家族ロールを取得するヘルパー
  */
-export function requireAdminAccess(
+export function getEffectiveFamilyRole(user: Doc<"users">): "admin" | "viewer" {
+  return user.familyRole;
+}
+
+/**
+ * ユーザーがレコードの管理者（変更・削除・管理権限を持つ）であるかを判定するヘルパー
+ */
+export function isRecordAdmin(
   user: Doc<"users">,
   record: Doc<"serviceRecords">,
-) {
-  // 家族境界チェック
+): boolean {
+  // 家族境界チェック：レコードの家族IDが定義されており、ユーザーの家族IDと異なる場合は拒否
   if (
     record.familyId !== undefined &&
     user.familyId !== undefined &&
     record.familyId !== user.familyId
   ) {
-    throw new Error(
-      "Access denied: You don't have permission to access this record",
-    );
+    return false;
   }
 
   const ownerType = getEffectiveOwnerType(record);
   const ownerFamilyId = getEffectiveOwnerFamilyId(record);
-  const admins = getEffectiveAdmins(record) ?? [];
 
-  const isPersonalOwner = ownerType === "user" && record.accountId === user._id;
-  const isFamilyAdmin =
+  // 個人所有レコード: 作成者本人のみ
+  if (ownerType === "user" && record.accountId === user._id) {
+    return true;
+  }
+
+  // 家族共有レコード:
+  if (
     ownerType === "family" &&
     ownerFamilyId !== undefined &&
-    ownerFamilyId === user.familyId &&
-    admins.includes(user._id);
+    ownerFamilyId === user.familyId
+  ) {
+    // ファミリー管理者は無条件で全共有レコードの管理者
+    if (getEffectiveFamilyRole(user) === "admin") {
+      return true;
+    }
+    // 個別管理者（admins に含まれるデフォルト閲覧者、または自分で共有した閲覧者）
+    const admins = getEffectiveAdmins(record);
+    return admins.includes(user._id);
+  }
 
-  if (!isPersonalOwner && !isFamilyAdmin) {
+  return false;
+}
+
+/**
+ * レコードの管理権限（共有解除・管理者変更・削除・更新等）を検証
+ */
+export function requireAdminAccess(
+  user: Doc<"users">,
+  record: Doc<"serviceRecords">,
+) {
+  if (!isRecordAdmin(user, record)) {
     throw new Error(
-      "Access denied: admin rights required to manage sharing for this record",
+      "Access denied: admin rights required to manage this record",
     );
   }
 }

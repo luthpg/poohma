@@ -115,12 +115,14 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 
       await t.run(async (ctx) => {
         acc1Id = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "existing_user_uid",
           email: "old@example.com",
           photoURL: "https://old.com/photo.png",
           updatedAt: 1000,
         });
         acc2Id = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "existing_user_uid",
           email: "old@example.com",
           displayName: "設定済み名",
@@ -169,12 +171,14 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           updatedAt: Date.now(),
         });
         oldAccId1 = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "old_firebase_uid",
           email: "recreated@example.com",
           familyId,
           updatedAt: 1000,
         });
         oldAccId2 = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "old_firebase_uid",
           email: "recreated@example.com",
           displayName: "保持される名前",
@@ -367,6 +371,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
       let otherAccId!: Id<"users">;
       await t.run(async (ctx) => {
         otherAccId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "other_user_owner",
           email: "other@example.com",
           updatedAt: Date.now(),
@@ -392,6 +397,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
       let nonExistentId!: Id<"users">;
       await t.run(async (ctx) => {
         const dummy = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "temp",
           email: "temp@example.com",
           updatedAt: Date.now(),
@@ -452,6 +458,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 
         // 孤立 familyId を持つアカウント
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "get_acc_user",
           email: "getacc@example.com",
           familyId: danglingFamilyId,
@@ -459,6 +466,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
         });
         // 有効な familyId を持つアカウント
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "get_acc_user",
           email: "getacc@example.com",
           familyId: validFamilyId,
@@ -466,6 +474,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
         });
         // 家族なしアカウント
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "get_acc_user",
           email: "getacc@example.com",
           updatedAt: Date.now(),
@@ -507,6 +516,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           updatedAt: Date.now(),
         });
         userAccId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "solo_family_user",
           email: "solo@example.com",
           familyId,
@@ -521,6 +531,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           updatedAt: Date.now(),
         });
         const otherUserAccId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "other_req_user",
           email: "other@example.com",
           updatedAt: Date.now(),
@@ -566,12 +577,14 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           updatedAt: Date.now(),
         });
         leavingAccId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "leaving_member_uid",
           email: "leaving@example.com",
           familyId,
           updatedAt: Date.now(),
         });
         remainingAccId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "remaining_member_uid",
           email: "remaining@example.com",
           familyId,
@@ -628,6 +641,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           updatedAt: Date.now(),
         });
         userAccId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "no_family_user",
           email: "nofam@example.com",
           updatedAt: Date.now(),
@@ -681,18 +695,21 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           updatedAt: Date.now(),
         });
         myAcc1 = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "delete_all_multi_user",
           email: "delmulti@example.com",
           familyId: sharedFamilyId,
           updatedAt: Date.now(),
         });
         otherAcc = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "other_member_uid",
           email: "other@example.com",
           familyId: sharedFamilyId,
           updatedAt: Date.now(),
         });
         myAcc2 = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "delete_all_multi_user",
           email: "delmulti@example.com",
           updatedAt: Date.now(),
@@ -766,6 +783,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           updatedAt: Date.now(),
         });
         acc1Id = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "internal_user_uid",
           email: "internal@example.com",
           displayName: "内部1",
@@ -773,12 +791,14 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "internal_user_uid",
           email: "internal@example.com",
           displayName: "内部2",
           updatedAt: Date.now(),
         });
         otherAccId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "other_uid",
           email: "other@example.com",
           updatedAt: Date.now(),
@@ -826,12 +846,14 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           updatedAt: Date.now(),
         });
         userWithFamId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "uid_fam",
           email: "fam@example.com",
           familyId: famId,
           updatedAt: Date.now(),
         });
         userWithoutFamId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "uid_nofam",
           email: "nofam@example.com",
           updatedAt: Date.now(),
@@ -852,6 +874,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
       let nonExistentId!: Id<"users">;
       await t.run(async (ctx) => {
         const temp = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "temp",
           email: "t@example.com",
           updatedAt: Date.now(),
@@ -886,6 +909,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
       let accountId!: Id<"users">;
       await t.run(async (ctx) => {
         accountId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_device_test",
           email: "device@example.com",
           updatedAt: Date.now(),
@@ -925,11 +949,13 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 
       await t.run(async (ctx) => {
         myAccId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "login_fb_user",
           email: "loginfb@example.com",
           updatedAt: Date.now(),
         });
         otherAccId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "other_login_user",
           email: "other@example.com",
           updatedAt: Date.now(),
@@ -969,6 +995,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
       let testAccId!: Id<"users">;
       await t.run(async (ctx) => {
         testAccId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "cleanup_user_small",
           email: "clean_small@example.com",
           updatedAt: Date.now(),
@@ -1015,6 +1042,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
       let testAccId!: Id<"users">;
       await t.run(async (ctx) => {
         testAccId = await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "cleanup_user_100",
           email: "clean100@example.com",
           updatedAt: Date.now(),
@@ -1044,6 +1072,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
       const t = convexTest(schema, modules);
       await t.run(async (ctx) => {
         await ctx.db.insert("users", {
+          familyRole: "admin",
           userId: "user_bio_test",
           email: "bio@example.com",
           displayName: "生体太郎",
@@ -1120,6 +1149,120 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           tags: [],
         }),
       ).rejects.toThrow("User does not belong to a family");
+    });
+
+    it("familyAdminMutation: 家族に未所属のユーザーが実行した場合に拒否されること", async () => {
+      const t = convexTest(schema, modules);
+      let dummyAccId!: Id<"users">;
+      await t.run(async (ctx) => {
+        dummyAccId = await ctx.db.insert("users", {
+          familyRole: "admin",
+          userId: "dummy_target",
+          email: "dummy@example.com",
+          updatedAt: Date.now(),
+        });
+      });
+
+      const user = t.withIdentity({
+        subject: "no_fam_admin_user",
+        email: "nofamadmin@example.com",
+        emailVerified: true,
+      });
+      await user.mutation(api.users.syncUser, { displayName: "NoFamAdmin" });
+
+      await expect(
+        user.mutation(api.families.updateMemberRole, {
+          targetAccountId: dummyAccId,
+          role: "admin",
+        }),
+      ).rejects.toThrow("User does not belong to a family");
+    });
+
+    it("recordAdminMutation: 存在しないレコードまたは管理権限のないユーザーが実行した場合に拒否されること", async () => {
+      const t = convexTest(schema, modules);
+      let familyId!: Id<"families">;
+      let viewerId!: Id<"users">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          name: "Test Family",
+          updatedAt: Date.now(),
+        });
+        viewerId = await ctx.db.insert("users", {
+          familyRole: "viewer",
+          userId: "viewer_user",
+          email: "viewer@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+      });
+
+      const user = t.withIdentity({
+        subject: "viewer_user",
+        email: "viewer@example.com",
+      });
+
+      // 存在しないレコード
+      await expect(
+        user.mutation(api.records.addRecordAdmin, {
+          id: "000000000000000000000000000serviceRecords" as unknown as Id<"serviceRecords">,
+          targetAccountId: viewerId,
+        }),
+      ).rejects.toThrow("Record not found");
+    });
+
+    it("recordAdminMutation: 実在する共有レコードに対して個別管理権限のない閲覧者が実行した場合に Access denied で拒否されること", async () => {
+      const t = convexTest(schema, modules);
+      let familyId!: Id<"families">;
+      let adminId!: Id<"users">;
+      let viewerId!: Id<"users">;
+      let sharedRecId!: Id<"serviceRecords">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          name: "Auth Test Family",
+          updatedAt: Date.now(),
+        });
+        adminId = await ctx.db.insert("users", {
+          familyRole: "admin",
+          userId: "admin_user",
+          email: "admin@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        viewerId = await ctx.db.insert("users", {
+          familyRole: "viewer",
+          userId: "viewer_user",
+          email: "viewer@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        sharedRecId = await ctx.db.insert("serviceRecords", {
+          userId: "admin_user",
+          accountId: adminId,
+          familyId,
+          ownerFamilyId: familyId,
+          title: "Existing Shared Record",
+          sortKey: "existing",
+          ownerType: "family",
+          admins: [],
+          tags: [],
+          updatedAt: Date.now(),
+        });
+      });
+
+      const viewer = t.withIdentity({
+        subject: "viewer_user",
+        email: "viewer@example.com",
+      });
+
+      // 個別管理者ではない閲覧者が管理者操作を実行した場合は Access denied で拒否されること
+      await expect(
+        viewer.mutation(api.records.addRecordAdmin, {
+          id: sharedRecId,
+          targetAccountId: viewerId,
+        }),
+      ).rejects.toThrow("Access denied");
     });
   });
 });

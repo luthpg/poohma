@@ -9,6 +9,7 @@ import {
   mutation as baseMutation,
   query as baseQuery,
 } from "./_generated/server";
+import { getEffectiveFamilyRole, requireAdminAccess } from "./rls";
 
 /**
  * 認証情報とアカウント所有権の共通解決関数
@@ -124,5 +125,46 @@ export const familyBoundMutation = customMutation(baseMutation, {
     if (!user.familyId) throw new Error("User does not belong to a family");
 
     return { ctx: { ...ctx, identity, user, familyId: user.familyId }, args };
+  },
+});
+
+/**
+ * 家族のファミリー管理者（familyRole === "admin"）であることを保証するミューテーション
+ */
+export const familyAdminMutation = customMutation(baseMutation, {
+  args: {
+    accountId: v.optional(v.id("users")),
+  },
+  input: async (ctx, args) => {
+    const { identity, user } = await resolveAccount(ctx, args.accountId);
+    if (!user.familyId) throw new Error("User does not belong to a family");
+    if (getEffectiveFamilyRole(user) !== "admin") {
+      throw new Error("Access denied: Admin role required");
+    }
+
+    return { ctx: { ...ctx, identity, user, familyId: user.familyId }, args };
+  },
+});
+
+/**
+ * レコードの管理者権限を保証し、解決済み record を提供するミューテーション
+ */
+export const recordAdminMutation = customMutation(baseMutation, {
+  args: {
+    id: v.id("serviceRecords"),
+    accountId: v.optional(v.id("users")),
+  },
+  input: async (ctx, args) => {
+    const { identity, user } = await resolveAccount(ctx, args.accountId);
+    const record = await ctx.db.get(args.id);
+    if (!record) {
+      throw new Error("Record not found");
+    }
+    requireAdminAccess(user, record);
+
+    return {
+      ctx: { ...ctx, identity, user, record, familyId: user.familyId },
+      args,
+    };
   },
 });

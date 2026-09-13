@@ -21,11 +21,13 @@ import {
   authenticatedQuery,
   familyBoundMutation,
   familyBoundQuery,
+  recordAdminMutation,
 } from "./customBuilders";
 import {
   getEffectiveAdmins,
   getEffectiveOwnerFamilyId,
   getEffectiveOwnerType,
+  isRecordAdmin,
   requireAdminAccess,
   requireContentAccess,
 } from "./rls";
@@ -341,10 +343,36 @@ export const getRecordDetail = authenticatedQuery({
 
     const recordOwner = await ctx.db.get(record.accountId);
 
-    // 管理者ユーザー一覧の情報を取得
-    const adminDocs = await Promise.all(
-      (record.admins ?? []).map((adminId) => ctx.db.get(adminId)),
-    );
+    // 管理者ユーザー一覧の情報を取得（動的マージ）
+    let adminDocs: (Doc<"users"> | null)[] = [];
+    if (record.ownerType === "family" && record.ownerFamilyId) {
+      const familyAdmins = await ctx.db
+        .query("users")
+        .filter((q) =>
+          q.and(
+            q.eq(q.field("familyId"), record.ownerFamilyId),
+            q.eq(q.field("familyRole"), "admin"),
+          ),
+        )
+        .collect();
+
+      const individualAdmins = await Promise.all(
+        (record.admins ?? []).map((adminId) => ctx.db.get(adminId)),
+      );
+
+      const allAdminsMap = new Map<Id<"users">, Doc<"users">>();
+      for (const u of familyAdmins) {
+        allAdminsMap.set(u._id, u);
+      }
+      for (const u of individualAdmins) {
+        if (u) allAdminsMap.set(u._id, u);
+      }
+      adminDocs = Array.from(allAdminsMap.values());
+    } else {
+      adminDocs = await Promise.all(
+        (record.admins ?? []).map((adminId) => ctx.db.get(adminId)),
+      );
+    }
     const admins = adminDocs
       .filter((u): u is Doc<"users"> => u != null)
       .map((u) => ({
@@ -495,7 +523,7 @@ export const createRecord = familyBoundMutation({
       sortKey,
       ownerType: isFamily ? "family" : "user",
       ownerFamilyId: isFamily ? user.familyId : undefined,
-      admins: isFamily ? [user._id] : [],
+      admins: isFamily && user.familyRole === "viewer" ? [user._id] : [],
       tags: args.tags,
       revision: 0,
       updatedAt: now,
@@ -571,8 +599,8 @@ export const updateRecord = familyBoundMutation({
     const record = await ctx.db.get(args.id);
     if (!record) throw new Error("Record not found");
 
-    // コンテンツ編集権限の確認
-    requireContentAccess(ctx.user, record);
+    // コンテンツ編集権限の確認（管理者権限が必要）
+    requireAdminAccess(ctx.user, record);
 
     // 楽観的ロック検証（force: true の場合はバイパス）
     if (!args.force) {
@@ -790,7 +818,7 @@ export const createCredential = familyBoundMutation({
   handler: async (ctx, args) => {
     const record = await ctx.db.get(args.recordId);
     if (!record) throw new Error("Record not found");
-    requireContentAccess(ctx.user, record);
+    requireAdminAccess(ctx.user, record);
 
     const existingCreds = await ctx.db
       .query("credentials")
@@ -846,7 +874,7 @@ export const updateCredential = familyBoundMutation({
 
     const record = await ctx.db.get(cred.recordId);
     if (!record) throw new Error("Record not found");
-    requireContentAccess(ctx.user, record);
+    requireAdminAccess(ctx.user, record);
 
     const now = Date.now();
     await ctx.db.patch(args.id, {
@@ -875,7 +903,7 @@ export const deleteCredential = familyBoundMutation({
 
     const record = await ctx.db.get(cred.recordId);
     if (!record) throw new Error("Record not found");
-    requireContentAccess(ctx.user, record);
+    requireAdminAccess(ctx.user, record);
 
     await ctx.db.delete(args.id);
     await ctx.db.patch(record._id, { updatedAt: Date.now() });
@@ -968,7 +996,7 @@ export const shareRecord = familyBoundMutation({
     await ctx.db.patch(args.id, {
       ownerType: "family",
       ownerFamilyId: ctx.user.familyId,
-      admins: [ctx.user._id],
+      admins: ctx.user.familyRole === "viewer" ? [ctx.user._id] : [],
       updatedAt: Date.now(),
     });
 
@@ -1071,26 +1099,26 @@ export const unshareRecord = familyBoundMutation({
 /**
  * 共有レコードの管理者を同一家族内メンバーから追加
  */
-export const addRecordAdmin = familyBoundMutation({
+export const addRecordAdmin = recordAdminMutation({
   args: {
-    id: v.id("serviceRecords"),
     targetAccountId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const record = await ctx.db.get(args.id);
-    if (!record) throw new Error("Record not found");
-
-    requireAdminAccess(ctx.user, record);
+    const record = ctx.record;
 
     const targetUser = await ctx.db.get(args.targetAccountId);
     if (!targetUser || targetUser.familyId !== ctx.user.familyId) {
       throw new Error("Target user is not a member of this family");
     }
 
+    if (targetUser.familyRole === "admin") {
+      throw new Error("ファミリー管理者はすでにあらゆるレコードの管理者です");
+    }
+
     const admins = record.admins ?? [];
     if (!admins.includes(args.targetAccountId)) {
       const newAdmins = [...admins, args.targetAccountId];
-      await ctx.db.patch(args.id, {
+      await ctx.db.patch(record._id, {
         admins: newAdmins,
         updatedAt: Date.now(),
       });
@@ -1098,7 +1126,7 @@ export const addRecordAdmin = familyBoundMutation({
       //ログ記録
       await logAuditEvent(ctx, {
         actor: ctx.user,
-        recordId: args.id,
+        recordId: record._id,
         ownerType: "family",
         ownerFamilyId: ctx.user.familyId,
         targetAccountId: undefined,
@@ -1109,7 +1137,7 @@ export const addRecordAdmin = familyBoundMutation({
         },
       });
 
-      const family = await ctx.db.get(ctx.familyId);
+      const family = ctx.familyId ? await ctx.db.get(ctx.familyId) : null;
       const familyName = family?.name ?? "家族";
       const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
       const now = Date.now();
@@ -1148,32 +1176,44 @@ export const addRecordAdmin = familyBoundMutation({
 /**
  * 共有レコードの管理者を降格（最後の1人の削除は拒否）
  */
-export const removeRecordAdmin = familyBoundMutation({
+export const removeRecordAdmin = recordAdminMutation({
   args: {
-    id: v.id("serviceRecords"),
     targetAccountId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const record = await ctx.db.get(args.id);
-    if (!record) throw new Error("Record not found");
-
-    requireAdminAccess(ctx.user, record);
+    const record = ctx.record;
 
     const targetUser = await ctx.db.get(args.targetAccountId);
     if (!targetUser) {
       throw new Error("Target user not found");
     }
 
+    if (targetUser.familyRole === "admin") {
+      throw new Error("ファミリー管理者は閲覧者に変更できません");
+    }
+
     const admins = record.admins ?? [];
     if (!admins.includes(args.targetAccountId)) {
       throw new Error("Target user is not an administrator of this record");
     }
-    if (admins.length <= 1) {
+
+    // 家族内にファミリー管理者が存在するか確認
+    const hasDefaultAdmin = await ctx.db
+      .query("users")
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("familyId"), ctx.user.familyId),
+          q.eq(q.field("familyRole"), "admin"),
+        ),
+      )
+      .first();
+
+    if (!hasDefaultAdmin && admins.length <= 1) {
       throw new Error("管理者が0人になるため削除できません");
     }
 
     const newAdmins = admins.filter((id) => id !== args.targetAccountId);
-    await ctx.db.patch(args.id, {
+    await ctx.db.patch(record._id, {
       admins: newAdmins,
       updatedAt: Date.now(),
     });
@@ -1181,7 +1221,7 @@ export const removeRecordAdmin = familyBoundMutation({
     //ログ記録
     await logAuditEvent(ctx, {
       actor: ctx.user,
-      recordId: args.id,
+      recordId: record._id,
       ownerType: "family",
       ownerFamilyId: ctx.user.familyId,
       targetAccountId: undefined,
@@ -1192,7 +1232,7 @@ export const removeRecordAdmin = familyBoundMutation({
       },
     });
 
-    const family = await ctx.db.get(ctx.familyId);
+    const family = ctx.familyId ? await ctx.db.get(ctx.familyId) : null;
     const familyName = family?.name ?? "家族";
     const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
     const now = Date.now();
@@ -1246,7 +1286,7 @@ export const bulkShareRecords = familyBoundMutation({
         await ctx.db.patch(id, {
           ownerType: "family",
           ownerFamilyId: ctx.user.familyId,
-          admins: [ctx.user._id],
+          admins: ctx.user.familyRole === "viewer" ? [ctx.user._id] : [],
           updatedAt: Date.now(),
         });
         count++;
@@ -1294,7 +1334,7 @@ export const bulkUnshareRecords = familyBoundMutation({
       if (
         record &&
         record.ownerType === "family" &&
-        (record.admins ?? []).includes(ctx.user._id)
+        isRecordAdmin(ctx.user, record)
       ) {
         await ctx.db.patch(id, {
           ownerType: "user",
@@ -1334,6 +1374,55 @@ export const bulkUnshareRecords = familyBoundMutation({
     }
 
     return { success: true, count, unsharedCount: count };
+  },
+});
+
+/**
+ * 選択した家族共有レコードに対して、対象の閲覧者メンバーの管理者設定／解除を一括実行
+ */
+export const bulkSetRecordAdmin = familyBoundMutation({
+  args: {
+    ids: v.array(v.id("serviceRecords")),
+    targetAccountId: v.id("users"),
+    makeAdmin: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const targetUser = await ctx.db.get(args.targetAccountId);
+    if (!targetUser || targetUser.familyId !== ctx.user.familyId) {
+      throw new Error("Target user is not a member of this family");
+    }
+
+    if (targetUser.familyRole === "admin") {
+      throw new Error("ファミリー管理者の権限は変更できません");
+    }
+
+    let count = 0;
+    for (const id of args.ids) {
+      const record = await ctx.db.get(id);
+      if (record?.ownerType !== "family") continue;
+
+      // 実行者に管理権限があるレコードのみ対象
+      if (!isRecordAdmin(ctx.user, record)) continue;
+
+      const admins = record.admins ?? [];
+      const hasAdmin = admins.includes(args.targetAccountId);
+
+      if (args.makeAdmin && !hasAdmin) {
+        await ctx.db.patch(id, {
+          admins: [...admins, args.targetAccountId],
+          updatedAt: Date.now(),
+        });
+        count++;
+      } else if (!args.makeAdmin && hasAdmin) {
+        await ctx.db.patch(id, {
+          admins: admins.filter((adminId) => adminId !== args.targetAccountId),
+          updatedAt: Date.now(),
+        });
+        count++;
+      }
+    }
+
+    return { success: true, count };
   },
 });
 

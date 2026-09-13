@@ -42,16 +42,16 @@ flowchart TD
     Issue -->|"有効な招待コードを共有"| Apply["申請者が参加申請を作成<br/>(joinRequests: pending)"]
     
     Apply --> Pending["pending"]
-    Pending -->|"既存メンバーが承認 (approveJoinRequest)"| Approved["approved<br/>(user.familyId 更新)"]
-    Pending -->|"既存メンバーが拒否 / 申請者が取り下げ"| Rejected["rejected<br/>(アクセス権なし)"]
+    Pending -->|"家族管理者が承認 (approveJoinRequest)"| Approved["approved<br/>(user.familyId 更新)"]
+    Pending -->|"家族管理者が拒否 / 申請者が取り下げ"| Rejected["rejected<br/>(アクセス権なし)"]
     
     Approved --> Unlock["家族パスコード入力でマスターキー解除"]
 ```
 
 - **招待コード発行**: 既存家族メンバーが有効期限（15分〜30日）を指定して発行（`createInviteCode`）。いつでも手動失効（`revokeInviteCode`）可能。
 - **参加申請トリガー**: 申請者が有効な招待コード（リンク/QR）を入力して申請を作成（`createJoinRequestWithInvite`）。
-- **承認時**: 既存家族メンバーのいずれかが承認（`approveJoinRequest`）すると、対象アカウントの `user.familyId` が更新され、申請者に通知。
-- **拒否・取り下げ時**: 既存メンバーによる拒否（`rejectJoinRequest`）または申請者自身によるキャンセル（`cancelJoinRequest`）により `rejected` となり、家族へのアクセス権は付与されない。
+- **承認時**: 家族の管理者（`familyAdminMutation`）が承認（`approveJoinRequest`）すると、対象アカウントの `user.familyId` が更新され、申請者に通知。
+- **拒否・取り下げ時**: 家族の管理者による拒否（`rejectJoinRequest`）または申請者自身によるキャンセル（`cancelJoinRequest`）により `rejected` となり、家族へのアクセス権は付与されない。
 - **参加完了後**: 申請者は家族パスコードを入力してマスターキーをロック解除し、家族内での利用を開始する。
 
 ---
@@ -105,7 +105,7 @@ flowchart TD
     VaultCreated -->|"30日タイムアウト / クローンジョブ<br/>(cleanupExpiredExportVaultsInternal)"| ExpiredVault["EXPIRED (物理削除)"]
 ```
 
-- **キック実行**: 家族メンバーが他メンバーを除名（`kickMember`）。自己キックや別アカウントの指定は拒否。
+- **キック実行**: ファミリー管理者が他メンバーを除名（`kickMember`、`familyAdminMutation`）。自己キック、別アカウントの指定、および家族内最後の管理者のキックは拒否。
 - **データ分離**: 共有レコード（`ownerType: "family"`）は旧家族資産として残り、被キックユーザーの `familyId` を即時クリア。管理者であった場合は `reconcileAdminsOnLeave` で残存メンバーへ調停。
 - **Export Vault 退避**: 個人レコード（`ownerType: "user"`）の持ち出しを可能にするため、旧家族の `masterKeyEncrypted`, `masterKeyIv`, `masterKeySalt`, `kdfIterations`, `cryptoVersion` を `pendingExportVaults` へ原子的に退避。
 - **持ち出し完了または破棄**: 被キックユーザーが旧パスコードでアンラップして新家族へ持ち出し完了（`commitFamilyMigration`）するか、手動破棄（`abandonPendingExportVault`）、または 30日経過による自動クリーンアップ（1時間ごとの Cron）によって Vault は物理削除される。
@@ -134,15 +134,37 @@ flowchart TD
 
 ---
 
+### 2.6 家族ロール（`familyRole`）のライフサイクル
+
+```mermaid
+flowchart TD
+    CreateFam["家族グループ新規作成 (createFamily)"] --> AdminRole["作成者: familyRole = 'admin'<br/>(ファミリー管理者)"]
+    JoinFam["家族参加申請承認 (approveJoinRequest)"] --> ViewerRole["新規参加者: familyRole = 'viewer'<br/>(メンバー)"]
+    
+    AdminRole -->|"updateMemberRole (降格)"| ViewerRole
+    ViewerRole -->|"updateMemberRole (昇格)"| AdminRole
+    
+    AdminRole -.->|"最後の1人の管理者を降格しようとした場合"| BlockDemote["BLOCK (最低1名の管理者を保持)"]
+    AdminRole -.->|"最後の1人の管理者をキックしようとした場合"| BlockKick["BLOCK (最後の管理者のキック不可)"]
+```
+
+- **初期付与**: 家族を新規作成したアカウントは `"admin"`、招待承認で新規参加したアカウントは安全のため `"viewer"` となる。バックフィル完了に伴い `users.familyRole` は必須フィールド。
+- **権限昇格・降格**: ファミリー管理者のみが他メンバーのロールを変更できる（`updateMemberRole`、`familyAdminMutation`）。
+- **最後の管理者保護**: 家族内に最低1名のファミリー管理者（`admin`）が存在することを必須とし、最後の管理者の降格およびキックはサーバー側で厳格に拒否する。
+
+---
+
 ## 3. レコード所有権モデルとアクセス権マトリクス
+
+管理者判定（`isRecordAdmin`）は、**ファミリー管理者（`familyRole === "admin"`）** または **対象レコードの `admins` 配列に含まれる個別管理者** のいずれかを満たす場合に成立する（動的マージ ACL）。
 
 | 操作 | 個人レコード (`ownerType: "user"`) | 共有レコード (`ownerType: "family"`) |
 | --- | --- | --- |
-| **閲覧・復号** | 所有アカウント (`accountId === user._id`) のみ | 同一 Family に所属する PoohMa Account 全員 |
-| **編集 (タイトル/メモ/タグ等)** | 所有アカウントのみ | 同一 Family に所属する PoohMa Account 全員 |
-| **ヒント更新 (DEK再暗号化)** | 所有アカウントのみ | 同一 Family に所属する PoohMa Account 全員 (家族マスターキーでDEK再ラップ) |
-| **共有解除 (個人へ戻す)** | 対象外 | レコード管理者 (`admins.includes(user._id)`) のみ |
-| **管理者変更 (admins追加/削除)** | 対象外 | レコード管理者のみ |
+| **閲覧・復号** | 所有アカウント (`accountId === user._id`) のみ | 同一 Family に所属する全メンバー（`viewer` 含む） |
+| **編集 (タイトル/メモ/タグ等)** | 所有アカウントのみ | レコード管理者（ファミリー管理者または個別管理者）のみ |
+| **ヒント更新 (DEK再暗号化)** | 所有アカウントのみ | レコード管理者（ファミリー管理者または個別管理者）のみ |
+| **共有解除 (個人へ戻す)** | 対象外 | レコード管理者のみ |
+| **管理者変更 (admins追加/解除)** | 対象外 | レコード管理者のみ（ファミリー管理者は全レコード管理権限を持つためadmins追加不要） |
 | **削除** | 所有アカウントのみ | レコード管理者のみ |
 
 ---
