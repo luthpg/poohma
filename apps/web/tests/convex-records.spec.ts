@@ -1697,6 +1697,10 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
     });
 
     const userA = t.withIdentity({ subject: "user_a", email: "a@example.com" });
+    const viewerUser = t.withIdentity({
+      subject: "viewer_b",
+      email: "b@example.com",
+    });
 
     // 一括で viewerId を管理者に追加
     const addRes = await userA.mutation(api.records.bulkSetRecordAdmin, {
@@ -1713,6 +1717,12 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
       expect(r2?.admins).toContain(viewerId);
     });
 
+    // 個別管理者付与後は viewerUser が recordAdminMutation (例: addRecordAdmin) を実行できること
+    await viewerUser.mutation(api.records.addRecordAdmin, {
+      id: rec1Id,
+      targetAccountId: viewerId,
+    });
+
     // 一括で viewerId を管理者から解除
     const removeRes = await userA.mutation(api.records.bulkSetRecordAdmin, {
       ids: [rec1Id, rec2Id],
@@ -1727,5 +1737,13 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
       const r2 = await ctx.db.get(rec2Id);
       expect(r2?.admins).not.toContain(viewerId);
     });
+
+    // 管理者解除後は同じ操作が Access denied で拒否されること
+    await expect(
+      viewerUser.mutation(api.records.addRecordAdmin, {
+        id: rec1Id,
+        targetAccountId: viewerId,
+      }),
+    ).rejects.toThrow("Access denied");
   });
 });

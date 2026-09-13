@@ -16,10 +16,11 @@ import {
   familyBoundQuery,
 } from "./customBuilders";
 import { deleteCredentialsForRecord, getCredentialsForRecord } from "./records";
+import { getEffectiveFamilyRole } from "./rls";
 
 /**
  * メンバーが家族を離脱または削除された際、共有レコードの管理者リストを調停
- * 管理者が0人になる場合は残りの家族メンバー全員を自動昇格
+ * デフォルト管理者が不在になる場合のみ残りの家族メンバーを自動昇格
  */
 export async function reconcileAdminsOnLeave(
   ctx: { db: MutationCtx["db"] },
@@ -50,16 +51,35 @@ export async function reconcileAdminsOnLeave(
     return;
   }
 
+  const remainingDefaultAdminIds = remainingFamilyMembers
+    .filter(
+      (u) =>
+        u._id !== leavingAccountId && getEffectiveFamilyRole(u) === "admin",
+    )
+    .map((u) => u._id);
+  const remainingDefaultAdminExists = remainingDefaultAdminIds.length > 0;
+
   for (const record of sharedRecords) {
     const currentAdmins = record.admins ?? [];
     const validRemainingAdmins = currentAdmins.filter(
       (id) => id !== leavingAccountId && remainingAccountIds.includes(id),
     );
 
-    const newAdmins =
-      validRemainingAdmins.length === 0
-        ? remainingAccountIds
-        : validRemainingAdmins;
+    let newAdmins: Id<"users">[];
+    if (currentAdmins.length === 0) {
+      // 元々個別管理者が設定されていない（空）レコードの場合：
+      // デフォルト管理者が残っていれば空のまま維持（動的ACLに委ね、閲覧者を昇格させない）
+      newAdmins = remainingDefaultAdminExists ? [] : remainingAccountIds;
+    } else if (validRemainingAdmins.length > 0) {
+      // 明示的に割り当てられていた残存管理者がいる場合はそれを引き継ぐ
+      newAdmins = validRemainingAdmins;
+    } else {
+      // 個別管理者が0人になってしまう場合：
+      // デフォルト管理者がいればデフォルト管理者のみを自動昇格（閲覧者の意図しない昇格を防止）
+      newAdmins = remainingDefaultAdminExists
+        ? remainingDefaultAdminIds
+        : remainingAccountIds;
+    }
 
     const hasChanged =
       newAdmins.length !== currentAdmins.length ||
@@ -1264,7 +1284,7 @@ export const getPendingRequests = familyBoundQuery({
   },
 });
 
-export const approveJoinRequest = familyBoundMutation({
+export const approveJoinRequest = familyAdminMutation({
   args: { requestId: v.id("joinRequests") },
   handler: async (ctx, args) => {
     const { familyId } = ctx;
@@ -1352,7 +1372,7 @@ export const approveJoinRequest = familyBoundMutation({
   },
 });
 
-export const rejectJoinRequest = familyBoundMutation({
+export const rejectJoinRequest = familyAdminMutation({
   args: { requestId: v.id("joinRequests") },
   handler: async (ctx, args) => {
     const { familyId } = ctx;

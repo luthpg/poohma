@@ -3499,5 +3499,163 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         expect(u?.familyId).toBeUndefined();
       });
     });
+
+    it("approveJoinRequest / rejectJoinRequest: デフォルト管理者のみ承認・却下でき、閲覧者は拒否されること", async () => {
+      const t = convexTest(schema, modules);
+      let familyId!: Id<"families">;
+      let req1Id!: Id<"joinRequests">;
+      let req2Id!: Id<"joinRequests">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          name: "Join Approval Family",
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("users", {
+          familyRole: "admin",
+          userId: "admin_user",
+          email: "admin@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("users", {
+          familyRole: "viewer",
+          userId: "viewer_user",
+          email: "viewer@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        const app1AccId = await ctx.db.insert("users", {
+          userId: "applicant_1",
+          email: "app1@example.com",
+          updatedAt: Date.now(),
+        });
+        const app2AccId = await ctx.db.insert("users", {
+          userId: "applicant_2",
+          email: "app2@example.com",
+          updatedAt: Date.now(),
+        });
+        req1Id = await ctx.db.insert("joinRequests", {
+          familyId,
+          userId: "applicant_1",
+          accountId: app1AccId,
+          status: "pending",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+        req2Id = await ctx.db.insert("joinRequests", {
+          familyId,
+          userId: "applicant_2",
+          accountId: app2AccId,
+          status: "pending",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+      });
+
+      const viewer = t.withIdentity({
+        subject: "viewer_user",
+        email: "viewer@example.com",
+      });
+      const admin = t.withIdentity({
+        subject: "admin_user",
+        email: "admin@example.com",
+      });
+
+      // 閲覧者による承認・却下は Admin role required で拒否されること
+      await expect(
+        viewer.mutation(api.families.approveJoinRequest, {
+          requestId: req1Id,
+        }),
+      ).rejects.toThrow("Access denied: Admin role required");
+
+      await expect(
+        viewer.mutation(api.families.rejectJoinRequest, {
+          requestId: req2Id,
+        }),
+      ).rejects.toThrow("Access denied: Admin role required");
+
+      // 管理者による承認・却下は成功すること
+      await admin.mutation(api.families.approveJoinRequest, {
+        requestId: req1Id,
+      });
+      await admin.mutation(api.families.rejectJoinRequest, {
+        requestId: req2Id,
+      });
+
+      await t.run(async (ctx) => {
+        const r1 = await ctx.db.get(req1Id);
+        expect(r1?.status).toBe("approved");
+        const r2 = await ctx.db.get(req2Id);
+        expect(r2?.status).toBe("rejected");
+      });
+    });
+
+    it("reconcileAdminsOnLeave: デフォルト管理者が残存している場合、adminsが空のレコードで閲覧者は自動昇格しないこと", async () => {
+      const t = convexTest(schema, modules);
+      let familyId!: Id<"families">;
+      let leavingAdminId!: Id<"users">;
+      let remainingAdminId!: Id<"users">;
+      let viewerId!: Id<"users">;
+      let sharedRecId!: Id<"serviceRecords">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          name: "Leave Reconcile Family",
+          updatedAt: Date.now(),
+        });
+        leavingAdminId = await ctx.db.insert("users", {
+          familyRole: "admin",
+          userId: "leaving_admin",
+          email: "leaving@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        remainingAdminId = await ctx.db.insert("users", {
+          familyRole: "admin",
+          userId: "remaining_admin",
+          email: "remaining@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        viewerId = await ctx.db.insert("users", {
+          familyRole: "viewer",
+          userId: "viewer_member",
+          email: "viewer_member@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        sharedRecId = await ctx.db.insert("serviceRecords", {
+          userId: "leaving_admin",
+          accountId: leavingAdminId,
+          familyId,
+          ownerFamilyId: familyId,
+          title: "Shared Without Explicit Admins",
+          sortKey: "shared",
+          ownerType: "family",
+          admins: [], // デフォルト管理者に委ねられている
+          tags: [],
+          updatedAt: Date.now(),
+        });
+      });
+
+      const remainingAdmin = t.withIdentity({
+        subject: "remaining_admin",
+        email: "remaining@example.com",
+      });
+
+      // remainingAdmin が leavingAdmin をキック（家族離脱時の reconcileAdminsOnLeave をトリガー）
+      await remainingAdmin.mutation(api.families.kickMember, {
+        targetAccountId: leavingAdminId,
+      });
+
+      // 残存メンバーに remainingAdmin がいるため、sharedRecId の admins は [] のまま維持され、viewerId は追加されないこと
+      await t.run(async (ctx) => {
+        const rec = await ctx.db.get(sharedRecId);
+        expect(rec?.admins).toEqual([]);
+        expect(rec?.admins).not.toContain(viewerId);
+        expect(rec?.admins).not.toContain(remainingAdminId);
+      });
+    });
   });
 });

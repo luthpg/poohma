@@ -797,7 +797,7 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 | getMyJoinRequest | Query | authenticated | 自分の申請状況取得 |
 | dismissRejectedRequest | Mutation | authenticated | 却下された申請の削除（確認） |
 | getPendingRequests | Query | familyBound | 自家族への保留中申請一覧 |
-| approveJoinRequest / rejectJoinRequest | Mutation | familyBound | 申請の承認／却下＋通知メール |
+| approveJoinRequest / rejectJoinRequest | Mutation | familyAdmin | 申請の承認／却下＋通知メール（デフォルト管理者のみ実行可能） |
 | prepareFamilyMigration | Mutation | authenticated | 家族移行の準備（PREPARED状態の作成とレコード更新スナップショットの保持） |
 | getMigrationForEncryption | Query | authenticated | 移行対象データ（暗号化済みDEK等）の取得 |
 | commitFamilyMigration | Mutation | authenticated | 移行の確定（再暗号化データの反映）。prepare時点とcommit時点のレコード一覧を照合する楽観的ロック（競合検知）を適用 |

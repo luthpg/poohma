@@ -325,30 +325,39 @@ function RouteComponent() {
     [selectedRecords],
   );
 
+  // 現在のアカウントの家族内ロール判定（デフォルト管理者は全共有レコードの管理者権限を持つ）
+  const currentFamilyMember = useMemo(
+    () => family?.users?.find((u) => u.id === activeAccountId),
+    [family?.users, activeAccountId],
+  );
+  const isFamilyAdmin = currentFamilyMember?.familyRole === "admin";
+
   // 共有解除可能なレコード（自分が管理者である家族共有レコード）
   const unshareableRecords = useMemo(
     () =>
-      selectedRecords.filter(
-        (r) =>
-          r.ownerType === "family" &&
-          Boolean(
-            activeAccountId && (r.admins ?? []).includes(activeAccountId),
-          ),
-      ),
-    [selectedRecords, activeAccountId],
+      selectedRecords.filter((r) => {
+        if (r.ownerType !== "family") return false;
+        if (isFamilyAdmin) return true;
+        return Boolean(
+          activeAccountId && (r.admins ?? []).includes(activeAccountId),
+        );
+      }),
+    [selectedRecords, activeAccountId, isFamilyAdmin],
   );
 
   // 管理者権限がないため共有解除の対象外となるレコード
   const excludedUnshareRecords = useMemo(
     () =>
       selectedRecords
-        .filter(
-          (r) =>
-            r.ownerType === "family" &&
-            !(activeAccountId && (r.admins ?? []).includes(activeAccountId)),
-        )
+        .filter((r) => {
+          if (r.ownerType !== "family") return false;
+          if (isFamilyAdmin) return false;
+          return !(
+            activeAccountId && (r.admins ?? []).includes(activeAccountId)
+          );
+        })
         .map((r) => ({ id: r._id, title: r.title })),
-    [selectedRecords, activeAccountId],
+    [selectedRecords, activeAccountId, isFamilyAdmin],
   );
 
   const deleteRecordsMut = useMutation(api.records.deleteRecords);

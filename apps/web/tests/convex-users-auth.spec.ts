@@ -1210,5 +1210,59 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
         }),
       ).rejects.toThrow("Record not found");
     });
+
+    it("recordAdminMutation: 実在する共有レコードに対して個別管理権限のない閲覧者が実行した場合に Access denied で拒否されること", async () => {
+      const t = convexTest(schema, modules);
+      let familyId!: Id<"families">;
+      let adminId!: Id<"users">;
+      let viewerId!: Id<"users">;
+      let sharedRecId!: Id<"serviceRecords">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          name: "Auth Test Family",
+          updatedAt: Date.now(),
+        });
+        adminId = await ctx.db.insert("users", {
+          familyRole: "admin",
+          userId: "admin_user",
+          email: "admin@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        viewerId = await ctx.db.insert("users", {
+          familyRole: "viewer",
+          userId: "viewer_user",
+          email: "viewer@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        sharedRecId = await ctx.db.insert("serviceRecords", {
+          userId: "admin_user",
+          accountId: adminId,
+          familyId,
+          ownerFamilyId: familyId,
+          title: "Existing Shared Record",
+          sortKey: "existing",
+          ownerType: "family",
+          admins: [],
+          tags: [],
+          updatedAt: Date.now(),
+        });
+      });
+
+      const viewer = t.withIdentity({
+        subject: "viewer_user",
+        email: "viewer@example.com",
+      });
+
+      // 個別管理者ではない閲覧者が管理者操作を実行した場合は Access denied で拒否されること
+      await expect(
+        viewer.mutation(api.records.addRecordAdmin, {
+          id: sharedRecId,
+          targetAccountId: viewerId,
+        }),
+      ).rejects.toThrow("Access denied");
+    });
   });
 });
