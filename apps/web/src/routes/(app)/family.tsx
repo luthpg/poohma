@@ -1850,7 +1850,7 @@ function FamilyComponent() {
             className="mt-8 border-t border-border pt-6"
           >
             <div className="mb-4 space-y-1">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center justify-between gap-3 mb-2">
                 <h3 className="text-[14px] font-medium text-foreground">
                   家族パスコードの変更
                 </h3>
@@ -1861,7 +1861,7 @@ function FamilyComponent() {
                   }
                   className="rounded-md bg-card px-3 py-1.5 text-[13px] font-medium text-foreground shadow-border hover:bg-accent transition shrink-0 cursor-pointer"
                 >
-                  {showRotatePasscodeForm ? "閉じる" : "パスコードを変更"}
+                  {showRotatePasscodeForm ? "閉じる" : "パスコード変更"}
                 </button>
               </div>
               <p className="text-[12px] text-muted-foreground leading-relaxed">
@@ -2039,7 +2039,7 @@ function FamilyComponent() {
           <div className="mt-8 border-t border-border pt-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 mb-2">
                   <ShieldCheck className="h-4 w-4 text-primary" />
                   <h3 className="text-[14px] font-medium text-foreground">
                     リカバリーキット
