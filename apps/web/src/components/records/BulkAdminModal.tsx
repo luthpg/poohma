@@ -140,11 +140,11 @@ export function BulkAdminModal({
                 htmlFor="bulk-admin-target-member"
                 className="text-xs font-semibold text-foreground"
               >
-                対象メンバー（閲覧専用メンバー）
+                対象メンバー（一般メンバー）
               </label>
               {viewerMembers.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  閲覧専用のメンバーが存在しません（全員デフォルト管理者です）。
+                  一般メンバーが存在しません（全員デフォルト管理者です）。
                 </p>
               ) : (
                 <select

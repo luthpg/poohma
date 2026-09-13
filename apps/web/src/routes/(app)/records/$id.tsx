@@ -792,58 +792,60 @@ function RecordDetailComponent({
           {/* URLリンクがあればオーバーレイ */}
           {record.url && (
             <div className="absolute bottom-4 right-4 flex gap-2">
-              <button
-                type="button"
-                onClick={async () => {
-                  if (!record.url) return;
-                  setIsLoading(true);
-                  try {
-                    const ogp = await getOgpInfo({ url: record.url });
-                    await updateRecord({
-                      id: record._id,
-                      accountId: activeAccountId || undefined,
-                      revision: record.revision ?? 0,
-                      data: {
-                        title: record.title,
-                        url: record.url,
-                        ogpImage: ogp.image || undefined,
-                        ogpDescription: ogp.description || undefined,
-                        memo: record.memo || undefined,
-                        ownerType: record.ownerType,
-                        credentials: record.credentials.map((c) => ({
-                          id: c.id,
-                          label: c.label || "",
-                          loginId: c.loginId || "",
-                          passwordHint: c.passwordHint || "",
-                          passwordHintIv: c.passwordHintIv || undefined,
-                          passwordHintDekEncrypted:
-                            c.passwordHintDekEncrypted || undefined,
-                          passwordHintDekIv: c.passwordHintDekIv || undefined,
-                        })),
-                        tags: record.tags,
-                      },
-                    });
-                    toast.success("サイト情報を更新しました");
-                    await router.invalidate();
-                  } catch (e: unknown) {
-                    const msg = e instanceof Error ? e.message : "";
-                    if (msg.includes("CONFLICT")) {
-                      toast.error(
-                        "他のご家族の更新と重なったため、サイト情報を更新できませんでした",
-                      );
-                    } else {
-                      toast.error("サイト情報の更新に失敗しました");
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!record.url) return;
+                    setIsLoading(true);
+                    try {
+                      const ogp = await getOgpInfo({ url: record.url });
+                      await updateRecord({
+                        id: record._id,
+                        accountId: activeAccountId || undefined,
+                        revision: record.revision ?? 0,
+                        data: {
+                          title: record.title,
+                          url: record.url,
+                          ogpImage: ogp.image || undefined,
+                          ogpDescription: ogp.description || undefined,
+                          memo: record.memo || undefined,
+                          ownerType: record.ownerType,
+                          credentials: record.credentials.map((c) => ({
+                            id: c.id,
+                            label: c.label || "",
+                            loginId: c.loginId || "",
+                            passwordHint: c.passwordHint || "",
+                            passwordHintIv: c.passwordHintIv || undefined,
+                            passwordHintDekEncrypted:
+                              c.passwordHintDekEncrypted || undefined,
+                            passwordHintDekIv: c.passwordHintDekIv || undefined,
+                          })),
+                          tags: record.tags,
+                        },
+                      });
+                      toast.success("サイト情報を更新しました");
+                      await router.invalidate();
+                    } catch (e: unknown) {
+                      const msg = e instanceof Error ? e.message : "";
+                      if (msg.includes("CONFLICT")) {
+                        toast.error(
+                          "他のご家族の更新と重なったため、サイト情報を更新できませんでした",
+                        );
+                      } else {
+                        toast.error("サイト情報の更新に失敗しました");
+                      }
+                    } finally {
+                      setIsLoading(false);
                     }
-                  } finally {
-                    setIsLoading(false);
-                  }
-                }}
-                disabled={isLoading}
-                className="rounded-full bg-black/60 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm hover:bg-black/80 transition flex items-center gap-2 disabled:opacity-50"
-              >
-                {isLoading ? <Spinner className="h-4 w-4" /> : "↻"}
-                サイト情報を更新
-              </button>
+                  }}
+                  disabled={isLoading}
+                  className="rounded-full bg-black/60 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm hover:bg-black/80 transition flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isLoading ? <Spinner className="h-4 w-4" /> : "↻"}
+                  サイト情報を更新
+                </button>
+              )}
               <a
                 href={record.url}
                 target="_blank"
@@ -1271,7 +1273,7 @@ function ShareSettingsDialog({
                         </span>
                       ) : (
                         <span className="rounded border border-border text-muted-foreground text-[10px] px-1.5 py-0.5 font-medium">
-                          閲覧専用
+                          メンバー
                         </span>
                       )}
                     </div>

@@ -47,7 +47,7 @@ export const recordDetailSteps: DriveStep[] = [
     popover: {
       title: "家族共有と個人保存",
       description:
-        "家族全員で共有するか、自分専用にするかもいつでも自由に切り替えられます。",
+        "家族全員で共有するか、自分専用にするかもいつでも自由に切り替えられます。デフォルト権限が閲覧者の場合は、共有レコードの編集・削除は制限され、安全にヒントを閲覧・利用できます。",
       side: "bottom",
       align: "start",
     },

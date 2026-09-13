@@ -373,7 +373,7 @@ function FamilyComponent() {
       toast.success(
         newRole === "admin"
           ? "デフォルト管理者に変更しました"
-          : "閲覧専用に変更しました",
+          : "メンバーに変更しました",
       );
     } catch (error) {
       toast.error(
@@ -1693,7 +1693,7 @@ function FamilyComponent() {
                               >
                                 {u.familyRole === "admin"
                                   ? "デフォルト管理者"
-                                  : "閲覧専用"}
+                                  : "メンバー"}
                               </Badge>
                               <ChevronDown className="h-3 w-3 opacity-50" />
                             </Button>
@@ -1717,7 +1717,7 @@ function FamilyComponent() {
                             >
                               {u.familyRole === "admin" && adminCount <= 1
                                 ? "最後の管理者のため変更不可"
-                                : "閲覧専用にする"}
+                                : "メンバーにする"}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -1730,7 +1730,7 @@ function FamilyComponent() {
                         >
                           {u.familyRole === "admin"
                             ? "デフォルト管理者"
-                            : "閲覧専用"}
+                            : "メンバー"}
                         </Badge>
                       )}
 
