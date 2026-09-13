@@ -3528,11 +3528,13 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         const app1AccId = await ctx.db.insert("users", {
           userId: "applicant_1",
           email: "app1@example.com",
+          familyRole: "viewer",
           updatedAt: Date.now(),
         });
         const app2AccId = await ctx.db.insert("users", {
           userId: "applicant_2",
           email: "app2@example.com",
+          familyRole: "viewer",
           updatedAt: Date.now(),
         });
         req1Id = await ctx.db.insert("joinRequests", {

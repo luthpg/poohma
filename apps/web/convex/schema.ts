@@ -63,7 +63,7 @@ export default defineSchema({
     displayName: v.optional(v.string()),
     photoURL: v.optional(v.string()),
     familyId: v.optional(v.id("families")),
-    familyRole: v.optional(v.union(v.literal("admin"), v.literal("viewer"))),
+    familyRole: v.union(v.literal("admin"), v.literal("viewer")),
     onboardingVersion: v.optional(v.number()),
     createdAt: v.optional(v.number()),
     updatedAt: v.number(),

@@ -18,7 +18,7 @@
   - `identityVerifiedQuery/Mutation`：Firebase Identity の存在のみ検証（新規ユーザー同期など）
   - `authenticatedQuery/Mutation`：Identity検証に加え `resolveAccount` による所有権検証（下記IDOR対策）
   - `familyBoundQuery/Mutation`：上記に加え、対象アカウントが家族グループに所属していることを検証
-  - `familyAdminMutation`：上記に加え、対象アカウントの家族内ロールがファミリー管理者（`familyRole === "admin"` または未設定フォールバック）であることを検証
+  - `familyAdminMutation`：上記に加え、対象アカウントの家族内ロールがファミリー管理者（`familyRole === "admin"`）であることを検証
   - `recordAdminMutation`：`familyBound` に加え、対象レコード（`args.id`）が存在し `requireAdminAccess` を満たすことを検証
 - `resolveAccount` は、呼び出し側が任意で渡す `accountId` について、その `users` レコードの `userId`（Firebase UID）が現在ログイン中の `identity.subject` と一致するかを必ず照合し、不一致であれば `Unauthorized` を送出する（他人のアカウントIDを指定してのなりすまし＝IDORの防止）。
 - 上記はコード規約として徹底しており、Lint等による機械的な強制ではない。新規関数追加時のレビュー観点として [Threat Model](./threat-model.md) 6章にも明記している。

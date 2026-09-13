@@ -217,7 +217,7 @@ users     0..* ── * auditLogs         (auditLogs.accountId → users._id, op
 | displayName | string(optional) | 表示名（アカウント識別子としても機能。createAccountで必須、syncUserでは初期補完に使用） |
 | photoURL | string(optional) | プロフィール画像URL |
 | familyId | Id<families>(optional) | 所属家族グループ（アカウントごとに独立） |
-| familyRole | ("admin" \| "viewer")(optional) | 家族内ロール（"admin": ファミリー管理者, "viewer": メンバー）。未設定時は既存ユーザー互換として "admin" フォールバック |
+| familyRole | ("admin" \| "viewer") | 家族内ロール（"admin": ファミリー管理者, "viewer": メンバー） |
 | onboardingVersion | number(optional) | オンボーディング進捗バージョン（未開始: 0または未設定、完了: 1以上） |
 | createdAt | number(optional) | 作成日時 |
 | updatedAt | number | 更新日時 |
@@ -459,7 +459,7 @@ Convex 側は auth.config.ts の Issuer 設定 (securetoken.google.com/poohma) �
 | identityVerifiedQuery / Mutation | Firebase Identity の存在のみ検証 | ユーザー新規同期処理など |
 | authenticatedQuery / Mutation | Identity検証 + `resolveAccount` によるアカウント解決（所有権検証） | 一般的な認証必須API |
 | familyBoundQuery / Mutation | 上記 + 対象アカウントの `user.familyId` が設定されていること | 家族所属が前提の機能（招待承認、家族固有クエリ等） |
-| familyAdminMutation | 上記 + 対象アカウントの `familyRole === "admin"`（または未設定フォールバック）であること | 家族設定・メンバーロール変更・キック等の管理者限定機能 |
+| familyAdminMutation | 上記 + 対象アカウントの `familyRole === "admin"` であること | 家族設定・メンバーロール変更・キック等の管理者限定機能 |
 | recordAdminMutation | familyBound + 対象レコード（`args.id`）が存在し `requireAdminAccess` を満たすこと（`ctx.record` 注入） | レコード個別管理者追加・解除等のレコード管理者限定機能 |
 
 #### アカウント解決（resolveAccount）の仕組み

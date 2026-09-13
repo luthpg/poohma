@@ -346,7 +346,7 @@ export const getRecordDetail = authenticatedQuery({
     // 管理者ユーザー一覧の情報を取得（動的マージ）
     let adminDocs: (Doc<"users"> | null)[] = [];
     if (record.ownerType === "family" && record.ownerFamilyId) {
-      const familyDefaultAdmins = await ctx.db
+      const familyAdmins = await ctx.db
         .query("users")
         .filter((q) =>
           q.and(
@@ -361,7 +361,7 @@ export const getRecordDetail = authenticatedQuery({
       );
 
       const allAdminsMap = new Map<Id<"users">, Doc<"users">>();
-      for (const u of familyDefaultAdmins) {
+      for (const u of familyAdmins) {
         allAdminsMap.set(u._id, u);
       }
       for (const u of individualAdmins) {

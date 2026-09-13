@@ -66,7 +66,7 @@ export function requireContentAccess(
  * ユーザーの実効的な家族ロールを取得するヘルパー
  */
 export function getEffectiveFamilyRole(user: Doc<"users">): "admin" | "viewer" {
-  return user.familyRole ?? "admin";
+  return user.familyRole;
 }
 
 /**
