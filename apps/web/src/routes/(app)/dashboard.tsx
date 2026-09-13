@@ -325,7 +325,7 @@ function RouteComponent() {
     [selectedRecords],
   );
 
-  // 現在のアカウントの家族内ロール判定（デフォルト管理者は全共有レコードの管理者権限を持つ）
+  // 現在のアカウントの家族内ロール判定（ファミリー管理者は全共有レコードの管理者権限を持つ）
   const currentFamilyMember = useMemo(
     () => family?.users?.find((u) => u.id === activeAccountId),
     [family?.users, activeAccountId],

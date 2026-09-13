@@ -372,7 +372,7 @@ function FamilyComponent() {
       });
       toast.success(
         newRole === "admin"
-          ? "デフォルト管理者に変更しました"
+          ? "ファミリー管理者に変更しました"
           : "メンバーに変更しました",
       );
     } catch (error) {
@@ -1692,7 +1692,7 @@ function FamilyComponent() {
                                 className="text-[11px]"
                               >
                                 {u.familyRole === "admin"
-                                  ? "デフォルト管理者"
+                                  ? "ファミリー管理者"
                                   : "メンバー"}
                               </Badge>
                               <ChevronDown className="h-3 w-3 opacity-50" />
@@ -1705,7 +1705,7 @@ function FamilyComponent() {
                               }
                               onClick={() => handleRoleChange(u.id, "admin")}
                             >
-                              デフォルト管理者にする
+                              ファミリー管理者にする
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               disabled={
@@ -1729,7 +1729,7 @@ function FamilyComponent() {
                           className="text-[11px]"
                         >
                           {u.familyRole === "admin"
-                            ? "デフォルト管理者"
+                            ? "ファミリー管理者"
                             : "メンバー"}
                         </Badge>
                       )}

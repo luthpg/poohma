@@ -129,7 +129,7 @@ export const familyBoundMutation = customMutation(baseMutation, {
 });
 
 /**
- * 家族のデフォルト管理者（familyRole === "admin"）であることを保証するミューテーション
+ * 家族のファミリー管理者（familyRole === "admin"）であることを保証するミューテーション
  */
 export const familyAdminMutation = customMutation(baseMutation, {
   args: {

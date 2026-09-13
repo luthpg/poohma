@@ -99,7 +99,7 @@ export function isRecordAdmin(
     ownerFamilyId !== undefined &&
     ownerFamilyId === user.familyId
   ) {
-    // 家族デフォルト管理者は無条件で全共有レコードの管理者
+    // ファミリー管理者は無条件で全共有レコードの管理者
     if (getEffectiveFamilyRole(user) === "admin") {
       return true;
     }

@@ -125,13 +125,13 @@ export function BulkAdminModal({
           </div>
         ) : (
           <div className="space-y-4 py-2">
-            {/* デフォルト管理者に関する注記 */}
+            {/* ファミリー管理者に関する注記 */}
             <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
               <span className="font-semibold text-foreground">
-                💡 デフォルト管理者について:
+                💡 ファミリー管理者について:
               </span>
               <br />
-              家族の「デフォルト管理者」は全共有レコードの管理権限を自動で保持しているため、個別に追加・解除する必要はありません。
+              家族の「ファミリー管理者」は全共有レコードの管理権限を自動で保持しているため、個別に追加・解除する必要はありません。
             </div>
 
             {/* 対象メンバーの選択 */}
@@ -144,7 +144,7 @@ export function BulkAdminModal({
               </label>
               {viewerMembers.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  一般メンバーが存在しません（全員デフォルト管理者です）。
+                  一般メンバーが存在しません（全員ファミリー管理者です）。
                 </p>
               ) : (
                 <select

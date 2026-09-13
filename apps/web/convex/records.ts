@@ -1112,7 +1112,7 @@ export const addRecordAdmin = recordAdminMutation({
     }
 
     if (targetUser.familyRole === "admin") {
-      throw new Error("デフォルト管理者はすでにあらゆるレコードの管理者です");
+      throw new Error("ファミリー管理者はすでにあらゆるレコードの管理者です");
     }
 
     const admins = record.admins ?? [];
@@ -1189,7 +1189,7 @@ export const removeRecordAdmin = recordAdminMutation({
     }
 
     if (targetUser.familyRole === "admin") {
-      throw new Error("デフォルト管理者は閲覧者に変更できません");
+      throw new Error("ファミリー管理者は閲覧者に変更できません");
     }
 
     const admins = record.admins ?? [];
@@ -1197,7 +1197,7 @@ export const removeRecordAdmin = recordAdminMutation({
       throw new Error("Target user is not an administrator of this record");
     }
 
-    // 家族内にデフォルト管理者が存在するか確認
+    // 家族内にファミリー管理者が存在するか確認
     const hasDefaultAdmin = await ctx.db
       .query("users")
       .filter((q) =>
@@ -1393,7 +1393,7 @@ export const bulkSetRecordAdmin = familyBoundMutation({
     }
 
     if (targetUser.familyRole === "admin") {
-      throw new Error("デフォルト管理者の権限は変更できません");
+      throw new Error("ファミリー管理者の権限は変更できません");
     }
 
     let count = 0;

@@ -1134,8 +1134,9 @@ function ShareSettingsDialog({
     } catch (e: unknown) {
       const raw = e instanceof Error ? e.message : "";
       toast.error(
-        raw.includes("デフォルト管理者は解除できません")
-          ? "デフォルト管理者は解除できません"
+        raw.includes("ファミリー管理者は解除できません") ||
+          raw.includes("デフォルト管理者は解除できません")
+          ? "ファミリー管理者は解除できません"
           : raw.includes("管理者が0人になるため削除できません")
             ? "管理者が0人になるため削除できません"
             : "管理者の解除に失敗しました",
@@ -1206,7 +1207,7 @@ function ShareSettingsDialog({
                         {admin._id === activeAccountId && " (あなた)"}
                         {isDefaultAdmin ? (
                           <span className="rounded bg-secondary text-secondary-foreground text-[10px] px-1.5 py-0.5 font-medium">
-                            デフォルト管理者
+                            ファミリー管理者
                           </span>
                         ) : (
                           <span className="rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] px-1.5 py-0.5 font-medium">
@@ -1265,7 +1266,7 @@ function ShareSettingsDialog({
                     <div>
                       {isDefaultAdmin ? (
                         <span className="rounded bg-secondary text-secondary-foreground text-[10px] px-1.5 py-0.5 font-medium">
-                          デフォルト管理者
+                          ファミリー管理者
                         </span>
                       ) : isMemberAdmin ? (
                         <span className="rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] px-1.5 py-0.5 font-medium">

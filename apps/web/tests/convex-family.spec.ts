@@ -3308,7 +3308,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
   });
 
   describe("家族ロール管理（updateMemberRole & 認可・不変条件ガード）", () => {
-    it("デフォルト管理者は他のメンバーを昇格・降格できること", async () => {
+    it("ファミリー管理者は他のメンバーを昇格・降格できること", async () => {
       const t = convexTest(schema, modules);
       let familyId!: Id<"families">;
       let targetAccId!: Id<"users">;
@@ -3500,7 +3500,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
       });
     });
 
-    it("approveJoinRequest / rejectJoinRequest: デフォルト管理者のみ承認・却下でき、閲覧者は拒否されること", async () => {
+    it("approveJoinRequest / rejectJoinRequest: ファミリー管理者のみ承認・却下でき、閲覧者は拒否されること", async () => {
       const t = convexTest(schema, modules);
       let familyId!: Id<"families">;
       let req1Id!: Id<"joinRequests">;
@@ -3591,7 +3591,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
       });
     });
 
-    it("reconcileAdminsOnLeave: デフォルト管理者が残存している場合、adminsが空のレコードで閲覧者は自動昇格しないこと", async () => {
+    it("reconcileAdminsOnLeave: ファミリー管理者が残存している場合、adminsが空のレコードで閲覧者は自動昇格しないこと", async () => {
       const t = convexTest(schema, modules);
       let familyId!: Id<"families">;
       let leavingAdminId!: Id<"users">;
@@ -3633,7 +3633,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
           title: "Shared Without Explicit Admins",
           sortKey: "shared",
           ownerType: "family",
-          admins: [], // デフォルト管理者に委ねられている
+          admins: [], // ファミリー管理者に委ねられている
           tags: [],
           updatedAt: Date.now(),
         });

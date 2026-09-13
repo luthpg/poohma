@@ -20,7 +20,7 @@ import { getEffectiveFamilyRole } from "./rls";
 
 /**
  * メンバーが家族を離脱または削除された際、共有レコードの管理者リストを調停
- * デフォルト管理者が不在になる場合のみ残りの家族メンバーを自動昇格
+ * ファミリー管理者が不在になる場合のみ残りの家族メンバーを自動昇格
  */
 export async function reconcileAdminsOnLeave(
   ctx: { db: MutationCtx["db"] },
@@ -68,14 +68,14 @@ export async function reconcileAdminsOnLeave(
     let newAdmins: Id<"users">[];
     if (currentAdmins.length === 0) {
       // 元々個別管理者が設定されていない（空）レコードの場合：
-      // デフォルト管理者が残っていれば空のまま維持（動的ACLに委ね、閲覧者を昇格させない）
+      // ファミリー管理者が残っていれば空のまま維持（動的ACLに委ね、閲覧者を昇格させない）
       newAdmins = remainingDefaultAdminExists ? [] : remainingAccountIds;
     } else if (validRemainingAdmins.length > 0) {
       // 明示的に割り当てられていた残存管理者がいる場合はそれを引き継ぐ
       newAdmins = validRemainingAdmins;
     } else {
       // 個別管理者が0人になってしまう場合：
-      // デフォルト管理者がいればデフォルト管理者のみを自動昇格（閲覧者の意図しない昇格を防止）
+      // ファミリー管理者がいればファミリー管理者のみを自動昇格（閲覧者の意図しない昇格を防止）
       newAdmins = remainingDefaultAdminExists
         ? remainingDefaultAdminIds
         : remainingAccountIds;
@@ -1100,23 +1100,26 @@ export const createJoinRequest = authenticatedMutation({
       updatedAt: Date.now(),
     });
 
-    // Send email to all existing family members
+    // 参加申請を承認・却下できるファミリー管理者のみに通知メールを送信
     const familyMembers = await ctx.db
       .query("users")
       .filter((q) => q.eq(q.field("familyId"), family._id))
       .collect();
+    const familyAdmins = familyMembers.filter(
+      (m) => getEffectiveFamilyRole(m) === "admin",
+    );
 
     const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
-    for (const member of familyMembers) {
+    for (const admin of familyAdmins) {
       await ctx.scheduler.runAfter(
         0,
         internal.actions.sendTemplatedEmailInternal,
         {
-          email: member.email,
+          email: admin.email,
           payload: {
             template: "joinRequestReceived",
             props: {
-              displayName: member.displayName || "メンバー",
+              displayName: admin.displayName || "管理者",
               familyName: family.name,
               applicantDisplayName: user.displayName || "名無し",
               applicantEmail: user.email,
@@ -1611,8 +1614,8 @@ export const cleanupExpiredExportVaultsInternal = internalMutation({
 });
 
 /**
- * メンバーの家族ロール（デフォルト管理者 / 閲覧専用）を更新
- * 家族デフォルト管理者のみ実行可能
+ * メンバーの家族ロール（ファミリー管理者 / メンバー）を更新
+ * ファミリー管理者のみ実行可能
  */
 export const updateMemberRole = familyAdminMutation({
   args: {
