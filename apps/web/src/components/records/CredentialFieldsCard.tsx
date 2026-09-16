@@ -30,10 +30,10 @@ export function CredentialFieldsCard({
 
   const getModifiedClass = (modified?: boolean) => {
     if (!isEditMode) return "";
-    return `relative pl-3.5 before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-1 before:bg-orange-500 before:rounded-full before:transition-all before:duration-200 ${
+    return `relative pl-3.5 before:pointer-events-none before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-1 before:bg-orange-500 before:rounded-full before:transition-all before:duration-200 ${
       modified
         ? "before:opacity-100 before:scale-y-100"
-        : "before:opacity-0 before:scale-y-50 pointer-events-none"
+        : "before:opacity-0 before:scale-y-50"
     }`;
   };
 

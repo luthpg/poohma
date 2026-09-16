@@ -34,10 +34,10 @@ export function RecordForm({
   const getModifiedClass = (field: string) => {
     if (!isEditMode) return "";
     const modified = isFieldModified(field);
-    return `relative pl-3.5 before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-1 before:bg-orange-500 before:rounded-full before:transition-all before:duration-200 ${
+    return `relative pl-3.5 before:pointer-events-none before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-1 before:bg-orange-500 before:rounded-full before:transition-all before:duration-200 ${
       modified
         ? "before:opacity-100 before:scale-y-100"
-        : "before:opacity-0 before:scale-y-50 pointer-events-none"
+        : "before:opacity-0 before:scale-y-50"
     }`;
   };
 
@@ -277,33 +277,35 @@ export function RecordForm({
       </section>
 
       {/* 下部固定アクションバー */}
-      <div className="sticky bottom-0 z-20 -mx-6 -mb-6 mt-8 border-t border-border bg-background/95 backdrop-blur px-6 py-3.5 flex items-center justify-end gap-3 sm:gap-4 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] dark:shadow-[0_-4px_12px_rgba(0,0,0,0.3)]">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-md bg-card px-5 py-2 text-[14px] font-medium text-foreground shadow-border hover:bg-accent transition cursor-pointer"
-        >
-          キャンセル
-        </button>
-        <button
-          type="submit"
-          disabled={isBusy}
-          className="flex items-center rounded-md bg-orange-500 px-5 py-2 text-[14px] font-medium text-white shadow-border hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50 transition cursor-pointer"
-        >
-          {form.isSubmitting ? (
-            <>
-              <Spinner className="mr-2 h-4 w-4" />
-              保存中...
-            </>
-          ) : form.isFetchingFurigana || form.isFetchingOgp ? (
-            <>
-              <Spinner className="mr-2 h-4 w-4" />
-              自動取得中...
-            </>
-          ) : (
-            submitIdleLabel
-          )}
-        </button>
+      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-border/80 bg-background/95 backdrop-blur-md px-4 py-2.5 sm:px-6 sm:py-3.5 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] dark:shadow-[0_-4px_12px_rgba(0,0,0,0.3)] pb-[max(0.625rem,env(safe-area-inset-bottom))] sm:pb-[max(0.875rem,env(safe-area-inset-bottom))]">
+        <div className="mx-auto flex max-w-3xl items-center justify-end gap-3 sm:gap-4">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex h-9 sm:h-10 items-center justify-center rounded-md bg-card px-3 sm:px-5 text-xs sm:text-[14px] font-medium text-foreground shadow-border hover:bg-accent transition cursor-pointer"
+          >
+            キャンセル
+          </button>
+          <button
+            type="submit"
+            disabled={isBusy}
+            className="flex h-9 sm:h-10 min-w-[80px] sm:min-w-[100px] items-center justify-center rounded-md bg-orange-500 px-4 sm:px-6 text-xs sm:text-[14px] font-medium text-white shadow-sm hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50 transition cursor-pointer"
+          >
+            {form.isSubmitting ? (
+              <>
+                <Spinner className="mr-2 h-4 w-4" />
+                保存中...
+              </>
+            ) : form.isFetchingFurigana || form.isFetchingOgp ? (
+              <>
+                <Spinner className="mr-2 h-4 w-4" />
+                自動取得中...
+              </>
+            ) : (
+              submitIdleLabel
+            )}
+          </button>
+        </div>
       </div>
 
       {/* セッション切れ時の再認証・データ救済モーダル */}

@@ -158,6 +158,7 @@ export async function saveRecordDraft(params: {
   initialRevision?: number | null;
   isEditing?: boolean;
   accountId?: string | null;
+  isCancelled?: () => boolean;
 }): Promise<void> {
   const {
     targetRecordId,
@@ -167,6 +168,7 @@ export async function saveRecordDraft(params: {
     initialRevision,
     isEditing,
     accountId,
+    isCancelled,
   } = params;
 
   const now = Date.now();
@@ -201,6 +203,11 @@ export async function saveRecordDraft(params: {
       };
     }),
   );
+
+  // 非同期暗号化中にキャンセルまたは世代交代が発生した場合は書き込みを中断
+  if (isCancelled?.()) {
+    return;
+  }
 
   const container: StoredRecordDraftContainer = {
     targetRecordId,
@@ -261,13 +268,14 @@ export async function loadRecordDraft(params: {
       return null;
     }
 
-    // アカウント境界チェック（両方確定している場合のみ検証）
-    if (
-      container.accountId &&
-      currentAccountId &&
-      container.accountId !== currentAccountId
-    ) {
-      return null;
+    // アカウント境界チェック（container.accountId が存在する場合、currentAccountId との完全一致を必須化）
+    if (container.accountId != null) {
+      if (
+        currentAccountId == null ||
+        container.accountId !== currentAccountId
+      ) {
+        return null;
+      }
     }
 
     // クレデンシャル復号（DEK を unwrap してヒントを復号）
@@ -372,29 +380,73 @@ export function clearRecordDraft(params: {
 }
 
 /**
- * 何らかの有効なドラフトが存在するかを軽量判定（ルートガード等用）
+ * 何らかの有効なドラフトが存在するかを軽量判定（ルートガード等用・副作用なし）
  */
 export function hasAnyPendingDraft(): boolean {
   const local = getLocalStorage();
   if (!local) return false;
 
   try {
+    const keys: string[] = [];
     for (let i = 0; i < local.length; i++) {
       const key = local.key(i);
       if (key?.startsWith("poohma_draft_")) {
-        const raw = local.getItem(key);
-        if (raw) {
+        keys.push(key);
+      }
+    }
+
+    const now = Date.now();
+    for (const key of keys) {
+      const raw = local.getItem(key);
+      if (raw) {
+        try {
           const container = JSON.parse(raw) as StoredRecordDraftContainer;
-          if (Date.now() <= container.expiresAt) {
+          if (now <= container.expiresAt) {
             return true;
           }
-          local.removeItem(key);
+        } catch {
+          // ignore corrupted json
         }
       }
     }
     return false;
   } catch {
     return false;
+  }
+}
+
+/**
+ * 期限切れとなったドラフトのクリーンアップ
+ */
+export function cleanupExpiredDrafts(): void {
+  const local = getLocalStorage();
+  if (!local) return;
+
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < local.length; i++) {
+      const key = local.key(i);
+      if (key?.startsWith("poohma_draft_")) {
+        keys.push(key);
+      }
+    }
+
+    const now = Date.now();
+    for (const key of keys) {
+      const raw = local.getItem(key);
+      if (raw) {
+        try {
+          const container = JSON.parse(raw) as StoredRecordDraftContainer;
+          if (now > container.expiresAt) {
+            local.removeItem(key);
+          }
+        } catch {
+          local.removeItem(key);
+        }
+      }
+    }
+  } catch {
+    // ignore
   }
 }
 

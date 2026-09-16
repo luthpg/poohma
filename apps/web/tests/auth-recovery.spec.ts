@@ -211,6 +211,41 @@ describe("auth-recovery", () => {
       expect(restored).toBeNull();
       expect(hasRecordDraft({ draftId: "draft_ttl_test" })).toBe(false);
     });
+
+    it("保存時の accountId と異なる currentAccountId や null では復元せず null を返すこと (CR-9 / CR-NIT-1)", async () => {
+      const masterKey = await generateMasterKey();
+      await saveRecordDraft({
+        draftId: "draft_account_boundary_test",
+        values: mockDraftValues,
+        masterKey,
+        accountId: "account_user_1",
+      });
+
+      // 異なる accountId
+      const mismatch = await loadRecordDraft({
+        draftId: "draft_account_boundary_test",
+        masterKey,
+        currentAccountId: "account_user_2",
+      });
+      expect(mismatch).toBeNull();
+
+      // currentAccountId が未解決（null）
+      const nullAccount = await loadRecordDraft({
+        draftId: "draft_account_boundary_test",
+        masterKey,
+        currentAccountId: null,
+      });
+      expect(nullAccount).toBeNull();
+
+      // 正しい accountId
+      const match = await loadRecordDraft({
+        draftId: "draft_account_boundary_test",
+        masterKey,
+        currentAccountId: "account_user_1",
+      });
+      expect(match).not.toBeNull();
+      expect(match?.values.title).toBe("Netflix");
+    });
   });
 
   describe("formatDraftAsText", () => {

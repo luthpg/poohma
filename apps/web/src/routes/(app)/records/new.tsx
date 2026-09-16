@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { api } from "@/../convex/_generated/api";
@@ -28,21 +28,88 @@ function getInitialDraftId(): string {
       // ignore
     }
   }
-  return `d_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  return crypto.randomUUID();
 }
 
 function NewRecordComponent() {
   const navigate = useNavigate();
 
   // draftId が URL に無ければ採番して URL にセット（他タブ分離 & リフレッシュ耐性）
-  const [draftId] = useState<string>(getInitialDraftId);
+  const [draftId, setDraftId] = useState<string>(getInitialDraftId);
+  const tabInstanceIdRef = useRef<string>(
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `tab_${Date.now()}`,
+  );
+  const draftIdRef = useRef(draftId);
+  draftIdRef.current = draftId;
+
+  // BroadcastChannel によるタブ複製時の draftId 衝突検知 (CR-6)
+  useEffect(() => {
+    if (
+      typeof window === "undefined" ||
+      typeof BroadcastChannel === "undefined"
+    ) {
+      return;
+    }
+
+    const channel = new BroadcastChannel("poohma_draft_bus");
+    const currentTabId = tabInstanceIdRef.current;
+
+    channel.onmessage = (event: MessageEvent) => {
+      const data = event.data;
+      if (!data || typeof data !== "object") return;
+
+      // 他タブから自身の draftId に対する ping を受け取ったら pong で応答
+      if (
+        data.type === "ping" &&
+        data.draftId === draftIdRef.current &&
+        data.senderTabId !== currentTabId
+      ) {
+        channel.postMessage({
+          type: "pong",
+          draftId: draftIdRef.current,
+          responderTabId: currentTabId,
+        });
+      }
+
+      // 自身が送信した ping に対する pong を受信した場合、先行タブが存在するため新 draftId を採番
+      if (
+        data.type === "pong" &&
+        data.draftId === draftIdRef.current &&
+        data.responderTabId !== currentTabId
+      ) {
+        const newDraftId = crypto.randomUUID();
+        setDraftId(newDraftId);
+        try {
+          const params = new URLSearchParams(window.location.search);
+          params.set("draftId", newDraftId);
+          const newUrl = `${window.location.pathname}?${params.toString()}`;
+          window.history.replaceState(null, "", newUrl);
+        } catch {
+          // ignore
+        }
+      }
+    };
+
+    // マウント時に現在の draftId について先行タブの存在を問い合わせ
+    channel.postMessage({
+      type: "ping",
+      draftId: draftIdRef.current,
+      senderTabId: currentTabId,
+    });
+
+    return () => {
+      channel.close();
+    };
+  }, []);
 
   useEffect(() => {
     window.scrollTo(0, 0);
     if (typeof window !== "undefined") {
       try {
         const params = new URLSearchParams(window.location.search);
-        if (!params.get("draftId")) {
+        if (params.get("draftId") !== draftId) {
           params.set("draftId", draftId);
           const newUrl = `${window.location.pathname}?${params.toString()}`;
           window.history.replaceState(null, "", newUrl);
@@ -84,7 +151,7 @@ function NewRecordComponent() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl p-6">
+    <div className="mx-auto max-w-3xl p-6 pb-24 sm:pb-32">
       <h1 className="mb-8 text-[24px] font-semibold tracking-geist-h2 text-foreground">
         サービスを登録
       </h1>

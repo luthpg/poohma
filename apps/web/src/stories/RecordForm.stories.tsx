@@ -20,11 +20,13 @@ function MockFormContainer({
   isAdmin = true,
   submitIdleLabel = "登録する",
   isBusy = false,
+  targetRecordId,
 }: {
   initialValues?: Partial<RecordFormValues>;
   isAdmin?: boolean;
   submitIdleLabel?: string;
   isBusy?: boolean;
+  targetRecordId?: string;
 }) {
   const [values, setValues] = useState<RecordFormValues>({
     title: "",
@@ -85,8 +87,9 @@ function MockFormContainer({
     isSessionExpired: false,
     setIsSessionExpired: () => {},
     restoredMetadata: null,
+    setEditingMetadata: () => {},
     isDirty: false,
-    targetRecordId: undefined,
+    targetRecordId,
   };
 
   return (
@@ -114,6 +117,7 @@ export const EditRecord: Story = {
   render: () => (
     <MockFormContainer
       submitIdleLabel="保存する"
+      targetRecordId="record-123"
       initialValues={{
         title: "Amazon",
         titleReading: "あまぞん",
@@ -145,6 +149,7 @@ export const NonAdminFamilyRecord: Story = {
   render: () => (
     <MockFormContainer
       submitIdleLabel="保存する"
+      targetRecordId="record-123"
       initialValues={{
         title: "三井住友銀行",
         titleReading: "みついすみともぎんこう",

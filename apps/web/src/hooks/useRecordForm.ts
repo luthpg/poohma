@@ -120,12 +120,17 @@ export function useRecordForm(
     isEditing?: boolean;
     accountId?: string | null;
   } | null>(null);
+  const [editingMetadata, setEditingMetadata] = useState<{
+    initialRevision?: number | null;
+    isEditing?: boolean;
+  } | null>(null);
 
   const pendingActionRef = useRef<
     ((payload: RecordSubmitPayload) => Promise<void>) | null
   >(null);
   const initialValuesJsonRef = useRef(JSON.stringify(values));
   const isRestoredRef = useRef(false);
+  const saveGenerationRef = useRef(0);
 
   const isDirty = JSON.stringify(values) !== initialValuesJsonRef.current;
 
@@ -177,19 +182,29 @@ export function useRecordForm(
   valuesRef.current = values;
   const restoredMetadataRef = useRef(restoredMetadata);
   restoredMetadataRef.current = restoredMetadata;
+  const editingMetadataRef = useRef(editingMetadata);
+  editingMetadataRef.current = editingMetadata;
 
   const performAutoSave = useCallback(
     async (currentValues: RecordFormValues) => {
       if (!masterKey || !isDirty) return;
+      saveGenerationRef.current += 1;
+      const currentGen = saveGenerationRef.current;
+
       try {
         await saveRecordDraft({
           targetRecordId,
           draftId,
           values: currentValues,
           masterKey,
-          initialRevision: restoredMetadataRef.current?.initialRevision,
-          isEditing: restoredMetadataRef.current?.isEditing,
+          initialRevision:
+            editingMetadataRef.current?.initialRevision ??
+            restoredMetadataRef.current?.initialRevision,
+          isEditing:
+            editingMetadataRef.current?.isEditing ??
+            restoredMetadataRef.current?.isEditing,
           accountId: activeAccountId,
+          isCancelled: () => currentGen !== saveGenerationRef.current,
         });
       } catch {
         // ignore
@@ -230,6 +245,7 @@ export function useRecordForm(
 
   // 明示的キャンセル時のドラフト破棄
   const discardDraft = useCallback(() => {
+    saveGenerationRef.current += 1;
     clearRecordDraft({ targetRecordId, draftId });
   }, [targetRecordId, draftId]);
 
@@ -346,9 +362,13 @@ export function useRecordForm(
     [invalidateFuriganaRequest],
   );
 
-  const updateTitleReading = useCallback((titleReading: string) => {
-    setValues((prev) => ({ ...prev, titleReading }));
-  }, []);
+  const updateTitleReading = useCallback(
+    (titleReading: string) => {
+      invalidateFuriganaRequest();
+      setValues((prev) => ({ ...prev, titleReading }));
+    },
+    [invalidateFuriganaRequest],
+  );
 
   const handleTitleBlur = useCallback(() => {
     if (!values.title || values.titleReading) return Promise.resolve(null);
@@ -529,6 +549,7 @@ export function useRecordForm(
         try {
           await action(payload);
           pendingActionRef.current = null;
+          saveGenerationRef.current += 1;
 
           // 保存成功時は即座にドラフトを物理削除
           clearRecordDraft({ targetRecordId, draftId });
@@ -539,10 +560,20 @@ export function useRecordForm(
             // 1. まずサイレント再認証を試行
             const refreshed = await attemptSilentReauth();
             if (refreshed) {
-              await action(payload);
-              pendingActionRef.current = null;
-              clearRecordDraft({ targetRecordId, draftId });
-              return true;
+              try {
+                await action(payload);
+                pendingActionRef.current = null;
+                saveGenerationRef.current += 1;
+                clearRecordDraft({ targetRecordId, draftId });
+                return true;
+              } catch (retryErr) {
+                if (isAuthSessionError(retryErr)) {
+                  pendingActionRef.current = action;
+                  setIsSessionExpired(true);
+                  return false;
+                }
+                throw retryErr;
+              }
             }
 
             // 2. サイレント失敗時は再認証モーダルを表示
@@ -612,6 +643,7 @@ export function useRecordForm(
     isSessionExpired,
     setIsSessionExpired,
     restoredMetadata,
+    setEditingMetadata,
     isDirty,
     targetRecordId,
   } as const;

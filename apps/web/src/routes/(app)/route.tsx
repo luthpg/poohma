@@ -86,8 +86,16 @@ function RouteComponent() {
     }
   }, [activeAccount, isAccountLoading, pathname, navigate]);
 
-  // 認証初期化・復元中、および未認証時（ログイン画面へのリダイレクト遷移中）はローディング表示
-  if (isAuthLoading || !isAuthenticated) {
+  // 一度ログイン済みの状態でセッションが切れた場合、レコード画面ではインライン救済（SessionExpiredDialog）に任せて強制遷移・画面ブロッキングを控える
+  const isRecordEditRoute = pathname.includes("/records");
+  const isRedirectSuppressed =
+    !isAuthLoading &&
+    !isAuthenticated &&
+    hasBeenAuthenticatedRef.current &&
+    isRecordEditRoute;
+
+  // 認証初期化中、またはリダイレクト抑止されていない未認証時（ログイン画面へのリダイレクト遷移中）はローディング表示
+  if (isAuthLoading || (!isAuthenticated && !isRedirectSuppressed)) {
     return <Loader />;
   }
 
