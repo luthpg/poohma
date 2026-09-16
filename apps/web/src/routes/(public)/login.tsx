@@ -85,7 +85,18 @@ function LoginPage() {
           if (!isComponentMounted) return;
           await router.invalidate();
 
+          const loginRedirect =
+            typeof window !== "undefined"
+              ? localStorage.getItem("poohma_login_redirect")
+              : null;
+          if (typeof window !== "undefined") {
+            try {
+              localStorage.removeItem("poohma_login_redirect");
+            } catch {}
+          }
+
           const target =
+            loginRedirect ||
             search.redirect ||
             localStorage.getItem("postLoginRedirect") ||
             "/dashboard";
@@ -93,9 +104,11 @@ function LoginPage() {
 
           try {
             const url = new URL(target, window.location.origin);
+            const hash = url.hash.replace(/^#/, "") || undefined;
             await router.navigate({
               to: url.pathname,
               search: Object.fromEntries(url.searchParams),
+              hash,
             });
           } catch {
             await router.navigate({ to: "/dashboard" });

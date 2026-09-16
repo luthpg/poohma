@@ -11,6 +11,8 @@ import { useAuth } from "@/components/AuthProvider";
 import { HoneyPotLoader } from "@/components/HoneyPotLoader";
 import { useAccount } from "@/hooks/useAccount";
 
+import { hasAnyPendingDraft } from "@/lib/auth-recovery";
+
 const Loader = () => (
   <div className="flex min-h-screen items-center justify-center bg-background">
     <HoneyPotLoader size="lg" animationDurationSeconds={1.5} />
@@ -33,10 +35,28 @@ function RouteComponent() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   const hasRedirectedRef = useRef(false);
+  const hasBeenAuthenticatedRef = useRef(false);
+  const isDraftRestoring =
+    typeof window !== "undefined" && hasAnyPendingDraft();
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      hasBeenAuthenticatedRef.current = true;
+      hasRedirectedRef.current = false;
+    }
+  }, [isAuthenticated]);
 
   // 未認証確定時はログイン画面へリダイレクト
   useEffect(() => {
-    if (!isAuthLoading && !isAuthenticated && !hasRedirectedRef.current) {
+    if (isAuthLoading || isDraftRestoring) return;
+
+    if (!isAuthenticated && !hasRedirectedRef.current) {
+      // 一度ログイン済みの状態でセッションが切れた場合、レコード画面ではインライン救済（SessionExpiredDialog）に任せて強制遷移を控える
+      const isRecordEditRoute = pathname.includes("/records");
+      if (hasBeenAuthenticatedRef.current && isRecordEditRoute) {
+        return;
+      }
+
       hasRedirectedRef.current = true;
       navigate({
         to: "/login",
@@ -44,10 +64,14 @@ function RouteComponent() {
         replace: true,
       });
     }
-    if (isAuthenticated) {
-      hasRedirectedRef.current = false;
-    }
-  }, [isAuthLoading, isAuthenticated, navigate, location.href]);
+  }, [
+    isAuthLoading,
+    isAuthenticated,
+    navigate,
+    location.href,
+    pathname,
+    isDraftRestoring,
+  ]);
 
   const currentAccount = activeAccount || user;
 

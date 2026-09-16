@@ -1,4 +1,4 @@
-﻿// @vitest-environment jsdom
+// @vitest-environment jsdom
 import {
   cleanup,
   fireEvent,
@@ -7,6 +7,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import * as convexReact from "convex/react";
+import { getFunctionName } from "convex/server";
 import type React from "react";
 import {
   afterEach,
@@ -92,7 +93,9 @@ describe("records/new Component", () => {
     const mockGetFurigana = vi.fn().mockResolvedValue("");
 
     (convexReact.useAction as Mock).mockImplementation((action) => {
-      if (action === api.actions.getFurigana) {
+      if (
+        getFunctionName(action) === getFunctionName(api.actions.getFurigana)
+      ) {
         return mockGetFurigana;
       }
       return mockGetOgpInfo;

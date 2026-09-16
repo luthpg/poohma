@@ -14,9 +14,11 @@ description: >-
 
 作業内容に応じて、以下のドキュメントをオンデマンドで必ず参照してください：
 
-- **外部レビュー（CodeRabbit等）審査**: [`.ai/pitfalls/review-and-guardrails.md`](../../../.ai/pitfalls/review-and-guardrails.md)
+- **外部レビュー（CodeRabbit等）審査 & 設計原則**: [`.ai/pitfalls/review-and-guardrails.md`](../../../.ai/pitfalls/review-and-guardrails.md)
+  - **「念のため二重にする」精神・過剰冗長化の完全排除**: 「不安だから両方に保存・二重チェック」という思考停止を根絶し、Single Source of Truth を1つに断定・一本化する。
   - 一般的なReactの慣習に惑わされず、フロントエンドへの生エラー（`error.message`）露出提案を却下する。
   - マイグレーション過剰防衛コード（未バックフィル検査ガード）をアプリ側に入れず、KISS原則と手動ワンショット移行を守る。
+
 - **フロントエンドのエラーハンドリング**: [`.ai/invariants.md`](../../../.ai/invariants.md) 第5節
   - `toast.error(固定日本語メッセージ)` を徹底する。
   - ブラウザの `console.error` 等への生例外オブジェクト出力も禁止（E2EE暗号鍵保護・CWE-209防止）。`catch (_error) {}` で安全に握る。

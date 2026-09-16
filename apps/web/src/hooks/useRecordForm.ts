@@ -1,8 +1,17 @@
 import { useAction } from "convex/react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import { usePasscode } from "@/components/PasscodeProvider";
+import { useAccount } from "@/hooks/useAccount";
+import {
+  attemptSilentReauth,
+  clearRecordDraft,
+  hasRecordDraft,
+  isAuthSessionError,
+  loadRecordDraft,
+  saveRecordDraft,
+} from "@/lib/auth-recovery";
 import {
   RECORD_FORM_VALIDATION_MESSAGES,
   type RecordFormValidationCode,
@@ -80,7 +89,14 @@ const DEFAULT_VALUES: RecordFormValues = {
   credentials: [{ ...EMPTY_CREDENTIAL }],
 };
 
-export function useRecordForm(initialValues?: Partial<RecordFormValues>) {
+export function useRecordForm(
+  initialValues?: Partial<RecordFormValues>,
+  targetRecordId?: string,
+  draftId?: string,
+) {
+  const { activeAccountId } = useAccount();
+  const { encryptHint, masterKey, requireUnlock } = usePasscode();
+
   const [values, setValues] = useState<RecordFormValues>({
     ...DEFAULT_VALUES,
     ...initialValues,
@@ -89,9 +105,168 @@ export function useRecordForm(initialValues?: Partial<RecordFormValues>) {
       : [{ ...EMPTY_CREDENTIAL }],
   });
 
+  // 編集開始時の復号データ等を反映する動的初期基準値
+  const [baselineValues, setBaselineValues] = useState<
+    Partial<RecordFormValues> | undefined
+  >(initialValues);
+
   const [isFetchingOgp, setIsFetchingOgp] = useState(false);
   const [isFetchingFurigana, setIsFetchingFurigana] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSessionExpired, setIsSessionExpired] = useState(false);
+  const [restoredMetadata, setRestoredMetadata] = useState<{
+    recordId?: string;
+    initialRevision?: number | null;
+    isEditing?: boolean;
+    accountId?: string | null;
+  } | null>(null);
+
+  const pendingActionRef = useRef<
+    ((payload: RecordSubmitPayload) => Promise<void>) | null
+  >(null);
+  const initialValuesJsonRef = useRef(JSON.stringify(values));
+  const isRestoredRef = useRef(false);
+
+  const isDirty = JSON.stringify(values) !== initialValuesJsonRef.current;
+
+  // 開始時アンロック連携:
+  // 新規登録画面（!targetRecordId）または未保存ドラフトが存在する場合に requireUnlock を試行
+  // ※ 通常のレコード詳細閲覧モード時に不必要にアンロックダイアログを開かない
+  useEffect(() => {
+    if (!masterKey) {
+      const shouldUnlock =
+        !targetRecordId || hasRecordDraft({ targetRecordId, draftId });
+      if (shouldUnlock) {
+        requireUnlock().catch(() => {});
+      }
+    }
+  }, [masterKey, requireUnlock, targetRecordId, draftId]);
+
+  // masterKey 解除時にドラフトが存在すれば自動復元（サイレントリフレッシュ / 再ログイン復帰時）
+  useEffect(() => {
+    if (typeof window === "undefined" || !masterKey) return;
+    if (isRestoredRef.current) return;
+
+    (async () => {
+      try {
+        const draft = await loadRecordDraft({
+          targetRecordId,
+          draftId,
+          masterKey,
+          currentAccountId: activeAccountId,
+        });
+        if (draft) {
+          isRestoredRef.current = true;
+          setValues(draft.values);
+          setRestoredMetadata({
+            recordId: targetRecordId,
+            initialRevision: draft.initialRevision,
+            isEditing: draft.isEditing,
+            accountId: draft.accountId,
+          });
+          toast.success("未保存の入力内容を復元しました");
+        }
+      } catch {
+        // ignore
+      }
+    })();
+  }, [masterKey, targetRecordId, draftId, activeAccountId]);
+
+  // Auto-Save 処理（debounce & visibilitychange/pagehide）
+  const valuesRef = useRef(values);
+  valuesRef.current = values;
+  const restoredMetadataRef = useRef(restoredMetadata);
+  restoredMetadataRef.current = restoredMetadata;
+
+  const performAutoSave = useCallback(
+    async (currentValues: RecordFormValues) => {
+      if (!masterKey || !isDirty) return;
+      try {
+        await saveRecordDraft({
+          targetRecordId,
+          draftId,
+          values: currentValues,
+          masterKey,
+          initialRevision: restoredMetadataRef.current?.initialRevision,
+          isEditing: restoredMetadataRef.current?.isEditing,
+          accountId: activeAccountId,
+        });
+      } catch {
+        // ignore
+      }
+    },
+    [masterKey, isDirty, targetRecordId, draftId, activeAccountId],
+  );
+
+  // 1000ms debounce auto-save
+  useEffect(() => {
+    if (!isDirty || !masterKey) return;
+    const timer = setTimeout(() => {
+      performAutoSave(values);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [values, isDirty, masterKey, performAutoSave]);
+
+  // iOS Safari バックグラウンド退避（visibilitychange & pagehide）
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        performAutoSave(valuesRef.current);
+      }
+    };
+    const handlePageHide = () => {
+      performAutoSave(valuesRef.current);
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handlePageHide);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handlePageHide);
+    };
+  }, [performAutoSave]);
+
+  // 明示的キャンセル時のドラフト破棄
+  const discardDraft = useCallback(() => {
+    clearRecordDraft({ targetRecordId, draftId });
+  }, [targetRecordId, draftId]);
+
+  // フィールド単位の変更判定（初期基準値と現在の値を比較）
+  const isFieldModified = useCallback(
+    (field: string): boolean => {
+      // 新規作成時（targetRecordId なし）は変更強調を行わない
+      if (!targetRecordId) return false;
+
+      if (field === "title")
+        return values.title !== (baselineValues?.title ?? "");
+      if (field === "titleReading")
+        return values.titleReading !== (baselineValues?.titleReading ?? "");
+      if (field === "url") return values.url !== (baselineValues?.url ?? "");
+      if (field === "memo") return values.memo !== (baselineValues?.memo ?? "");
+      if (field === "ownerType")
+        return values.ownerType !== (baselineValues?.ownerType ?? "user");
+      if (field === "tags") {
+        const a = values.tags ?? [];
+        const b = baselineValues?.tags ?? [];
+        if (a.length !== b.length) return true;
+        return a.some((t, i) => t !== b[i]);
+      }
+      if (field.startsWith("credential_")) {
+        const parts = field.split("_");
+        const index = Number.parseInt(parts[1], 10);
+        const subfield = parts[2] as keyof RecordFormCredential;
+        const currentCred = values.credentials[index];
+        const initCred = baselineValues?.credentials?.[index];
+        if (!currentCred) return false;
+        if (!initCred) return true;
+        return (currentCred[subfield] ?? "") !== (initCred[subfield] ?? "");
+      }
+      return false;
+    },
+    [values, baselineValues, targetRecordId],
+  );
 
   const furiganaReqIdRef = useRef(0);
   const furiganaPromiseRef = useRef<Promise<string | null> | null>(null);
@@ -103,7 +278,6 @@ export function useRecordForm(initialValues?: Partial<RecordFormValues>) {
 
   const getOgpInfo = useAction(api.actions.getOgpInfo);
   const getFurigana = useAction(api.actions.getFurigana);
-  const { encryptHint, masterKey, requireUnlock } = usePasscode();
 
   // ---- フォーム初期化・リセット ---------------------------------------
 
@@ -113,13 +287,15 @@ export function useRecordForm(initialValues?: Partial<RecordFormValues>) {
     ogpPromiseRef.current = null;
     setIsFetchingFurigana(false);
     setIsFetchingOgp(false);
-    setValues({
+    const nextValues: RecordFormValues = {
       ...DEFAULT_VALUES,
       ...next,
       credentials: next.credentials?.length
         ? next.credentials
         : [{ ...EMPTY_CREDENTIAL }],
-    });
+    };
+    setValues(nextValues);
+    setBaselineValues(nextValues);
   }, []);
 
   const invalidateFuriganaRequest = useCallback(() => {
@@ -142,22 +318,18 @@ export function useRecordForm(initialValues?: Partial<RecordFormValues>) {
       const promise = (async () => {
         try {
           const reading = await getFurigana({ text });
-          if (
-            currentReqId === furiganaReqIdRef.current &&
-            typeof reading === "string" &&
-            reading
-          ) {
+          if (currentReqId === furiganaReqIdRef.current && reading) {
             setValues((prev) => ({ ...prev, titleReading: reading }));
             return reading;
           }
+          return null;
         } catch (_e) {
-          // ふりがな取得失敗時は何もしない
+          return null;
         } finally {
           if (currentReqId === furiganaReqIdRef.current) {
             setIsFetchingFurigana(false);
           }
         }
-        return null;
       })();
 
       furiganaPromiseRef.current = promise;
@@ -169,23 +341,18 @@ export function useRecordForm(initialValues?: Partial<RecordFormValues>) {
   const updateTitle = useCallback(
     (title: string) => {
       invalidateFuriganaRequest();
-      setValues((prev) => ({ ...prev, title, titleReading: "" }));
+      setValues((prev) => ({ ...prev, title }));
     },
     [invalidateFuriganaRequest],
   );
 
-  const updateTitleReading = useCallback(
-    (titleReading: string) => {
-      invalidateFuriganaRequest();
-      setValues((prev) => ({ ...prev, titleReading }));
-    },
-    [invalidateFuriganaRequest],
-  );
+  const updateTitleReading = useCallback((titleReading: string) => {
+    setValues((prev) => ({ ...prev, titleReading }));
+  }, []);
 
   const handleTitleBlur = useCallback(() => {
-    if (values.title && !values.titleReading) {
-      fetchFuriganaForTitle(values.title);
-    }
+    if (!values.title || values.titleReading) return Promise.resolve(null);
+    return fetchFuriganaForTitle(values.title);
   }, [values.title, values.titleReading, fetchFuriganaForTitle]);
 
   const setUrl = useCallback((url: string) => {
@@ -217,7 +384,6 @@ export function useRecordForm(initialValues?: Partial<RecordFormValues>) {
         }
         return ogp;
       } catch (_e) {
-        // OGP取得失敗時はnullを返却
         return null;
       } finally {
         setIsFetchingOgp(false);
@@ -262,40 +428,33 @@ export function useRecordForm(initialValues?: Partial<RecordFormValues>) {
   const removeCredential = useCallback((index: number) => {
     setValues((prev) => {
       if (prev.credentials.length <= 1) return prev;
-      return {
-        ...prev,
-        credentials: prev.credentials.filter((_, i) => i !== index),
-      };
+      const next = prev.credentials.filter((_, i) => i !== index);
+      return { ...prev, credentials: next };
     });
   }, []);
 
   const updateCredentialField = useCallback(
-    (
-      index: number,
-      field: keyof Omit<RecordFormCredential, "id">,
-      value: string,
-    ) => {
+    (index: number, field: keyof RecordFormCredential, value: string) => {
       setValues((prev) => {
-        const credentials = [...prev.credentials];
-        if (!credentials[index]) return prev;
-        credentials[index] = { ...credentials[index], [field]: value };
-        return { ...prev, credentials };
+        const next = [...prev.credentials];
+        next[index] = { ...next[index], [field]: value };
+        return { ...prev, credentials: next };
       });
     },
     [],
   );
 
-  // ---- 送信・暗号化 ----------------------------------------------------
+  // ---- 暗号化ペイロード生成 -------------------------------------------
 
   const buildEncryptedPayload =
     useCallback(async (): Promise<RecordSubmitPayload> => {
       let currentTitleReading = values.titleReading;
+      if (!currentTitleReading && furiganaPromiseRef.current) {
+        currentTitleReading = (await furiganaPromiseRef.current) ?? "";
+      }
+
       if (ogpPromiseRef.current) {
         await ogpPromiseRef.current;
-      }
-      if (furiganaPromiseRef.current) {
-        const fetched = await furiganaPromiseRef.current;
-        if (fetched) currentTitleReading = fetched;
       }
 
       const filteredCreds = values.credentials.filter(
@@ -366,8 +525,35 @@ export function useRecordForm(initialValues?: Partial<RecordFormValues>) {
       setIsSubmitting(true);
       try {
         const payload = await buildEncryptedPayload();
-        await action(payload);
-        return true;
+
+        try {
+          await action(payload);
+          pendingActionRef.current = null;
+
+          // 保存成功時は即座にドラフトを物理削除
+          clearRecordDraft({ targetRecordId, draftId });
+          return true;
+        } catch (actionErr) {
+          // セッション切れエラー判定
+          if (isAuthSessionError(actionErr)) {
+            // 1. まずサイレント再認証を試行
+            const refreshed = await attemptSilentReauth();
+            if (refreshed) {
+              await action(payload);
+              pendingActionRef.current = null;
+              clearRecordDraft({ targetRecordId, draftId });
+              return true;
+            }
+
+            // 2. サイレント失敗時は再認証モーダルを表示
+            pendingActionRef.current = action;
+            setIsSessionExpired(true);
+            return false;
+          }
+
+          // セッション切れ以外の例外（CONFLICT等）は上位のハンドラへ伝播させるため再スロー
+          throw actionErr;
+        }
       } catch (err) {
         if (err instanceof RecordFormUnlockCancelledError) {
           return false;
@@ -379,14 +565,27 @@ export function useRecordForm(initialValues?: Partial<RecordFormValues>) {
           );
           return false;
         }
+
+        // CONFLICT など上位（handleEditSubmit）でハンドリングされる業務例外なら汎用トーストを抑制
+        const message = err instanceof Error ? err.message : String(err);
+        if (message.includes("CONFLICT") || message.includes("競合")) {
+          return false;
+        }
+
         toast.error("保存に失敗しました。");
         return false;
       } finally {
         setIsSubmitting(false);
       }
     },
-    [buildEncryptedPayload],
+    [buildEncryptedPayload, targetRecordId, draftId],
   );
+
+  const retryPendingSubmit = useCallback(async (): Promise<boolean> => {
+    if (!pendingActionRef.current) return false;
+    const action = pendingActionRef.current;
+    return submit(action);
+  }, [submit]);
 
   return {
     values,
@@ -404,9 +603,17 @@ export function useRecordForm(initialValues?: Partial<RecordFormValues>) {
     updateCredentialField,
     reset,
     submit,
+    retryPendingSubmit,
+    discardDraft,
+    isFieldModified,
     isFetchingOgp,
     isFetchingFurigana,
     isSubmitting,
+    isSessionExpired,
+    setIsSessionExpired,
+    restoredMetadata,
+    isDirty,
+    targetRecordId,
   } as const;
 }
 

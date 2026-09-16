@@ -52,3 +52,17 @@ Firebase Auth および Session Cookie 管理における落とし穴と回避�
 
 - **問題**: クライアント側の Firebase Auth が未認証になった際、再ログインのために `/login` へアクセスしたにもかかわらず、`login.tsx` の `beforeLoad` が古い Session Cookie（`context.user`）を見て `throw redirect({ to: "/dashboard" })` してしまうと、未認証のまま `/(app)` へ突き返され、画面が真っ白にフリーズする。
 - **回避法**: `login.tsx` では `beforeLoad` による即時強制リダイレクトを行わず、ブラウザ側（`LoginPage` 内の `onAuthStateChanged`）で実際にログイン状態が確認できた場合にのみ `/dashboard` へナビゲートする。
+
+---
+
+### `localStorage` と `sessionStorage` の二重管理アンチパターン（過剰防衛とKISS原則違反）
+
+- **問題**: 外部ドメイン（Google OAuth）へのリダイレクトやタブ・画面遷移を伴う復元処理において、「念のため」と `localStorage` と `sessionStorage` の両方に同じデータを書き込み、双方から探索・消去する過剰な二重管理コードを書いてしまう。
+- **原因**:
+  1. `sessionStorage` はタブローカルであり、iOS Safari 等の外部リダイレクト（OAuth 遷移）や別タブ復帰で容易に破棄される。
+  2. 一方 `localStorage` は同一オリジン内で確実に永続化され、外部リダイレクト後も安全に保持される。
+  3. 「保険のつもりで両方に書き込む」二重管理は、片方の消し忘れによるゴーストデータの残留、状態の不整合、読み書き・削除ロジックの肥大化（KISS原則違反）を招くだけで、機能的メリットが一切ない。
+- **回避法**:
+  - 外部リダイレクトやブラウザリロードを跨いで引き継ぐ一時データ（リダイレクト復帰先 URL、暗号化ドラフト退避データ等）は、**`localStorage` のみに一本化**する。
+  - TTL（有効期限）をメタデータとして保持させ、復元完了時または期限切れ時に確実に `removeItem` で消去する。
+  - 「保険のつもりで `sessionStorage` にも書く」冗長な二重化コードは書かない。

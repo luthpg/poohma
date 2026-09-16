@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
+import { SessionExpiredDialog } from "@/components/auth/SessionExpiredDialog";
 import { Spinner } from "@/components/ui/spinner";
 import { TagInput } from "@/components/ui/tag-input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -25,9 +26,20 @@ export function RecordForm({
   isAdmin = true,
 }: RecordFormProps) {
   const [showAdvancedTitle, setShowAdvancedTitle] = useState(false);
-  const { values } = form;
+  const { values, isFieldModified } = form;
+  const isEditMode = Boolean(form.targetRecordId);
   const isBusy =
     form.isSubmitting || form.isFetchingOgp || form.isFetchingFurigana;
+
+  const getModifiedClass = (field: string) => {
+    if (!isEditMode) return "";
+    const modified = isFieldModified(field);
+    return `relative pl-3.5 before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-1 before:bg-orange-500 before:rounded-full before:transition-all before:duration-200 ${
+      modified
+        ? "before:opacity-100 before:scale-y-100"
+        : "before:opacity-0 before:scale-y-50 pointer-events-none"
+    }`;
+  };
 
   return (
     <form onSubmit={onSubmit} className="space-y-8">
@@ -39,7 +51,7 @@ export function RecordForm({
           </h2>
         </div>
         <div className="space-y-4">
-          <div>
+          <div className={getModifiedClass("url")}>
             <label
               htmlFor="url-input"
               className="block text-[14px] font-medium text-foreground"
@@ -68,7 +80,7 @@ export function RecordForm({
             </p>
           </div>
 
-          <div>
+          <div className={getModifiedClass("title")}>
             <label
               htmlFor="title-input"
               className="block text-[14px] font-medium text-foreground"
@@ -107,7 +119,9 @@ export function RecordForm({
             </button>
 
             {showAdvancedTitle && (
-              <div className="mt-2 rounded-md bg-muted/40 p-3.5 border border-border/40 space-y-2 animate-in fade-in duration-200">
+              <div
+                className={`mt-2 rounded-md bg-muted/40 p-3.5 border border-border/40 space-y-2 animate-in fade-in duration-200 ${getModifiedClass("titleReading")}`}
+              >
                 <div className="flex items-center justify-between">
                   <label
                     htmlFor="title-reading-input"
@@ -173,6 +187,8 @@ export function RecordForm({
               removable={values.credentials.length > 1}
               onChange={form.updateCredentialField}
               onRemove={form.removeCredential}
+              isFieldModified={isFieldModified}
+              isEditMode={isEditMode}
             />
           ))}
         </div>
@@ -185,7 +201,7 @@ export function RecordForm({
             その他の設定
           </h2>
         </div>
-        <div>
+        <div className={getModifiedClass("ownerType")}>
           <span
             id="owner-type-label"
             className="block text-[14px] font-medium text-foreground mb-2"
@@ -229,7 +245,7 @@ export function RecordForm({
           )}
         </div>
 
-        <div>
+        <div className={getModifiedClass("tags")}>
           <label
             htmlFor="tags-input"
             className="block text-[14px] font-medium text-foreground mb-1"
@@ -243,7 +259,7 @@ export function RecordForm({
           />
         </div>
 
-        <div>
+        <div className={getModifiedClass("memo")}>
           <label
             htmlFor="memo-input"
             className="block text-[14px] font-medium text-foreground mb-1"
@@ -289,6 +305,13 @@ export function RecordForm({
           )}
         </button>
       </div>
+
+      {/* セッション切れ時の再認証・データ救済モーダル */}
+      <SessionExpiredDialog
+        open={form.isSessionExpired}
+        onOpenChange={form.setIsSessionExpired}
+        values={values}
+      />
     </form>
   );
 }

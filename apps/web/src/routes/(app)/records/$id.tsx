@@ -19,7 +19,7 @@ import {
   Trash2,
   Users,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { api } from "@/../convex/_generated/api";
@@ -56,7 +56,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { useAccount } from "@/hooks/useAccount";
 import { useOnboarding } from "@/hooks/useOnboarding";
-import { useRecordForm } from "@/hooks/useRecordForm";
+import {
+  type RecordFormValues,
+  type RecordSubmitPayload,
+  useRecordForm,
+} from "@/hooks/useRecordForm";
+import {
+  attemptSilentReauth,
+  hasPendingDraft,
+  isAuthSessionError,
+} from "@/lib/auth-recovery";
 import { recordDetailSteps } from "@/lib/onboarding/tours";
 
 const detailSearchSchema = z.object({
@@ -214,7 +223,7 @@ function RecordDetailComponent({
     window.scrollTo(0, 0);
   }, []);
 
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(() => hasPendingDraft(record._id));
   const [isNavigating, setIsNavigating] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -223,11 +232,43 @@ function RecordDetailComponent({
   // 同時編集管理用ステート
   const [initialRevision, setInitialRevision] = useState<number | null>(null);
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
-  const [pendingPayload, setPendingPayload] = useState<
-    Parameters<Parameters<typeof form.submit>[0]>[0] | null
-  >(null);
+  const [pendingPayload, setPendingPayload] =
+    useState<RecordSubmitPayload | null>(null);
+  const initialFormValues: Partial<RecordFormValues> = useMemo(() => {
+    return {
+      title: record.title,
+      titleReading: record.titleReading || "",
+      url: record.url || "",
+      ogpImage: record.ogpImage || "",
+      ogpDescription: record.ogpDescription || "",
+      tags: record.tags,
+      memo: record.memo || "",
+      ownerType: record.ownerType ?? "user",
+      credentials: record.credentials.map((c) => ({
+        id: c.id,
+        label: c.label || "",
+        loginId: c.loginId || "",
+        passwordHint: "",
+      })),
+    };
+  }, [record]);
 
-  const form = useRecordForm();
+  const form = useRecordForm(initialFormValues, record._id);
+
+  // リダイレクト再ログイン復帰時のドラフトメタデータ（isEditing, initialRevision）復元
+  useEffect(() => {
+    if (
+      form.restoredMetadata &&
+      form.restoredMetadata.recordId === record._id
+    ) {
+      if (form.restoredMetadata.initialRevision != null) {
+        setInitialRevision(form.restoredMetadata.initialRevision);
+      }
+      if (form.restoredMetadata.isEditing) {
+        setIsEditing(true);
+      }
+    }
+  }, [form.restoredMetadata, record._id]);
 
   // 編集セッション情報のリアルタイム購読
   const activeEditors = useQuery(api.records.getActiveEditors, {
@@ -433,6 +474,7 @@ function RecordDetailComponent({
   };
 
   const handleEditCancel = useCallback(async () => {
+    form.discardDraft();
     toast.dismiss("record-stale-toast");
     toast.dismiss("editing-presence-toast");
     setIsEditing(false);
@@ -446,7 +488,7 @@ function RecordDetailComponent({
     } catch {
       // 編集セッション終了失敗はサイレントに処理
     }
-  }, [endEditingSession, record._id, activeAccountId]);
+  }, [form, endEditingSession, record._id, activeAccountId]);
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -514,7 +556,33 @@ function RecordDetailComponent({
       setInitialRevision(null);
       await router.invalidate();
       setIsEditing(false);
-    } catch {
+    } catch (err) {
+      if (isAuthSessionError(err)) {
+        const refreshed = await attemptSilentReauth();
+        if (refreshed) {
+          try {
+            await updateRecord({
+              accountId: activeAccountId || undefined,
+              id: record._id,
+              force: true,
+              data: pendingPayload,
+            });
+            toast.dismiss("record-stale-toast");
+            toast.dismiss("editing-presence-toast");
+            toast.success("レコードを上書き保存しました");
+            setConflictDialogOpen(false);
+            setPendingPayload(null);
+            setInitialRevision(null);
+            await router.invalidate();
+            setIsEditing(false);
+            return;
+          } catch {
+            // fall through
+          }
+        }
+        form.setIsSessionExpired(true);
+        return;
+      }
       toast.error("保存に失敗しました");
     } finally {
       setIsLoading(false);
@@ -658,9 +726,9 @@ function RecordDetailComponent({
           isAdmin={isAdmin}
         />
 
-        {/* 競合発生時の解決ダイアログ */}
+        {/* 競合発生時の解決ダイアログ（セッション切れダイアログと排他制御） */}
         <AlertDialog
-          open={conflictDialogOpen}
+          open={conflictDialogOpen && !form.isSessionExpired}
           onOpenChange={setConflictDialogOpen}
         >
           <AlertDialogContent>
@@ -695,7 +763,7 @@ function RecordDetailComponent({
   }
 
   return (
-    <div className="mx-auto max-w-3xl p-6">
+    <div className="mx-auto max-w-3xl p-6 pb-28 sm:pb-32">
       {/* オンボーディングツアー（詳細画面用） */}
       <OnboardingTour
         steps={recordDetailSteps}
@@ -1006,49 +1074,51 @@ function RecordDetailComponent({
           {/* 編集履歴 */}
           <RecordAuditHistoryAccordion recordId={record._id} />
 
-          {/* アクションボタン (編集権限がある場合のみ) */}
+          {/* 画面下部常時固定フッター (編集権限がある場合のみ) */}
           {isEditable && (
-            <div className="mt-10 flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 border-t border-border pt-6">
-              <button
-                type="button"
-                onClick={handleEditStart}
-                className="w-full sm:w-auto rounded-md bg-foreground px-6 py-2.5 sm:py-2 text-[14px] font-medium text-background hover:bg-foreground/90 transition text-center order-1 sm:order-2"
-              >
-                編集する
-              </button>
-              {isAdmin && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <button
-                      type="button"
-                      className="w-full sm:w-auto rounded-md px-6 py-2.5 sm:py-2 text-[14px] font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition text-center order-2 sm:order-1"
-                    >
-                      削除する
-                    </button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>
-                        レコードを削除しますか？
-                      </AlertDialogTitle>
-                      <AlertDialogDescription>
-                        この操作は取り消せません。本当に削除してもよろしいですか？
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-0">
-                      <AlertDialogCancel className="w-full sm:w-auto">
-                        キャンセル
-                      </AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={handleDelete}
-                        className="w-full sm:w-auto bg-red-500 hover:bg-red-600 focus:ring-red-500"
+            <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-border/80 bg-background/95 backdrop-blur-md px-6 py-3.5 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] dark:shadow-[0_-4px_12px_rgba(0,0,0,0.3)] pb-[max(0.875rem,env(safe-area-inset-bottom))]">
+              <div className="mx-auto flex max-w-3xl items-center justify-end gap-3 sm:gap-4">
+                {isAdmin && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <button
+                        type="button"
+                        className="w-full sm:w-auto rounded-md px-6 py-2.5 sm:py-2 text-[14px] font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition text-center order-2 sm:order-1 cursor-pointer"
                       >
                         削除する
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
+                      </button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>
+                          レコードを削除しますか？
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          この操作は取り消せません。本当に削除してもよろしいですか？
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-0">
+                        <AlertDialogCancel className="w-full sm:w-auto cursor-pointer">
+                          キャンセル
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleDelete}
+                          className="w-full sm:w-auto bg-red-500 hover:bg-red-600 focus:ring-red-500 cursor-pointer"
+                        >
+                          削除する
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+                <button
+                  type="button"
+                  onClick={handleEditStart}
+                  className="w-full sm:w-auto rounded-md bg-foreground px-6 py-2.5 sm:py-2 text-[14px] font-medium text-background hover:bg-foreground/90 transition text-center order-1 sm:order-2 cursor-pointer"
+                >
+                  編集する
+                </button>
+              </div>
             </div>
           )}
         </div>

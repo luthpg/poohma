@@ -44,7 +44,7 @@ function MockFormContainer({
     updateTitle: (title) => setValues((prev) => ({ ...prev, title })),
     updateTitleReading: (titleReading) =>
       setValues((prev) => ({ ...prev, titleReading })),
-    handleTitleBlur: () => {},
+    handleTitleBlur: async () => null,
     fetchFuriganaForTitle: async () => null,
     setUrl: (url) => setValues((prev) => ({ ...prev, url })),
     handleUrlBlur: () => Promise.resolve(null),
@@ -76,9 +76,17 @@ function MockFormContainer({
         ...next,
       })),
     submit: async () => true,
+    retryPendingSubmit: async () => true,
+    discardDraft: () => {},
+    isFieldModified: () => false,
     isFetchingOgp: false,
     isFetchingFurigana: false,
     isSubmitting: isBusy,
+    isSessionExpired: false,
+    setIsSessionExpired: () => {},
+    restoredMetadata: null,
+    isDirty: false,
+    targetRecordId: undefined,
   };
 
   return (
