@@ -105,4 +105,4 @@
 | **定期自動バックアップ** | Cloudflare Workers（定時Cron）により、Convex Cloud から暗号化済みデータを定期エクスポートし、Cloudflare R2 へ90日間ZIPアーカイブ保管。 | バックグラウンド | `ADR-005` | ✅ 実装済 |
 | **microCMS 連携** | FAQ、利用規約、プライバシーポリシー等の公開静的コンテンツを microCMS から安全に取得・表示（サニタイズ適用）。 | 公開ページ | `architecture.md` | ✅ 実装済 |
 | **PWA (Progressive Web App)** | Web App Manifest および Service Worker により、モバイル端末のホーム画面に追加してネイティブアプリ感覚で利用可能。 | モバイル全般 | `README.md` | ✅ 実装済 |
-| **推奨動作環境・サポートブラウザ基準** | MDN Web Docs 基準に基づき、コア Web API（BroadcastChannel, Web Crypto, WebAuthn 等）を安定動作させる最低バージョン以上（Safari 15.4+, Chrome 92+, Edge 92+, Firefox 103+）を明記し利用規約・FAQに掲載。 | 公開ページ（使い方・FAQ） | `NFR-ENV-01` | ✅ 実装済 |
+| **推奨動作環境・サポートブラウザ基準** | MDN Web Docs 基準に基づき、コア Web API（BroadcastChannel, Web Crypto 等）を安定動作させる最低バージョン以上（Safari 15.4+, Chrome 92+, Edge 92+, Firefox 103+）を明記し利用規約・FAQに掲載（生体認証PRF拡張はSafari 18+, Chrome 116+等に対応、非対応時はパスコードへ自動フォールバック）。 | 公開ページ（使い方・FAQ） | `NFR-ENV-01` | ✅ 実装済 |

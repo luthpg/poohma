@@ -171,6 +171,11 @@ export async function saveRecordDraft(params: {
     isCancelled,
   } = params;
 
+  // アカウント ID が確定していない状態でのドラフト保存は抑止（マルチアカウント漏洩防止）
+  if (!accountId) {
+    return;
+  }
+
   const now = Date.now();
   const expiresAt = now + DRAFT_TTL_MS;
 
@@ -268,14 +273,13 @@ export async function loadRecordDraft(params: {
       return null;
     }
 
-    // アカウント境界チェック（container.accountId が存在する場合、currentAccountId との完全一致を必須化）
-    if (container.accountId != null) {
-      if (
-        currentAccountId == null ||
-        container.accountId !== currentAccountId
-      ) {
-        return null;
-      }
+    // アカウント境界チェック（container.accountId と currentAccountId の両方が非nullかつ完全一致する場合のみ復元）
+    if (
+      !container.accountId ||
+      !currentAccountId ||
+      container.accountId !== currentAccountId
+    ) {
+      return null;
     }
 
     // クレデンシャル復号（DEK を unwrap してヒントを復号）

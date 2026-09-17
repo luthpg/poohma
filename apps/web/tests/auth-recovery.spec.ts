@@ -151,6 +151,7 @@ describe("auth-recovery", () => {
         draftId: "tab_A_uuid",
         values: { ...mockDraftValues, title: "Tab A Service" },
         masterKey,
+        accountId: "user_abc",
       });
 
       // タブBの新規作成
@@ -158,16 +159,19 @@ describe("auth-recovery", () => {
         draftId: "tab_B_uuid",
         values: { ...mockDraftValues, title: "Tab B Service" },
         masterKey,
+        accountId: "user_abc",
       });
 
       // 各タブが自身のドラフトのみを独立して取得できること
       const draftA = await loadRecordDraft({
         draftId: "tab_A_uuid",
         masterKey,
+        currentAccountId: "user_abc",
       });
       const draftB = await loadRecordDraft({
         draftId: "tab_B_uuid",
         masterKey,
+        currentAccountId: "user_abc",
       });
 
       expect(draftA?.values.title).toBe("Tab A Service");
@@ -185,6 +189,7 @@ describe("auth-recovery", () => {
         draftId: "draft_cancel_test",
         values: mockDraftValues,
         masterKey,
+        accountId: "user_abc",
       });
       expect(hasRecordDraft({ draftId: "draft_cancel_test" })).toBe(true);
 
@@ -198,6 +203,7 @@ describe("auth-recovery", () => {
         draftId: "draft_ttl_test",
         values: mockDraftValues,
         masterKey,
+        accountId: "user_abc",
       });
 
       // 25時間後に進める
@@ -207,12 +213,35 @@ describe("auth-recovery", () => {
       const restored = await loadRecordDraft({
         draftId: "draft_ttl_test",
         masterKey,
+        currentAccountId: "user_abc",
       });
       expect(restored).toBeNull();
       expect(hasRecordDraft({ draftId: "draft_ttl_test" })).toBe(false);
     });
 
-    it("保存時の accountId と異なる currentAccountId や null では復元せず null を返すこと (CR-9 / CR-NIT-1)", async () => {
+    it("accountId が null または未指定の場合は保存を抑止すること (CR-18)", async () => {
+      const masterKey = await generateMasterKey();
+      await saveRecordDraft({
+        draftId: "draft_null_account_test",
+        values: mockDraftValues,
+        masterKey,
+        accountId: null,
+      });
+      expect(hasRecordDraft({ draftId: "draft_null_account_test" })).toBe(
+        false,
+      );
+
+      await saveRecordDraft({
+        draftId: "draft_undefined_account_test",
+        values: mockDraftValues,
+        masterKey,
+      });
+      expect(hasRecordDraft({ draftId: "draft_undefined_account_test" })).toBe(
+        false,
+      );
+    });
+
+    it("保存時の accountId と異なる currentAccountId や null では復元せず null を返すこと (CR-9 / CR-NIT-1 / CR-18)", async () => {
       const masterKey = await generateMasterKey();
       await saveRecordDraft({
         draftId: "draft_account_boundary_test",

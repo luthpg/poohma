@@ -594,16 +594,17 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
   マスターキー（パスコード経路と同一のものに到達する）
 
 【クライアント側ドラフト暗号化経路（FR-REC-28）】
-入力フォームの未保存内容（平文フィールド含む全値）を一時退避する際も、
-E2EE原則を厳格に維持するためマスターキーによる封筒暗号化を適用する。
+入力フォームの未保存内容を一時退避する際も、PoohMa の基本暗号化方針（秘密情報のみ E2EE 対象とする設計思想）に従い、
+パスワードヒントに対してマスターキーによる封筒暗号化を適用する（タイトル・URL等のメタデータは平文コンテナ内に保持）。
   マスターキー（メモリ上に展開中）
-    │  wrapKey（自動保存ごとに新規生成した短命 draftDEK をラップ）
+    │  wrapKey（自動保存ごとにクレデンシャル単位で新規生成した短命 draftDEK をラップ）
     ▼
-  暗号化済み draftDEK（draftDEKEncrypted / draftDEKIv）
-    │  encrypt(values, draftDEK)
+  暗号化済み draftDEK（passwordHintDekEncrypted / passwordHintDekIv）
+    │  encrypt(passwordHint, draftDEK)
     ▼
-  暗号化済みドラフトデータ（encryptedValues / valuesIv）
-  → localStorage（キー: poohma_draft_record_${id} / poohma_draft_new_${draftId}）に24h TTL付きで退避
+  暗号化済みパスワードヒント（passwordHintEncrypted / passwordHintIv）
+  ＋ 平文メタデータ（title, url, memo, tags等）
+  → StoredRecordDraftContainer として localStorage（キー: poohma_draft_record_${id} / poohma_draft_new_${draftId}）に24h TTL付き・accountId照合付きで退避
 ```
 
 備考：エンベロープ暗号化は全レコードで必須であり、暗号化（encryptHint）・復号（decryptHint）・家族移行時の再ラップ（reWrapCredential）のいずれにおいても DEK を必須とする（マスターキー直接暗号化・復号へのフォールバックは行わない）。

@@ -1100,7 +1100,7 @@ function RecordDetailComponent({
                         <button
                           type="button"
                           aria-label="レコードを削除する"
-                          className="flex h-9 sm:h-10 items-center justify-center gap-1.5 rounded-md px-2.5 sm:px-4 text-xs sm:text-[14px] font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition cursor-pointer"
+                          className="flex h-9 sm:h-10 min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-md px-2.5 sm:px-4 text-xs sm:text-[14px] font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition cursor-pointer"
                         >
                           <Trash2 className="h-4 w-4" />
                           <span className="hidden sm:inline">削除する</span>
@@ -1134,7 +1134,7 @@ function RecordDetailComponent({
                   <button
                     type="button"
                     onClick={handleEditStart}
-                    className="flex h-9 sm:h-10 min-w-[80px] sm:min-w-[100px] items-center justify-center rounded-md bg-orange-500 px-4 sm:px-6 text-xs sm:text-[14px] font-medium text-white shadow-sm hover:bg-orange-600 transition cursor-pointer"
+                    className="flex h-9 sm:h-10 min-h-11 min-w-20 sm:min-w-25 items-center justify-center rounded-md bg-orange-600 px-4 sm:px-6 text-xs sm:text-[14px] font-semibold text-white shadow-sm hover:bg-orange-700 transition cursor-pointer"
                   >
                     編集する
                   </button>

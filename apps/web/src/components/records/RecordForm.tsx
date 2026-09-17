@@ -282,14 +282,14 @@ export function RecordForm({
           <button
             type="button"
             onClick={onCancel}
-            className="flex h-9 sm:h-10 items-center justify-center rounded-md bg-card px-3 sm:px-5 text-xs sm:text-[14px] font-medium text-foreground shadow-border hover:bg-accent transition cursor-pointer"
+            className="flex h-9 sm:h-10 min-h-11 items-center justify-center rounded-md bg-card px-3 sm:px-5 text-xs sm:text-[14px] font-medium text-foreground shadow-border hover:bg-accent transition cursor-pointer"
           >
             キャンセル
           </button>
           <button
             type="submit"
             disabled={isBusy}
-            className="flex h-9 sm:h-10 min-w-[80px] sm:min-w-[100px] items-center justify-center rounded-md bg-orange-500 px-4 sm:px-6 text-xs sm:text-[14px] font-medium text-white shadow-sm hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50 transition cursor-pointer"
+            className="flex h-9 sm:h-10 min-h-11 min-w-20 sm:min-w-25 items-center justify-center rounded-md bg-orange-600 px-4 sm:px-6 text-xs sm:text-[14px] font-semibold text-white shadow-sm hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50 transition cursor-pointer"
           >
             {form.isSubmitting ? (
               <>
