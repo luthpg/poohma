@@ -336,6 +336,7 @@ export function useRecordForm(
         : [{ ...EMPTY_CREDENTIAL }],
     };
     setValues(nextValues);
+    initialValuesJsonRef.current = JSON.stringify(nextValues);
     setBaselineValuesState(nextValues);
   }, []);
 
@@ -509,8 +510,14 @@ export function useRecordForm(
         currentTitleReading = (await furiganaPromiseRef.current) ?? "";
       }
 
+      let ogpResult: {
+        title?: string;
+        image?: string;
+        description?: string;
+      } | null = null;
+
       if (ogpPromiseRef.current) {
-        await ogpPromiseRef.current;
+        ogpResult = await ogpPromiseRef.current;
       }
 
       const filteredCreds = values.credentials.filter(
@@ -561,12 +568,17 @@ export function useRecordForm(
           }),
         );
 
+      const resolvedTitle = values.title || ogpResult?.title || "";
+      const resolvedOgpImage = values.ogpImage || ogpResult?.image || undefined;
+      const resolvedOgpDescription =
+        values.ogpDescription || ogpResult?.description || undefined;
+
       return {
-        title: values.title,
+        title: resolvedTitle,
         titleReading: currentTitleReading || undefined,
         url: values.url || undefined,
-        ogpImage: values.ogpImage || undefined,
-        ogpDescription: values.ogpDescription || undefined,
+        ogpImage: resolvedOgpImage,
+        ogpDescription: resolvedOgpDescription,
         memo: values.memo || undefined,
         ownerType: values.ownerType,
         tags: values.tags,

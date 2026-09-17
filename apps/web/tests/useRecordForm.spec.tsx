@@ -359,4 +359,83 @@ describe("useRecordForm", () => {
     // Bレコード単位で初回アンロックが正しく走る
     expect(mockRequireUnlock).toHaveBeenCalledTimes(1);
   });
+
+  it("reset 実行時に initialValuesJsonRef が更新され、復号ヒント反映直後に isDirty が false のままであること", () => {
+    const { result } = renderHook(() =>
+      useRecordForm({
+        title: "Test",
+        credentials: [
+          {
+            label: "メイン",
+            loginId: "user@example.com",
+            passwordHint: "",
+          },
+        ],
+      }),
+    );
+
+    expect(result.current.isDirty).toBe(false);
+
+    // 編集開始時に復号されたヒントを reset でセット
+    act(() => {
+      result.current.reset({
+        title: "Test",
+        credentials: [
+          {
+            label: "メイン",
+            loginId: "user@example.com",
+            passwordHint: "復号された平文ヒント",
+          },
+        ],
+      });
+    });
+
+    // 基準値が同期されたため、isDirty は false のまま
+    expect(result.current.isDirty).toBe(false);
+
+    // ユーザーがフィールドを変更したときは isDirty が true になる
+    act(() => {
+      result.current.updateTitle("Updated Title");
+    });
+    expect(result.current.isDirty).toBe(true);
+  });
+
+  it("OGP 取得待機後に submit された場合、解決された OGP タイトルや画像が payload に正しく反映されること", async () => {
+    const { useAction } = await import("convex/react");
+    vi.mocked(useAction).mockReturnValue(
+      vi.fn().mockResolvedValue({
+        title: "OGP 取得タイトル",
+        image: "https://example.com/ogp.jpg",
+        description: "OGP 説明文",
+      }),
+    );
+
+    const { result } = renderHook(() => useRecordForm());
+
+    // URL を設定して handleUrlBlur をトリガー
+    act(() => {
+      result.current.setUrl("https://example.com");
+    });
+
+    let blurPromise: Promise<unknown>;
+    act(() => {
+      blurPromise = result.current.handleUrlBlur();
+    });
+
+    const submitAction = vi.fn().mockResolvedValue(undefined);
+
+    // OGP 完了を待たずに即座に submit を呼ぶ
+    let submitSuccess = false;
+    await act(async () => {
+      submitSuccess = await result.current.submit(submitAction);
+      await blurPromise;
+    });
+
+    expect(submitSuccess).toBe(true);
+    expect(submitAction).toHaveBeenCalledTimes(1);
+    const submittedPayload = submitAction.mock.calls[0][0];
+    expect(submittedPayload.title).toBe("OGP 取得タイトル");
+    expect(submittedPayload.ogpImage).toBe("https://example.com/ogp.jpg");
+    expect(submittedPayload.ogpDescription).toBe("OGP 説明文");
+  });
 });

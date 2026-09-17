@@ -62,11 +62,7 @@ import {
   type RecordSubmitPayload,
   useRecordForm,
 } from "@/hooks/useRecordForm";
-import {
-  attemptSilentReauth,
-  hasPendingDraft,
-  isAuthSessionError,
-} from "@/lib/auth-recovery";
+import { attemptSilentReauth, isAuthSessionError } from "@/lib/auth-recovery";
 import { recordDetailSteps } from "@/lib/onboarding/tours";
 
 const detailSearchSchema = z.object({
@@ -268,7 +264,7 @@ function RecordDetailComponent({
     window.scrollTo(0, 0);
   }, []);
 
-  const [isEditing, setIsEditing] = useState(() => hasPendingDraft(record._id));
+  const [isEditing, setIsEditing] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -304,6 +300,7 @@ function RecordDetailComponent({
       setIsEditing(false);
     },
   });
+  const { restoredMetadata, setBaselineValues, discardDraft } = form;
 
   // リダイレクト再ログイン復帰時のドラフトメタデータ（isEditing, initialRevision）復元 & 基準値同期
   const isDraftRestoredHandledRef = useRef(false);
@@ -312,16 +309,16 @@ function RecordDetailComponent({
 
     if (
       !isDraftRestoredHandledRef.current &&
-      form.restoredMetadata &&
-      form.restoredMetadata.recordId === record._id
+      restoredMetadata &&
+      restoredMetadata.recordId === record._id
     ) {
       isDraftRestoredHandledRef.current = true;
 
-      if (form.restoredMetadata.initialRevision != null) {
-        setInitialRevision(form.restoredMetadata.initialRevision);
+      if (restoredMetadata.initialRevision != null) {
+        setInitialRevision(restoredMetadata.initialRevision);
       }
 
-      if (form.restoredMetadata.isEditing) {
+      if (restoredMetadata.isEditing) {
         const hasEncryptedHints = record.credentials.some(
           (c) => c.passwordHint && c.passwordHintIv,
         );
@@ -330,7 +327,7 @@ function RecordDetailComponent({
           decryptRecordCredentials(record.credentials, decryptHint)
             .then((baselineCredentials) => {
               if (isCancelled) return;
-              form.setBaselineValues({
+              setBaselineValues({
                 title: record.title,
                 titleReading: record.titleReading || "",
                 url: record.url || "",
@@ -348,11 +345,11 @@ function RecordDetailComponent({
               toast.error(
                 "パスワードヒントの復号に失敗したため、編集画面を復元できませんでした",
               );
-              form.discardDraft();
+              discardDraft();
               setIsEditing(false);
             });
         } else {
-          form.setBaselineValues({
+          setBaselineValues({
             title: record.title,
             titleReading: record.titleReading || "",
             url: record.url || "",
@@ -376,7 +373,7 @@ function RecordDetailComponent({
     return () => {
       isCancelled = true;
     };
-  }, [form.restoredMetadata, record, decryptHint, form]);
+  }, [restoredMetadata, record, decryptHint, setBaselineValues, discardDraft]);
 
   // 編集セッション情報のリアルタイム購読
   const activeEditors = useQuery(api.records.getActiveEditors, {
