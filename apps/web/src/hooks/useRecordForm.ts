@@ -89,10 +89,15 @@ const DEFAULT_VALUES: RecordFormValues = {
   credentials: [{ ...EMPTY_CREDENTIAL }],
 };
 
+export interface UseRecordFormOptions {
+  onUnlockCancelled?: () => void;
+}
+
 export function useRecordForm(
   initialValues?: Partial<RecordFormValues>,
   targetRecordId?: string,
   draftId?: string,
+  options?: UseRecordFormOptions,
 ) {
   const { activeAccountId } = useAccount();
   const { encryptHint, masterKey, requireUnlock } = usePasscode();
@@ -106,7 +111,7 @@ export function useRecordForm(
   });
 
   // 編集開始時の復号データ等を反映する動的初期基準値
-  const [baselineValues, setBaselineValues] = useState<
+  const [baselineValues, setBaselineValuesState] = useState<
     Partial<RecordFormValues> | undefined
   >(initialValues);
 
@@ -137,12 +142,23 @@ export function useRecordForm(
   // 開始時アンロック連携:
   // 新規登録画面（!targetRecordId）または未保存ドラフトが存在する場合に requireUnlock を試行
   // ※ 通常のレコード詳細閲覧モード時に不必要にアンロックダイアログを開かない
+  const onUnlockCancelledRef = useRef(options?.onUnlockCancelled);
+  onUnlockCancelledRef.current = options?.onUnlockCancelled;
+
   useEffect(() => {
     if (!masterKey) {
       const shouldUnlock =
         !targetRecordId || hasRecordDraft({ targetRecordId, draftId });
       if (shouldUnlock) {
-        requireUnlock().catch(() => {});
+        requireUnlock()
+          .then((unlocked) => {
+            if (!unlocked) {
+              onUnlockCancelledRef.current?.();
+            }
+          })
+          .catch(() => {
+            onUnlockCancelledRef.current?.();
+          });
       }
     }
   }, [masterKey, requireUnlock, targetRecordId, draftId]);
@@ -311,7 +327,18 @@ export function useRecordForm(
         : [{ ...EMPTY_CREDENTIAL }],
     };
     setValues(nextValues);
-    setBaselineValues(nextValues);
+    setBaselineValuesState(nextValues);
+  }, []);
+
+  const setBaselineValues = useCallback((next: Partial<RecordFormValues>) => {
+    const nextBaseline: RecordFormValues = {
+      ...DEFAULT_VALUES,
+      ...next,
+      credentials: next.credentials?.length
+        ? next.credentials
+        : [{ ...EMPTY_CREDENTIAL }],
+    };
+    setBaselineValuesState(nextBaseline);
   }, []);
 
   const invalidateFuriganaRequest = useCallback(() => {
@@ -633,6 +660,7 @@ export function useRecordForm(
     removeCredential,
     updateCredentialField,
     reset,
+    setBaselineValues,
     submit,
     retryPendingSubmit,
     discardDraft,

@@ -77,6 +77,7 @@ function MockFormContainer({
         ...prev,
         ...next,
       })),
+    setBaselineValues: () => {},
     submit: async () => true,
     retryPendingSubmit: async () => true,
     discardDraft: () => {},

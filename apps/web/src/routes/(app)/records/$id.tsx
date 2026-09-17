@@ -57,6 +57,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useAccount } from "@/hooks/useAccount";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import {
+  type RecordFormCredential,
   type RecordFormValues,
   type RecordSubmitPayload,
   useRecordForm,
@@ -151,6 +152,49 @@ function RecordDetailWrapper() {
       activeAccountId={activeAccountId}
       familyMembers={familyMembers?.users || []}
     />
+  );
+}
+
+async function decryptRecordCredentials(
+  credentials: {
+    id: string;
+    label?: string;
+    loginId?: string;
+    passwordHint?: string;
+    passwordHintIv?: string;
+    passwordHintDekEncrypted?: string;
+    passwordHintDekIv?: string;
+  }[],
+  decryptHint: (
+    cipher: string,
+    iv: string,
+    dekEncrypted?: string,
+    dekIv?: string,
+  ) => Promise<string>,
+): Promise<RecordFormCredential[]> {
+  return Promise.all(
+    credentials.map(async (c) => {
+      if (c.passwordHint && c.passwordHintIv) {
+        const plain = await decryptHint(
+          c.passwordHint,
+          c.passwordHintIv,
+          c.passwordHintDekEncrypted,
+          c.passwordHintDekIv,
+        );
+        return {
+          id: c.id,
+          label: c.label || "",
+          loginId: c.loginId || "",
+          passwordHint: plain,
+        };
+      }
+      return {
+        id: c.id,
+        label: c.label || "",
+        loginId: c.loginId || "",
+        passwordHint: c.passwordHint || "",
+      };
+    }),
   );
 }
 
@@ -253,22 +297,85 @@ function RecordDetailComponent({
     };
   }, [record]);
 
-  const form = useRecordForm(initialFormValues, record._id);
+  const { decryptHint, requireUnlock } = usePasscode();
+  const form = useRecordForm(initialFormValues, record._id, undefined, {
+    onUnlockCancelled: () => {
+      setIsEditing(false);
+    },
+  });
 
-  // リダイレクト再ログイン復帰時のドラフトメタデータ（isEditing, initialRevision）復元
+  // リダイレクト再ログイン復帰時のドラフトメタデータ（isEditing, initialRevision）復元 & 基準値同期
+  const isDraftRestoredHandledRef = useRef(false);
   useEffect(() => {
+    let isCancelled = false;
+
     if (
+      !isDraftRestoredHandledRef.current &&
       form.restoredMetadata &&
       form.restoredMetadata.recordId === record._id
     ) {
+      isDraftRestoredHandledRef.current = true;
+
       if (form.restoredMetadata.initialRevision != null) {
         setInitialRevision(form.restoredMetadata.initialRevision);
       }
+
       if (form.restoredMetadata.isEditing) {
-        setIsEditing(true);
+        const hasEncryptedHints = record.credentials.some(
+          (c) => c.passwordHint && c.passwordHintIv,
+        );
+
+        if (hasEncryptedHints) {
+          decryptRecordCredentials(record.credentials, decryptHint)
+            .then((baselineCredentials) => {
+              if (isCancelled) return;
+              form.setBaselineValues({
+                title: record.title,
+                titleReading: record.titleReading || "",
+                url: record.url || "",
+                ogpImage: record.ogpImage || "",
+                ogpDescription: record.ogpDescription || "",
+                tags: record.tags,
+                memo: record.memo || "",
+                ownerType: record.ownerType ?? "user",
+                credentials: baselineCredentials,
+              });
+              setIsEditing(true);
+            })
+            .catch(() => {
+              if (isCancelled) return;
+              toast.error(
+                "パスワードヒントの復号に失敗したため、編集画面を復元できませんでした",
+              );
+              form.discardDraft();
+              setIsEditing(false);
+            });
+        } else {
+          form.setBaselineValues({
+            title: record.title,
+            titleReading: record.titleReading || "",
+            url: record.url || "",
+            ogpImage: record.ogpImage || "",
+            ogpDescription: record.ogpDescription || "",
+            tags: record.tags,
+            memo: record.memo || "",
+            ownerType: record.ownerType ?? "user",
+            credentials: record.credentials.map((c) => ({
+              id: c.id,
+              label: c.label || "",
+              loginId: c.loginId || "",
+              passwordHint: c.passwordHint || "",
+            })),
+          });
+          setIsEditing(true);
+        }
       }
     }
-  }, [form.restoredMetadata, record._id]);
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [form.restoredMetadata, record, decryptHint, form]);
 
   // 編集セッション情報のリアルタイム購読
   const activeEditors = useQuery(api.records.getActiveEditors, {
@@ -338,8 +445,6 @@ function RecordDetailComponent({
   );
   const endEditingSession = useMutation(api.records.endEditingSession);
 
-  const { decryptHint, requireUnlock } = usePasscode();
-
   // 編集モード中の定期ハートビートと復帰（visibilitychange）対応
   useEffect(() => {
     if (!isEditing) return;
@@ -395,50 +500,26 @@ function RecordDetailComponent({
       (c) => c.passwordHint && c.passwordHintIv,
     );
 
-    let credentials: {
-      id?: string;
-      label: string;
-      loginId: string;
-      passwordHint: string;
-    }[];
+    let credentials: RecordFormCredential[];
 
     if (hasEncryptedHints) {
       const unlocked = await requireUnlock();
-      if (!unlocked) return; // user cancelled or failed
+      if (!unlocked) {
+        setIsEditing(false);
+        return;
+      }
 
-      credentials = await Promise.all(
-        record.credentials.map(async (c) => {
-          if (c.passwordHint && c.passwordHintIv) {
-            try {
-              const plain = await decryptHint(
-                c.passwordHint,
-                c.passwordHintIv,
-                c.passwordHintDekEncrypted,
-                c.passwordHintDekIv,
-              );
-              return {
-                id: c.id,
-                label: c.label || "",
-                loginId: c.loginId || "",
-                passwordHint: plain,
-              };
-            } catch {
-              return {
-                id: c.id,
-                label: c.label || "",
-                loginId: c.loginId || "",
-                passwordHint: "",
-              };
-            }
-          }
-          return {
-            id: c.id,
-            label: c.label || "",
-            loginId: c.loginId || "",
-            passwordHint: c.passwordHint || "",
-          };
-        }),
-      );
+      try {
+        credentials = await decryptRecordCredentials(
+          record.credentials,
+          decryptHint,
+        );
+      } catch {
+        toast.error(
+          "パスワードヒントの復号に失敗したため、編集を開始できませんでした",
+        );
+        return;
+      }
     } else {
       credentials = record.credentials.map((c) => ({
         id: c.id,

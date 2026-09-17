@@ -233,4 +233,83 @@ describe("useRecordForm", () => {
     expect(hookResult?.current.restoredMetadata?.initialRevision).toBe(3);
     expect(hookResult?.current.restoredMetadata?.isEditing).toBe(true);
   });
+
+  it("setBaselineValues で基準値が更新され、DBと同じヒントは未変更と判定されること", () => {
+    // 閲覧時（未復号ヒントは空文字で渡される）
+    const initialValues = {
+      title: "Google",
+      credentials: [
+        {
+          label: "メイン",
+          loginId: "user@gmail.com",
+          passwordHint: "",
+        },
+      ],
+    };
+
+    const { result } = renderHook(() =>
+      useRecordForm(initialValues, "rec_123"),
+    );
+
+    // ドラフト復元等により値が復元された状態をシミュレート
+    act(() => {
+      result.current.updateCredentialField(
+        0,
+        "passwordHint",
+        "復号されたパスワードヒント",
+      );
+    });
+
+    // 基準値未同期時点では空文字と異なるため変更ありと判定される
+    expect(result.current.isFieldModified("credential_0_passwordHint")).toBe(
+      true,
+    );
+
+    // setBaselineValues で DB から復号された基準値を反映
+    act(() => {
+      result.current.setBaselineValues({
+        title: "Google",
+        credentials: [
+          {
+            label: "メイン",
+            loginId: "user@gmail.com",
+            passwordHint: "復号されたパスワードヒント",
+          },
+        ],
+      });
+    });
+
+    // DB 基準値と一致するため未変更（消灯）と判定される
+    expect(result.current.isFieldModified("credential_0_passwordHint")).toBe(
+      false,
+    );
+
+    // ユーザーがさらにヒントを変更した場合は正しく点灯
+    act(() => {
+      result.current.updateCredentialField(
+        0,
+        "passwordHint",
+        "さらに新しいヒント",
+      );
+    });
+    expect(result.current.isFieldModified("credential_0_passwordHint")).toBe(
+      true,
+    );
+  });
+
+  it("マウント時にパスコード解除がキャンセルされた場合、onUnlockCancelled が呼ばれること", async () => {
+    mockRequireUnlock.mockResolvedValueOnce(false);
+    const onUnlockCancelled = vi.fn();
+
+    // 新規作成画面（!targetRecordId）ではマウント時に requireUnlock が走る
+    await act(async () => {
+      renderHook(() =>
+        useRecordForm(undefined, undefined, undefined, {
+          onUnlockCancelled,
+        }),
+      );
+    });
+
+    expect(onUnlockCancelled).toHaveBeenCalledTimes(1);
+  });
 });
