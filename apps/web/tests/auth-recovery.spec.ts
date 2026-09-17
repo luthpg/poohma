@@ -275,6 +275,36 @@ describe("auth-recovery", () => {
       expect(match).not.toBeNull();
       expect(match?.values.title).toBe("Netflix");
     });
+
+    it("暗号化ヒントの復号（unwrapDEK / decrypt）に失敗した場合は空文字で成功扱いとせず、null を返してドラフトを破棄すること", async () => {
+      const correctMasterKey = await generateMasterKey();
+      const wrongMasterKey = await generateMasterKey();
+
+      await saveRecordDraft({
+        draftId: "draft_decrypt_failure_test",
+        values: mockDraftValues,
+        masterKey: correctMasterKey,
+        accountId: "user_abc",
+      });
+      expect(hasRecordDraft({ draftId: "draft_decrypt_failure_test" })).toBe(
+        true,
+      );
+
+      // 異なる（不正な）masterKey で復号を試みる
+      const failed = await loadRecordDraft({
+        draftId: "draft_decrypt_failure_test",
+        masterKey: wrongMasterKey,
+        currentAccountId: "user_abc",
+      });
+
+      // 空文字ヒントで成功扱いにならず、null を返すこと
+      expect(failed).toBeNull();
+
+      // 破損・復号不可ドラフトはクリーンアップ（破棄）されること
+      expect(hasRecordDraft({ draftId: "draft_decrypt_failure_test" })).toBe(
+        false,
+      );
+    });
   });
 
   describe("formatDraftAsText", () => {

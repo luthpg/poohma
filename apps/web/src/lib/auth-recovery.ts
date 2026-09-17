@@ -291,31 +291,22 @@ export async function loadRecordDraft(params: {
           cred.passwordHintDekEncrypted &&
           cred.passwordHintDekIv
         ) {
-          try {
-            const draftDek = await unwrapDEK(
-              cred.passwordHintDekEncrypted,
-              cred.passwordHintDekIv,
-              masterKey,
-            );
-            const plainHint = await decrypt(
-              cred.passwordHintEncrypted,
-              cred.passwordHintIv,
-              draftDek,
-            );
-            return {
-              id: cred.id,
-              label: cred.label,
-              loginId: cred.loginId,
-              passwordHint: plainHint,
-            };
-          } catch {
-            return {
-              id: cred.id,
-              label: cred.label,
-              loginId: cred.loginId,
-              passwordHint: "",
-            };
-          }
+          const draftDek = await unwrapDEK(
+            cred.passwordHintDekEncrypted,
+            cred.passwordHintDekIv,
+            masterKey,
+          );
+          const plainHint = await decrypt(
+            cred.passwordHintEncrypted,
+            cred.passwordHintIv,
+            draftDek,
+          );
+          return {
+            id: cred.id,
+            label: cred.label,
+            loginId: cred.loginId,
+            passwordHint: plainHint,
+          };
         }
         return {
           id: cred.id,
@@ -339,6 +330,7 @@ export async function loadRecordDraft(params: {
       accountId: container.accountId,
     };
   } catch {
+    clearRecordDraft({ targetRecordId, draftId });
     return null;
   }
 }

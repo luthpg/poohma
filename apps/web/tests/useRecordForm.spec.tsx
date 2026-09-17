@@ -438,4 +438,21 @@ describe("useRecordForm", () => {
     expect(submittedPayload.ogpImage).toBe("https://example.com/ogp.jpg");
     expect(submittedPayload.ogpDescription).toBe("OGP 説明文");
   });
+
+  it("ドラフトが存在したにもかかわらず loadRecordDraft が null（復号失敗等）を返した場合、toast.error が呼ばれること", async () => {
+    mockMasterKey = {} as CryptoKey;
+    const authRecovery = await import("@/lib/auth-recovery");
+    vi.spyOn(authRecovery, "hasRecordDraft").mockReturnValue(true);
+    vi.spyOn(authRecovery, "loadRecordDraft").mockResolvedValue(null);
+
+    const { toast } = await import("sonner");
+
+    await act(async () => {
+      renderHook(() => useRecordForm(undefined, "rec_failed_restore"));
+    });
+
+    expect(toast.error).toHaveBeenCalledWith(
+      "未保存の下書きの復元に失敗しました",
+    );
+  });
 });

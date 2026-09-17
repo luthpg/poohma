@@ -179,6 +179,7 @@ export function useRecordForm(
 
     (async () => {
       try {
+        const hadDraft = hasRecordDraft({ targetRecordId, draftId });
         const draft = await loadRecordDraft({
           targetRecordId,
           draftId,
@@ -195,9 +196,11 @@ export function useRecordForm(
             accountId: draft.accountId,
           });
           toast.success("未保存の入力内容を復元しました");
+        } else if (hadDraft) {
+          toast.error("未保存の下書きの復元に失敗しました");
         }
       } catch {
-        // ignore
+        toast.error("未保存の下書きの復元に失敗しました");
       }
     })();
   }, [masterKey, targetRecordId, draftId, activeAccountId]);
