@@ -45,12 +45,34 @@ describe("isPrivateIp", () => {
 });
 
 describe("validateUrlSafety", () => {
-  // プライベートIPへのアクセス拒否
-  it("should reject private IP addresses", async () => {
-    await expect(validateUrlSafety("http://127.0.0.1")).rejects.toThrow(
-      "Access to private IP addresses is not allowed",
-    );
-  });
+  // 不正形式・非許可スキーム・プライベートIPの拒否
+  it.each([
+    {
+      url: "not-a-url",
+      expectedError: "Invalid URL format",
+    },
+    {
+      url: "ftp://example.com",
+      expectedError: "Only http and https URLs are allowed",
+    },
+    {
+      url: "file:///etc/passwd",
+      expectedError: "Only http and https URLs are allowed",
+    },
+    {
+      url: "javascript:alert(1)",
+      expectedError: "Only http and https URLs are allowed",
+    },
+    {
+      url: "http://127.0.0.1",
+      expectedError: "Access to private IP addresses is not allowed",
+    },
+  ])(
+    "should reject invalid/unsafe URL ($url) with error",
+    async ({ url, expectedError }) => {
+      await expect(validateUrlSafety(url)).rejects.toThrow(expectedError);
+    },
+  );
 
   it("should allow direct public IPv4 address", async () => {
     const ip = await validateUrlSafety("http://8.8.8.8");

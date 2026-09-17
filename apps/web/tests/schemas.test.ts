@@ -207,7 +207,19 @@ describe("RecordInputSchema", () => {
       expected: false,
     },
     {
-      desc: "up to 10 credentials is valid, 11 is rejected",
+      desc: "exactly 10 credentials is valid",
+      data: {
+        title: "Test",
+        ownerType: "user" as const,
+        credentials: Array.from({ length: 10 }, (_, i) => ({
+          label: `Cred${i}`,
+        })),
+        tags: [],
+      },
+      expected: true,
+    },
+    {
+      desc: "11 credentials is rejected",
       data: {
         title: "Test",
         ownerType: "user" as const,
@@ -219,7 +231,17 @@ describe("RecordInputSchema", () => {
       expected: false,
     },
     {
-      desc: "up to 20 tags is valid, 21 is rejected",
+      desc: "exactly 20 tags is valid",
+      data: {
+        title: "Test",
+        ownerType: "user" as const,
+        credentials: [],
+        tags: Array.from({ length: 20 }, (_, i) => `tag${i}`),
+      },
+      expected: true,
+    },
+    {
+      desc: "21 tags is rejected",
       data: {
         title: "Test",
         ownerType: "user" as const,

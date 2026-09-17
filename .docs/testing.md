@@ -20,7 +20,7 @@ PoohMa のテストは、既存テストを基準に場当たり的に拡張す�
 
 ### 現行のテスト実績サマリー (2026年9月現在)
 
-- **Vitest 全体**: **38 テストファイル / 404 テスト全件パス**
+- **Vitest 全体**: **38 テストファイル / 411 テスト全件パス**
 - **Convex バックエンド カバレッジ**: **82.38%**（`rls.ts` 100%, `customBuilders.ts` 100%, `users.ts` 93.8%, `recovery.ts` 90.1%, `records.ts` 84.1%, `crypto.ts` 90.6%）
 - **Playwright E2E**: 主要公開ルート、認証セットアップ、ダッシュボード・主要画面遷移、ログアウト、実暗号化シード復号（`e2ee-seed-import.spec.ts`）を配備
 
@@ -127,39 +127,37 @@ flowchart TD
 家族参加・家族変更に伴うデータ移行は、`prepareFamilyMigration → getMigrationForEncryption → commitFamilyMigration` の移行フローを利用する。
 
 - `convex-family.spec.ts`: 家族参加・家族変更というユーザー操作の文脈から、migration が正しく開始・完了することを検証
-- `convex-migrations.spec.ts`: migration 自体の状態遷移、認可、対象データ、コミット、abort、expire、旧Family削除などを詳細に検証
-- ブラウザテスト: クライアント側での再暗号化・復号を含む実際のE2EE動作を検証
-
-単体・統合テストでは実際の暗号化処理を再現せず、migration 対象の境界とDB上の整合性を検証する。
+- `convex-family.spec.ts`: migration 自体の状態遷移、認可、対象データ、コミット、abort、expire、旧Family削除などのバックエンド整合性を詳細に検証
+- `crypto.spec.ts`: `reWrapCredential` / `reEncryptCredentials` により、クライアント側での新マスターキーへの DEK 再ラップおよび移行後データの復号可能性を Web Crypto API で検証
 
 ### 4.3 家族移行 (Family Migration)
 
 | ID | テストケース | 種別 | 優先度 | 現状 | 主な対応ファイル |
 | --- | --- | --- | --- | :---: | --- |
-| MIG-01 | 新Familyへの migration prepare | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-02 | 既存Familyへの migration prepare | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-03 | 未承認Familyへの migration 拒否 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-04 | PREPARED 状態生成 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-05 | migration 対象 record 取得 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-06 | 他ユーザー record の混入拒否 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-07 | 他ユーザー credential の改変防止 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-08 | migration commit | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-09 | record の Family 変更 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-10 | user の Family 変更 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-11 | 旧 Family 削除 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-12 | 他メンバーがいる旧 Family を削除しない | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-13 | ABORTED への遷移 | 統合 | P1 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-14 | 他ユーザーによる abort 拒否 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-15 | COMPLETED migration の再 commit 拒否 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-16 | EXPIRED migration の commit 拒否 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-17 | 30分経過による EXPIRED 化 | 統合 | P1 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-18 | cron による EXPIRED クリーンアップ | 統合 | P1 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-19 | EXPIRED 後の孤児 Family 削除 | 統合 | P1 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-20 | ABORTED 後の孤児 Family 削除 | 統合 | P1 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-21 | migration 途中失敗時のデータ保持 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-22 | migration 中の同時操作（楽観的ロック検証） | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` (Issue #190) |
-| MIG-23 | migration 再実行・二重 commit 防止 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-24 | migration 後の暗号データ復号可能性 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
+| MIG-01 | 新Familyへの migration prepare | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-02 | 既存Familyへの migration prepare | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-03 | 未承認Familyへの migration 拒否 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-04 | PREPARED 状態生成 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-05 | migration 対象 record 取得 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-06 | 他ユーザー record の混入拒否 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-07 | 他ユーザー credential の改変防止 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-08 | migration commit | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-09 | record の Family 変更 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-10 | user の Family 変更 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-11 | 旧 Family 削除 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-12 | 他メンバーがいる旧 Family を削除しない | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-13 | ABORTED への遷移 | 統合 | P1 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-14 | 他ユーザーによる abort 拒否 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-15 | COMPLETED migration の再 commit 拒否 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-16 | EXPIRED migration の commit 拒否 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-17 | 30分経過による EXPIRED 化 | 統合 | P1 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-18 | cron による EXPIRED クリーンアップ | 統合 | P1 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-19 | EXPIRED 後の孤児 Family 削除 | 統合 | P1 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-20 | ABORTED 後の孤児 Family 削除 | 統合 | P1 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-21 | migration 途中失敗時のデータ保持 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-22 | migration 中の同時操作（楽観的ロック検証） | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` (Issue #190) |
+| MIG-23 | migration 再実行・二重 commit 防止 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-24 | migration 後の暗号データ復号可能性 | 単体/統合 | P0 | ✅ 実装済 | `tests/crypto.spec.ts` / `tests/convex-family.spec.ts` |
 
 ### 4.4 家族パスコード・Master Key & E2EE
 

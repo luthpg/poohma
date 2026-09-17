@@ -96,9 +96,7 @@ test.describe("認証済みルートのアクセス検証", () => {
           .first();
         await expect(familyElement).toBeVisible({ timeout: 10000 });
       } else if (targetRoute === "/settings") {
-        const settingsElement = page
-          .locator("h1, h2, form, input#display-name-input")
-          .first();
+        const settingsElement = page.locator("input#display-name-input");
         await expect(settingsElement).toBeVisible({ timeout: 10000 });
       }
 

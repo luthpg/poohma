@@ -322,6 +322,57 @@ describe("PasscodeProvider E2EE State Management", () => {
   });
 });
 
+describe("PasscodeProvider - decryptHint", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useRouteContext).mockReturnValue({
+      user: {
+        familyId: "family-1",
+        family: {
+          name: "Test Family",
+          masterKeyEncrypted: "encrypted-key",
+          masterKeyIv: "iv",
+          masterKeySalt: "salt",
+        },
+      },
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it("dekEncrypted または dekIv がない場合、DEK必須エラーがスローされること", async () => {
+    const mockMasterKey = { tag: "mock-master-key" } as unknown as CryptoKey;
+    vi.spyOn(cryptoLib, "deriveKeyFromPasscode").mockResolvedValue(
+      {} as CryptoKey,
+    );
+    vi.spyOn(cryptoLib, "unwrapMasterKey").mockResolvedValue(mockMasterKey);
+
+    let resultContext!: ReturnType<typeof usePasscode>;
+    function TestComponent() {
+      resultContext = usePasscode();
+      return null;
+    }
+
+    render(
+      <PasscodeProvider>
+        <TestComponent />
+      </PasscodeProvider>,
+    );
+
+    // テスト実行前に unlock を呼び出して masterKey をセットする
+    await act(async () => {
+      await resultContext.unlock("dummy-passcode");
+    });
+
+    await expect(
+      resultContext.decryptHint("encrypted_data", "iv_data"),
+    ).rejects.toThrow("DEK is required for hint decryption");
+  });
+});
+
 describe("PasscodeProvider - 誤入力時の指数バックオフ・ロックアウト", () => {
   beforeEach(() => {
     vi.clearAllMocks();
