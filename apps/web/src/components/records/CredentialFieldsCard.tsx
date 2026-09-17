@@ -11,6 +11,8 @@ export interface CredentialFieldsCardProps {
     value: string,
   ) => void;
   onRemove: (index: number) => void;
+  isFieldModified?: (field: string) => boolean;
+  isEditMode?: boolean;
 }
 
 export function CredentialFieldsCard({
@@ -19,14 +21,29 @@ export function CredentialFieldsCard({
   removable,
   onChange,
   onRemove,
+  isFieldModified,
+  isEditMode = false,
 }: CredentialFieldsCardProps) {
+  const isLabelModified = isFieldModified?.(`credential_${index}_label`);
+  const isLoginIdModified = isFieldModified?.(`credential_${index}_loginId`);
+  const isHintModified = isFieldModified?.(`credential_${index}_passwordHint`);
+
+  const getModifiedClass = (modified?: boolean) => {
+    if (!isEditMode) return "";
+    return `relative pl-3.5 before:pointer-events-none before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-1 before:bg-orange-500 before:rounded-full before:transition-all before:duration-200 ${
+      modified
+        ? "before:opacity-100 before:scale-y-100"
+        : "before:opacity-0 before:scale-y-50"
+    }`;
+  };
+
   return (
     <div className="rounded-md bg-muted/50 p-5 shadow-border-light relative group">
       {removable && (
         <button
           type="button"
           onClick={() => onRemove(index)}
-          className="absolute right-2.5 top-2.5 inline-flex items-center justify-center rounded-md p-1.5 text-muted-foreground transition-all hover:bg-red-500/10 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/30 opacity-80 hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"
+          className="absolute right-2.5 top-2.5 inline-flex items-center justify-center rounded-md p-1.5 text-muted-foreground transition-all hover:bg-red-500/10 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/30 opacity-80 hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100 cursor-pointer"
           title="このアカウント情報を削除"
           aria-label="このアカウント情報を削除"
         >
@@ -34,7 +51,7 @@ export function CredentialFieldsCard({
         </button>
       )}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div>
+        <div className={getModifiedClass(isLabelModified)}>
           <label
             htmlFor={`label-input-${index}`}
             className="block text-[12px] font-medium text-muted-foreground uppercase tracking-wider mb-1"
@@ -49,7 +66,7 @@ export function CredentialFieldsCard({
             className="w-full rounded-md bg-card p-2 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
           />
         </div>
-        <div>
+        <div className={getModifiedClass(isLoginIdModified)}>
           <label
             htmlFor={`login-id-input-${index}`}
             className="block text-[12px] font-medium text-muted-foreground uppercase tracking-wider mb-1"
@@ -64,7 +81,7 @@ export function CredentialFieldsCard({
             className="w-full rounded-md bg-card p-2 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50 font-mono"
           />
         </div>
-        <div>
+        <div className={getModifiedClass(isHintModified)}>
           <label
             htmlFor={`pw-hint-input-${index}`}
             className="block text-[12px] font-medium text-muted-foreground uppercase tracking-wider mb-1"

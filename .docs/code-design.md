@@ -592,6 +592,19 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
     │  unwrapKey（families.masterKeyRecoveryEncrypted / masterKeyRecoveryIv を復号）
     ▼
   マスターキー（パスコード経路と同一のものに到達する）
+
+【クライアント側ドラフト暗号化経路（FR-REC-28）】
+入力フォームの未保存内容を一時退避する際も、PoohMa の基本暗号化方針（秘密情報のみ E2EE 対象とする設計思想）に従い、
+パスワードヒントに対してマスターキーによる封筒暗号化を適用する（タイトル・URL等のメタデータは平文コンテナ内に保持）。
+  マスターキー（メモリ上に展開中）
+    │  wrapKey（自動保存ごとにクレデンシャル単位で新規生成した短命 draftDEK をラップ）
+    ▼
+  暗号化済み draftDEK（passwordHintDekEncrypted / passwordHintDekIv）
+    │  encrypt(passwordHint, draftDEK)
+    ▼
+  暗号化済みパスワードヒント（passwordHintEncrypted / passwordHintIv）
+  ＋ 平文メタデータ（title, url, memo, tags等）
+  → StoredRecordDraftContainer として localStorage（キー: poohma_draft_record_${id} / poohma_draft_new_${draftId}）に24h TTL付き・accountId照合付きで退避
 ```
 
 備考：エンベロープ暗号化は全レコードで必須であり、暗号化（encryptHint）・復号（decryptHint）・家族移行時の再ラップ（reWrapCredential）のいずれにおいても DEK を必須とする（マスターキー直接暗号化・復号へのフォールバックは行わない）。
@@ -938,6 +951,8 @@ ConvexProviderWithAuth(useConvexFirebaseAuth)
 - タグ入力欄は、ソフトウェアキーボード表示中でもよく使うタグを選択・解除できるUI（入力欄直下に候補チップス形式で表示、選択中タグは前方ソート）とする（FR-REC-14）。上限（20個）到達時は追加操作を抑止する。
 - レコード登録・編集フォームは、グローバルヘッダー（`sticky top-0 h-16`）の直下（`sticky top-16 z-10`）に各セクション（基本情報、アカウント情報、その他の設定）の見出しがスクロール位置に応じて連動固定される設計とし、入力中の視認性を担保する。
 - 公開レイアウト（`PublicLayout`）は、SSR解決された認証ユーザー情報に基づき、未ログイン時はログインボタン、ログイン時は共通ユーザーアバター（`UserAvatar`）による `UserMenu`（ダッシュボード導線付き）を描画する。
+- 変更インジケーター（FR-REC-29）：レコード編集時、各入力コンテナ左端に `before:bg-orange-500` の視覚的アクセントバーを配置。入力中のガタつき（レイアウトシフト）を完全に防止するため、未変更時も常時余白（`pl-3.5`）を確保し、`opacity` と `scale-y` の滑らかなトランジションで状態を切り替える。復号結果を動的基準値に同期し、新規作成時は抑止する。
+- 固定アクションフッター（FR-REC-30）：レコード詳細閲覧・編集・新規登録の3画面において、最下部固定（`fixed bottom-0` + `backdrop-blur-md` + `pb-safe`）アクションフッターの体験を統一。右端にSubmit相当（オレンジPrimary）、左端に削除ボタン（Destructive、誤タップ防止のため隔離・モバイルではアイコン化）を配置する。
 
 ### 8.4 状態管理・キャッシュ戦略（TanStack Query vs Convex）
 
@@ -950,12 +965,21 @@ TanStack QueryとConvexは双方がキャッシュ機構を持つため、責務
 | 認証状態・ルート保護 | Firebase Auth（useAuth / AuthGuard） | 認証状態、Firebase User、IDトークン | 長期ログイン状態の本体（Single Source of Truth）、ルート保護 |
 | 初期スナップショット・CMS | TanStack Query | SSR初期スナップショット（Cookieベース）、UI設定、CMSデータ（FAQ・規約等の静的コンテンツ） | SSR時の初期データ解決、低頻度更新の外部コンテンツのキャッシュ |
 | アプリケーションデータ | Convex（useQuery） | serviceRecords、家族情報、参加申請状態など | リアルタイムデータ同期。信頼できる唯一の情報源（Single Source of Truth） |
+| 未保存フォームドラフト | localStorage（useRecordForm / auth-recovery） | 暗号化済みレコード入力値（poohma_draft_*） | iOSメモリ解放耐性・再認証後の入力復元。24h TTL、タブ複製衝突自律回避 |
 
 基本原則：
 
 1. **二重キャッシュの禁止** ：Convexが提供するアプリケーションデータは、ConvexのWebSocket経由のリアクティブ同期によって常に最新状態が保たれる。これをTanStack Queryで再度フェッチ・ラップしてキャッシュすることは、他端末での編集が即時反映されない等のデータ不整合と、不要なHTTPリクエストを招くため厳禁とする。
 2. **描画品質（チラツキ防止）の担保** ：Convexのデータ取得が開始してから完了するまでの遷移期間に画面がちらつかないよう、コンポーネントは `usePersistentQuery` フックを介してメモリ上にフォールバックキャッシュ（直近取得結果、最大1,000件、NFR-PERF-02）を保持する。
 3. **セッションクリーンアップ** ：ログアウト時は、TanStack Queryのキャッシュ（ `queryClient.clear()` ）と `usePersistentQuery` のインメモリキャッシュの両方を即時にクリアし、アカウント間でのデータ残存・露出を防ぐ。
+4. **ドラフトの安全なライフサイクル管理** ：未保存ドラフトは短命 `draftDEK` で暗号化され、平文のままストレージに永続化されることはない。保存成功、明示的キャンセル、競合解決完了（最新リロード／上書き保存）時には即座に物理削除（`discardDraft`）する。また別タブでの複製操作に対しては `BroadcastChannel`（`poohma_draft_bus`）により衝突を自律検知して新規IDへ分岐する。
+5. **編集・ドラフト復元時の基準値同期と安全ブロック** ：
+   - **動的基準値同期（`setBaselineValues`）**：localStorage からのドラフト復元時、DB レコードの暗号化パスワードヒントを復号して基準値に同期する。これにより、DB 保存値と同一のヒントに対する変更インジケータ誤点灯を完全に排除する。
+   - **復号失敗時の安全ブロックとドラフト破棄**：編集開始時およびドラフト復元（`loadRecordDraft`）時、暗号化ヒントの復号に失敗した場合は空文字へのサイレントフォールバックを完全撤廃し、復元・編集開始を即座に中断する。復号に失敗した壊れたドラフトはストレージから安全に破棄（`clearRecordDraft`）し、固定日本語トースト（CWE-209保護）で通知することで、空文字での上書き保存による既存暗号化データの消滅・不可逆破壊を確実に防止する。
+   - **アンロックキャンセル時の安全復帰（`onUnlockCancelled`）**：未保存ドラフトが存在してマウント時に編集画面として起動された際、ユーザーがパスコードロック解除をキャンセルした場合は、ヒント欄がブランクのまま編集画面に留まるのを防ぎ、即座に閲覧モード（`isEditing: false`）へ安全に復帰する。
+   - **ドラフト復元完了までの閲覧モード維持**：未保存ドラフトが存在する場合でも、マウント時は閲覧モード（`isEditing: false`）で開始し、ドラフト復元およびパスワードヒント復号が完了した時のみ `setIsEditing(true)` に遷移する。これにより、アンロック前や復号失敗時に空文字ヒントの編集フォームが一瞬露出・残留するリスクを根本排除する。
+   - **フォームリセット時の初期基準値同期（`initialValuesJsonRef`）**：`form.reset` 呼び出し時に `initialValuesJsonRef` を新値の JSON に同期し、編集開始時の復号ヒント反映直後に `isDirty` が誤って `true` と判定されて不要なオートセーブが走るのを防止する。
+   - **OGP取得解決値の即時ペイロード統合**：URL入力直後に保存ボタンが押下された際、`ogpPromiseRef` の完了待機後に得られた最新の OGP 情報（タイトル・画像・説明文）を即座に暗号化ペイロードへ統合し、非同期レンダリング遅延によるメタデータ欠落を防止する。
 
 ### 8.5 ビジュアルデザインシステム（概要）
 

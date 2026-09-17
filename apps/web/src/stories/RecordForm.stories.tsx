@@ -20,11 +20,13 @@ function MockFormContainer({
   isAdmin = true,
   submitIdleLabel = "登録する",
   isBusy = false,
+  targetRecordId,
 }: {
   initialValues?: Partial<RecordFormValues>;
   isAdmin?: boolean;
   submitIdleLabel?: string;
   isBusy?: boolean;
+  targetRecordId?: string;
 }) {
   const [values, setValues] = useState<RecordFormValues>({
     title: "",
@@ -44,7 +46,7 @@ function MockFormContainer({
     updateTitle: (title) => setValues((prev) => ({ ...prev, title })),
     updateTitleReading: (titleReading) =>
       setValues((prev) => ({ ...prev, titleReading })),
-    handleTitleBlur: () => {},
+    handleTitleBlur: async () => null,
     fetchFuriganaForTitle: async () => null,
     setUrl: (url) => setValues((prev) => ({ ...prev, url })),
     handleUrlBlur: () => Promise.resolve(null),
@@ -75,10 +77,20 @@ function MockFormContainer({
         ...prev,
         ...next,
       })),
+    setBaselineValues: () => {},
     submit: async () => true,
+    retryPendingSubmit: async () => true,
+    discardDraft: () => {},
+    isFieldModified: () => false,
     isFetchingOgp: false,
     isFetchingFurigana: false,
     isSubmitting: isBusy,
+    isSessionExpired: false,
+    setIsSessionExpired: () => {},
+    restoredMetadata: null,
+    setEditingMetadata: () => {},
+    isDirty: false,
+    targetRecordId,
   };
 
   return (
@@ -106,6 +118,7 @@ export const EditRecord: Story = {
   render: () => (
     <MockFormContainer
       submitIdleLabel="保存する"
+      targetRecordId="record-123"
       initialValues={{
         title: "Amazon",
         titleReading: "あまぞん",
@@ -137,6 +150,7 @@ export const NonAdminFamilyRecord: Story = {
   render: () => (
     <MockFormContainer
       submitIdleLabel="保存する"
+      targetRecordId="record-123"
       initialValues={{
         title: "三井住友銀行",
         titleReading: "みついすみともぎんこう",

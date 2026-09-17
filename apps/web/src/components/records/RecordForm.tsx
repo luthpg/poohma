@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
+import { SessionExpiredDialog } from "@/components/auth/SessionExpiredDialog";
 import { Spinner } from "@/components/ui/spinner";
 import { TagInput } from "@/components/ui/tag-input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -25,9 +26,20 @@ export function RecordForm({
   isAdmin = true,
 }: RecordFormProps) {
   const [showAdvancedTitle, setShowAdvancedTitle] = useState(false);
-  const { values } = form;
+  const { values, isFieldModified } = form;
+  const isEditMode = Boolean(form.targetRecordId);
   const isBusy =
     form.isSubmitting || form.isFetchingOgp || form.isFetchingFurigana;
+
+  const getModifiedClass = (field: string) => {
+    if (!isEditMode) return "";
+    const modified = isFieldModified(field);
+    return `relative pl-3.5 before:pointer-events-none before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-1 before:bg-orange-500 before:rounded-full before:transition-all before:duration-200 ${
+      modified
+        ? "before:opacity-100 before:scale-y-100"
+        : "before:opacity-0 before:scale-y-50"
+    }`;
+  };
 
   return (
     <form onSubmit={onSubmit} className="space-y-8">
@@ -39,7 +51,7 @@ export function RecordForm({
           </h2>
         </div>
         <div className="space-y-4">
-          <div>
+          <div className={getModifiedClass("url")}>
             <label
               htmlFor="url-input"
               className="block text-[14px] font-medium text-foreground"
@@ -68,7 +80,7 @@ export function RecordForm({
             </p>
           </div>
 
-          <div>
+          <div className={getModifiedClass("title")}>
             <label
               htmlFor="title-input"
               className="block text-[14px] font-medium text-foreground"
@@ -107,7 +119,9 @@ export function RecordForm({
             </button>
 
             {showAdvancedTitle && (
-              <div className="mt-2 rounded-md bg-muted/40 p-3.5 border border-border/40 space-y-2 animate-in fade-in duration-200">
+              <div
+                className={`mt-2 rounded-md bg-muted/40 p-3.5 border border-border/40 space-y-2 animate-in fade-in duration-200 ${getModifiedClass("titleReading")}`}
+              >
                 <div className="flex items-center justify-between">
                   <label
                     htmlFor="title-reading-input"
@@ -173,6 +187,8 @@ export function RecordForm({
               removable={values.credentials.length > 1}
               onChange={form.updateCredentialField}
               onRemove={form.removeCredential}
+              isFieldModified={isFieldModified}
+              isEditMode={isEditMode}
             />
           ))}
         </div>
@@ -185,7 +201,7 @@ export function RecordForm({
             その他の設定
           </h2>
         </div>
-        <div>
+        <div className={getModifiedClass("ownerType")}>
           <span
             id="owner-type-label"
             className="block text-[14px] font-medium text-foreground mb-2"
@@ -229,7 +245,7 @@ export function RecordForm({
           )}
         </div>
 
-        <div>
+        <div className={getModifiedClass("tags")}>
           <label
             htmlFor="tags-input"
             className="block text-[14px] font-medium text-foreground mb-1"
@@ -243,7 +259,7 @@ export function RecordForm({
           />
         </div>
 
-        <div>
+        <div className={getModifiedClass("memo")}>
           <label
             htmlFor="memo-input"
             className="block text-[14px] font-medium text-foreground mb-1"
@@ -261,34 +277,43 @@ export function RecordForm({
       </section>
 
       {/* 下部固定アクションバー */}
-      <div className="sticky bottom-0 z-20 -mx-6 -mb-6 mt-8 border-t border-border bg-background/95 backdrop-blur px-6 py-3.5 flex items-center justify-end gap-3 sm:gap-4 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] dark:shadow-[0_-4px_12px_rgba(0,0,0,0.3)]">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-md bg-card px-5 py-2 text-[14px] font-medium text-foreground shadow-border hover:bg-accent transition cursor-pointer"
-        >
-          キャンセル
-        </button>
-        <button
-          type="submit"
-          disabled={isBusy}
-          className="flex items-center rounded-md bg-orange-500 px-5 py-2 text-[14px] font-medium text-white shadow-border hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50 transition cursor-pointer"
-        >
-          {form.isSubmitting ? (
-            <>
-              <Spinner className="mr-2 h-4 w-4" />
-              保存中...
-            </>
-          ) : form.isFetchingFurigana || form.isFetchingOgp ? (
-            <>
-              <Spinner className="mr-2 h-4 w-4" />
-              自動取得中...
-            </>
-          ) : (
-            submitIdleLabel
-          )}
-        </button>
+      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-border/80 bg-background/95 backdrop-blur-md px-4 py-2.5 sm:px-6 sm:py-3.5 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] dark:shadow-[0_-4px_12px_rgba(0,0,0,0.3)] pb-[max(0.625rem,env(safe-area-inset-bottom))] sm:pb-[max(0.875rem,env(safe-area-inset-bottom))]">
+        <div className="mx-auto flex max-w-3xl items-center justify-end gap-3 sm:gap-4">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex h-9 sm:h-10 min-h-11 items-center justify-center rounded-md bg-card px-3 sm:px-5 text-xs sm:text-[14px] font-medium text-foreground shadow-border hover:bg-accent transition cursor-pointer"
+          >
+            キャンセル
+          </button>
+          <button
+            type="submit"
+            disabled={isBusy}
+            className="flex h-9 sm:h-10 min-h-11 min-w-20 sm:min-w-25 items-center justify-center rounded-md bg-orange-600 px-4 sm:px-6 text-xs sm:text-[14px] font-semibold text-white shadow-sm hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50 transition cursor-pointer"
+          >
+            {form.isSubmitting ? (
+              <>
+                <Spinner className="mr-2 h-4 w-4" />
+                保存中...
+              </>
+            ) : form.isFetchingFurigana || form.isFetchingOgp ? (
+              <>
+                <Spinner className="mr-2 h-4 w-4" />
+                自動取得中...
+              </>
+            ) : (
+              submitIdleLabel
+            )}
+          </button>
+        </div>
       </div>
+
+      {/* セッション切れ時の再認証・データ救済モーダル */}
+      <SessionExpiredDialog
+        open={form.isSessionExpired}
+        onOpenChange={form.setIsSessionExpired}
+        values={values}
+      />
     </form>
   );
 }

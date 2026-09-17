@@ -21,6 +21,12 @@ What distinguishes Vercel from other monochrome design systems is its shadow-as-
 
 ## 2. Color Palette & Roles
 
+### Brand Identity (PoohMa Signature)
+
+- **PoohMa Orange** (`#f97316` / Tailwind `orange-500`): アプリケーション全体のシグネチャーブランドカラー。ハチミツを想起させる温かみと安心感を象徴する核となるカラー。
+  - 用途: ブランドロゴ、アプリアイコン、フォーム変更インジケーター（アクセントバー）、重要ハイライト、ブランドシンボル。
+  - 特性: モノクロ・ミニマルな Geist デザインシステムの中で、PoohMa 独自のアイデンティティと親しみやすさを際立たせる。
+
 ### Primary
 
 - **Vercel Black** (`#171717`): Primary text, headings, dark surface backgrounds. Not pure black — the slight warmth prevents harshness.
@@ -129,6 +135,16 @@ What distinguishes Vercel from other monochrome design systems is its shadow-as-
 - Radius: 6px
 - Use: Primary CTA ("Start Deploying", "Get Started")
 
+**Primary Action Button (Orange CTA - Button Specific)**
+
+PoohMa のブランドカラー本体（`#f97316` / orange-500：ロゴや変更インジケーター等のシグネチャー）と調和を保ちつつ、ボタン内の白文字の視認性（WCAGコントラスト比）およびモバイル操作性を担保するための**ボタン限定の専用スタイル**：
+- Background: `#ea580c` (orange-600), Hover: `#c2410c` (orange-700)
+- Text: `#ffffff`
+- Font: `font-semibold text-xs sm:text-[14px]` (コントラスト比 3.56:1、太字UI要素/ラージテキスト基準 3:1 クリア)
+- Padding & Sizing: `px-4 sm:px-6 py-2 sm:py-2.5 min-h-[44px]` (NFR-UX-04 の最小タップ領域 44px 準拠)
+- Radius: 6px
+- Use: レコード関連フローの主要送信・決定アクション限定（"登録する", "保存する", "編集する"）
+
 **Pill Button / Badge**
 
 - Background: `#ebf5ff` (tinted blue)
@@ -159,6 +175,26 @@ What distinguishes Vercel from other monochrome design systems is its shadow-as-
 - Focus shadow: `1px 0 0 0 var(--ds-gray-alpha-600)`
 - Focus outline: `2px solid var(--ds-focus-color)` — consistent blue focus ring
 - Border: via shadow technique, not traditional border
+
+**Visual Accent Bar (Form Modification Indicator)**
+
+- Container: `relative pl-3.5`（編集画面では常に左余白 14px を確保し、レイアウトシフト＝ガタつきを完全防止）
+- Indicator Bar: `before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-1 before:bg-orange-500 before:rounded-full before:transition-all before:duration-200`
+- State:
+  - 未変更時: `before:opacity-0 before:scale-y-50`（非表示だが余白は維持）
+  - 変更時: `before:opacity-100 before:scale-y-100`（ブランドオレンジバーが出現）
+- 新規作成時（`new.tsx`）: 変更の概念が存在しないため、インジケーターおよび左余白を完全抑止（`pl-0`）。
+
+### Fixed Action Footer (Service Records)
+
+レコード詳細閲覧、レコード編集、新規登録の3画面において、下部アクションバーの体験・配置を統一：
+- Container: `fixed bottom-0 left-0 right-0 z-20 border-t border-border/80 bg-background/95 backdrop-blur-md px-4 py-2.5 sm:px-6 sm:py-3.5 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] dark:shadow-[0_-4px_12px_rgba(0,0,0,0.3)] pb-[max(0.625rem,env(safe-area-inset-bottom))] sm:pb-[max(0.875rem,env(safe-area-inset-bottom))]`
+- Content Width: `max-w-4xl mx-auto flex items-center justify-between`
+- Button Alignment & Tap Targets:
+  - **右端 (Primary)**: Submit相当（登録・保存・編集）をオレンジPrimaryボタンスタイル（`min-h-[44px]`）で右端に配置。
+  - **右隣 (Secondary)**: キャンセルボタン（`min-h-[44px]`）をメインボタンの左隣に配置。
+  - **左端 (Destructive)**: 削除ボタンを左端に隔離配置（誤タップ防止）。モバイル（`< sm`）ではゴミ箱アイコン単体（`min-h-[44px] min-w-[44px]` で 44px 以上のタップ領域を確保）、PCではアイコン＋テキスト。
+- Main Scroll Offset: メインコンテンツ末尾に `pb-24 sm:pb-32` のスクロール余白を常時確保。
 
 ### Navigation
 

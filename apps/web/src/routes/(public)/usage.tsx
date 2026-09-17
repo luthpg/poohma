@@ -1147,6 +1147,47 @@ function UsagePage() {
                 </JpText>
               </AccordionContent>
             </AccordionItem>
+
+            <AccordionItem
+              value="q6"
+              className="rounded-xl border border-border bg-card px-4 sm:px-6 shadow-xs"
+            >
+              <AccordionTrigger className="text-sm sm:text-base font-semibold text-foreground py-4 hover:no-underline text-left">
+                <JpText>推奨する動作環境・対応ブラウザを教えてください</JpText>
+              </AccordionTrigger>
+              <AccordionContent className="text-xs sm:text-sm text-muted-foreground leading-relaxed pb-4 whitespace-pre-wrap space-y-2">
+                <p>
+                  <JpText>
+                    PoohMaは端末内での安全な暗号化（E2EE）やオフライン耐性を実現するため、Web標準のセキュリティ技術を採用しています。最新バージョンでのご利用をお願いいたしますが、サポートといたしましては以下の環境以上のブラウザでのご利用を推奨しております。
+                  </JpText>
+                </p>
+                <ul className="list-disc list-inside space-y-1 pl-1 text-muted-foreground">
+                  <li>
+                    <span className="font-semibold text-foreground">
+                      iPhone / iPad:
+                    </span>{" "}
+                    Safari 15.4 以上（iOS / iPadOS 15.4 以降）
+                  </li>
+                  <li>
+                    <span className="font-semibold text-foreground">
+                      Android:
+                    </span>{" "}
+                    Google Chrome 92 以上
+                  </li>
+                  <li>
+                    <span className="font-semibold text-foreground">
+                      パソコン（Windows / Mac / Linux）:
+                    </span>{" "}
+                    Google Chrome 92 以上、Safari 15.4 以上、Microsoft Edge 92
+                    以上、Mozilla Firefox 103 以上
+                  </li>
+                </ul>
+                <p className="text-[11px] text-muted-foreground/80 pt-1">
+                  ※
+                  ブラウザのプライベートブラウズモード等、ローカルストレージの保存が制限される環境では正常に動作しない場合があります。
+                </p>
+              </AccordionContent>
+            </AccordionItem>
           </Accordion>
 
           <div className="mt-8 text-center">

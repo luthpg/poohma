@@ -74,6 +74,12 @@ flowchart TB
 - このDEKでパスワードヒント本体を暗号化し、`credentials.passwordHint` / `credentials.passwordHintIv` として保存する。
 - エンベロープ暗号化は全レコードで必須であり、暗号化・復号・再暗号化のいずれにおいても DEK を必須とする（マスターキー直接暗号化・復号へのフォールバックは行わない）。
 
+### クライアント側ドラフト暗号化（FR-REC-28）
+
+- フォーム入力中の未保存内容は、iOS Safari の Jetsam メモリ解放やサイレント再認証後の入力復元のため、クライアント側（localStorage）に一時退避される。
+- E2EE の Zero-Knowledge 原則を堅持するため、平文や未ラップの鍵材料はストレージに一切保存せず、自動保存ごとに短命な `draftDEK`（AES-GCM 256）を生成してフォーム全入力値（メモや平文項目を含む）を暗号化し、その `draftDEK` をメモリ上の `masterKey` で wrap して保存する（`draftDEKEncrypted` + `encryptedValues`）。
+- 保存先キーは `poohma_draft_record_${recordId}` / `poohma_draft_new_${draftId}`。24時間TTL、保存完了・明示的キャンセル・競合解決完了（最新リロード／上書き保存）時の即時物理破棄、別タブ複製時の `BroadcastChannel`（`poohma_draft_bus`）衝突自律検知、およびアカウント分離（`accountId` 照合）を行う。
+
 ## Encryption / Decryption Flow
 
 ```mermaid
