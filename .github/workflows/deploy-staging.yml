@@ -66,6 +66,12 @@ jobs:
           fi
           echo "alias_url=$ALIAS" >> "$GITHUB_OUTPUT"
 
+      - name: Get current time
+        if: always() && github.event_name == 'pull_request'
+        id: time
+        run: |
+          echo "current_time=$(TZ=Asia/Tokyo date +'%Y-%m-%d %H:%M:%S JST')" >> "$GITHUB_OUTPUT"
+
       - name: Comment or Update PR
         uses: marocchino/sticky-pull-request-comment@v2
         # デプロイ成否に関わらず実行しつつ、手動実行(workflow_dispatch)時はPRが存在しないためスキップ
@@ -84,7 +90,7 @@ jobs:
             | **Branch** | `${{ github.head_ref }}` |
 
             ---
-            *Updated at: ${{ github.event.repository.updated_at }}*
+            *Updated at: ${{ steps.time.outputs.current_time }}*
             
 
   e2e:
