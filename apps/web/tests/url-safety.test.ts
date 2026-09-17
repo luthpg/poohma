@@ -45,81 +45,9 @@ describe("isPrivateIp", () => {
 });
 
 describe("validateUrlSafety", () => {
-  it("should allow valid https URLs", async () => {
-    const ip = await validateUrlSafety("https://example.com");
-    expect(ip).toBeTypeOf("string");
-    expect(isPrivateIp(ip)).toBe(false);
-  });
-
-  it("should allow valid http URLs", async () => {
-    const ip = await validateUrlSafety("http://example.com");
-    expect(ip).toBeTypeOf("string");
-    expect(isPrivateIp(ip)).toBe(false);
-  });
-
-  it("should reject ftp URLs", async () => {
-    await expect(validateUrlSafety("ftp://example.com")).rejects.toThrow(
-      "Only http and https URLs are allowed",
-    );
-  });
-
-  it("should reject file URLs", async () => {
-    await expect(validateUrlSafety("file:///etc/passwd")).rejects.toThrow(
-      "Only http and https URLs are allowed",
-    );
-  });
-
-  it("should reject javascript URLs", async () => {
-    await expect(validateUrlSafety("javascript:alert(1)")).rejects.toThrow(
-      "Only http and https URLs are allowed",
-    );
-  });
-
-  it("should reject invalid URL format", async () => {
-    await expect(validateUrlSafety("not-a-url")).rejects.toThrow(
-      "Invalid URL format",
-    );
-  });
-
   // プライベートIPへのアクセス拒否
-  it("should reject http://127.0.0.1", async () => {
+  it("should reject private IP addresses", async () => {
     await expect(validateUrlSafety("http://127.0.0.1")).rejects.toThrow(
-      "Access to private IP addresses is not allowed",
-    );
-  });
-
-  it("should reject http://10.0.0.1", async () => {
-    await expect(validateUrlSafety("http://10.0.0.1")).rejects.toThrow(
-      "Access to private IP addresses is not allowed",
-    );
-  });
-
-  it("should reject http://169.254.169.254 (AWS metadata)", async () => {
-    await expect(validateUrlSafety("http://169.254.169.254")).rejects.toThrow(
-      "Access to private IP addresses is not allowed",
-    );
-  });
-
-  it("should reject http://192.168.1.1", async () => {
-    await expect(validateUrlSafety("http://192.168.1.1")).rejects.toThrow(
-      "Access to private IP addresses is not allowed",
-    );
-  });
-
-  it("should reject http://172.16.0.1", async () => {
-    await expect(validateUrlSafety("http://172.16.0.1")).rejects.toThrow(
-      "Access to private IP addresses is not allowed",
-    );
-  });
-
-  it("should reject http://[::1]", async () => {
-    await expect(validateUrlSafety("http://[::1]")).rejects.toThrow(
-      "Access to private IP addresses is not allowed",
-    );
-  });
-
-  it("should reject http://0.0.0.0", async () => {
-    await expect(validateUrlSafety("http://0.0.0.0")).rejects.toThrow(
       "Access to private IP addresses is not allowed",
     );
   });

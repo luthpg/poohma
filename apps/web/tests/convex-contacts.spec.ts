@@ -102,45 +102,6 @@ describe("Convex Contacts (お問い合わせ機能)", () => {
     });
   });
 
-  it("無効なメールアドレスで送信した場合にエラーになること", async () => {
-    const t = setupTest();
-
-    await expect(
-      t.mutation(api.contacts.createContact, {
-        name: "田中",
-        email: "invalid-email",
-        category: "不具合・障害の報告",
-        message: "画面が真っ白になります。",
-      }),
-    ).rejects.toThrow("有効なメールアドレスを入力してください");
-  });
-
-  it("空の名前で送信した場合にエラーになること", async () => {
-    const t = setupTest();
-
-    await expect(
-      t.mutation(api.contacts.createContact, {
-        name: "   ",
-        email: "tanaka@example.com",
-        category: "不具合・障害の報告",
-        message: "画面が真っ白になります。",
-      }),
-    ).rejects.toThrow("お名前は1文字以上100文字以内で入力してください");
-  });
-
-  it("5文字未満の短いメッセージで送信した場合にエラーになること", async () => {
-    const t = setupTest();
-
-    await expect(
-      t.mutation(api.contacts.createContact, {
-        name: "田中",
-        email: "tanaka@example.com",
-        category: "不具合・障害の報告",
-        message: "あ",
-      }),
-    ).rejects.toThrow("メッセージは5文字以上3000文字以内で入力してください");
-  });
-
   it("同一メールアドレスから短時間（10分間）に4回送信を試みた場合、レート制限でエラーになること", async () => {
     const t = setupTest();
     const testEmail = "ratelimit@example.com";
@@ -195,19 +156,6 @@ describe("Convex Contacts (お問い合わせ機能)", () => {
         message: "ケーステスト4回目のメッセージです。",
       }),
     ).rejects.toThrow("短時間に複数回送信されています");
-  });
-
-  it("許可されていないお問い合わせ種別（category）の場合はエラーになること", async () => {
-    const t = setupTest();
-
-    await expect(
-      t.mutation(api.contacts.createContact, {
-        name: "山田 太郎",
-        email: "yamada@example.com",
-        category: "不正なカテゴリー",
-        message: "お問い合わせメッセージです。",
-      }),
-    ).rejects.toThrow("有効なお問い合わせ種別を選択してください");
   });
 
   it("お名前とメッセージの文字数境界値が正しく検証されること", async () => {

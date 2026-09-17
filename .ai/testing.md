@@ -205,9 +205,7 @@ export const test = base.extend({
 ### テストスイート構成
 - `public-routes.spec.ts`: LP、利用規約、プライバシーポリシー、未認証ガード（`/dashboard` / `/family` から `/login` へのリダイレクト）
 - `auth.setup.ts`: Firebase Admin SDK カスタムトークン発行と Bridge IIFE によるブラウザ `signInWithCustomToken`、認証ストレージ保存
-- `dashboard.spec.ts`: ログイン済みアクセス、認証済み状態での `/login` からの自動リダイレクト
-- `family.spec.ts`: 家族作成オンボーディング・管理画面の表示確認
-- `settings.spec.ts`: 家族未所属時の保護リダイレクト検証
+- `dashboard.spec.ts`: ログイン済みアクセス、認証済み状態での `/login` からの自動リダイレクト、および `/family` / `/settings` 等への画面遷移と見出し検証
 - `logout.spec.ts`: ログアウト処理実行後のセッション破棄・未認証状態遷移の検証
 - `e2ee-seed-import.spec.ts`: 家族作成（Master Key生成・KEK導出）、CSVインポートによる平文ヒントのクライアント暗号化Seed投入、詳細画面でのヒント復号検証、およびUI一括削除機能による他家族データを壊さない安全なクリーンアップ検証
 

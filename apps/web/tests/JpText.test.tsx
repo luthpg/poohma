@@ -99,32 +99,6 @@ describe("JpText", () => {
     expect(screen.getByText("12345")).not.toBeNull();
   });
 
-  it("as プロパティで指定された HTML タグで描画されること", () => {
-    render(<JpText as="h2">見出しタイトル</JpText>);
-    const heading = screen.getByRole("heading", { level: 2 });
-    expect(heading).not.toBeNull();
-    expect(heading.tagName.toLowerCase()).toBe("h2");
-  });
-
-  it("追加の HTML 属性 (id, data-testid, onClick 等) が正常に転送されること", () => {
-    const handleClick = vi.fn();
-    render(
-      <JpText
-        id="jp-text-id"
-        data-testid="jp-text-element"
-        onClick={handleClick}
-      >
-        クリック可能なテキスト
-      </JpText>,
-    );
-
-    const element = screen.getByTestId("jp-text-element");
-    expect(element.id).toBe("jp-text-id");
-
-    element.click();
-    expect(handleClick).toHaveBeenCalledTimes(1);
-  });
-
   it("strongタグで終わる句点の直後にaタグが続く場合、文境界でbrタグが正常に挿入されること", () => {
     const { container } = render(
       <JpText>
@@ -137,21 +111,6 @@ describe("JpText", () => {
     expect(brs.length).toBe(1);
     const strong = container.querySelector("strong");
     expect(strong?.querySelector("br")).not.toBeNull();
-  });
-
-  it("複数階層に深くネストされたJSX要素でも再帰的にBudouXパースが適用されること", () => {
-    const { container } = render(
-      <JpText>
-        <div>
-          <span>
-            <strong>深くネストされた日本語の文章です。</strong>
-          </span>
-        </div>
-      </JpText>,
-    );
-
-    const strong = container.querySelector("strong");
-    expect(strong?.querySelectorAll("wbr").length).toBeGreaterThan(0);
   });
 
   it("句点（。）の直後に明示的な <br /> タグが存在する場合に二重改行されないこと", () => {

@@ -89,6 +89,19 @@ test.describe("認証済みルートのアクセス検証", () => {
       await page.waitForURL(new RegExp(`.*${targetRoute}`), { timeout: 15000 });
       await expect(page.locator("main")).toBeVisible({ timeout: 10000 });
 
+      if (targetRoute === "/family") {
+        const familyElement = page
+          .getByRole("heading", { name: "家族管理" })
+          .or(page.locator('[data-testid="family-manager-section"]'))
+          .first();
+        await expect(familyElement).toBeVisible({ timeout: 10000 });
+      } else if (targetRoute === "/settings") {
+        const settingsElement = page
+          .locator("h1, h2, form, input#display-name-input")
+          .first();
+        await expect(settingsElement).toBeVisible({ timeout: 10000 });
+      }
+
       // 2. ヘッダーのロゴリンクをクリックして /dashboard へ SPA ソフト遷移
       const logoLink = page.locator('header a[href="/dashboard"]').first();
       await expect(logoLink).toBeVisible({ timeout: 10000 });
