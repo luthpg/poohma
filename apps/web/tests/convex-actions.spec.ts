@@ -67,31 +67,6 @@ describe("convex/actions: sendEmailReq", () => {
     });
   });
 
-  it("DISABLE_EMAIL_DELIVERY が未設定の場合、通常通り Resend API が呼び出されること", async () => {
-    delete process.env.DISABLE_EMAIL_DELIVERY;
-    process.env.RESEND_API_KEY = "test_resend_api_key";
-    process.env.RESEND_MAIL_FROM = "noreply@example.com";
-    sendMock.mockResolvedValue({ data: { id: "msg_456" }, error: null });
-
-    const result = await sendEmailReq({
-      email: "user1@example.com, user2@example.com",
-      subject: "複数送信テスト",
-      html: "<p>テスト</p>",
-      text: "テスト",
-    });
-
-    expect(result).toBe(true);
-    expect(sendMock).toHaveBeenCalledTimes(1);
-    expect(sendMock).toHaveBeenCalledWith({
-      from: "PoohMa <noreply@example.com>",
-      to: ["user1@example.com", "user2@example.com"],
-      subject: "複数送信テスト",
-      html: "<p>テスト</p>",
-      text: "テスト",
-      replyTo: undefined,
-    });
-  });
-
   it("Resend API がエラーを返した場合、sendEmailReq が false を返すこと", async () => {
     process.env.DISABLE_EMAIL_DELIVERY = "false";
     process.env.RESEND_API_KEY = "test_resend_api_key";

@@ -20,9 +20,9 @@ PoohMa のテストは、既存テストを基準に場当たり的に拡張す�
 
 ### 現行のテスト実績サマリー (2026年9月現在)
 
-- **Vitest 全体**: **35 テストファイル / 382 テスト全件パス**
-- **Convex バックエンド カバレッジ**: **81.42%**（`rls.ts` 100%, `customBuilders.ts` 100%, `users.ts` 97.9%, `recovery.ts` 90.1%, `crypto.ts` 90.6%）
-- **Playwright E2E**: 主要公開ルート、認証セットアップ、ログアウト、実暗号化シード復号（`e2ee-seed-import.spec.ts`）を配備
+- **Vitest 全体**: **38 テストファイル / 411 テスト全件パス**
+- **Convex バックエンド カバレッジ**: **82.38%**（`rls.ts` 100%, `customBuilders.ts` 100%, `users.ts` 93.8%, `recovery.ts` 90.1%, `records.ts` 84.1%, `crypto.ts` 90.6%）
+- **Playwright E2E**: 主要公開ルート、認証セットアップ、ダッシュボード・主要画面遷移、ログアウト、実暗号化シード復号（`e2ee-seed-import.spec.ts`）を配備
 
 ---
 
@@ -91,7 +91,7 @@ flowchart TD
 | AUTH-14 | 他メンバーがいる場合のFamily保持 | 統合 | P0 | ✅ 実装済 | `tests/convex-users-auth.spec.ts` |
 | AUTH-15 | 表示名更新 | 統合 | P1 | ✅ 実装済 | `tests/convex-users-auth.spec.ts` |
 | AUTH-16 | 表示名境界値 | 単体 | P1 | ✅ 実装済 | `tests/schemas.test.ts` |
-| AUTH-17 | セッション期限切れ・失効時の認証拒否 (`checkRevoked`) | 統合 | P0 | ✅ 実装済 | `tests/firebase-admin.server.spec.ts` |
+| AUTH-17 | セッション期限切れ・失効時の認証拒否 (`checkRevoked`) | 統合/E2E | P0 | ✅ 実装済 | `e2e/auth.setup.ts`, `tests/convex-users-auth.spec.ts` |
 
 ### 4.2 家族作成・参加・管理
 
@@ -127,39 +127,37 @@ flowchart TD
 家族参加・家族変更に伴うデータ移行は、`prepareFamilyMigration → getMigrationForEncryption → commitFamilyMigration` の移行フローを利用する。
 
 - `convex-family.spec.ts`: 家族参加・家族変更というユーザー操作の文脈から、migration が正しく開始・完了することを検証
-- `convex-migrations.spec.ts`: migration 自体の状態遷移、認可、対象データ、コミット、abort、expire、旧Family削除などを詳細に検証
-- ブラウザテスト: クライアント側での再暗号化・復号を含む実際のE2EE動作を検証
-
-単体・統合テストでは実際の暗号化処理を再現せず、migration 対象の境界とDB上の整合性を検証する。
+- `convex-family.spec.ts`: migration 自体の状態遷移、認可、対象データ、コミット、abort、expire、旧Family削除などのバックエンド整合性を詳細に検証
+- `crypto.spec.ts`: `reWrapCredential` / `reEncryptCredentials` により、クライアント側での新マスターキーへの DEK 再ラップおよび移行後データの復号可能性を Web Crypto API で検証
 
 ### 4.3 家族移行 (Family Migration)
 
 | ID | テストケース | 種別 | 優先度 | 現状 | 主な対応ファイル |
 | --- | --- | --- | --- | :---: | --- |
-| MIG-01 | 新Familyへの migration prepare | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-02 | 既存Familyへの migration prepare | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-03 | 未承認Familyへの migration 拒否 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-04 | PREPARED 状態生成 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-05 | migration 対象 record 取得 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-06 | 他ユーザー record の混入拒否 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-07 | 他ユーザー credential の改変防止 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-08 | migration commit | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-09 | record の Family 変更 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-10 | user の Family 変更 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-11 | 旧 Family 削除 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-12 | 他メンバーがいる旧 Family を削除しない | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-13 | ABORTED への遷移 | 統合 | P1 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-14 | 他ユーザーによる abort 拒否 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-15 | COMPLETED migration の再 commit 拒否 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-16 | EXPIRED migration の commit 拒否 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-17 | 30分経過による EXPIRED 化 | 統合 | P1 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-18 | cron による EXPIRED クリーンアップ | 統合 | P1 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-19 | EXPIRED 後の孤児 Family 削除 | 統合 | P1 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-20 | ABORTED 後の孤児 Family 削除 | 統合 | P1 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-21 | migration 途中失敗時のデータ保持 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-22 | migration 中の同時操作（楽観的ロック検証） | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` (Issue #190) |
-| MIG-23 | migration 再実行・二重 commit 防止 | 統合 | P0 | ✅ 実装済 | `tests/convex-migrations.spec.ts` |
-| MIG-24 | migration 後の暗号データ復号可能性 | ブラウザ | P0 | ✅ 実装済 | `tests/browser-e2e/family-migration.browser.test.tsx` |
+| MIG-01 | 新Familyへの migration prepare | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-02 | 既存Familyへの migration prepare | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-03 | 未承認Familyへの migration 拒否 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-04 | PREPARED 状態生成 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-05 | migration 対象 record 取得 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-06 | 他ユーザー record の混入拒否 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-07 | 他ユーザー credential の改変防止 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-08 | migration commit | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-09 | record の Family 変更 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-10 | user の Family 変更 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-11 | 旧 Family 削除 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-12 | 他メンバーがいる旧 Family を削除しない | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-13 | ABORTED への遷移 | 統合 | P1 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-14 | 他ユーザーによる abort 拒否 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-15 | COMPLETED migration の再 commit 拒否 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-16 | EXPIRED migration の commit 拒否 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-17 | 30分経過による EXPIRED 化 | 統合 | P1 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-18 | cron による EXPIRED クリーンアップ | 統合 | P1 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-19 | EXPIRED 後の孤児 Family 削除 | 統合 | P1 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-20 | ABORTED 後の孤児 Family 削除 | 統合 | P1 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-21 | migration 途中失敗時のデータ保持 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-22 | migration 中の同時操作（楽観的ロック検証） | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` (Issue #190) |
+| MIG-23 | migration 再実行・二重 commit 防止 | 統合 | P0 | ✅ 実装済 | `tests/convex-family.spec.ts` |
+| MIG-24 | migration 後の暗号データ復号可能性 | 単体/統合 | P0 | ✅ 実装済 | `tests/crypto.spec.ts` / `tests/convex-family.spec.ts` |
 
 ### 4.4 家族パスコード・Master Key & E2EE
 
@@ -180,8 +178,8 @@ flowchart TD
 | ID | テストケース | 種別 | 優先度 | 現状 | 主な対応ファイル |
 | --- | --- | --- | --- | :---: | --- |
 | REC-01〜06 | Record 作成バリデーション（タイトル・URL・タグ等） | 単体 | P1 | ✅ 実装済 | `tests/schemas.test.ts`, `tests/record-form-validation.test.ts` |
-| REC-07〜10 | 所有権モデル（user / family）の可視性制御 | 統合 | P0 | ✅ 実装済 | `tests/convex-records.spec.ts`, `tests/convex-rls.spec.ts` |
-| REC-11, 12 | 他人の PRIVATE record / 他 Family record 拒否 | 統合 | P0 | ✅ 実装済 | `tests/convex-rls.spec.ts` |
+| REC-07〜10 | 所有権モデル（user / family）の可視性制御 | 統合 | P0 | ✅ 実装済 | `tests/convex-records.spec.ts` |
+| REC-11, 12 | 他人の PRIVATE record / 他 Family record 拒否 | 統合 | P0 | ✅ 実装済 | `tests/convex-records.spec.ts` |
 | REC-13, 14 | Record 詳細取得・IDOR 拒否 | 統合 | P0 | ✅ 実装済 | `tests/convex-records.spec.ts` |
 | REC-15, 16 | Record 更新・他人 Record 更新拒否・楽観的ロック | 統合 | P0 | ✅ 実装済 | `tests/convex-records.spec.ts` |
 | REC-17〜19 | Record 単体・複数一括削除・権限拒否 | 統合 | P0 | ✅ 実装済 | `tests/convex-records.spec.ts` |
@@ -219,7 +217,7 @@ flowchart TD
 | --- | --- | --- | --- | :---: | --- |
 | PASS-01〜07 | ロック・解除・3回失敗指数バックオフ・世代競合防止 | 単体/UI | P0 | ✅ 実装済 | `tests/PasscodeProvider.spec.tsx` |
 | BIO-01〜06 | WebAuthn PRF 拡張対応判定・暗号化パスコード保管・解除 | 単体 | P1 | ✅ 実装済 | `tests/biometric.spec.ts` |
-| SEC-01〜18 | 未認証拒否・Family未所属拒否・IDOR完全防止 | 統合 | P0 | ✅ 実装済 | `tests/convex-rls.spec.ts`, `tests/convex-users-auth.spec.ts` |
+| SEC-01〜18 | 未認証拒否・Family未所属拒否・IDOR完全防止 | 統合 | P0 | ✅ 実装済 | `tests/convex-records.spec.ts`, `tests/convex-users-auth.spec.ts` |
 
 ---
 
@@ -230,7 +228,7 @@ Issue #176 の観点で、現在不足しているのは主に **「Playwright �
 | ID | テストケース | 種別 | 優先度 | 現状の代替保証と課題 |
 | --- | --- | --- | --- | --- |
 | **E2E-04〜06** | 招待 → 参加申請 → 承認フロー | E2E | P0 | 統合テスト（`convex-family.spec.ts`）でバックエンド整合性は保証済。2つのブラウザセッションを用いた結合 E2E が未着手。 |
-| **E2E-17** | 家族移行ウィザード | E2E | P0 | `family-migration.browser.test.tsx` で実機暗号化は保証済。フルルート E2E が未着手。 |
+| **E2E-17** | 家族移行ウィザード | E2E | P0 | 統合テスト（`convex-migrations.spec.ts`）でバックエンド整合性は保証済。フルルート E2E が未着手。 |
 | **E2E-22** | リカバリーキット 2段階復元フロー | E2E | P0 | `convex-recovery.spec.ts`（18KB）でバックエンドは完全保証済。メールOTP入力のUI E2E が未作成。 |
 | **NFR-07〜11** | axe-core による a11y 違反自動検出、フォーカストラップ | E2E | P2 | コンポーネント単位の CSS レビューに依存しており、自動リグレッションテストが未導入。 |
 

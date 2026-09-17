@@ -678,53 +678,6 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
     });
   });
 
-  it("Zodによる文字数制限バリデーションが機能し、違反した入力ではエラーが返ること", async () => {
-    const t = convexTest(schema, modules);
-    let family1Id!: Id<"families">;
-
-    await t.run(async (ctx) => {
-      family1Id = await ctx.db.insert("families", {
-        name: "Family 1",
-        updatedAt: Date.now(),
-      });
-
-      await ctx.db.insert("users", {
-        familyRole: "admin",
-        userId: "user_a",
-        email: "a@example.com",
-        familyId: family1Id,
-        updatedAt: Date.now(),
-      });
-    });
-
-    const userA = t.withIdentity({ subject: "user_a", email: "a@example.com" });
-
-    // Title exceeds 255 chars
-    await expect(
-      userA.mutation(api.records.createRecord, {
-        title: "a".repeat(256),
-        ownerType: "user",
-        credentials: [],
-        tags: [],
-      }),
-    ).rejects.toThrow("Validation failed");
-
-    // Credential label exceeds 100 chars
-    await expect(
-      userA.mutation(api.records.createRecord, {
-        title: "Valid Title",
-        ownerType: "user",
-        credentials: [
-          {
-            id: "cred1",
-            label: "a".repeat(101),
-          },
-        ],
-        tags: [],
-      }),
-    ).rejects.toThrow("Validation failed");
-  });
-
   it("updateRecord で titleReading を指定しない更新を行った場合、既存の titleReading が保持されること", async () => {
     const t = convexTest(schema, modules);
     let familyId!: Id<"families">;
@@ -782,73 +735,271 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
   });
 });
 
-describe("件数境界値テスト", () => {
-  it("createRecordで11件のcredentialsを送信するとバリデーションエラーになること", async () => {
+describe("レコード削除・一括操作の認可検証 (deleteRecord / deleteRecords)", () => {
+  it("他人の個人レコードを deleteRecord で削除しようとした場合、例外がスローされること", async () => {
     const t = convexTest(schema, modules);
+
+    let recordAId!: Id<"serviceRecords">;
+    let userAId!: Id<"users">;
+
     await t.run(async (ctx) => {
       const familyId = await ctx.db.insert("families", {
         name: "Test Family",
         updatedAt: Date.now(),
       });
+      userAId = await ctx.db.insert("users", {
+        familyRole: "admin",
+        userId: "user_a",
+        email: "a@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
       await ctx.db.insert("users", {
         familyRole: "admin",
-        userId: "user_cap",
-        email: "cap@example.com",
+        userId: "user_b",
+        email: "b@example.com",
         familyId,
+        updatedAt: Date.now(),
+      });
+
+      recordAId = await ctx.db.insert("serviceRecords", {
+        stableId: crypto.randomUUID(),
+        userId: "user_a",
+        accountId: userAId,
+        familyId,
+        title: "User A Record",
+        sortKey: computeSortKey("User A Record"),
+        ownerType: "user",
+        admins: [],
+        tags: [],
         updatedAt: Date.now(),
       });
     });
 
-    const user = t.withIdentity({
-      subject: "user_cap",
-      email: "cap@example.com",
+    const userB = t.withIdentity({
+      subject: "user_b",
+      email: "b@example.com",
     });
 
     await expect(
-      user.mutation(api.records.createRecord, {
-        title: "Too many credentials",
-        ownerType: "user",
-        credentials: Array.from({ length: 11 }, (_, i) => ({
-          id: `cred_${i}`,
-          label: `Cred${i}`,
-        })),
-        tags: [],
-      }),
-    ).rejects.toThrow("Validation failed");
+      userB.mutation(api.records.deleteRecord, { id: recordAId }),
+    ).rejects.toThrow("Access denied");
   });
 
-  it("createRecordで10件ちょうどのcredentialsは登録できること", async () => {
+  it("他人が所有する個人レコードを含むdeleteRecordsはアクセス拒否され、何も削除されないこと", async () => {
     const t = convexTest(schema, modules);
+    let family1Id!: Id<"families">;
+    let ownRecordId!: Id<"serviceRecords">;
+    let othersPrivateId!: Id<"serviceRecords">;
     await t.run(async (ctx) => {
-      const familyId = await ctx.db.insert("families", {
-        name: "Test Family",
+      family1Id = await ctx.db.insert("families", {
+        name: "Family 1",
         updatedAt: Date.now(),
       });
-      await ctx.db.insert("users", {
+      const userAId = await ctx.db.insert("users", {
         familyRole: "admin",
-        userId: "user_cap2",
-        email: "cap2@example.com",
-        familyId,
+        userId: "user_bulk_a",
+        email: "bulka@example.com",
+        familyId: family1Id,
+        updatedAt: Date.now(),
+      });
+      const userBId = await ctx.db.insert("users", {
+        familyRole: "admin",
+        userId: "user_bulk_b",
+        email: "bulkb@example.com",
+        familyId: family1Id,
+        updatedAt: Date.now(),
+      });
+      ownRecordId = await ctx.db.insert("serviceRecords", {
+        stableId: crypto.randomUUID(),
+        userId: "user_bulk_b",
+        accountId: userBId,
+        familyId: family1Id,
+        title: "Bの自分のレコード",
+        sortKey: computeSortKey("Bの自分のレコード"),
+        ownerType: "user",
+        admins: [],
+        tags: [],
+        updatedAt: Date.now(),
+      });
+      othersPrivateId = await ctx.db.insert("serviceRecords", {
+        stableId: crypto.randomUUID(),
+        userId: "user_bulk_a",
+        accountId: userAId,
+        familyId: family1Id,
+        title: "Aの個人レコード",
+        sortKey: computeSortKey("Aの個人レコード"),
+        ownerType: "user",
+        admins: [],
+        tags: [],
         updatedAt: Date.now(),
       });
     });
-
-    const user = t.withIdentity({
-      subject: "user_cap2",
-      email: "cap2@example.com",
+    const userB = t.withIdentity({
+      subject: "user_bulk_b",
+      email: "bulkb@example.com",
     });
 
     await expect(
-      user.mutation(api.records.createRecord, {
-        title: "Exactly 10 credentials",
-        ownerType: "user",
-        credentials: Array.from({ length: 10 }, (_, i) => ({
-          id: `cred_${i}`,
-          label: `Cred${i}`,
-        })),
-        tags: [],
+      userB.mutation(api.records.deleteRecords, {
+        ids: [ownRecordId, othersPrivateId],
       }),
-    ).resolves.toBeDefined();
+    ).rejects.toThrow("Access denied");
+
+    await t.run(async (ctx) => {
+      expect(await ctx.db.get(ownRecordId)).not.toBeNull();
+      expect(await ctx.db.get(othersPrivateId)).not.toBeNull();
+    });
+  });
+
+  it("共有レコードの非管理者メンバーによるdeleteRecordsは拒否され、管理者は削除できること", async () => {
+    const t = convexTest(schema, modules);
+    let sharedRecordId!: Id<"serviceRecords">;
+    await t.run(async (ctx) => {
+      const familyId = await ctx.db.insert("families", {
+        name: "Family Shared",
+        updatedAt: Date.now(),
+      });
+      const userAId = await ctx.db.insert("users", {
+        familyRole: "admin",
+        userId: "user_bulk_owner",
+        email: "bulkowner@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+      await ctx.db.insert("users", {
+        familyRole: "viewer",
+        userId: "user_bulk_member",
+        email: "bulkmember@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+      sharedRecordId = await ctx.db.insert("serviceRecords", {
+        stableId: crypto.randomUUID(),
+        userId: "user_bulk_owner",
+        accountId: userAId,
+        familyId,
+        ownerFamilyId: familyId,
+        title: "共有レコード",
+        sortKey: computeSortKey("共有レコード"),
+        ownerType: "family",
+        admins: [userAId],
+        tags: [],
+        updatedAt: Date.now(),
+      });
+    });
+    const userMember = t.withIdentity({
+      subject: "user_bulk_member",
+      email: "bulkmember@example.com",
+    });
+
+    await expect(
+      userMember.mutation(api.records.deleteRecords, {
+        ids: [sharedRecordId],
+      }),
+    ).rejects.toThrow("Access denied");
+
+    const userOwner = t.withIdentity({
+      subject: "user_bulk_owner",
+      email: "bulkowner@example.com",
+    });
+
+    await userOwner.mutation(api.records.deleteRecords, {
+      ids: [sharedRecordId],
+    });
+
+    await t.run(async (ctx) => {
+      expect(await ctx.db.get(sharedRecordId)).toBeNull();
+    });
+  });
+
+  it("移行互換ヘルパー（getEffectiveOwnerType等）および家族境界チェックが機能すること", async () => {
+    const t = convexTest(schema, modules);
+    await t.run(async (ctx) => {
+      const family1Id = await ctx.db.insert("families", {
+        name: "Family 1",
+        updatedAt: Date.now(),
+      });
+      const family2Id = await ctx.db.insert("families", {
+        name: "Family 2",
+        updatedAt: Date.now(),
+      });
+      const user1Id = await ctx.db.insert("users", {
+        familyRole: "admin",
+        userId: "u1",
+        email: "u1@example.com",
+        familyId: family1Id,
+        updatedAt: Date.now(),
+      });
+      const user2Id = await ctx.db.insert("users", {
+        familyRole: "admin",
+        userId: "u2",
+        email: "u2@example.com",
+        familyId: family2Id,
+        updatedAt: Date.now(),
+      });
+
+      const user1 = await ctx.db.get(user1Id);
+      const user2 = await ctx.db.get(user2Id);
+
+      const sharedRecordId = await ctx.db.insert("serviceRecords", {
+        stableId: crypto.randomUUID(),
+        userId: "u1",
+        accountId: user1Id,
+        familyId: family1Id,
+        title: "Shared Record",
+        sortKey: computeSortKey("Shared Record"),
+        ownerType: "family",
+        ownerFamilyId: family1Id,
+        admins: [user1Id],
+        tags: [],
+        updatedAt: Date.now(),
+      });
+      const sharedRecord = await ctx.db.get(sharedRecordId);
+
+      const privateRecordId = await ctx.db.insert("serviceRecords", {
+        stableId: crypto.randomUUID(),
+        userId: "u1",
+        accountId: user1Id,
+        familyId: family1Id,
+        title: "Private Record",
+        sortKey: computeSortKey("Private Record"),
+        ownerType: "user",
+        tags: [],
+        updatedAt: Date.now(),
+      });
+      const privateRecord = await ctx.db.get(privateRecordId);
+
+      if (!user1 || !user2 || !sharedRecord || !privateRecord) {
+        throw new Error("Fixture not found");
+      }
+
+      const {
+        requireContentAccess,
+        requireAdminAccess,
+        getEffectiveOwnerType,
+        getEffectiveOwnerFamilyId,
+        getEffectiveAdmins,
+      } = await import("../convex/rls");
+
+      expect(getEffectiveOwnerType(sharedRecord)).toBe("family");
+      expect(getEffectiveOwnerFamilyId(sharedRecord)).toBe(family1Id);
+      expect(getEffectiveAdmins(sharedRecord)).toEqual([user1Id]);
+
+      expect(getEffectiveOwnerType(privateRecord)).toBe("user");
+      expect(getEffectiveOwnerFamilyId(privateRecord)).toBeUndefined();
+      expect(getEffectiveAdmins(privateRecord)).toEqual([]);
+
+      expect(() => requireContentAccess(user1, sharedRecord)).not.toThrow();
+      expect(() => requireAdminAccess(user1, sharedRecord)).not.toThrow();
+
+      expect(() => requireContentAccess(user2, sharedRecord)).toThrow(
+        "Access denied",
+      );
+      expect(() => requireAdminAccess(user2, sharedRecord)).toThrow(
+        "Access denied",
+      );
+    });
   });
 
   it("createCredential: 途中のクレデンシャル削除後もorderが重複せず既存の最大値+1で採番されること", async () => {

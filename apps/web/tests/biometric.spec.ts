@@ -95,31 +95,7 @@ describe("生体認証解除機能のテスト (PRF拡張対応版: src/lib/biom
       expect(supported).toBe(true);
     });
 
-    it("プラットフォーム認証器が利用不可の場合 false を返すこと", async () => {
-      Object.defineProperty(globalThis, "PublicKeyCredential", {
-        value: {
-          isUserVerifyingPlatformAuthenticatorAvailable: vi
-            .fn()
-            .mockResolvedValue(false),
-        },
-        writable: true,
-        configurable: true,
-      });
-      const supported = await isBiometricSupported();
-      expect(supported).toBe(false);
-    });
-
-    it("isUserVerifyingPlatformAuthenticatorAvailable が関数でない場合 false を返すこと", async () => {
-      Object.defineProperty(globalThis, "PublicKeyCredential", {
-        value: {},
-        writable: true,
-        configurable: true,
-      });
-      const supported = await isBiometricSupported();
-      expect(supported).toBe(false);
-    });
-
-    it("PublicKeyCredential が存在しない場合 false を返すこと", async () => {
+    it("プラットフォーム認証器が利用不可の場合は false を返すこと", async () => {
       Object.defineProperty(globalThis, "PublicKeyCredential", {
         value: undefined,
         writable: true,

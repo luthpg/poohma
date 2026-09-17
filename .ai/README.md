@@ -26,10 +26,11 @@ PoohMa では、AI Agent が継続的に利用するプロジェクト固有の�
 ├── patterns.md             # PoohMa で実証された実装・調査パターン
 ├── decisions.md            # 重要な設計判断とその背景
 ├── testing.md              # テスト技法（convex-test, E2EE暗号テスト, E2E）
-├── workflows.md            # CMS レビュー等の定型運用フロー
-├── workflows/              # 定型作業手順（Git, ドキュメント同期等）
+├── workflows/              # 定型作業手順（Git, CMS, ドキュメント同期等）
 │   ├── git-workflow.md
-│   └── doc-sync.md
+│   ├── doc-sync.md
+│   ├── test-refactoring.md
+│   └── cms-review.md
 └── pitfalls/               # 過去の失敗事例・落とし穴（ドメイン別分割）
     ├── review-and-guardrails.md
     ├── backend-convex.md
