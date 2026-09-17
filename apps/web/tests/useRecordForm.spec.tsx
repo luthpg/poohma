@@ -312,4 +312,51 @@ describe("useRecordForm", () => {
 
     expect(onUnlockCancelled).toHaveBeenCalledTimes(1);
   });
+
+  it("編集中にオートロック（masterKey が null 化）しても、開始時アンロックが再発火しないこと", async () => {
+    mockMasterKey = {} as CryptoKey;
+    const { rerender } = renderHook(() =>
+      useRecordForm(undefined, "rec_autolock_test"),
+    );
+
+    expect(mockRequireUnlock).not.toHaveBeenCalled();
+
+    // 編集中にオートロック発火（masterKey が null になる）
+    mockMasterKey = null;
+    await act(async () => {
+      rerender();
+    });
+
+    // 開始時アンロックが再発火してプロンプトが開くことはない
+    expect(mockRequireUnlock).not.toHaveBeenCalled();
+  });
+
+  it("Aレコードの後にドラフトのあるBレコードへ切り替わった場合、Bレコードの初回アンロックが正常に走ること", async () => {
+    mockMasterKey = {} as CryptoKey;
+    const authRecovery = await import("@/lib/auth-recovery");
+    vi.spyOn(authRecovery, "hasRecordDraft").mockImplementation(
+      ({ targetRecordId }) => targetRecordId === "rec_B",
+    );
+
+    let currentRecordId = "rec_A";
+    const { rerender } = renderHook(() =>
+      useRecordForm(undefined, currentRecordId),
+    );
+
+    // Aレコード編集中にオートロック発火
+    mockMasterKey = null;
+    await act(async () => {
+      rerender();
+    });
+    expect(mockRequireUnlock).not.toHaveBeenCalled();
+
+    // Bレコード（ドラフトあり）へ切り替え
+    currentRecordId = "rec_B";
+    await act(async () => {
+      rerender();
+    });
+
+    // Bレコード単位で初回アンロックが正しく走る
+    expect(mockRequireUnlock).toHaveBeenCalledTimes(1);
+  });
 });

@@ -139,17 +139,23 @@ export function useRecordForm(
 
   const isDirty = JSON.stringify(values) !== initialValuesJsonRef.current;
 
-  // 開始時アンロック連携:
+  // 開始時アンロック連携（レコード別の初回マウント時のみ試行）:
   // 新規登録画面（!targetRecordId）または未保存ドラフトが存在する場合に requireUnlock を試行
-  // ※ 通常のレコード詳細閲覧モード時に不必要にアンロックダイアログを開かない
+  // ※ 同一レコード編集中にオートロックがかかった後に不必要にアンロックダイアログを再オープンしない。
+  // ※ 別のレコード（または新規登録）に切り替わった際は、それぞれのレコード単位で初回アンロック判定を行う。
   const onUnlockCancelledRef = useRef(options?.onUnlockCancelled);
   onUnlockCancelledRef.current = options?.onUnlockCancelled;
+  const lastAttemptedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
+    const currentKey = `${targetRecordId ?? "new"}_${draftId ?? ""}`;
+    if (lastAttemptedKeyRef.current === currentKey) return;
+
     if (!masterKey) {
       const shouldUnlock =
         !targetRecordId || hasRecordDraft({ targetRecordId, draftId });
       if (shouldUnlock) {
+        lastAttemptedKeyRef.current = currentKey;
         requireUnlock()
           .then((unlocked) => {
             if (!unlocked) {
@@ -160,6 +166,9 @@ export function useRecordForm(
             onUnlockCancelledRef.current?.();
           });
       }
+    } else {
+      // 既に masterKey がアンロック済みの状態で開かれた場合は初回試行済みとする
+      lastAttemptedKeyRef.current = currentKey;
     }
   }, [masterKey, requireUnlock, targetRecordId, draftId]);
 

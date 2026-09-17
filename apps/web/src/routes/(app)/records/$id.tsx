@@ -147,6 +147,7 @@ function RecordDetailWrapper() {
 
   return (
     <RecordDetailComponent
+      key={record._id}
       record={record}
       availableTags={availableTags}
       activeAccountId={activeAccountId}
