@@ -536,10 +536,12 @@ function RecordDetailComponent({
     setConflictDialogOpen(false);
     setPendingPayload(null);
     setInitialRevision(null);
+    form.discardDraft();
+    form.setEditingMetadata(null);
     setIsEditing(false);
     await router.invalidate();
     toast.info("最新のレコード情報を再読み込みしました");
-  }, [router]);
+  }, [router, form]);
 
   // 競合解決: 強制上書き保存
   const handleResolveForceSave = async () => {
@@ -558,6 +560,8 @@ function RecordDetailComponent({
       setConflictDialogOpen(false);
       setPendingPayload(null);
       setInitialRevision(null);
+      form.discardDraft();
+      form.setEditingMetadata(null);
       await router.invalidate();
       setIsEditing(false);
     } catch (err) {
@@ -577,6 +581,7 @@ function RecordDetailComponent({
             setConflictDialogOpen(false);
             setPendingPayload(null);
             setInitialRevision(null);
+            form.discardDraft();
             form.setEditingMetadata(null);
             await router.invalidate();
             setIsEditing(false);

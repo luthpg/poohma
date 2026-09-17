@@ -26,6 +26,9 @@
 - **`.ai/` Knowledge Base の事前参照（Read）と事後還元（Write）の義務**:
   - 実装・調査・テスト・レビュー作業に着手する前に、必ず「8. 作業種別ごとの事前参照マトリクス」に従って関連するドキュメント（特に [`.ai/invariants.md`](./.ai/invariants.md) や [`.ai/pitfalls/`](./.ai/pitfalls/)）を確認し、不変条件に抵触しないかを事前審査すること。
   - また、ユーザーからの指摘やレビュー対応、試行錯誤を通じて得られた知見は、コミット前に必ず [`.ai/pitfalls/`](./.ai/pitfalls/) や [`.ai/invariants.md`](./.ai/invariants.md) に還元・蓄積すること。
+- **コミット前のドキュメント横断同期（Doc-Sync Gate）の義務**:
+  - コード変更、リファクタリング、PR レビュー指摘対応のいずれにおいても、「テストが通ったから実装完了」と早合点してはならない。コミット前に必ず `git diff --stat` を行い、`.docs/`（features, requirements, DESIGN, code-design, security）の5大文書および `.ai/` との差分突合・更新を完了してからコミットすること（[`.ai/workflows/doc-sync.md`](./.ai/workflows/doc-sync.md) 参照）。
+  - 「レビュー指摘対応で追加されたUX改善・ボタン配置変更・セキュリティ補強」もすべて公式仕様の拡張として扱い、ドキュメント更新を後回しにしてはならない。
 
 ---
 

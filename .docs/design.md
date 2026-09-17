@@ -129,6 +129,14 @@ What distinguishes Vercel from other monochrome design systems is its shadow-as-
 - Radius: 6px
 - Use: Primary CTA ("Start Deploying", "Get Started")
 
+**Primary Brand Orange (PoohMa Signature)**
+
+- Background: `#f97316` (orange-500), Hover: `#ea580c` (orange-600)
+- Text: `#ffffff`
+- Padding: `px-4 sm:px-6 py-2 sm:py-2.5` (h-9 sm:h-10)
+- Radius: 6px
+- Use: Primary submit actions across service record flows ("登録する", "保存する", "編集する")
+
 **Pill Button / Badge**
 
 - Background: `#ebf5ff` (tinted blue)
@@ -159,6 +167,26 @@ What distinguishes Vercel from other monochrome design systems is its shadow-as-
 - Focus shadow: `1px 0 0 0 var(--ds-gray-alpha-600)`
 - Focus outline: `2px solid var(--ds-focus-color)` — consistent blue focus ring
 - Border: via shadow technique, not traditional border
+
+**Visual Accent Bar (Form Modification Indicator)**
+
+- Container: `relative pl-3.5`（編集画面では常に左余白 14px を確保し、レイアウトシフト＝ガタつきを完全防止）
+- Indicator Bar: `before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-1 before:bg-orange-500 before:rounded-full before:transition-all before:duration-200`
+- State:
+  - 未変更時: `before:opacity-0 before:scale-y-50`（非表示だが余白は維持）
+  - 変更時: `before:opacity-100 before:scale-y-100`（ブランドオレンジバーが出現）
+- 新規作成時（`new.tsx`）: 変更の概念が存在しないため、インジケーターおよび左余白を完全抑止（`pl-0`）。
+
+### Fixed Action Footer (Service Records)
+
+レコード詳細閲覧、レコード編集、新規登録の3画面において、下部アクションバーの体験・配置を統一：
+- Container: `fixed bottom-0 left-0 right-0 z-20 border-t border-border/80 bg-background/95 backdrop-blur-md px-4 py-2.5 sm:px-6 sm:py-3.5 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] dark:shadow-[0_-4px_12px_rgba(0,0,0,0.3)] pb-[max(0.625rem,env(safe-area-inset-bottom))] sm:pb-[max(0.875rem,env(safe-area-inset-bottom))]`
+- Content Width: `max-w-4xl mx-auto flex items-center justify-between`
+- Button Alignment:
+  - **右端 (Primary)**: Submit相当（登録・保存・編集）をオレンジPrimaryボタンスタイルで右端に配置。
+  - **右隣 (Secondary)**: キャンセルボタンをメインボタンの左隣に配置。
+  - **左端 (Destructive)**: 削除ボタンを左端に隔離配置（誤タップ防止）。モバイル（`< sm`）ではゴミ箱アイコン単体（`h-9 w-9`）、PCではアイコン＋テキスト。
+- Main Scroll Offset: メインコンテンツ末尾に `pb-24 sm:pb-32` のスクロール余白を常時確保。
 
 ### Navigation
 
