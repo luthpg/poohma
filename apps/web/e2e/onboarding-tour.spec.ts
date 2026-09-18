@@ -96,9 +96,28 @@ test.describe("オンボーディングツアーの画面間遷移検証", () =>
     await createTestAccount(page, "ツアー検証ユーザー");
     await createTestFamily(page, "ツアー検証家族", passcode);
 
-    // 2. /dashboard へ移動（新規家族なので初回オンボーディングが確実に発動）
-    await page.goto("/dashboard");
-    await page.waitForURL(/.*\/dashboard/, { timeout: 15000 });
+    // 2. 家族作成直後にヘッダーロゴにダッシュボード誘導ツアーが表示されることを検証！
+    const tourPopover = page.locator(".driver-popover, .poohma-tour-popover");
+    await expect(tourPopover).toBeVisible({ timeout: 10000 });
+    await expect(page.locator("text=家族グループができました！")).toBeVisible({
+      timeout: 5000,
+    });
+    // サブボタン「このまま家族設定を見る」が活性状態で表示されていること
+    const stayBtn = page.locator(
+      ".driver-popover-prev-btn:has-text('このまま家族設定を見る')",
+    );
+    await expect(stayBtn).toBeVisible({ timeout: 5000 });
+    await expect(stayBtn).toBeEnabled();
+
+    // 「ダッシュボードへ移動する」をクリックしてダッシュボードへ進む
+    const toDashboardBtn = page.locator(".driver-popover-done-btn");
+    await expect(toDashboardBtn).toBeVisible({ timeout: 5000 });
+    await toDashboardBtn.click();
+
+    // 3. /dashboard へ到達（新規家族なので初回オンボーディングが確実に発動）
+    await page.waitForURL(/.*\/dashboard.*onboarding=modal.*/, {
+      timeout: 15000,
+    });
 
     // 3. オンボーディングモーダルの「サンプルデータで体験してみる」をクリック
     const startTourBtn = page.getByRole("button", {
@@ -123,7 +142,6 @@ test.describe("オンボーディングツアーの画面間遷移検証", () =>
     }
 
     // 4. ダッシュボードツアー（前半）のポップオーバーが表示されることを待機
-    const tourPopover = page.locator(".driver-popover, .poohma-tour-popover");
     await expect(tourPopover).toBeVisible({ timeout: 15000 });
 
     // 前半 Step 1（スライド）：「次へ」をクリック
@@ -231,5 +249,30 @@ test.describe("オンボーディングツアーの画面間遷移検証", () =>
     await page.reload();
     await page.waitForURL(/.*\/dashboard/, { timeout: 10000 });
     await expect(tourPopover).toBeHidden();
+  });
+
+  test("家族作成後に「このまま家族設定を見る」をクリックすると活性状態のボタンでツアーが閉じ、/family にとどまること", async ({
+    page,
+  }) => {
+    const passcode =
+      process.env.E2E_FAMILY_PASSCODE || "PoohMa#Secure2026!Pass";
+
+    await createTestAccount(page, "家族設定残留検証ユーザー");
+    await createTestFamily(page, "家族設定残留検証家族", passcode);
+
+    const tourPopover = page.locator(".driver-popover, .poohma-tour-popover");
+    await expect(tourPopover).toBeVisible({ timeout: 10000 });
+
+    const stayBtn = page.locator(
+      ".driver-popover-prev-btn:has-text('このまま家族設定を見る')",
+    );
+    await expect(stayBtn).toBeVisible({ timeout: 5000 });
+    await expect(stayBtn).toBeEnabled();
+
+    // クリックするとツアーが閉じ、/familyにとどまる
+    await stayBtn.click();
+    await expect(tourPopover).toBeHidden({ timeout: 5000 });
+    await expect(page).toHaveURL(/.*\/family.*/);
+    await expect(page.locator("h1:has-text('家族管理')")).toBeVisible();
   });
 });

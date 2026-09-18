@@ -254,3 +254,28 @@ export const manualDashboardSteps: DriveStep[] = [
     },
   },
 ];
+
+/**
+ * 家族作成・参加完了画面（/family）：ダッシュボード誘導ツアーステップ
+ */
+export const familyCreatedStepDefinitions: OnboardingStep[] = [
+  {
+    type: "spotlight",
+    driveStep: {
+      element: '[data-tour="app-logo"]',
+      popover: {
+        title: "家族グループができました！ 🎉",
+        description:
+          "家族の準備が整いました。<br />ダッシュボードへ移動して、サービスの登録や体験ツアーを始めましょう！",
+        side: "bottom",
+        align: "start",
+        doneBtnText: "ダッシュボードへ移動する",
+        prevBtnText: "このまま家族設定を見る",
+      },
+    },
+  },
+];
+
+export const familyCreatedSteps: DriveStep[] = toDriveSteps(
+  familyCreatedStepDefinitions,
+);

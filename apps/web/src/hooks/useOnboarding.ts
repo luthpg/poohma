@@ -300,9 +300,13 @@ export function useOnboarding() {
         setPhase("manual-tour");
         return true;
       }
-      // オンボーディング完了済みの場合は、part1/part2/detail の自動復元を行わずクエリ削除を促す
+      // オンボーディング完了済みの場合は、part1/part2/detail/modal の自動復元を行わずクエリ削除を促す
       if (!needsOnboarding) {
         return false;
+      }
+      if (queryParam === "modal") {
+        setPhase("modal");
+        return true;
       }
       if (queryParam === "detail") {
         setPhase("detail-tour");

@@ -1,4 +1,9 @@
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  useNavigate,
+  useRouter,
+} from "@tanstack/react-router";
 import {
   useConvex,
   useConvexAuth,
@@ -35,6 +40,7 @@ import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
 import { AccountSwitcher } from "@/components/AccountSwitcher";
 import { RecoveryKitDialog } from "@/components/family/RecoveryKitDialog";
+import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { usePasscode } from "@/components/PasscodeProvider";
 import { PasscodeStrengthMeter } from "@/components/PasscodeStrengthMeter";
 import {
@@ -79,6 +85,7 @@ import {
   unwrapMasterKey,
   wrapMasterKey,
 } from "@/lib/crypto";
+import { familyCreatedSteps } from "@/lib/onboarding/tours";
 import { logout } from "@/services/auth.functions";
 import {
   AUDIT_ACTION_CONFIG,
@@ -178,6 +185,8 @@ function FamilyComponent() {
 
   const search = Route.useSearch();
   const router = useRouter();
+  const navigate = useNavigate();
+  const [showFamilyCreatedTour, setShowFamilyCreatedTour] = useState(false);
 
   const { queryClient } = Route.useRouteContext();
   const convex = useConvex();
@@ -693,6 +702,7 @@ function FamilyComponent() {
       setVaultUnlockedKey(null);
       setVaultPasscode("");
       await router.invalidate();
+      setShowFamilyCreatedTour(true);
     } catch (_error) {
       if (currentMigrationId) {
         try {
@@ -814,6 +824,7 @@ function FamilyComponent() {
         setVaultUnlockedKey(null);
         setVaultPasscode("");
         await router.invalidate();
+        setShowFamilyCreatedTour(true);
       } catch (_error) {
         if (currentMigrationId) {
           try {
@@ -871,6 +882,7 @@ function FamilyComponent() {
       await queryClient.invalidateQueries({ queryKey: ["authUser"] });
       toast.success("家族グループを作成しました。");
       await router.invalidate();
+      setShowFamilyCreatedTour(true);
     } catch {
       toast.error("作成に失敗しました");
     } finally {
@@ -2675,6 +2687,23 @@ function FamilyComponent() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* 家族作成・参加直後のダッシュボード誘導ツアーステップ */}
+      <OnboardingTour
+        steps={familyCreatedSteps}
+        isActive={showFamilyCreatedTour}
+        allowClose={true}
+        onComplete={() => {
+          setShowFamilyCreatedTour(false);
+          navigate({
+            to: "/dashboard",
+            search: { onboarding: "modal" },
+          });
+        }}
+        onClose={() => {
+          setShowFamilyCreatedTour(false);
+        }}
+      />
     </div>
   );
 }

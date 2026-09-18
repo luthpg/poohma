@@ -5,6 +5,8 @@ import {
   dashboardPart1Steps,
   dashboardPart2StepDefinitions,
   dashboardPart2Steps,
+  familyCreatedStepDefinitions,
+  familyCreatedSteps,
   recordDetailIntroSteps,
   recordDetailReturnSteps,
   recordDetailStepDefinitions,
@@ -231,6 +233,23 @@ describe("Onboarding Tour 概念説明スライドと Driver.js 変換", () => {
         expect(slot?.role).toBeTruthy();
         expect(slot?.role.length).toBeGreaterThan(5);
       }
+    });
+
+    it("家族作成・参加直後のダッシュボード誘導ツアーステップが1ステップで構成されていること", () => {
+      expect(familyCreatedStepDefinitions).toHaveLength(1);
+      expect(familyCreatedSteps).toHaveLength(1);
+
+      expect(familyCreatedStepDefinitions[0].type).toBe("spotlight");
+      expect(familyCreatedSteps[0].element).toBe('[data-tour="app-logo"]');
+      expect(familyCreatedSteps[0].popover?.title).toContain(
+        "家族グループができました！",
+      );
+      expect(familyCreatedSteps[0].popover?.doneBtnText).toBe(
+        "ダッシュボードへ移動する",
+      );
+      expect(familyCreatedSteps[0].popover?.prevBtnText).toBe(
+        "このまま家族設定を見る",
+      );
     });
   });
 });

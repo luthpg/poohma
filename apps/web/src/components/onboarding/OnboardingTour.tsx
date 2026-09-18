@@ -86,21 +86,19 @@ export function OnboardingTour({
         doneBtnText: "完了",
         progressText: "{{current}} / {{total}}",
         steps: normalizedSteps,
-        onPopoverRender: (popover, opts) => {
-          if (popover.closeButton) {
-            popover.closeButton.setAttribute("aria-label", "ツアーを終了");
-            popover.closeButton.setAttribute("title", "ツアーを終了");
+        onDoneClick: () => {
+          isFinishedByDoneRef.current = true;
+          destroyDriver();
+          onCompleteRef.current();
+        },
+        onPrevClick: () => {
+          if (driverObj.isFirstStep() && driverObj.isLastStep()) {
+            isClosedByUserRef.current = true;
+            destroyDriver();
+            onCloseRef.current();
+            return;
           }
-          // 最終ステップの「完了」ボタンがクリックされたことを確実に追跡
-          if (opts.driver.isLastStep() && popover.nextButton) {
-            popover.nextButton.addEventListener(
-              "click",
-              () => {
-                isFinishedByDoneRef.current = true;
-              },
-              { once: true },
-            );
-          }
+          driverObj.movePrevious();
         },
         onCloseClick: () => {
           isClosedByUserRef.current = true;
@@ -108,13 +106,35 @@ export function OnboardingTour({
           onCloseRef.current();
         },
         onDestroyStarted: () => {
-          if (isClosedByUserRef.current) return;
-          const isDone = isFinishedByDoneRef.current || driverObj.isLastStep();
+          if (isClosedByUserRef.current || isFinishedByDoneRef.current) return;
           destroyDriver();
-          if (isDone) {
-            onCompleteRef.current();
-          } else {
-            onCloseRef.current();
+          onCloseRef.current();
+        },
+        onPopoverRender: (popover, opts) => {
+          if (popover.closeButton) {
+            popover.closeButton.setAttribute("aria-label", "ツアーを終了");
+            popover.closeButton.setAttribute("title", "ツアーを終了");
+          }
+          // 単一ステップで prevBtnText（例：「このまま家族設定を見る」）が指定されている場合、キャンセル用ボタンとして表示
+          const singleStepPrevBtnText =
+            normalizedSteps.length === 1
+              ? normalizedSteps[0]?.popover?.prevBtnText
+              : undefined;
+
+          if (
+            opts.driver.isFirstStep() &&
+            opts.driver.isLastStep() &&
+            singleStepPrevBtnText &&
+            popover.previousButton
+          ) {
+            popover.previousButton.style.display = "inline-block";
+            popover.previousButton.disabled = false;
+            popover.previousButton.removeAttribute("disabled");
+            popover.previousButton.classList.remove(
+              "driver-popover-btn-disabled",
+            );
+            popover.previousButton.style.pointerEvents = "auto";
+            popover.previousButton.innerText = singleStepPrevBtnText;
           }
         },
       });

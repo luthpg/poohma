@@ -28,6 +28,7 @@ export function AppHeader({ user }: AppHeaderProps) {
       <div className="mx-auto max-w-5xl h-full flex items-center justify-between px-6">
         <Link
           to="/dashboard"
+          data-tour="app-logo"
           className="flex items-center gap-2 text-[24px] font-semibold tracking-geist-h1 text-foreground hover:opacity-80 transition-opacity"
         >
           <img

@@ -194,7 +194,11 @@ function RouteComponent() {
   }, [searchParams.q]);
 
   // --- オンボーディング ---
-  const { activeAccountId } = useAccount();
+  const {
+    activeAccount,
+    activeAccountId,
+    isLoading: isAccountLoading,
+  } = useAccount();
   const records = usePersistentQuery<
     NonNullable<typeof api.records.getRecords._returnType>
   >(api.records.getRecords, {
@@ -227,6 +231,9 @@ function RouteComponent() {
 
   // 初回表示時にモーダルを表示、またはURLクエリから復帰
   useEffect(() => {
+    // アカウント情報の読み込みを待機
+    if (isAccountLoading || !activeAccount) return;
+
     if (onboardingSearch.onboarding) {
       const resumed = onboarding.resumeFromQuery(onboardingSearch.onboarding);
       if (resumed) return;
@@ -252,6 +259,8 @@ function RouteComponent() {
       onboarding.showModal();
     }
   }, [
+    isAccountLoading,
+    activeAccount,
     records,
     hasRealRecords,
     onboardingSearch.onboarding,

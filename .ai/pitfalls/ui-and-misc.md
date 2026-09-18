@@ -63,7 +63,12 @@ UI 実装、外部 API 連携、環境変数、モノレポ設定における落
   1. `allowClose: true` のままにすると、暗い背景オーバーレイを誤クリックしただけでツアーが不意に終了してしまい、離脱したユーザーが二度とツアーを体験できなくなる。
   2. 画面上のボタン（例: 暗号化ヒントの「🔒 クリックして表示」）を押させたいステップで、ポップオーバー側にも「次へ」「完了」ボタンが表示されていると、ユーザーが画面のボタンを押さずに次へ進んでしまい、未復号のまま完了扱いになってデータやUIの状態不整合が発生する。
   3. 画面間を跨ぐツアー（ダッシュボード ➔ 詳細 ➔ ダッシュボード後半）において、URLクエリ（`?onboarding=part2`）の復帰ロジックに「初回オンボーディング未完了（`needsOnboarding`）」のガードを入れてしまうと、既存アカウントやツアー再開時に後半ツアーが拒絶されて起動しなくなる。
+  4. **`nextButton` / `previousButton` への直接 DOM `addEventListener` の不発**: Driver.js は内部で `document` にキャプチャフェーズ（`capture: true`）のクリックリスナーを登録し、`stopImmediatePropagation()` を実行する。そのため、`onPopoverRender` 内で `popover.nextButton.addEventListener("click", ...)` を登録してもイベントが到達せず発火しない。
+  5. **単一ステップツアーでの `previousButton` 自動 disabled 化と離脱時の完了誤認**: Driver.js は先頭ステップ（`isFirstStep()`）で `previousButton` を自動的に `disabled` かつ `driver-popover-btn-disabled` にする。これを単一ステップツアーのサブアクション（「このまま家族設定を見る」等）に流用すると非活性のままになる。また、単一ステップツアーは常に `isLastStep()` が true になるため、終了フック（`onDestroyStarted`）で `driver.isLastStep()` を完了判定に含めていると、背景クリックや閉じるボタン等の離脱でも「ツアー完了」と誤認される。
 - **回避法**:
-  1. `allowClose: false` を指定して背景クリックによる離脱を禁止し、離脱はポップオーバー右上の「×」ボタンに一元化する。
+  1. 通常の手動ツアーでは `allowClose: false` を指定して背景クリックによる離脱を禁止し、離脱はポップオーバー右上の「×」ボタンに一元化する。
   2. UIボタン操作が必須のステップでは `popover.showButtons: ["previous", "close"]` を設定し、ポップオーバーの「次へ」ボタンを物理的に非表示にする。UI側のボタンクリック時にツアーを一時閉じ（`onRevealStart`）、処理完了後に次のツアーを自動再開（`onRevealSuccess`）させる。
-  3. URLクエリに `onboarding=part2` などの明示的なシグナルがある場合は、完了フラグの有無に関係なく素直にフェーズを復元・起動する。
+  3. URLクエリに `onboarding=part2` や `onboarding=modal` などの明示的なシグナルがある場合は、完了フラグの有無に関係なく素直にフェーズを復元・起動する。
+  4. 完了や戻るのアクションは DOM イベントではなく、Driver.js 公式の `onDoneClick`、`onPrevClick`、`onCloseClick` コールバックで宣言的に実装する。
+  5. 単一ステップで `previousButton` をサブアクションとして使う場合は、`onPopoverRender` で `removeAttribute("disabled")`、`disabled = false`、`pointerEvents = "auto"` を指定して強制活性化する。また完了判定は `isLastStep()` に頼らず、`onDoneClick` で明示的に立てたフラグのみで行う。
+
