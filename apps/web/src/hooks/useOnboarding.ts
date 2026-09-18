@@ -87,6 +87,10 @@ export function useOnboarding() {
 
   // 完了処理の共通ヘルパー（DB更新 + authUser クエリの無効化 + クエリ削除）
   const completeAndSync = useCallback(async () => {
+    // レースコンディション防止のため、非同期通信前に直ちにローカル状態を完了にしてクエリを消去
+    setPhase("completed");
+    clearOnboardingQuery();
+
     try {
       await completeOnboardingMutation({
         accountId: activeAccount?._id,
@@ -94,8 +98,6 @@ export function useOnboarding() {
       });
       // ★重要: TanStack Query の authUser キャッシュを更新し、AccountProvider に最新の onboardingVersion を反映
       await queryClient.invalidateQueries({ queryKey: ["authUser"] });
-      setPhase("completed");
-      clearOnboardingQuery();
     } catch (_e) {
       // 完了ステータスの更新失敗時は静かに無視
     }
@@ -230,6 +232,7 @@ export function useOnboarding() {
         ...(prev as DashboardSearchParams),
         onboarding: "part2",
       }),
+      replace: true,
     });
   }, [navigate]);
 
@@ -291,25 +294,32 @@ export function useOnboarding() {
   /**
    * URLクエリパラメータからフェーズを復元（画面遷移後の再開用）
    */
-  const resumeFromQuery = useCallback((queryParam?: string): boolean => {
-    if (queryParam === "guide") {
-      setPhase("manual-tour");
-      return true;
-    }
-    if (queryParam === "detail") {
-      setPhase("detail-tour");
-      return true;
-    }
-    if (queryParam === "part2") {
-      setPhase("dashboard-tour-2");
-      return true;
-    }
-    if (queryParam === "part1") {
-      setPhase("dashboard-tour-1");
-      return true;
-    }
-    return false;
-  }, []);
+  const resumeFromQuery = useCallback(
+    (queryParam?: string): boolean => {
+      if (queryParam === "guide") {
+        setPhase("manual-tour");
+        return true;
+      }
+      // オンボーディング完了済みの場合は、part1/part2/detail の自動復元を行わずクエリ削除を促す
+      if (!needsOnboarding) {
+        return false;
+      }
+      if (queryParam === "detail") {
+        setPhase("detail-tour");
+        return true;
+      }
+      if (queryParam === "part2") {
+        setPhase("dashboard-tour-2");
+        return true;
+      }
+      if (queryParam === "part1") {
+        setPhase("dashboard-tour-1");
+        return true;
+      }
+      return false;
+    },
+    [needsOnboarding],
+  );
 
   return {
     phase,

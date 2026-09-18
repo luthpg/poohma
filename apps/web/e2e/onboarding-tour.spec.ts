@@ -222,5 +222,14 @@ test.describe("オンボーディングツアーの画面間遷移検証", () =>
 
     // ダッシュボードURLから onboarding クエリが除去されていること
     await expect(page).toHaveURL(/.*\/dashboard(?!\?.*onboarding).*/);
+
+    // 9. 完了直後にポップオーバーが再表示されないことを待機して検証（再表示バグの回帰防止）
+    await page.waitForTimeout(2000);
+    await expect(tourPopover).toBeHidden();
+
+    // 10. ページをリロードしてもツアーが再起動しないこと
+    await page.reload();
+    await page.waitForURL(/.*\/dashboard/, { timeout: 10000 });
+    await expect(tourPopover).toBeHidden();
   });
 });

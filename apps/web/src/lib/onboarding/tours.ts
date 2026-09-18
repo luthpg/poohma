@@ -106,7 +106,7 @@ export const recordDetailReturnStepDefinitions: OnboardingStep[] = [
       popover: {
         title: "カギが開いてヒントが現れました！",
         description:
-          "暗号化されていたヒントが、スマホの中だけで安全に復号されました。<br />あなたとご家族以外には、PoohMaの運営であっても読めない安心の仕組みです。",
+          "先ほど入力していただいた「合言葉」によって、安全に暗号が解かれました。<br />あなたとご家族以外には、PoohMaの運営であっても読めない安心の仕組みです。",
         side: "bottom",
         align: "start",
         nextBtnText: "次へ進む",
