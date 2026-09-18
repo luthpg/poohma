@@ -236,10 +236,16 @@ function RouteComponent() {
 
     if (onboardingSearch.onboarding) {
       const resumed = onboarding.resumeFromQuery(onboardingSearch.onboarding);
-      if (resumed) return;
+      if (resumed) {
+        onboardingInitRef.current = true;
+        return;
+      }
       // ツアー起動対象外の不要なクエリパラメータは自動削除
       onboarding.clearOnboardingQuery();
     }
+
+    // 既にオンボーディング進行中・完了済みの場合は自動起動判定をスキップ
+    if (onboarding.phase !== "idle") return;
 
     // レコードの取得完了を待機
     if (records === undefined) return;
@@ -264,6 +270,7 @@ function RouteComponent() {
     records,
     hasRealRecords,
     onboardingSearch.onboarding,
+    onboarding.phase,
     onboarding.needsOnboarding,
     onboarding.showModal,
     onboarding.markCompleted,

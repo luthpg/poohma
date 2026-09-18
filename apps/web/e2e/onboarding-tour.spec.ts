@@ -275,4 +275,60 @@ test.describe("オンボーディングツアーの画面間遷移検証", () =>
     await expect(page).toHaveURL(/.*\/family.*/);
     await expect(page.locator("h1:has-text('家族管理')")).toBeVisible();
   });
+
+  test("初回オンボーディングモーダルでスキップを選択した際、完了後にモーダルが再表示されないこと", async ({
+    page,
+  }) => {
+    const passcode =
+      process.env.E2E_FAMILY_PASSCODE || "PoohMa#Secure2026!Pass";
+
+    await createTestAccount(page, "モーダルスキップ検証ユーザー");
+    await createTestFamily(page, "モーダルスキップ検証家族", passcode);
+
+    const tourPopover = page.locator(".driver-popover, .poohma-tour-popover");
+    await expect(tourPopover).toBeVisible({ timeout: 10000 });
+
+    // 「ダッシュボードへ移動する」をクリック
+    const toDashboardBtn = page.locator(".driver-popover-done-btn");
+    await expect(toDashboardBtn).toBeVisible({ timeout: 5000 });
+    await toDashboardBtn.click();
+
+    // /dashboard?onboarding=modal へ到達
+    await page.waitForURL(/.*\/dashboard.*onboarding=modal.*/, {
+      timeout: 15000,
+    });
+
+    // オンボーディングモーダルが表示されること
+    const modalDialog = page.getByRole("dialog");
+    await expect(modalDialog).toBeVisible({ timeout: 10000 });
+    await expect(
+      page.getByRole("heading", { name: "PoohMaへようこそ！" }),
+    ).toBeVisible({ timeout: 5000 });
+
+    // 「スキップして空のまま始める」をクリック
+    const skipBtn = page.getByRole("button", {
+      name: "スキップして空のまま始める",
+    });
+    await expect(skipBtn).toBeVisible({ timeout: 5000 });
+    await skipBtn.click();
+
+    // モーダルが閉じること
+    await expect(modalDialog).toBeHidden({ timeout: 10000 });
+
+    // ダッシュボードURLから onboarding クエリが除去されていること
+    await expect(page).toHaveURL(/.*\/dashboard(?!\?.*onboarding).*/, {
+      timeout: 10000,
+    });
+
+    // 通信遅延中および完了後にモーダルが再表示されないことを待機して検証（レースコンディション回帰防止）
+    await page.waitForTimeout(2000);
+    await expect(modalDialog).toBeHidden();
+    await expect(tourPopover).toBeHidden();
+
+    // ページをリロードしてもモーダルが表示されないこと
+    await page.reload();
+    await page.waitForURL(/.*\/dashboard/, { timeout: 10000 });
+    await expect(modalDialog).toBeHidden();
+    await expect(tourPopover).toBeHidden();
+  });
 });

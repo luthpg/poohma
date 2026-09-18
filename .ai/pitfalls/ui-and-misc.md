@@ -72,3 +72,17 @@ UI 実装、外部 API 連携、環境変数、モノレポ設定における落
   4. 完了や戻るのアクションは DOM イベントではなく、Driver.js 公式の `onDoneClick`、`onPrevClick`、`onCloseClick` コールバックで宣言的に実装する。
   5. 単一ステップで `previousButton` をサブアクションとして使う場合は、`onPopoverRender` で `removeAttribute("disabled")`、`disabled = false`、`pointerEvents = "auto"` を指定して強制活性化する。また完了判定は `isLastStep()` に頼らず、`onDoneClick` で明示的に立てたフラグのみで行う。
 
+---
+
+### オンボーディング完了処理におけるレスポンシブ即時完了とクエリ消去によるレースコンディション
+
+- **問題**:
+  - オンボーディングの「スキップ」や「ツアー完了」時、ユーザー体験向上のためサーバー通信待ちの前にレスポンシブにローカル状態（`phase = "completed"`）を更新し、同時に URL クエリ（`?onboarding=...`）を消去することがある。
+  - しかし、クエリ消去によってコンポーネントが再レンダリングされ、ダッシュボード等の自動初期化 effect が再発火する。
+  - この時、Convex 等のバックエンド更新とキャッシュ（TanStack Query / authUser）の反映には通信遅延（数十〜数百ms）があるため、キャッシュ上はまだ未完了（`needsOnboarding === true`）のままとなる。
+  - その結果、新規家族（レコード件数 0）などで「初回モーダルを自動表示する」ロジックが誤って再発火し、スキップしたはずのモーダルが再オープンするレースコンディションが発生する。
+- **回避法**:
+  - **Single Source of Truth**: クライアントローカルで `phase === "completed"` となった時点で、キャッシュの遅延に関わらず未完了判定を即時無効化（`if (phase === "completed") return false;`）する。
+  - **状態機械の防衛**: `showModal` に `if (phase === "completed") return;` ガードを設け、完了状態からモーダル表示への逆戻りを防止する。
+  - **初期化 effect の責務限定**: ダッシュボード等の自動起動 effect では `if (phase !== "idle") return;` を設け、既に進行中または完了状態の場合は自動判定を確実にスキップする。
+

@@ -63,12 +63,14 @@ export function useOnboarding() {
 
   // オンボーディング未完了かどうか
   const needsOnboarding = useMemo(() => {
+    // ローカルで完了済みの場合はキャッシュ更新待ちに関わらず未完了と判定しない
+    if (phase === "completed") return false;
     if (!activeAccount) return false;
     // 家族未所属 → オンボーディングの対象外（家族作成後に初めて発動）
     if (!activeAccount.familyId) return false;
     const version = activeAccount.onboardingVersion ?? 0;
     return version < ONBOARDING_CURRENT_VERSION;
-  }, [activeAccount]);
+  }, [activeAccount, phase]);
 
   /**
    * 現在の画面パスを維持したまま、URLの `onboarding` クエリパラメータを型安全に除去する
@@ -116,10 +118,10 @@ export function useOnboarding() {
    * モーダルを表示（初回ダッシュボード到達時に呼ばれる）
    */
   const showModal = useCallback(() => {
-    if (needsOnboarding) {
+    if (needsOnboarding && phase !== "completed") {
       setPhase("modal");
     }
-  }, [needsOnboarding]);
+  }, [needsOnboarding, phase]);
 
   /**
    * 「スキップして空のまま始める」
