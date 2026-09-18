@@ -43,7 +43,7 @@ export function CredentialFieldsCard({
         <button
           type="button"
           onClick={() => onRemove(index)}
-          className="absolute right-2.5 top-2.5 inline-flex items-center justify-center rounded-md p-1.5 text-muted-foreground transition-all hover:bg-red-500/10 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/30 opacity-80 hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100 cursor-pointer"
+          className="absolute right-1 top-1 inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-md p-2.5 text-muted-foreground transition-all hover:bg-red-500/10 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/30 opacity-70 hover:opacity-100 focus:opacity-100 cursor-pointer"
           title="このアカウント情報を削除"
           aria-label="このアカウント情報を削除"
         >

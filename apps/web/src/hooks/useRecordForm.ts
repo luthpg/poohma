@@ -71,13 +71,28 @@ export class RecordFormValidationError extends Error {
 }
 export class RecordFormUnlockCancelledError extends Error {}
 
-const EMPTY_CREDENTIAL: RecordFormCredential = {
-  label: "",
-  loginId: "",
-  passwordHint: "",
-};
+export function createEmptyCredential(): RecordFormCredential {
+  return {
+    id: crypto.randomUUID(),
+    label: "",
+    loginId: "",
+    passwordHint: "",
+  };
+}
 
-const DEFAULT_VALUES: RecordFormValues = {
+export function ensureCredentialIds(
+  credentials?: RecordFormCredential[],
+): RecordFormCredential[] {
+  if (!credentials || credentials.length === 0) {
+    return [createEmptyCredential()];
+  }
+  return credentials.map((cred) => ({
+    ...cred,
+    id: cred.id || crypto.randomUUID(),
+  }));
+}
+
+const DEFAULT_VALUES: Omit<RecordFormValues, "credentials"> = {
   title: "",
   titleReading: "",
   url: "",
@@ -86,7 +101,6 @@ const DEFAULT_VALUES: RecordFormValues = {
   memo: "",
   ownerType: "user",
   tags: [],
-  credentials: [{ ...EMPTY_CREDENTIAL }],
 };
 
 export interface UseRecordFormOptions {
@@ -102,13 +116,11 @@ export function useRecordForm(
   const { activeAccountId } = useAccount();
   const { encryptHint, masterKey, requireUnlock } = usePasscode();
 
-  const [values, setValues] = useState<RecordFormValues>({
+  const [values, setValues] = useState<RecordFormValues>(() => ({
     ...DEFAULT_VALUES,
     ...initialValues,
-    credentials: initialValues?.credentials?.length
-      ? initialValues.credentials
-      : [{ ...EMPTY_CREDENTIAL }],
-  });
+    credentials: ensureCredentialIds(initialValues?.credentials),
+  }));
 
   // 編集開始時の復号データ等を反映する動的初期基準値
   const [baselineValues, setBaselineValuesState] = useState<
@@ -188,7 +200,10 @@ export function useRecordForm(
         });
         if (draft) {
           isRestoredRef.current = true;
-          setValues(draft.values);
+          setValues({
+            ...draft.values,
+            credentials: ensureCredentialIds(draft.values.credentials),
+          });
           setRestoredMetadata({
             recordId: targetRecordId,
             initialRevision: draft.initialRevision,
@@ -334,9 +349,7 @@ export function useRecordForm(
     const nextValues: RecordFormValues = {
       ...DEFAULT_VALUES,
       ...next,
-      credentials: next.credentials?.length
-        ? next.credentials
-        : [{ ...EMPTY_CREDENTIAL }],
+      credentials: ensureCredentialIds(next.credentials),
     };
     setValues(nextValues);
     initialValuesJsonRef.current = JSON.stringify(nextValues);
@@ -347,9 +360,7 @@ export function useRecordForm(
     const nextBaseline: RecordFormValues = {
       ...DEFAULT_VALUES,
       ...next,
-      credentials: next.credentials?.length
-        ? next.credentials
-        : [{ ...EMPTY_CREDENTIAL }],
+      credentials: ensureCredentialIds(next.credentials),
     };
     setBaselineValuesState(nextBaseline);
   }, []);
@@ -481,7 +492,7 @@ export function useRecordForm(
     }
     setValues((prev) => ({
       ...prev,
-      credentials: [...prev.credentials, { ...EMPTY_CREDENTIAL }],
+      credentials: [...prev.credentials, createEmptyCredential()],
     }));
   }, [values.credentials.length]);
 
