@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { logAuditEvent } from "./auditLogs";
 import {
   authenticatedMutation,
   familyBoundMutation,
@@ -108,6 +109,18 @@ export const registerRecoveryKit = familyBoundMutation({
         },
       );
     }
+
+    await logAuditEvent(ctx, {
+      actor: user,
+      ownerType: "family",
+      ownerFamilyId: familyId,
+      action: "RECOVERY_KIT_REGISTERED",
+      metadata: {
+        detail: isReissue
+          ? "リカバリーキットを再発行"
+          : "リカバリーキットを発行",
+      },
+    });
 
     return { success: true, issuedAt: now };
   },
@@ -449,6 +462,16 @@ export const redeemRecoveryAndRotatePasscode = familyBoundMutation({
         },
       );
     }
+
+    await logAuditEvent(ctx, {
+      actor: user,
+      ownerType: "family",
+      ownerFamilyId: familyId,
+      action: "RECOVERY_REDEEMED",
+      metadata: {
+        detail: "アカウント復元を実行しパスコードを再設定",
+      },
+    });
 
     return { success: true };
   },

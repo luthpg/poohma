@@ -12,9 +12,23 @@ export interface LogAuditParams {
     | "RECORD_CREATE"
     | "RECORD_UPDATE"
     | "RECORD_DELETE"
-    | "HINT_VIEW"
+    | "CREDENTIAL_CREATE"
+    | "CREDENTIAL_UPDATE"
+    | "CREDENTIAL_DELETE"
     | "SHARE_SETTING_CHANGED"
-    | "ADMIN_CHANGED";
+    | "ADMIN_CHANGED"
+    | "FAMILY_UPDATE"
+    | "MEMBER_JOIN"
+    | "MEMBER_REMOVE"
+    | "MEMBER_LEAVE"
+    | "MEMBER_ROLE_CHANGED"
+    | "INVITE_CREATE"
+    | "INVITE_REVOKE"
+    | "JOIN_REQUEST_REJECTED"
+    | "FAMILY_MIGRATION"
+    | "PASSCODE_ROTATED"
+    | "RECOVERY_KIT_REGISTERED"
+    | "RECOVERY_REDEEMED";
   metadata?: {
     targetTitle?: string;
     changedFields?: string[];

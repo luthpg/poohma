@@ -21,15 +21,11 @@ import {
   History,
   KeyRound,
   Plus,
-  PlusCircle,
   QrCode,
   RotateCcw,
   Share2,
-  ShieldAlert,
   ShieldCheck,
-  Trash2,
   UserMinus,
-  Users,
   X,
 } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
@@ -84,6 +80,11 @@ import {
   wrapMasterKey,
 } from "@/lib/crypto";
 import { logout } from "@/services/auth.functions";
+import {
+  AUDIT_ACTION_CONFIG,
+  DEFAULT_ACTION_CONFIG,
+  formatFieldName,
+} from "@/utils/audit-log-formatter";
 import { auth } from "@/utils/firebase";
 import {
   evaluatePasscodeStrength,
@@ -2678,45 +2679,6 @@ function FamilyComponent() {
   );
 }
 
-const ACTION_CONFIG = {
-  RECORD_CREATE: {
-    label: "新規作成",
-    icon: PlusCircle,
-    badgeClass:
-      "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
-  },
-  RECORD_UPDATE: {
-    label: "更新",
-    icon: FileEdit,
-    badgeClass:
-      "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
-  },
-  RECORD_DELETE: {
-    label: "削除",
-    icon: Trash2,
-    badgeClass:
-      "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
-  },
-  HINT_VIEW: {
-    label: "閲覧",
-    icon: Eye,
-    badgeClass:
-      "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
-  },
-  SHARE_SETTING_CHANGED: {
-    label: "共有設定",
-    icon: Users,
-    badgeClass:
-      "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
-  },
-  ADMIN_CHANGED: {
-    label: "管理者変更",
-    icon: ShieldAlert,
-    badgeClass:
-      "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
-  },
-};
-
 /** 家族共有レコードの監査ログをページネーション付きで表示する。 */
 export function FamilyAuditLogSection({
   activeAccountId,
@@ -2759,12 +2721,12 @@ export function FamilyAuditLogSection({
               </h3>
             </div>
             <span className="text-xs text-muted-foreground hidden sm:block mr-2">
-              直近の変更・閲覧証跡
+              直近の変更証跡
             </span>
           </div>
         </AccordionTrigger>
         <p className="text-[12px] text-muted-foreground mb-3">
-          家族共有レコードに対する登録・更新・ヒント閲覧・削除の履歴を確認できます。
+          家族共有レコードに対する登録・更新・共有設定変更・削除などの変更履歴を確認できます。
         </p>
         <AccordionContent className="pb-0">
           {status === "LoadingFirstPage" ? (
@@ -2780,11 +2742,8 @@ export function FamilyAuditLogSection({
             <div className="space-y-2">
               <Accordion type="multiple" className="w-full space-y-2">
                 {results.map((log) => {
-                  const config = ACTION_CONFIG[log.action] || {
-                    label: log.action,
-                    icon: Clock,
-                    badgeClass: "bg-muted text-muted-foreground",
-                  };
+                  const config =
+                    AUDIT_ACTION_CONFIG[log.action] || DEFAULT_ACTION_CONFIG;
                   const Icon = config.icon;
                   const hasMetadata =
                     log.metadata?.changedFields?.length || log.metadata?.detail;
@@ -2802,12 +2761,10 @@ export function FamilyAuditLogSection({
                         >
                           <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
                             <span
-                              className={`inline-flex items-center gap-1 px-1.5 sm:px-2.5 py-0.5 rounded-full text-xs font-semibold border shrink-0 ${config.badgeClass}`}
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border shrink-0 ${config.badgeClass}`}
                             >
                               <Icon className="h-3.5 w-3.5" />
-                              <span className="hidden sm:inline">
-                                {config.label}
-                              </span>
+                              <span>{config.label}</span>
                             </span>
                             <div className="min-w-0 text-left">
                               <span className="font-semibold text-foreground text-xs mr-1 sm:mr-2">
@@ -2830,12 +2787,10 @@ export function FamilyAuditLogSection({
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-2.5 gap-1.5 sm:gap-2">
                           <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
                             <span
-                              className={`inline-flex items-center gap-1 px-1.5 sm:px-2.5 py-0.5 rounded-full text-xs font-semibold border shrink-0 ${config.badgeClass}`}
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border shrink-0 ${config.badgeClass}`}
                             >
                               <Icon className="h-3.5 w-3.5" />
-                              <span className="hidden sm:inline">
-                                {config.label}
-                              </span>
+                              <span>{config.label}</span>
                             </span>
                             <div className="min-w-0 text-left">
                               <span className="font-semibold text-foreground text-xs mr-1 sm:mr-2">
@@ -2859,16 +2814,19 @@ export function FamilyAuditLogSection({
                       {hasMetadata ? (
                         <AccordionContent className="pt-2 pb-3 text-xs text-muted-foreground border-t border-border/40">
                           <div className="space-y-1 bg-muted/30 p-2.5 rounded-md">
-                            {log.metadata?.changedFields && (
-                              <div>
-                                <span className="font-medium text-foreground mr-1.5">
-                                  変更されたフィールド:
-                                </span>
-                                <span>
-                                  {log.metadata.changedFields.join(", ")}
-                                </span>
-                              </div>
-                            )}
+                            {log.metadata?.changedFields &&
+                              log.metadata.changedFields.length > 0 && (
+                                <div>
+                                  <span className="font-medium text-foreground mr-1.5">
+                                    変更項目:
+                                  </span>
+                                  <span>
+                                    {log.metadata.changedFields
+                                      .map(formatFieldName)
+                                      .join(", ")}
+                                  </span>
+                                </div>
+                              )}
                             {log.metadata?.detail && (
                               <div>
                                 <span className="font-medium text-foreground mr-1.5">

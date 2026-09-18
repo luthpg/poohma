@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery } from "./_generated/server";
+import { logAuditEvent } from "./auditLogs";
 import {
   authenticatedMutation,
   identityVerifiedMutation,
@@ -430,6 +431,17 @@ export const deleteAccount = authenticatedMutation({
         }
 
         await reconcileAdminsOnLeave(ctx, familyId, user._id);
+
+        await logAuditEvent(ctx, {
+          actor: user,
+          ownerType: "family",
+          ownerFamilyId: familyId,
+          targetAccountId: user._id,
+          action: "MEMBER_LEAVE",
+          metadata: {
+            detail: `メンバー退会: ${displayName}`,
+          },
+        });
       }
     } else {
       // 家族未所属の場合、このアカウントが作成した全レコードを削除

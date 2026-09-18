@@ -10,14 +10,9 @@ import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
 import {
   ArrowLeft,
   Check,
-  Clock,
   Copy,
-  Eye,
-  FileEdit,
   History,
-  PlusCircle,
   Share2,
-  ShieldAlert,
   Trash2,
   Users,
 } from "lucide-react";
@@ -66,6 +61,11 @@ import {
 } from "@/hooks/useRecordForm";
 import { attemptSilentReauth, isAuthSessionError } from "@/lib/auth-recovery";
 import { recordDetailSteps } from "@/lib/onboarding/tours";
+import {
+  AUDIT_ACTION_CONFIG,
+  DEFAULT_ACTION_CONFIG,
+  formatFieldName,
+} from "@/utils/audit-log-formatter";
 
 const detailSearchSchema = z.object({
   onboarding: z.string().optional(),
@@ -1676,52 +1676,8 @@ function CopyButton({ text, label }: { text: string; label: string }) {
 }
 
 // 操作種別ごとのラベル・バッジ設定マッピング
-const ACTION_CONFIG = {
-  RECORD_CREATE: {
-    label: "作成",
-    variant: "default" as const,
-    icon: PlusCircle,
-    colorClass:
-      "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
-  },
-  RECORD_UPDATE: {
-    label: "更新",
-    variant: "secondary" as const,
-    icon: FileEdit,
-    colorClass:
-      "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
-  },
-  HINT_VIEW: {
-    label: "ヒント閲覧",
-    variant: "outline" as const,
-    icon: Eye,
-    colorClass:
-      "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
-  },
-  SHARE_SETTING_CHANGED: {
-    label: "共有設定変更",
-    variant: "secondary" as const,
-    icon: History,
-    colorClass:
-      "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
-  },
-  ADMIN_CHANGED: {
-    label: "管理者変更",
-    variant: "secondary" as const,
-    icon: ShieldAlert,
-    colorClass:
-      "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
-  },
-  RECORD_DELETE: {
-    label: "削除",
-    variant: "destructive" as const,
-    icon: Trash2,
-    colorClass:
-      "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
-  },
-};
 
-/** レコードのアクセス・変更履歴を折りたたみ可能な一覧で表示する。 */
+/** レコードの変更履歴を折りたたみ可能な一覧で表示する。 */
 function RecordAuditHistoryAccordion({
   recordId,
 }: {
@@ -1756,7 +1712,7 @@ function RecordAuditHistoryAccordion({
           <AccordionTrigger className="hover:no-underline py-3">
             <div className="flex items-center gap-2 text-[14px] font-semibold text-foreground tracking-wide uppercase">
               <History className="h-4 w-4 text-orange-500" />
-              <span>アクセス・変更履歴</span>
+              <span>変更履歴</span>
               {auditLogs !== undefined && (
                 <span className="text-xs font-normal text-muted-foreground ml-1">
                   (
@@ -1772,20 +1728,17 @@ function RecordAuditHistoryAccordion({
             {auditLogs === undefined ? (
               <div className="flex items-center justify-center py-6 text-muted-foreground text-xs gap-2">
                 <Spinner className="h-4 w-4" />
-                <span>履歴を読み込み中...</span>
+                <span>変更履歴を読み込み中...</span>
               </div>
             ) : auditLogs.length === 0 ? (
               <p className="text-xs text-muted-foreground py-2">
-                記録されたアクセス履歴はありません。
+                記録された変更履歴はありません。
               </p>
             ) : (
               <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
                 {auditLogs.map((log) => {
-                  const config = ACTION_CONFIG[log.action] || {
-                    label: log.action,
-                    icon: Clock,
-                    colorClass: "bg-muted text-muted-foreground",
-                  };
+                  const config =
+                    AUDIT_ACTION_CONFIG[log.action] || DEFAULT_ACTION_CONFIG;
                   const Icon = config.icon;
 
                   return (
@@ -1793,23 +1746,31 @@ function RecordAuditHistoryAccordion({
                       key={log._id}
                       className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 p-2.5 rounded-md bg-muted/40 border border-border/40 text-xs"
                     >
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
                         <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${config.colorClass}`}
+                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${config.colorClass}`}
                         >
                           <Icon className="h-3 w-3 shrink-0" />
-                          {config.label}
+                          <span>{config.label}</span>
                         </span>
                         <span className="font-semibold text-foreground truncate max-w-[140px] sm:max-w-[180px]">
                           {log.actorDisplayName}
                         </span>
                         {log.metadata?.changedFields &&
                           log.metadata.changedFields.length > 0 && (
-                            <span className="text-[11px] text-muted-foreground w-full md:w-auto whitespace-pre-wrap break-words block md:inline">
-                              (変更項目: {log.metadata.changedFields.join(", ")}
+                            <span className="text-[11px] text-muted-foreground w-full sm:w-auto whitespace-pre-wrap break-words block sm:inline">
+                              (変更項目:{" "}
+                              {log.metadata.changedFields
+                                .map(formatFieldName)
+                                .join(", ")}
                               )
                             </span>
                           )}
+                        {log.metadata?.detail && (
+                          <span className="text-[11px] text-muted-foreground w-full sm:w-auto whitespace-pre-wrap break-words block sm:inline">
+                            ({log.metadata.detail})
+                          </span>
+                        )}
                       </div>
                       <time className="text-[11px] text-muted-foreground shrink-0 font-mono self-end sm:self-auto">
                         {formatDate(log.createdAt)}

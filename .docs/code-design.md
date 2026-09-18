@@ -110,6 +110,7 @@ poohma/                    … プロジェクトルート（Turborepo / pnpm wo
 │       │   ├── actions.ts  … OGP取得・ふりがな取得・メール送信 (Node runtime)
 │       │   ├── auth.config.ts … Firebase IDトークンの信頼プロバイダ設定
 │       │   ├── auditLogs.ts … 監査ログ書き込みヘルパー (logAuditEvent)
+│       │   ├── viewLogs.ts  … 閲覧ログ書き込み・取得・パージヘルパー (logViewEvent)
 │       │   ├── crons.ts    … 定期バッチ定義
 │       │   ├── customBuilders.ts … 認証・認可レベル別のQuery/Mutationビルダー
 │       │   ├── families.ts … 家族グループ・参加申請・家族移行ロジック
@@ -169,6 +170,9 @@ serviceRecords 1 ── * recordEditingSessions (recordEditingSessions.recordId 
 serviceRecords 0..* ── * auditLogs    (auditLogs.recordId → serviceRecords._id, optional)
 families  0..* ── * auditLogs         (auditLogs.familyId → families._id, optional)
 users     0..* ── * auditLogs         (auditLogs.accountId → users._id, optional / 削除後も参照切れ考慮)
+serviceRecords 1 ── * viewLogs        (viewLogs.recordId → serviceRecords._id)
+families  0..* ── * viewLogs          (viewLogs.familyId → families._id, optional)
+users     0..* ── * viewLogs          (viewLogs.accountId → users._id, optional / 削除後も参照切れ考慮)
 ```
 
 ### 4.2 テーブル定義
@@ -341,7 +345,7 @@ users     0..* ── * auditLogs         (auditLogs.accountId → users._id, op
 
 #### auditLogs（監査ログ）
 
-レコードの作成・更新・削除・ヒント閲覧・共有設定変更・管理者変更の全操作を家族単位で記録する監査テーブル。脱退・削除後のメンバー表示維持のため操作時点の表示名を `actorDisplayName` に保存する。180日経過したログは `cleanupOldAuditLogsInternal` により自動削除される。
+レコードやクレデンシャルの作成・更新・削除、家族設定変更、メンバーシップ操作、リカバリ操作など、セキュリティ上重要な変更・権限変更・状態変更を記録する監査テーブル。閲覧系操作（ヒント閲覧等）はここに含まれず `viewLogs` に分離される。脱退・削除後のメンバー表示維持のため操作時点の表示名を `actorDisplayName` に保存する。180日経過したログは `cleanupOldAuditLogsInternal` により自動削除される。
 
 | フィールド | 型 | 説明 |
 | --------- | --------------------- | --------- |
@@ -353,11 +357,27 @@ users     0..* ── * auditLogs         (auditLogs.accountId → users._id, op
 | ownerType | "user" \| "family" | 操作時点の所有種別 |
 | ownerFamilyId | Id<families>(optional) | ownerType === "family" の対象家族ID |
 | targetAccountId | Id<users>(optional) | ownerType === "user" の所有者Account ID |
-| action | "RECORD_CREATE" \| "RECORD_UPDATE" \| "RECORD_DELETE" \| "HINT_VIEW" \| "SHARE_SETTING_CHANGED" \| "ADMIN_CHANGED" | 操作種別 |
+| action | string (リテラル共用体) | 操作種別 (`RECORD_CREATE`, `RECORD_UPDATE`, `RECORD_DELETE`, `CREDENTIAL_CREATE`, `CREDENTIAL_UPDATE`, `CREDENTIAL_DELETE`, `SHARE_SETTING_CHANGED`, `ADMIN_CHANGED`, `FAMILY_CREATE`, `FAMILY_UPDATE`, `FAMILY_MIGRATION`, `PASSCODE_ROTATED`, `INVITE_CREATE`, `INVITE_REVOKE`, `MEMBER_JOIN`, `MEMBER_LEAVE`, `MEMBER_REMOVE`, `MEMBER_ROLE_CHANGED`, `JOIN_REQUEST_REJECTED`, `RECOVERY_KIT_REGISTERED`, `RECOVERY_REDEEMED`) |
 | metadata | object(optional) | 補足情報（targetTitle: レコード名, changedFields: 変更フィールド配列, detail: 付加情報） |
 | createdAt | number | 記録日時（epoch ms） |
 
 インデックス: by_family_createdAt（家族ログ取得）, by_recordId_createdAt（レコード別履歴）, by_targetAccountId_createdAt（個人レコード操作履歴）, by_createdAt（定期パージ用）。
+
+#### viewLogs（閲覧ログ）
+
+パスワードヒントなどの閲覧系イベントを記録するテーブル。Audit Log（セキュリティ変更履歴）のノイズ化を防ぎつつ、利用状況の確認や将来的な利用率可視化、CSVエクスポートでのマージ出力のために独立して保持される。180日経過したログは `cleanupOldViewLogsInternal` により自動削除される。
+
+| フィールド | 型 | 説明 |
+| --------- | --------------------- | --------- |
+| recordId | Id<serviceRecords> | 閲覧対象レコードID |
+| familyId | Id<families>(optional) | 家族共有レコードの場合の家族ID |
+| accountId | Id<users>(optional) | 閲覧者のPoohMa Account ID（削除後は参照切れ考慮） |
+| userId | string | 閲覧者のFirebase UID |
+| actorDisplayName | string | 閲覧時点の表示名（脱退・削除後の表示維持用） |
+| type | "HINT_VIEW" | 閲覧種別 |
+| createdAt | number | 閲覧日時（epoch ms） |
+
+インデックス: by_recordId_createdAt（レコード別閲覧履歴）, by_familyId_createdAt（家族別閲覧履歴）, by_createdAt（定期パージ用）。
 
 #### recoveryOtps（FR-CRYPT-07）
 
@@ -866,11 +886,14 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 | startEditingSession / heartbeatEditingSession / endEditingSession | Mutation | familyBound | recordEditingSessionsの作成・更新・削除（FR-REC-15、TTL 5分、ハートビート30秒） |
 | getActiveEditors | Query | authenticated | 対象レコードを編集中のユーザー一覧を取得（Convexのリアクティブクエリでクライアントが購読、TTL 5分超過分は自動除外） |
 | cleanupExpiredEditingSessionsInternal | InternalMutation | internal（Cron） | 5分TTLを超過した期限切れ編集セッションの定期クリーンアップ（1分間隔cronから実行、1回最大500件のバッチ削除でトランザクション上限を回避） |
-| logRecordHintView | Mutation | familyBound | パスワードヒント閲覧時の監査ログ記録。`serviceRecords.lastViewedAt` / `lastViewedByAccountId` を更新し、`auditLogs` に `HINT_VIEW` を記録する |
+| logRecordHintView | Mutation | familyBound | パスワードヒント閲覧イベントの記録。`serviceRecords.lastViewedAt` / `lastViewedByAccountId` を更新し、`viewLogs` に記録する（auditLogs には混入させない） |
+| getRecordViewLogs | Query | authenticated | 単一レコードの閲覧履歴タイムラインを取得（`by_recordId_createdAt` インデックス使用） |
 | getFamilyAuditLogs | Query | familyBound | 家族全体の監査ログをページネーションで取得（`by_family_createdAt` インデックス使用、降順）。actorDisplayNameをDBから最新化して返す |
-| getRecordAuditLogs | Query | authenticated | 単一レコードのアクセス履歴タイムラインを取得（最大50件、`by_recordId_createdAt` インデックス使用） |
+| getRecordAuditLogs | Query | authenticated | 単一レコードの変更履歴タイムラインを取得（最大50件、`by_recordId_createdAt` インデックス使用） |
+| getFamilyAuditAndViewsForExport | Query | familyBound | CSVエクスポート用：家族の変更系監査ログと閲覧ログを統合し降順で取得 |
 | getStaleRecords | Query | authenticated | 指定日数（デフォルト180日）以上更新されていないレコードを取得（サンプルレコード除外） |
 | cleanupOldAuditLogsInternal | InternalMutation | internal（Cron） | 180日以上経過した監査ログを削除（24時間間隔cronから実行、1回100件バッチ、件数上限到達時は再帰実行） |
+| cleanupOldViewLogsInternal | InternalMutation | internal（Cron） | 180日以上経過した閲覧ログを削除（24時間間隔cronから実行、1回100件バッチ、件数上限到達時は再帰実行） |
 
 ### 7.4 convex/actions.ts（Node runtime, "use node"）
 
@@ -1161,6 +1184,10 @@ convex/crons.ts に登録されている定期ジョブ一覧:
 5. cleanup old audit logs（24時間間隔）
    → internal.records.cleanupOldAuditLogsInternal
    - 180日以上経過した auditLogs を削除（1回100件バッチ、上限到達時は再帰実行）
+
+6. cleanup old view logs（24時間間隔）
+   → internal.records.cleanupOldViewLogsInternal
+   - 180日以上経過した viewLogs を削除（1回100件バッチ、上限到達時は再帰実行）
 ```
 
 ## 13. 外部サービス連携設計

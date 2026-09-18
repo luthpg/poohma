@@ -196,10 +196,12 @@ flowchart TD
 | ID | テストケース | 種別 | 優先度 | 現状 | 主な対応ファイル |
 | --- | --- | --- | --- | :---: | --- |
 | AUDIT-01 | 暗号化境界: auditLogs の metadata に平文ヒント・暗号資材が含まれないこと (Zero-Knowledge) | 統合 | P0 | ✅ 実装済 | `tests/convex-audit-logs.spec.ts` |
-| AUDIT-02 | レコード作成・更新・ヒント閲覧時に auditLog が生成されること | 統合 | P0 | ✅ 実装済 | `tests/convex-audit-logs.spec.ts` |
-| AUDIT-03 | 他家族メンバーが auditLogs を閲覧できないこと (IDOR 防止) | 統合 | P0 | ✅ 実装済 | `tests/convex-audit-logs.spec.ts` |
-| AUDIT-04 | updatedByAccountId・lastViewedAt・lastViewedByAccountId が正しく更新されること | 統合 | P1 | ⏳ 未実装 | — |
-| AUDIT-05 | cleanupOldAuditLogsInternal が 180日超過ログのみを削除し、直近ログを保持すること | 統合 | P1 | ✅ 実装済 | `tests/convex-audit-logs.spec.ts` |
+| AUDIT-02 | レコード・クレデンシャル変更およびセキュリティ操作時に auditLog が生成され、ヒント閲覧は viewLogs に分離記録されること | 統合 | P0 | ✅ 実装済 | `tests/convex-audit-logs.spec.ts` |
+| AUDIT-03 | 他家族メンバーが auditLogs / viewLogs を閲覧できないこと (IDOR 防止) | 統合 | P0 | ✅ 実装済 | `tests/convex-audit-logs.spec.ts` |
+| AUDIT-04 | updatedByAccountId・lastViewedAt・lastViewedByAccountId が正しく更新されること (viewLogs と連動) | 統合 | P1 | ✅ 実装済 | `tests/convex-audit-logs.spec.ts` |
+| AUDIT-05 | cleanupOldAuditLogsInternal / cleanupOldViewLogsInternal が 180日超過ログのみを削除し、直近ログを保持すること | 統合 | P1 | ✅ 実装済 | `tests/convex-audit-logs.spec.ts` |
+| AUDIT-06 | CSVエクスポート時に変更系ログと閲覧系ログを統合して降順取得できること | 統合 | P1 | ✅ 実装済 | `tests/convex-audit-logs.spec.ts` |
+| AUDIT-07 | 旧形式の HINT_VIEW ログが migrateHintViewsToViewLogsInternal により viewLogs へ移行・削除されること | 統合 | P1 | ✅ 実装済 | `tests/convex-audit-logs.spec.ts` |
 
 ### 4.6 CSV & OGP (SSRF 防御)
 
