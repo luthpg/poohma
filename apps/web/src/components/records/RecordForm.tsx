@@ -172,7 +172,7 @@ export function RecordForm({
             type="button"
             onClick={form.addCredential}
             disabled={values.credentials.length >= MAX_CREDENTIALS_PER_RECORD}
-            className="text-[14px] font-medium text-orange-500 hover:text-orange-600 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+            className="inline-flex items-center min-h-[44px] px-2.5 py-1.5 text-[14px] font-medium text-orange-500 hover:text-orange-600 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
           >
             + 追加する
           </button>
@@ -181,7 +181,7 @@ export function RecordForm({
         <div className="space-y-6">
           {values.credentials.map((cred, index) => (
             <CredentialFieldsCard
-              key={cred.id ?? index}
+              key={cred.id}
               index={index}
               credential={cred}
               removable={values.credentials.length > 1}

@@ -8,8 +8,10 @@ import {
 } from "@tanstack/react-router";
 import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
 import {
+  ArrowLeft,
   Check,
   Clock,
+  Copy,
   Eye,
   FileEdit,
   History,
@@ -892,16 +894,18 @@ function RecordDetailComponent({
               router.navigate({ to: "/dashboard" });
             }
           }}
-          className="text-[14px] font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+          aria-label="ダッシュボードに戻る"
+          className="inline-flex items-center gap-1.5 min-h-[44px] -ml-2.5 px-2.5 py-2 rounded-md text-[14px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
         >
-          <span className="text-[16px] leading-none mb-0.5">←</span>{" "}
-          ダッシュボードに戻る
+          <ArrowLeft className="h-4 w-4" />
+          <span>ダッシュボードに戻る</span>
         </button>
 
         <button
           type="button"
           onClick={handleWebShare}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground shadow-sm cursor-pointer"
+          aria-label="ページを共有"
+          className="inline-flex items-center gap-1.5 min-h-[44px] rounded-lg border border-border/60 bg-background/80 px-3.5 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground shadow-sm cursor-pointer"
         >
           {shareSuccess || copied ? (
             <Check className="h-3.5 w-3.5 text-green-500" />
@@ -1607,7 +1611,8 @@ function CredentialCard({
               data-tour="hint-reveal-btn"
               onClick={handleReveal}
               disabled={isDecrypting}
-              className="inline-flex items-center gap-1.5 rounded bg-orange-300/10 px-2.5 py-1 text-xs font-medium text-orange-600 hover:bg-orange-500/20 transition disabled:opacity-50"
+              aria-label="クリックしてパスワードヒントを表示"
+              className="inline-flex items-center gap-1.5 min-h-[44px] rounded-md bg-orange-300/10 px-3 py-2 text-xs font-medium text-orange-600 hover:bg-orange-500/20 active:bg-orange-500/30 transition disabled:opacity-50 cursor-pointer"
             >
               {isDecrypting ? (
                 <>
@@ -1631,6 +1636,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
+    if (!text) return;
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
@@ -1645,17 +1651,25 @@ function CopyButton({ text, label }: { text: string; label: string }) {
     <button
       type="button"
       onClick={handleCopy}
-      className="text-[11px] text-muted-foreground hover:text-foreground transition"
+      disabled={!text}
+      aria-label={copied ? `${label}をコピーしました` : `${label}をコピー`}
+      className="inline-flex items-center justify-center gap-1 min-h-[44px] min-w-[44px] -my-2 px-2 py-1.5 rounded-md text-[12px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/80 active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
     >
       {copied ? (
         <>
-          <span aria-hidden="true" className="text-green-500">
-            ✓
+          <Check
+            aria-hidden="true"
+            className="h-3.5 w-3.5 text-green-500 shrink-0"
+          />
+          <span className="text-green-600 dark:text-green-400 font-medium">
+            コピー済
           </span>
-          <span className="ml-1 text-green-600">コピー済</span>
         </>
       ) : (
-        <span>コピー</span>
+        <>
+          <Copy aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+          <span>コピー</span>
+        </>
       )}
     </button>
   );

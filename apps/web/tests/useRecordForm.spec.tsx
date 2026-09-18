@@ -57,11 +57,82 @@ describe("useRecordForm", () => {
       result.current.updateCredentialField(0, "passwordHint", "hint123");
     });
 
-    expect(result.current.values.credentials[0]).toEqual({
+    expect(result.current.values.credentials[0]).toMatchObject({
       label: "メイン",
       loginId: "user@example.com",
       passwordHint: "hint123",
     });
+  });
+
+  it("初期生成されたcredentialに一意なIDが付与されていること", () => {
+    const { result } = renderHook(() => useRecordForm());
+    expect(result.current.values.credentials[0].id).toBeDefined();
+    expect(typeof result.current.values.credentials[0].id).toBe("string");
+    expect(result.current.values.credentials[0].id?.length).toBeGreaterThan(0);
+  });
+
+  it("addCredential で追加されたクレデンシャルに既存と重複しない一意なIDが付与されること", () => {
+    const { result } = renderHook(() => useRecordForm());
+    const initialId = result.current.values.credentials[0].id;
+
+    act(() => result.current.addCredential());
+    expect(result.current.values.credentials).toHaveLength(2);
+
+    const newId = result.current.values.credentials[1].id;
+    expect(newId).toBeDefined();
+    expect(typeof newId).toBe("string");
+    expect(newId).not.toBe(initialId);
+  });
+
+  it("複数credentialの中間行を削除した際、残ったcredentialのIDおよび値が正しく維持されること", () => {
+    const { result } = renderHook(() => useRecordForm());
+
+    // 1行目のフィールド設定
+    act(() => {
+      result.current.updateCredentialField(0, "label", "1行目");
+      result.current.updateCredentialField(0, "loginId", "user1@example.com");
+    });
+    const id1 = result.current.values.credentials[0].id;
+
+    // 2行目追加 & 設定
+    act(() => result.current.addCredential());
+    act(() => {
+      result.current.updateCredentialField(1, "label", "2行目");
+      result.current.updateCredentialField(1, "loginId", "user2@example.com");
+    });
+    const id2 = result.current.values.credentials[1].id;
+
+    // 3行目追加 & 設定
+    act(() => result.current.addCredential());
+    act(() => {
+      result.current.updateCredentialField(2, "label", "3行目");
+      result.current.updateCredentialField(2, "loginId", "user3@example.com");
+    });
+    const id3 = result.current.values.credentials[2].id;
+
+    expect(result.current.values.credentials).toHaveLength(3);
+
+    // 中間行（index 1: 2行目）を削除
+    act(() => result.current.removeCredential(1));
+
+    expect(result.current.values.credentials).toHaveLength(2);
+
+    // 削除後: 旧1行目と旧3行目が残っており、IDと値が完全に一致すること（キーや入力値のズレがないこと）
+    expect(result.current.values.credentials[0]).toEqual({
+      id: id1,
+      label: "1行目",
+      loginId: "user1@example.com",
+      passwordHint: "",
+    });
+    expect(result.current.values.credentials[1]).toEqual({
+      id: id3,
+      label: "3行目",
+      loginId: "user3@example.com",
+      passwordHint: "",
+    });
+    expect(result.current.values.credentials.some((c) => c.id === id2)).toBe(
+      false,
+    );
   });
 
   it("マウント時に masterKey がなければ requireUnlock を呼び出すこと", () => {
