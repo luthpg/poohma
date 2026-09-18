@@ -237,9 +237,24 @@ export default defineSchema({
       v.literal("RECORD_CREATE"),
       v.literal("RECORD_UPDATE"),
       v.literal("RECORD_DELETE"),
-      v.literal("HINT_VIEW"),
+      v.literal("CREDENTIAL_CREATE"),
+      v.literal("CREDENTIAL_UPDATE"),
+      v.literal("CREDENTIAL_DELETE"),
       v.literal("SHARE_SETTING_CHANGED"),
       v.literal("ADMIN_CHANGED"),
+      v.literal("FAMILY_UPDATE"),
+      v.literal("MEMBER_JOIN"),
+      v.literal("MEMBER_REMOVE"),
+      v.literal("MEMBER_LEAVE"),
+      v.literal("MEMBER_ROLE_CHANGED"),
+      v.literal("INVITE_CREATE"),
+      v.literal("INVITE_REVOKE"),
+      v.literal("JOIN_REQUEST_REJECTED"),
+      v.literal("FAMILY_MIGRATION"),
+      v.literal("PASSCODE_ROTATED"),
+      v.literal("RECOVERY_KIT_REGISTERED"),
+      v.literal("RECOVERY_REDEEMED"),
+      v.literal("ACCOUNT_DELETE"),
     ),
     metadata: v.optional(
       v.object({
@@ -253,5 +268,18 @@ export default defineSchema({
     .index("by_family_createdAt", ["familyId", "createdAt"])
     .index("by_recordId_createdAt", ["recordId", "createdAt"])
     .index("by_targetAccountId_createdAt", ["targetAccountId", "createdAt"])
+    .index("by_userId_createdAt", ["userId", "createdAt"])
+    .index("by_createdAt", ["createdAt"]), // 定期パージ用
+
+  viewLogs: defineTable({
+    familyId: v.optional(v.id("families")), // 家族共有レコードの場合に設定
+    accountId: v.optional(v.id("users")), // 閲覧者のアカウントID (削除された場合は参照切れ考慮)
+    userId: v.string(), // 閲覧者の Firebase UID
+    actorDisplayName: v.string(), // 操作時点の表示名 (脱退・削除後の表示維持用)
+    recordId: v.id("serviceRecords"), // 対象レコードID
+    createdAt: v.number(), // 閲覧日時 (epoch ms)
+  })
+    .index("by_family_createdAt", ["familyId", "createdAt"])
+    .index("by_recordId_createdAt", ["recordId", "createdAt"])
     .index("by_createdAt", ["createdAt"]), // 定期パージ用
 });

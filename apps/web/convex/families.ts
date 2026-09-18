@@ -11,6 +11,7 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
+import { logAuditEvent } from "./auditLogs";
 import {
   authenticatedMutation,
   authenticatedQuery,
@@ -705,6 +706,17 @@ export const commitFamilyMigration = authenticatedMutation({
 
     await ctx.db.patch(migration._id, { status: "COMPLETED" });
 
+    const targetFamily = await ctx.db.get(migration.targetFamilyId);
+    await logAuditEvent(ctx, {
+      actor: user,
+      ownerType: "family",
+      ownerFamilyId: migration.targetFamilyId,
+      action: "FAMILY_MIGRATION",
+      metadata: {
+        detail: `家族移行完了 (移行先: ${targetFamily?.name ?? "新家族"})`,
+      },
+    });
+
     const pendingVault = await ctx.db
       .query("pendingExportVaults")
       .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
@@ -713,7 +725,6 @@ export const commitFamilyMigration = authenticatedMutation({
       await ctx.db.delete(pendingVault._id);
     }
 
-    const targetFamily = await ctx.db.get(migration.targetFamilyId);
     const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
     await ctx.scheduler.runAfter(
       0,
@@ -846,6 +857,16 @@ export const rotatePasscode = familyBoundMutation({
       );
     }
 
+    await logAuditEvent(ctx, {
+      actor: ctx.user,
+      ownerType: "family",
+      ownerFamilyId: familyId,
+      action: "PASSCODE_ROTATED",
+      metadata: {
+        detail: "ファミリーパスコードを変更",
+      },
+    });
+
     return { success: true };
   },
 });
@@ -882,6 +903,16 @@ export const createFamilyInvite = familyBoundMutation({
       useCount: 0,
     });
 
+    await logAuditEvent(ctx, {
+      actor: user,
+      ownerType: "family",
+      ownerFamilyId: familyId,
+      action: "INVITE_CREATE",
+      metadata: {
+        detail: `招待コードを発行 (有効期間: ${Math.round(clampedTtl / 60)}時間)`,
+      },
+    });
+
     return {
       _id: inviteId,
       code,
@@ -907,6 +938,17 @@ export const revokeFamilyInvite = familyBoundMutation({
     await ctx.db.patch(invite._id, {
       revokedAt: Date.now(),
     });
+
+    await logAuditEvent(ctx, {
+      actor: ctx.user,
+      ownerType: "family",
+      ownerFamilyId: familyId,
+      action: "INVITE_REVOKE",
+      metadata: {
+        detail: "招待コードを無効化",
+      },
+    });
+
     return { success: true };
   },
 });
@@ -1374,6 +1416,17 @@ export const approveJoinRequest = familyAdminMutation({
       );
     }
 
+    await logAuditEvent(ctx, {
+      actor: ctx.user,
+      ownerType: "family",
+      ownerFamilyId: familyId,
+      targetAccountId: applicant._id,
+      action: "MEMBER_JOIN",
+      metadata: {
+        detail: `参加リクエスト承認: ${applicant.displayName || "メンバー"}`,
+      },
+    });
+
     return { success: true };
   },
 });
@@ -1419,6 +1472,17 @@ export const rejectJoinRequest = familyAdminMutation({
         },
       );
     }
+
+    await logAuditEvent(ctx, {
+      actor: ctx.user,
+      ownerType: "family",
+      ownerFamilyId: familyId,
+      targetAccountId: applicant?._id,
+      action: "JOIN_REQUEST_REJECTED",
+      metadata: {
+        detail: `参加リクエスト拒否: ${applicant?.displayName || "申請者"}`,
+      },
+    });
 
     return { success: true };
   },
@@ -1556,6 +1620,17 @@ export const kickMember = familyBoundMutation({
       },
     );
 
+    await logAuditEvent(ctx, {
+      actor: user,
+      ownerType: "family",
+      ownerFamilyId: familyId,
+      targetAccountId: targetUser._id,
+      action: "MEMBER_REMOVE",
+      metadata: {
+        detail: `メンバー除名: ${targetUser.displayName || "メンバー"}`,
+      },
+    });
+
     return { success: true };
   },
 });
@@ -1663,6 +1738,17 @@ export const updateMemberRole = familyAdminMutation({
       familyRole: args.role,
       updatedAt: Date.now(),
     });
+
+    await logAuditEvent(ctx, {
+      actor: ctx.user,
+      ownerType: "family",
+      ownerFamilyId: familyId,
+      targetAccountId: targetUser._id,
+      action: "MEMBER_ROLE_CHANGED",
+      metadata: {
+        detail: `${targetUser.displayName || "メンバー"} のロールを ${args.role === "admin" ? "管理者" : "メンバー"} に変更`,
+      },
+    });
   },
 });
 
@@ -1690,6 +1776,16 @@ export const updateFamilyName = familyAdminMutation({
     await ctx.db.patch(familyId, {
       name: parsed.data.name,
       updatedAt: Date.now(),
+    });
+
+    await logAuditEvent(ctx, {
+      actor: ctx.user,
+      ownerType: "family",
+      ownerFamilyId: familyId,
+      action: "FAMILY_UPDATE",
+      metadata: {
+        detail: `家族名を変更: ${parsed.data.name}`,
+      },
     });
 
     return { success: true, name: parsed.data.name };

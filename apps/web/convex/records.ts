@@ -31,6 +31,7 @@ import {
   requireAdminAccess,
   requireContentAccess,
 } from "./rls";
+import { logViewEvent } from "./viewLogs";
 
 const ConvexCredentialInputSchema = CredentialInputSchema.extend({
   id: z.string().optional(),
@@ -854,6 +855,23 @@ export const createCredential = familyBoundMutation({
     });
 
     await ctx.db.patch(args.recordId, { updatedAt: now });
+
+    const ownerType = getEffectiveOwnerType(record);
+    await logAuditEvent(ctx, {
+      actor: ctx.user,
+      recordId: record._id,
+      ownerType,
+      ownerFamilyId: ownerType === "family" ? record.ownerFamilyId : undefined,
+      targetAccountId: ownerType === "user" ? record.accountId : undefined,
+      action: "CREDENTIAL_CREATE",
+      metadata: {
+        targetTitle: record.title,
+        detail: args.label
+          ? `クレデンシャル追加: ${args.label}`
+          : "クレデンシャル追加",
+      },
+    });
+
     return credId;
   },
 });
@@ -893,6 +911,22 @@ export const updateCredential = familyBoundMutation({
     });
 
     await ctx.db.patch(record._id, { updatedAt: now });
+
+    const ownerType = getEffectiveOwnerType(record);
+    await logAuditEvent(ctx, {
+      actor: ctx.user,
+      recordId: record._id,
+      ownerType,
+      ownerFamilyId: ownerType === "family" ? record.ownerFamilyId : undefined,
+      targetAccountId: ownerType === "user" ? record.accountId : undefined,
+      action: "CREDENTIAL_UPDATE",
+      metadata: {
+        targetTitle: record.title,
+        detail: args.label
+          ? `クレデンシャル更新: ${args.label}`
+          : "クレデンシャル更新",
+      },
+    });
   },
 });
 
@@ -911,6 +945,22 @@ export const deleteCredential = familyBoundMutation({
 
     await ctx.db.delete(args.id);
     await ctx.db.patch(record._id, { updatedAt: Date.now() });
+
+    const ownerType = getEffectiveOwnerType(record);
+    await logAuditEvent(ctx, {
+      actor: ctx.user,
+      recordId: record._id,
+      ownerType,
+      ownerFamilyId: ownerType === "family" ? record.ownerFamilyId : undefined,
+      targetAccountId: ownerType === "user" ? record.accountId : undefined,
+      action: "CREDENTIAL_DELETE",
+      metadata: {
+        targetTitle: record.title,
+        detail: cred.label
+          ? `クレデンシャル削除: ${cred.label}`
+          : "クレデンシャル削除",
+      },
+    });
   },
 });
 
@@ -1843,16 +1893,11 @@ export const logRecordHintView = familyBoundMutation({
       lastViewedByAccountId: ctx.user._id,
     });
 
-    await logAuditEvent(ctx, {
+    await logViewEvent(ctx, {
       actor: ctx.user,
-      record,
-      ownerType: record.ownerType ?? "user",
-      ownerFamilyId: record.ownerFamilyId,
-      targetAccountId: record.accountId,
-      action: "HINT_VIEW",
-      metadata: {
-        targetTitle: record.title,
-      },
+      recordId: record._id,
+      familyId:
+        record.ownerType === "family" ? record.ownerFamilyId : undefined,
     });
 
     return { success: true, viewedAt: now };
@@ -1982,6 +2027,175 @@ export const cleanupOldAuditLogsInternal = internalMutation({
         {},
       );
     }
+  },
+});
+
+/** 保持期間を超えた閲覧ログをバッチ単位で削除する。 */
+export const cleanupOldViewLogsInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const RETENTION_MS = 180 * 24 * 60 * 60 * 1000;
+    const cutoff = Date.now() - RETENTION_MS;
+    const oldLogs = await ctx.db
+      .query("viewLogs")
+      .withIndex("by_createdAt", (q) => q.lt("createdAt", cutoff))
+      .take(100);
+
+    for (const log of oldLogs) {
+      await ctx.db.delete(log._id);
+    }
+
+    if (oldLogs.length === 100) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.records.cleanupOldViewLogsInternal,
+        {},
+      );
+    }
+  },
+});
+
+/**
+ * ワンショットマイグレーション:
+ * 既存の auditLogs から HINT_VIEW のレコードを viewLogs に移行し、auditLogs から削除する。
+ */
+export const migrateHintViewsToViewLogsInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const allLogs = await ctx.db.query("auditLogs").collect();
+    let migratedCount = 0;
+
+    for (const log of allLogs) {
+      if ((log as { action?: string }).action === "HINT_VIEW") {
+        if (log.recordId) {
+          await ctx.db.insert("viewLogs", {
+            familyId: log.familyId,
+            accountId: log.accountId,
+            userId: log.userId,
+            actorDisplayName: log.actorDisplayName,
+            recordId: log.recordId,
+            createdAt: log.createdAt,
+          });
+        }
+        await ctx.db.delete(log._id);
+        migratedCount++;
+      }
+    }
+
+    return { migratedCount };
+  },
+});
+
+/** 閲覧権限を確認し、単一レコードの閲覧履歴を新しい順に取得する（利用率可視化・監査照会用）。 */
+export const getRecordViewLogs = authenticatedQuery({
+  args: {
+    recordId: v.id("serviceRecords"),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const record = await ctx.db.get(args.recordId);
+    if (!record) throw new Error("Record not found");
+
+    requireContentAccess(ctx.user, record);
+
+    const limit = Math.min(Math.max(args.limit ?? 20, 1), 50);
+
+    const logs = await ctx.db
+      .query("viewLogs")
+      .withIndex("by_recordId_createdAt", (q) =>
+        q.eq("recordId", args.recordId),
+      )
+      .order("desc")
+      .take(limit);
+
+    return await Promise.all(
+      logs.map(async (log) => {
+        let actorName = log.actorDisplayName;
+        if (log.accountId) {
+          const actorDoc = await ctx.db.get(log.accountId);
+          if (actorDoc) {
+            actorName = actorDoc.displayName || actorDoc.email || actorName;
+          }
+        }
+        return {
+          ...log,
+          actorDisplayName: actorName,
+        };
+      }),
+    );
+  },
+});
+
+/**
+ * 家族監査ログエクスポート用クエリ（CSV出力用）
+ * includeViews: true の場合、変更系監査ログと閲覧履歴をマージして時系列順に返却する。
+ */
+export const getFamilyAuditAndViewsForExport = familyBoundQuery({
+  args: {
+    includeViews: v.optional(v.boolean()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const { familyId } = ctx;
+    const limit = Math.min(Math.max(args.limit ?? 1000, 1), 5000);
+
+    const auditLogs = await ctx.db
+      .query("auditLogs")
+      .withIndex("by_family_createdAt", (q) => q.eq("familyId", familyId))
+      .order("desc")
+      .take(limit);
+
+    type ExportItem = {
+      id: string;
+      category: "audit" | "view";
+      action: string;
+      actorDisplayName: string;
+      targetTitle?: string;
+      createdAt: number;
+    };
+
+    const items: ExportItem[] = auditLogs.map((l) => ({
+      id: l._id,
+      category: "audit" as const,
+      action: l.action,
+      actorDisplayName: l.actorDisplayName,
+      targetTitle: l.metadata?.targetTitle,
+      createdAt: l.createdAt,
+    }));
+
+    if (args.includeViews) {
+      const viewLogs = await ctx.db
+        .query("viewLogs")
+        .withIndex("by_family_createdAt", (q) => q.eq("familyId", familyId))
+        .order("desc")
+        .take(limit);
+
+      const recordIds = Array.from(new Set(viewLogs.map((v) => v.recordId)));
+      const recordDocs = await Promise.all(
+        recordIds.map((id) => ctx.db.get(id)),
+      );
+      const titleMap = new Map(
+        recordIds.map((id, i) => [id, recordDocs[i]?.title]),
+      );
+
+      for (const v of viewLogs) {
+        items.push({
+          id: v._id,
+          category: "view" as const,
+          action: "HINT_VIEW",
+          actorDisplayName: v.actorDisplayName,
+          targetTitle: titleMap.get(v.recordId),
+          createdAt: v.createdAt,
+        });
+      }
+
+      items.sort((a, b) => b.createdAt - a.createdAt);
+      if (items.length > limit) {
+        items.length = limit;
+      }
+    }
+
+    return items;
   },
 });
 

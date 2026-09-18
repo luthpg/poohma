@@ -25,6 +25,7 @@ import type * as records from "../records.js";
 import type * as recovery from "../recovery.js";
 import type * as rls from "../rls.js";
 import type * as users from "../users.js";
+import type * as viewLogs from "../viewLogs.js";
 
 declare const fullApi: ApiFromModules<{
   actions: typeof actions;
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   recovery: typeof recovery;
   rls: typeof rls;
   users: typeof users;
+  viewLogs: typeof viewLogs;
 }>;
 
 /**

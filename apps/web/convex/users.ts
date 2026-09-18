@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery } from "./_generated/server";
+import { logAuditEvent } from "./auditLogs";
 import {
   authenticatedMutation,
   identityVerifiedMutation,
@@ -383,19 +384,45 @@ export const deleteAccount = authenticatedMutation({
     const email = user.email;
     const displayName = user.displayName || "ユーザー";
 
-    // 1. 家族に関する処理
+    // 1. アカウント完全削除の監査ログを記録（問い合わせ対応・法的証跡用）
+    let otherMembersCount = 0;
     if (user.familyId) {
       const familyId = user.familyId;
-      // 同じ家族のメンバーをカウント
       const familyMembers = await ctx.db
         .query("users")
         .withIndex("by_familyId", (q) => q.eq("familyId", familyId))
         .collect();
+      otherMembersCount = familyMembers.filter(
+        (u) => u._id !== user._id,
+      ).length;
+    }
 
-      const otherMembers = familyMembers.filter((u) => u._id !== user._id);
+    let detail = `アカウント削除: ${displayName}`;
+    if (user.familyId) {
+      const familyId = user.familyId;
+      detail +=
+        otherMembersCount === 0
+          ? ` (家族も同時解散: ${familyId})`
+          : ` (家族脱退: ${familyId})`;
+    }
+
+    await logAuditEvent(ctx, {
+      actor: user,
+      ownerType: "user",
+      ownerFamilyId: user.familyId,
+      targetAccountId: user._id,
+      action: "ACCOUNT_DELETE",
+      metadata: {
+        detail,
+      },
+    });
+
+    // 2. 家族に関する処理
+    if (user.familyId) {
+      const familyId = user.familyId;
 
       // 他のメンバーがいない場合は家族およびそのレコードも削除
-      if (otherMembers.length === 0) {
+      if (otherMembersCount === 0) {
         const familyRecords = await ctx.db
           .query("serviceRecords")
           .withIndex("by_family_sortKey", (q) => q.eq("familyId", familyId))
@@ -430,6 +457,17 @@ export const deleteAccount = authenticatedMutation({
         }
 
         await reconcileAdminsOnLeave(ctx, familyId, user._id);
+
+        await logAuditEvent(ctx, {
+          actor: user,
+          ownerType: "family",
+          ownerFamilyId: familyId,
+          targetAccountId: user._id,
+          action: "MEMBER_LEAVE",
+          metadata: {
+            detail: `メンバー退会: ${displayName}`,
+          },
+        });
       }
     } else {
       // 家族未所属の場合、このアカウントが作成した全レコードを削除
@@ -445,10 +483,10 @@ export const deleteAccount = authenticatedMutation({
       }
     }
 
-    // 2. ユーザーアカウント自身の削除
+    // 3. ユーザーアカウント自身の削除
     await ctx.db.delete(user._id);
 
-    // 3. アカウント削除通知メール送信
+    // 4. アカウント削除通知メール送信
     const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
     await ctx.scheduler.runAfter(
       0,
