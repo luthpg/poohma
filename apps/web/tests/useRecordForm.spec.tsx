@@ -301,8 +301,48 @@ describe("useRecordForm", () => {
     expect(hookResult?.current.values.credentials[0].loginId).toBe(
       "restored@example.com",
     );
+    expect(hookResult?.current.values.credentials[0].id).toBeDefined();
+    expect(typeof hookResult?.current.values.credentials[0].id).toBe("string");
     expect(hookResult?.current.restoredMetadata?.initialRevision).toBe(3);
     expect(hookResult?.current.restoredMetadata?.isEditing).toBe(true);
+  });
+
+  it("IDを持たない複数credentialを含むドラフト復元時に、各行に重複しない一意なIDが付与されること", async () => {
+    mockMasterKey = {} as CryptoKey;
+    const authRecovery = await import("@/lib/auth-recovery");
+    vi.spyOn(authRecovery, "loadRecordDraft").mockResolvedValue({
+      values: {
+        title: "Multi Draft",
+        titleReading: "まるち",
+        url: "",
+        ogpImage: "",
+        ogpDescription: "",
+        memo: "",
+        ownerType: "user",
+        tags: [],
+        credentials: [
+          { label: "1つ目", loginId: "u1@example.com", passwordHint: "" },
+          { label: "2つ目", loginId: "u2@example.com", passwordHint: "" },
+        ],
+      },
+      initialRevision: 1,
+      isEditing: true,
+      accountId: "acc_123",
+    });
+
+    let hookResult: { current: ReturnType<typeof useRecordForm> } | undefined;
+    await act(async () => {
+      const { result } = renderHook(() =>
+        useRecordForm(undefined, "rec_multi_restore_test"),
+      );
+      hookResult = result;
+    });
+
+    const creds = hookResult?.current.values.credentials;
+    expect(creds).toHaveLength(2);
+    expect(creds?.[0].id).toBeDefined();
+    expect(creds?.[1].id).toBeDefined();
+    expect(creds?.[0].id).not.toBe(creds?.[1].id);
   });
 
   it("setBaselineValues で基準値が更新され、DBと同じヒントは未変更と判定されること", () => {

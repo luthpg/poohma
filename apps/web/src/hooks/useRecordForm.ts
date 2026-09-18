@@ -200,7 +200,10 @@ export function useRecordForm(
         });
         if (draft) {
           isRestoredRef.current = true;
-          setValues(draft.values);
+          setValues({
+            ...draft.values,
+            credentials: ensureCredentialIds(draft.values.credentials),
+          });
           setRestoredMetadata({
             recordId: targetRecordId,
             initialRevision: draft.initialRevision,
