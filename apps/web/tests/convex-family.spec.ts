@@ -3561,4 +3561,196 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
       });
     });
   });
+
+  describe("2.1.18 家族グループ名の変更 (Issue 177)", () => {
+    it("ファミリー管理者が家族グループ名を変更でき、getFamilyMembersに反映されること", async () => {
+      const t = convexTest(schema, modules);
+      let familyId!: Id<"families">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          name: "元の家族名",
+          updatedAt: Date.now(),
+        });
+
+        await ctx.db.insert("users", {
+          userId: "family_admin_177",
+          email: "admin177@example.com",
+          displayName: "管理者",
+          familyId,
+          familyRole: "admin",
+          updatedAt: Date.now(),
+        });
+      });
+
+      const adminUser = t.withIdentity({
+        subject: "family_admin_177",
+        email: "admin177@example.com",
+      });
+
+      // 1. 家族グループ名を変更
+      const res = await adminUser.mutation(api.families.updateFamilyName, {
+        name: "新しい家族名",
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.name).toBe("新しい家族名");
+
+      // 2. getFamilyMembers で新しい名前が返ること
+      const membersInfo = await adminUser.query(
+        api.families.getFamilyMembers,
+        {},
+      );
+      expect(membersInfo?.name).toBe("新しい家族名");
+
+      // 3. DB の families ドキュメントが更新されていること
+      await t.run(async (ctx) => {
+        const familyDoc = await ctx.db.get(familyId);
+        expect(familyDoc?.name).toBe("新しい家族名");
+        expect(familyDoc?.updatedAt).toBeDefined();
+      });
+    });
+
+    it("前後の空白が自動的にトリムされて保存されること", async () => {
+      const t = convexTest(schema, modules);
+      let familyId!: Id<"families">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          name: "トリム前家族名",
+          updatedAt: Date.now(),
+        });
+
+        await ctx.db.insert("users", {
+          userId: "trim_admin_177",
+          email: "trim@example.com",
+          familyId,
+          familyRole: "admin",
+          updatedAt: Date.now(),
+        });
+      });
+
+      const adminUser = t.withIdentity({
+        subject: "trim_admin_177",
+        email: "trim@example.com",
+      });
+
+      const res = await adminUser.mutation(api.families.updateFamilyName, {
+        name: "   空白付き家族名   ",
+      });
+
+      expect(res.name).toBe("空白付き家族名");
+
+      await t.run(async (ctx) => {
+        const doc = await ctx.db.get(familyId);
+        expect(doc?.name).toBe("空白付き家族名");
+      });
+    });
+
+    it("空文字、空白のみ、100文字超の名前はバリデーションエラーになること", async () => {
+      const t = convexTest(schema, modules);
+      let familyId!: Id<"families">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          name: "バリデーション家族",
+          updatedAt: Date.now(),
+        });
+
+        await ctx.db.insert("users", {
+          userId: "val_admin_177",
+          email: "val@example.com",
+          familyId,
+          familyRole: "admin",
+          updatedAt: Date.now(),
+        });
+      });
+
+      const adminUser = t.withIdentity({
+        subject: "val_admin_177",
+        email: "val@example.com",
+      });
+
+      // 空文字
+      await expect(
+        adminUser.mutation(api.families.updateFamilyName, { name: "" }),
+      ).rejects.toThrow();
+
+      // 空白のみ
+      await expect(
+        adminUser.mutation(api.families.updateFamilyName, { name: "    " }),
+      ).rejects.toThrow();
+
+      // 101文字（上限100文字超）
+      const longName = "あ".repeat(101);
+      await expect(
+        adminUser.mutation(api.families.updateFamilyName, { name: longName }),
+      ).rejects.toThrow();
+    });
+
+    it("一般メンバー (viewer) は家族名を変更できないこと（認可エラー）", async () => {
+      const t = convexTest(schema, modules);
+      let familyId!: Id<"families">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          name: "閲覧者テスト家族",
+          updatedAt: Date.now(),
+        });
+
+        await ctx.db.insert("users", {
+          userId: "viewer_user_177",
+          email: "viewer177@example.com",
+          familyId,
+          familyRole: "viewer",
+          updatedAt: Date.now(),
+        });
+      });
+
+      const viewerUser = t.withIdentity({
+        subject: "viewer_user_177",
+        email: "viewer177@example.com",
+      });
+
+      await expect(
+        viewerUser.mutation(api.families.updateFamilyName, {
+          name: "閲覧者が変えようとした名前",
+        }),
+      ).rejects.toThrow("Access denied: Admin role required");
+
+      // DB の家族名が変更されていないこと
+      await t.run(async (ctx) => {
+        const doc = await ctx.db.get(familyId);
+        expect(doc?.name).toBe("閲覧者テスト家族");
+      });
+    });
+
+    it("未認証ユーザーおよび家族未所属ユーザーは変更できないこと", async () => {
+      const t = convexTest(schema, modules);
+
+      await t.run(async (ctx) => {
+        await ctx.db.insert("users", {
+          userId: "no_family_user_177",
+          email: "nofamily@example.com",
+          familyRole: "admin",
+          updatedAt: Date.now(),
+        });
+      });
+
+      // 未認証ユーザー
+      await expect(
+        t.mutation(api.families.updateFamilyName, { name: "名前" }),
+      ).rejects.toThrow("Unauthenticated");
+
+      // 家族未所属ユーザー
+      const noFamilyUser = t.withIdentity({
+        subject: "no_family_user_177",
+        email: "nofamily@example.com",
+      });
+
+      await expect(
+        noFamilyUser.mutation(api.families.updateFamilyName, { name: "名前" }),
+      ).rejects.toThrow("User does not belong to a family");
+    });
+  });
 });

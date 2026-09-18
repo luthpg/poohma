@@ -346,14 +346,63 @@ function FamilyComponent() {
   const rotatePasscodeMut = useMutation(api.families.rotatePasscode);
   const kickMemberMut = useMutation(api.families.kickMember);
   const updateMemberRoleMut = useMutation(api.families.updateMemberRole);
+  const updateFamilyNameMut = useMutation(api.families.updateFamilyName);
   const abandonPendingExportVaultMut = useMutation(
     api.families.abandonPendingExportVault,
   );
+
+  const [isEditingFamilyName, setIsEditingFamilyName] = useState(false);
+  const [familyNameInput, setFamilyNameInput] = useState("");
+  const [isUpdatingFamilyName, setIsUpdatingFamilyName] = useState(false);
 
   const [isUpdatingRole, setIsUpdatingRole] = useState(false);
 
   const currentMember = family?.users.find((u) => u.id === activeAccountId);
   const isFamilyAdmin = currentMember?.familyRole === "admin";
+
+  const handleStartEditFamilyName = () => {
+    setFamilyNameInput(family?.name || "");
+    setIsEditingFamilyName(true);
+  };
+
+  const handleCancelEditFamilyName = () => {
+    setIsEditingFamilyName(false);
+    setFamilyNameInput(family?.name || "");
+  };
+
+  const handleSaveFamilyName = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!family) return;
+
+    const trimmed = familyNameInput.trim();
+    if (!trimmed) {
+      toast.error("家族名を入力してください");
+      return;
+    }
+    if (trimmed.length > 100) {
+      toast.error("家族名は100文字以内で入力してください");
+      return;
+    }
+
+    if (trimmed === family.name) {
+      setIsEditingFamilyName(false);
+      return;
+    }
+
+    setIsUpdatingFamilyName(true);
+    try {
+      await updateFamilyNameMut({
+        accountId: activeAccountId || undefined,
+        name: trimmed,
+      });
+      toast.success("家族名を変更しました");
+      setIsEditingFamilyName(false);
+    } catch (_error) {
+      toast.error("家族名の変更に失敗しました");
+    } finally {
+      setIsUpdatingFamilyName(false);
+    }
+  };
   const adminCount =
     family?.users.filter((u) => u.familyRole === "admin").length ?? 0;
 
@@ -1415,9 +1464,71 @@ function FamilyComponent() {
           className="rounded-lg bg-card p-6 shadow-card transition-shadow"
         >
           <div className="mb-6 flex items-center justify-between border-b border-border pb-4">
-            <h2 className="text-[18px] font-semibold tracking-geist-ui text-foreground">
-              {family.name}
-            </h2>
+            {isEditingFamilyName ? (
+              <form
+                onSubmit={handleSaveFamilyName}
+                className="flex w-full flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3"
+              >
+                <input
+                  type="text"
+                  value={familyNameInput}
+                  onChange={(e) => setFamilyNameInput(e.target.value)}
+                  disabled={isUpdatingFamilyName}
+                  maxLength={100}
+                  aria-label="家族グループ名"
+                  data-testid="family-name-edit-input"
+                  className="w-full flex-1 rounded-md bg-background px-3 py-1.5 text-base sm:text-[14px] font-medium text-foreground shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      handleCancelEditFamilyName();
+                    }
+                  }}
+                />
+                <div className="flex items-center justify-end gap-1.5 shrink-0 sm:ml-auto">
+                  <button
+                    type="submit"
+                    disabled={isUpdatingFamilyName || !familyNameInput.trim()}
+                    data-testid="save-family-name-btn"
+                    className="flex items-center gap-1 rounded-md bg-orange-500 px-3 py-1.5 text-[13px] font-medium text-white shadow-border hover:bg-orange-600 transition disabled:opacity-50 cursor-pointer"
+                  >
+                    {isUpdatingFamilyName && (
+                      <Spinner className="h-3.5 w-3.5" />
+                    )}
+                    保存
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isUpdatingFamilyName}
+                    onClick={handleCancelEditFamilyName}
+                    data-testid="cancel-family-name-btn"
+                    className="rounded-md border border-border bg-background px-3 py-1.5 text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition cursor-pointer"
+                  >
+                    キャンセル
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="flex flex-1 items-center justify-between gap-2 w-full">
+                <h2
+                  data-testid="family-name-heading"
+                  className="text-[18px] font-semibold tracking-geist-ui text-foreground"
+                >
+                  {family.name}
+                </h2>
+                {isFamilyAdmin && (
+                  <button
+                    type="button"
+                    onClick={handleStartEditFamilyName}
+                    data-testid="edit-family-name-btn"
+                    className="flex items-center gap-1 rounded-md px-2 py-1 text-[12px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition cursor-pointer shrink-0 ml-auto"
+                    title="家族名を変更"
+                  >
+                    <FileEdit className="h-3.5 w-3.5" />
+                    <span>名前を変更</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
           <div className="mb-8">
             <div className="mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">

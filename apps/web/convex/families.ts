@@ -1,5 +1,8 @@
 import { v } from "convex/values";
-import { RotatePasscodeInputSchema } from "../src/utils/schemas";
+import {
+  RotatePasscodeInputSchema,
+  UpdateFamilyNameSchema,
+} from "../src/utils/schemas";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -1660,5 +1663,35 @@ export const updateMemberRole = familyAdminMutation({
       familyRole: args.role,
       updatedAt: Date.now(),
     });
+  },
+});
+
+/**
+ * 家族グループ名を変更するMutation
+ * ファミリー管理者のみ実行可能
+ */
+export const updateFamilyName = familyAdminMutation({
+  args: {
+    name: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const { familyId } = ctx;
+
+    const parsed = UpdateFamilyNameSchema.safeParse({ name: args.name });
+    if (!parsed.success) {
+      throw new Error(parsed.error.issues[0]?.message || "Invalid family name");
+    }
+
+    const family = await ctx.db.get(familyId);
+    if (!family) {
+      throw new Error("Family not found");
+    }
+
+    await ctx.db.patch(familyId, {
+      name: parsed.data.name,
+      updatedAt: Date.now(),
+    });
+
+    return { success: true, name: parsed.data.name };
   },
 });
