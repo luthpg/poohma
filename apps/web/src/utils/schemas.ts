@@ -146,12 +146,19 @@ export const RecordInputSchema = z.object({
     .max(MAX_TAGS_PER_RECORD, `タグは${MAX_TAGS_PER_RECORD}個まで登録できます`), // タグ文字列の配列
 });
 
+export const FamilyNameSchema = z
+  .string()
+  .trim()
+  .min(1, "家族名は必須です")
+  .max(100, "家族名は100文字以内で入力してください");
+
+export const UpdateFamilyNameSchema = z.object({
+  name: FamilyNameSchema,
+});
+
 export const CreateFamilyInputSchema = z
   .object({
-    name: z
-      .string()
-      .min(1, "家族名は必須です")
-      .max(100, "家族名は100文字以内で入力してください"),
+    name: FamilyNameSchema,
     masterKeyEncrypted: z.string(),
     masterKeyIv: z.string(),
     masterKeySalt: z.string(),

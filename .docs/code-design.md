@@ -825,6 +825,7 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 | revokeFamilyInvite | Mutation | familyBound | 自家族の招待コードの手動失効 |
 | getFamilyInvites | Query | familyBound | 自家族の招待コード一覧取得（ステータス: active/expired/revoked付き） |
 | updateMemberRole | Mutation | familyAdmin | メンバーのロール（admin/viewer）の更新。ファミリー管理者のみ実行可能。家族内に最低1名のファミリー管理者が残るよう検証（最後の管理者の降格を防止） |
+| updateFamilyName | Mutation | familyAdmin | 家族グループ名の変更。ファミリー管理者のみ実行可能。前後の空白トリム・文字数（1〜100文字）バリデーションを適用（Issue #177） |
 | kickMember | Mutation | familyAdmin | メンバーのキック（強制削除）。ファミリー管理者のみ実行可能。最後のファミリー管理者のキックは防止。Export Vaultへのマスターキー退避（TTL: 30日）、admins調停、所属解除、通知メール送信（6.7） |
 | getMyPendingExportVault | Query | authenticated | 被キックユーザーの有効なExport Vault取得（期限切れ時はnull） |
 | abandonPendingExportVault | Mutation | authenticated | 被キックユーザーによるExport Vaultの明示的破棄（データ持ち出し放棄） |
