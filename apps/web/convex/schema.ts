@@ -254,6 +254,7 @@ export default defineSchema({
       v.literal("PASSCODE_ROTATED"),
       v.literal("RECOVERY_KIT_REGISTERED"),
       v.literal("RECOVERY_REDEEMED"),
+      v.literal("ACCOUNT_DELETE"),
     ),
     metadata: v.optional(
       v.object({
@@ -267,6 +268,7 @@ export default defineSchema({
     .index("by_family_createdAt", ["familyId", "createdAt"])
     .index("by_recordId_createdAt", ["recordId", "createdAt"])
     .index("by_targetAccountId_createdAt", ["targetAccountId", "createdAt"])
+    .index("by_userId_createdAt", ["userId", "createdAt"])
     .index("by_createdAt", ["createdAt"]), // 定期パージ用
 
   viewLogs: defineTable({

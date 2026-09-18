@@ -357,11 +357,11 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 | ownerType | "user" \| "family" | 操作時点の所有種別 |
 | ownerFamilyId | Id<families>(optional) | ownerType === "family" の対象家族ID |
 | targetAccountId | Id<users>(optional) | ownerType === "user" の所有者Account ID |
-| action | string (リテラル共用体) | 操作種別 (`RECORD_CREATE`, `RECORD_UPDATE`, `RECORD_DELETE`, `CREDENTIAL_CREATE`, `CREDENTIAL_UPDATE`, `CREDENTIAL_DELETE`, `SHARE_SETTING_CHANGED`, `ADMIN_CHANGED`, `FAMILY_CREATE`, `FAMILY_UPDATE`, `FAMILY_MIGRATION`, `PASSCODE_ROTATED`, `INVITE_CREATE`, `INVITE_REVOKE`, `MEMBER_JOIN`, `MEMBER_LEAVE`, `MEMBER_REMOVE`, `MEMBER_ROLE_CHANGED`, `JOIN_REQUEST_REJECTED`, `RECOVERY_KIT_REGISTERED`, `RECOVERY_REDEEMED`) |
+| action | string (リテラル共用体) | 操作種別 (`RECORD_CREATE`, `RECORD_UPDATE`, `RECORD_DELETE`, `CREDENTIAL_CREATE`, `CREDENTIAL_UPDATE`, `CREDENTIAL_DELETE`, `SHARE_SETTING_CHANGED`, `ADMIN_CHANGED`, `FAMILY_CREATE`, `FAMILY_UPDATE`, `FAMILY_MIGRATION`, `PASSCODE_ROTATED`, `INVITE_CREATE`, `INVITE_REVOKE`, `MEMBER_JOIN`, `MEMBER_LEAVE`, `MEMBER_REMOVE`, `MEMBER_ROLE_CHANGED`, `JOIN_REQUEST_REJECTED`, `RECOVERY_KIT_REGISTERED`, `RECOVERY_REDEEMED`, `ACCOUNT_DELETE`) |
 | metadata | object(optional) | 補足情報（targetTitle: レコード名, changedFields: 変更フィールド配列, detail: 付加情報） |
 | createdAt | number | 記録日時（epoch ms） |
 
-インデックス: by_family_createdAt（家族ログ取得）, by_recordId_createdAt（レコード別履歴）, by_targetAccountId_createdAt（個人レコード操作履歴）, by_createdAt（定期パージ用）。
+インデックス: by_family_createdAt（家族ログ取得）, by_recordId_createdAt（レコード別履歴）, by_targetAccountId_createdAt（個人レコード操作履歴）, by_userId_createdAt（退会後・問い合わせ対応時のユーザーUID検索）, by_createdAt（定期パージ用）。
 
 #### viewLogs（閲覧ログ）
 

@@ -28,7 +28,8 @@ export interface LogAuditParams {
     | "FAMILY_MIGRATION"
     | "PASSCODE_ROTATED"
     | "RECOVERY_KIT_REGISTERED"
-    | "RECOVERY_REDEEMED";
+    | "RECOVERY_REDEEMED"
+    | "ACCOUNT_DELETE";
   metadata?: {
     targetTitle?: string;
     changedFields?: string[];

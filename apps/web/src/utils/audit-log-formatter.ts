@@ -216,6 +216,14 @@ export const AUDIT_ACTION_CONFIG: Record<string, ActionConfigItem> = {
     colorClass:
       "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
   },
+  ACCOUNT_DELETE: {
+    label: "アカウント削除",
+    icon: UserX,
+    badgeClass:
+      "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
+    colorClass:
+      "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
+  },
 };
 
 export const DEFAULT_ACTION_CONFIG: ActionConfigItem = {

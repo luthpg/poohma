@@ -364,6 +364,102 @@ describe("監査ログ (Audit Log) & 閲覧履歴 (View Log) の統合テスト"
     );
     expect(viewLogs.length).toBeGreaterThan(0);
     expect(viewLogs[0].actorDisplayName).toBe("退会予定パパ");
+
+    // 退会ユーザー自身の監査ログ（ACCOUNT_DELETE）が記録され、UIDで追跡可能なこと
+    await t.run(async (ctx) => {
+      const userLogs = await ctx.db
+        .query("auditLogs")
+        .withIndex("by_userId_createdAt", (q) =>
+          q.eq("userId", "user_to_be_deleted"),
+        )
+        .collect();
+      const deleteLog = userLogs.find((l) => l.action === "ACCOUNT_DELETE");
+      expect(deleteLog).toBeDefined();
+      expect(deleteLog?.metadata?.detail).toContain(
+        "アカウント削除: 退会予定パパ",
+      );
+      expect(deleteLog?.metadata?.detail).toContain("家族脱退");
+    });
+  });
+
+  // 3b. 退会ユーザーの問い合わせ対応テスト: 家族解散を伴う最後の1人の退会および単独ユーザー退会でも ACCOUNT_DELETE が記録され追跡可能なこと
+  it("退会ユーザーの問い合わせ対応: 家族消滅・単独退会でも ACCOUNT_DELETE が記録され by_userId_createdAt で追跡できること", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+
+    // パターンA: 家族最後の1人（家族も同時解散）
+    await t.run(async (ctx) => {
+      const familyId = await ctx.db.insert("families", {
+        name: "Solo Family",
+        updatedAt: now,
+      });
+      await ctx.db.insert("users", {
+        familyRole: "admin",
+        userId: "user_solo_family",
+        email: "solo_family@example.com",
+        displayName: "最後の一人",
+        familyId,
+        updatedAt: now,
+      });
+    });
+
+    const soloFamilyClient = t.withIdentity({
+      subject: "user_solo_family",
+      issuer: "https://auth.poohma.test",
+    });
+
+    await soloFamilyClient.mutation(api.users.deleteAccount, {});
+
+    // 家族が消滅していること、かつ ACCOUNT_DELETE 監査ログが UID で追跡できること
+    await t.run(async (ctx) => {
+      const families = await ctx.db.query("families").collect();
+      expect(families.length).toBe(0);
+
+      const logs = await ctx.db
+        .query("auditLogs")
+        .withIndex("by_userId_createdAt", (q) =>
+          q.eq("userId", "user_solo_family"),
+        )
+        .collect();
+      const deleteLog = logs.find((l) => l.action === "ACCOUNT_DELETE");
+      expect(deleteLog).toBeDefined();
+      expect(deleteLog?.metadata?.detail).toContain(
+        "アカウント削除: 最後の一人",
+      );
+      expect(deleteLog?.metadata?.detail).toContain("家族も同時解散");
+    });
+
+    // パターンB: 家族未所属の単独ユーザー
+    await t.run(async (ctx) => {
+      await ctx.db.insert("users", {
+        familyRole: "viewer",
+        userId: "user_no_family",
+        email: "no_family@example.com",
+        displayName: "単独利用ユーザー",
+        updatedAt: now,
+      });
+    });
+
+    const noFamilyClient = t.withIdentity({
+      subject: "user_no_family",
+      issuer: "https://auth.poohma.test",
+    });
+
+    await noFamilyClient.mutation(api.users.deleteAccount, {});
+
+    await t.run(async (ctx) => {
+      const logs = await ctx.db
+        .query("auditLogs")
+        .withIndex("by_userId_createdAt", (q) =>
+          q.eq("userId", "user_no_family"),
+        )
+        .collect();
+      const deleteLog = logs.find((l) => l.action === "ACCOUNT_DELETE");
+      expect(deleteLog).toBeDefined();
+      expect(deleteLog?.metadata?.detail).toBe(
+        "アカウント削除: 単独利用ユーザー",
+      );
+    });
   });
 
   // 4. 長期間未更新レコード抽出テスト (FR-REC-16)
