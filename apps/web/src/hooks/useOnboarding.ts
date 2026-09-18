@@ -290,28 +290,25 @@ export function useOnboarding() {
   /**
    * URLクエリパラメータからフェーズを復元（画面遷移後の再開用）
    */
-  const resumeFromQuery = useCallback(
-    (queryParam?: string): boolean => {
-      if (queryParam === "guide") {
-        setPhase("manual-tour");
-        return true;
-      }
-      // サンプルツアー関連のクエリは、オンボーディングが未完了の場合のみ許可
-      if (!needsOnboarding) {
-        return false;
-      }
-      if (queryParam === "detail") {
-        setPhase("detail-tour");
-        return true;
-      }
-      if (queryParam === "part2") {
-        setPhase("dashboard-tour-2");
-        return true;
-      }
-      return false;
-    },
-    [needsOnboarding],
-  );
+  const resumeFromQuery = useCallback((queryParam?: string): boolean => {
+    if (queryParam === "guide") {
+      setPhase("manual-tour");
+      return true;
+    }
+    if (queryParam === "detail") {
+      setPhase("detail-tour");
+      return true;
+    }
+    if (queryParam === "part2") {
+      setPhase("dashboard-tour-2");
+      return true;
+    }
+    if (queryParam === "part1") {
+      setPhase("dashboard-tour-1");
+      return true;
+    }
+    return false;
+  }, []);
 
   return {
     phase,

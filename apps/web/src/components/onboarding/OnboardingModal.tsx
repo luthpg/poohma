@@ -1,4 +1,5 @@
-import { Play, Sparkles } from "lucide-react";
+import { KeyRound, Play, Sparkles } from "lucide-react";
+import { JpText } from "@/components/JpText";
 import {
   Dialog,
   DialogContent,
@@ -36,25 +37,53 @@ export function OnboardingModal({
 
         <DialogHeader className="text-center">
           <DialogTitle className="text-xl font-bold tracking-tight text-foreground text-center">
-            PoohMaへようこそ！
+            <JpText as="span">PoohMaへようこそ！</JpText>
           </DialogTitle>
-          <DialogDescription className="text-sm text-muted-foreground text-center leading-relaxed mt-2">
-            PoohMaは、大切なパスワードヒントを端末上で安全に守り、家族とだけ共有できるアプリです。
-            <br />
-            まずはサンプルデータを使って、安心の仕組みを体験してみませんか？
+          <DialogDescription
+            className="text-sm text-muted-foreground text-center leading-relaxed mt-2"
+            asChild
+          >
+            <div>
+              <JpText as="p">
+                PoohMaは、動画配信やネット回線などのサービス情報をひとまとめにし、家族とだけ安全に共有できるアプリです。
+              </JpText>
+              <JpText as="p" className="mt-1 font-medium text-foreground/80">
+                まずはサンプルデータを使って、安心の仕組みを体験してみませんか？
+              </JpText>
+            </div>
           </DialogDescription>
         </DialogHeader>
 
-        <div className="my-4 rounded-xl bg-muted/40 p-3.5 border border-border/50 text-xs text-muted-foreground space-y-2">
+        {/* 秘密の合言葉（家族パスコード）の事前案内 */}
+        <div className="my-2 rounded-xl bg-orange-500/10 border border-orange-500/20 p-3.5 text-xs text-left">
+          <div className="flex items-start gap-2.5">
+            <KeyRound className="h-4 w-4 text-orange-500 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <JpText
+                as="span"
+                className="font-semibold text-orange-600 dark:text-orange-400 block"
+              >
+                秘密の合言葉（家族パスコード）について
+              </JpText>
+              <JpText as="p" className="text-muted-foreground leading-relaxed">
+                「体験してみる」を押すと、設定済みの「秘密の合言葉」の入力画面が表示されます。お使いの端末内だけで安全にサンプルを準備するためのものですので、安心してご入力ください。
+              </JpText>
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-3 rounded-xl bg-muted/40 p-3 border border-border/50 text-xs text-muted-foreground space-y-1.5 text-left">
           <div className="flex items-center gap-2">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
-            <span>サンプルは端末上で安全に作られ、後から一括削除できます</span>
+            <JpText as="span">
+              サンプルは端末内で安全に作られ、後からいつでも一括削除できます
+            </JpText>
           </div>
           <div className="flex items-center gap-2">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
-            <span>
-              パスワードヒントがどのように安全に保護・表示されるか確認できます
-            </span>
+            <JpText as="span">
+              「家族で共有」と「自分専用」の使い分けやヒントの保護を体験できます
+            </JpText>
           </div>
         </div>
 
@@ -68,12 +97,12 @@ export function OnboardingModal({
             {isLoading ? (
               <>
                 <Spinner className="h-4 w-4 text-white" />
-                <span>サンプルを準備中...</span>
+                <JpText as="span">サンプルを準備中...</JpText>
               </>
             ) : (
               <>
                 <Play className="h-4 w-4 fill-white" />
-                <span>サンプルデータで体験してみる</span>
+                <JpText as="span">サンプルデータで体験してみる</JpText>
               </>
             )}
           </button>
@@ -83,7 +112,7 @@ export function OnboardingModal({
             disabled={isLoading}
             className="w-full rounded-xl border border-border/60 hover:bg-muted/50 px-5 py-2.5 text-xs font-medium text-muted-foreground hover:text-foreground transition disabled:opacity-50 cursor-pointer"
           >
-            スキップして空のまま始める
+            <JpText as="span">スキップして空のまま始める</JpText>
           </button>
         </div>
       </DialogContent>

@@ -72,7 +72,7 @@ export function CreateAccountDialog({
               onChange={(e) => setName(e.target.value)}
               placeholder="家族メンバーに表示される新アカウント名…"
               maxLength={30}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary/20"
               disabled={isSubmitting}
               autoFocus
             />

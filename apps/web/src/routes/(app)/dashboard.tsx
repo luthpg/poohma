@@ -230,6 +230,8 @@ function RouteComponent() {
     if (onboardingSearch.onboarding) {
       const resumed = onboarding.resumeFromQuery(onboardingSearch.onboarding);
       if (resumed) return;
+      // ツアー起動対象外の不要なクエリパラメータは自動削除
+      onboarding.clearOnboardingQuery();
     }
 
     // レコードの取得完了を待機
@@ -257,6 +259,7 @@ function RouteComponent() {
     onboarding.showModal,
     onboarding.markCompleted,
     onboarding.resumeFromQuery,
+    onboarding.clearOnboardingQuery,
   ]);
   const viewMode = (searchParams.view || prefs.view || "card") as
     | "card"
@@ -1062,6 +1065,9 @@ function ServiceListItem({
     <Link
       to="/records/$id"
       params={{ id: record._id }}
+      search={
+        dataTour === "sample-record" ? { onboarding: "detail" } : undefined
+      }
       {...(dataTour ? { "data-tour": dataTour } : {})}
       onClick={(e) => {
         if (isSelectMode && onToggleSelect) {
@@ -1177,6 +1183,9 @@ function ServiceCard({
     <Link
       to="/records/$id"
       params={{ id: record._id }}
+      search={
+        dataTour === "sample-record" ? { onboarding: "detail" } : undefined
+      }
       onClick={(e) => {
         if (isSelectMode && onToggleSelect) {
           e.preventDefault();
