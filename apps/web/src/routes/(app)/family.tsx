@@ -1474,7 +1474,6 @@ function FamilyComponent() {
                   value={familyNameInput}
                   onChange={(e) => setFamilyNameInput(e.target.value)}
                   disabled={isUpdatingFamilyName}
-                  maxLength={100}
                   aria-label="家族グループ名"
                   data-testid="family-name-edit-input"
                   className="w-full flex-1 rounded-md bg-background px-3 py-1.5 text-base sm:text-[14px] font-medium text-foreground shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"

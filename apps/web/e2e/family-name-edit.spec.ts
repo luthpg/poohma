@@ -70,28 +70,34 @@ test.describe("家族グループ名の変更機能 (Issue #177)", () => {
     await nameInput.fill(newFamilyName);
 
     const saveBtn = page.locator('[data-testid="save-family-name-btn"]');
-    await saveBtn.click();
 
-    // 成功トーストと新しい名前の表示を確認
-    await expect(page.locator("text=家族名を変更しました").first()).toBeVisible(
-      { timeout: 10000 },
-    );
-    await expect(nameHeading).toHaveText(newFamilyName, { timeout: 10000 });
+    try {
+      await saveBtn.click();
 
-    // 6. ページをリロードしても新しい家族名が維持されていること（永続化の検証）
-    await page.reload();
-    await page.waitForURL(/.*\/family/, { timeout: 15000 });
-    await ensureOnboardingCompleted(page);
-    await expect(nameHeading).toHaveText(newFamilyName, { timeout: 10000 });
+      // 成功トーストと新しい名前の表示を確認
+      await expect(
+        page.locator("text=家族名を変更しました").first(),
+      ).toBeVisible({ timeout: 10000 });
+      await expect(nameHeading).toHaveText(newFamilyName, { timeout: 10000 });
 
-    // 7. クリーンアップ：元の名前に戻しておく
-    await editBtn.click();
-    await expect(nameInput).toBeVisible({ timeout: 5000 });
-    await nameInput.fill(initialName);
-    await saveBtn.click();
-    await expect(page.locator("text=家族名を変更しました").first()).toBeVisible(
-      { timeout: 10000 },
-    );
-    await expect(nameHeading).toHaveText(initialName, { timeout: 10000 });
+      // 6. ページをリロードしても新しい家族名が維持されていること（永続化の検証）
+      await page.reload();
+      await page.waitForURL(/.*\/family/, { timeout: 15000 });
+      await ensureOnboardingCompleted(page);
+      await expect(nameHeading).toHaveText(newFamilyName, { timeout: 10000 });
+    } finally {
+      // 7. クリーンアップ：元の名前に戻しておく
+      if (await editBtn.isVisible()) {
+        await editBtn.click();
+        if (await nameInput.isVisible()) {
+          await nameInput.fill(initialName);
+          await saveBtn.click();
+          await expect(
+            page.locator("text=家族名を変更しました").first(),
+          ).toBeVisible({ timeout: 10000 });
+          await expect(nameHeading).toHaveText(initialName, { timeout: 10000 });
+        }
+      }
+    }
   });
 });
