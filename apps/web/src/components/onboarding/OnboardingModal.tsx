@@ -30,6 +30,8 @@ export function OnboardingModal({
       <DialogContent
         className="sm:max-w-md rounded-2xl p-6 sm:p-8 shadow-xl"
         showCloseButton={!isLoading}
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
       >
         <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-500/10 text-orange-500">
           <Sparkles className="h-7 w-7" />

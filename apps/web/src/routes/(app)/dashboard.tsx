@@ -485,6 +485,7 @@ function RouteComponent() {
       <OnboardingTour
         steps={manualDashboardSteps}
         isActive={onboarding.phase === "manual-tour"}
+        allowClose={true}
         onComplete={onboarding.onTourClose}
         onClose={onboarding.onTourClose}
       />
@@ -545,6 +546,7 @@ function RouteComponent() {
 
       {/* レコード一覧 */}
       <RecordListSection
+        isOnboardingTour1Active={onboarding.phase === "dashboard-tour-1"}
         searchParams={searchParams}
         sortParam={sortParam}
         viewMode={viewMode}
@@ -797,6 +799,7 @@ function RecordListSection({
   selectedIds,
   onToggleSelect,
   onSelectAll,
+  isOnboardingTour1Active,
 }: {
   searchParams: z.infer<typeof searchSchema>;
   sortParam: SortParam;
@@ -809,6 +812,7 @@ function RecordListSection({
   selectedIds: string[];
   onToggleSelect: (id: string) => void;
   onSelectAll: (ids: string[]) => void;
+  isOnboardingTour1Active?: boolean;
 }) {
   const { activeAccountId } = useAccount();
   const records = usePersistentQuery<RecordType[]>(api.records.getRecords, {
@@ -968,6 +972,7 @@ function RecordListSection({
                         isSelectMode={isSelectMode}
                         isSelected={selectedIds.includes(record._id)}
                         onToggleSelect={() => onToggleSelect(record._id)}
+                        isOnboardingTour1Active={isOnboardingTour1Active}
                         dataTour={
                           record._id === firstSampleRecordId
                             ? "sample-record"
@@ -982,6 +987,7 @@ function RecordListSection({
                         isSelectMode={isSelectMode}
                         isSelected={selectedIds.includes(record._id)}
                         onToggleSelect={() => onToggleSelect(record._id)}
+                        isOnboardingTour1Active={isOnboardingTour1Active}
                         dataTour={
                           record._id === firstSampleRecordId
                             ? "sample-record"
@@ -1012,6 +1018,7 @@ function RecordListSection({
                 isSelectMode={isSelectMode}
                 isSelected={selectedIds.includes(record._id)}
                 onToggleSelect={() => onToggleSelect(record._id)}
+                isOnboardingTour1Active={isOnboardingTour1Active}
                 dataTour={
                   record._id === firstSampleRecordId
                     ? "sample-record"
@@ -1026,6 +1033,7 @@ function RecordListSection({
                 isSelectMode={isSelectMode}
                 isSelected={selectedIds.includes(record._id)}
                 onToggleSelect={() => onToggleSelect(record._id)}
+                isOnboardingTour1Active={isOnboardingTour1Active}
                 dataTour={
                   record._id === firstSampleRecordId
                     ? "sample-record"
@@ -1052,6 +1060,7 @@ function ServiceListItem({
   isSelected,
   onToggleSelect,
   dataTour,
+  isOnboardingTour1Active,
 }: {
   record: RecordType;
   onTagClick: (tag: string) => void;
@@ -1059,6 +1068,7 @@ function ServiceListItem({
   isSelected?: boolean;
   onToggleSelect?: () => void;
   dataTour?: string;
+  isOnboardingTour1Active?: boolean;
 }) {
   const isShared = record.ownerType === "family";
   return (
@@ -1066,7 +1076,9 @@ function ServiceListItem({
       to="/records/$id"
       params={{ id: record._id }}
       search={
-        dataTour === "sample-record" ? { onboarding: "detail" } : undefined
+        dataTour === "sample-record" && isOnboardingTour1Active
+          ? { onboarding: "detail" }
+          : undefined
       }
       {...(dataTour ? { "data-tour": dataTour } : {})}
       onClick={(e) => {
@@ -1171,6 +1183,7 @@ function ServiceCard({
   isSelected,
   onToggleSelect,
   dataTour,
+  isOnboardingTour1Active,
 }: {
   record: RecordType;
   onTagClick: (tag: string) => void;
@@ -1178,13 +1191,16 @@ function ServiceCard({
   isSelected?: boolean;
   onToggleSelect?: () => void;
   dataTour?: string;
+  isOnboardingTour1Active?: boolean;
 }) {
   return (
     <Link
       to="/records/$id"
       params={{ id: record._id }}
       search={
-        dataTour === "sample-record" ? { onboarding: "detail" } : undefined
+        dataTour === "sample-record" && isOnboardingTour1Active
+          ? { onboarding: "detail" }
+          : undefined
       }
       onClick={(e) => {
         if (isSelectMode && onToggleSelect) {

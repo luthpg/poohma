@@ -5,8 +5,9 @@ import type { OnboardingStep } from "@/lib/onboarding/types";
 import "./onboarding.css";
 
 interface OnboardingTourProps {
-  steps: (OnboardingStep | DriveStep)[];
+  steps: OnboardingStep[] | DriveStep[];
   isActive: boolean;
+  allowClose?: boolean;
   onComplete: () => void;
   onClose: () => void;
 }
@@ -18,6 +19,7 @@ interface OnboardingTourProps {
 export function OnboardingTour({
   steps,
   isActive,
+  allowClose = false,
   onComplete,
   onClose,
 }: OnboardingTourProps) {
@@ -73,7 +75,7 @@ export function OnboardingTour({
       const driverObj = driver({
         showProgress: true,
         animate: true,
-        allowClose: false,
+        allowClose,
         showButtons: ["next", "previous", "close"],
         overlayColor: "rgba(0, 0, 0, 0.5)",
         stagePadding: 8,
@@ -127,7 +129,7 @@ export function OnboardingTour({
       cancelled = true;
       destroyDriver();
     };
-  }, [isActive, normalizedSteps, destroyDriver]);
+  }, [isActive, normalizedSteps, allowClose, destroyDriver]);
 
   // アンマウント時のクリーンアップ
   useEffect(() => {

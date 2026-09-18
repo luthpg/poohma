@@ -197,7 +197,20 @@ test.describe("オンボーディングツアーの画面間遷移検証", () =>
     await expect(part2NextBtn).toBeVisible({ timeout: 5000 });
     await part2NextBtn.click();
 
-    // 後半 Step 2（スポットライト）：「ツアーを完了する」をクリック
+    // 後半 Step 2（スポットライト: user-menu お守りシート案内）：「次へ」をクリック
+    await expect(tourPopover).toBeVisible({ timeout: 5000 });
+    await expect(page.locator("text=お守りシートの発行場所")).toBeVisible({
+      timeout: 5000,
+    });
+    const userMenuNextBtn = page.locator(".driver-popover-next-btn");
+    await expect(userMenuNextBtn).toBeVisible({ timeout: 5000 });
+    await userMenuNextBtn.click();
+
+    // 後半 Step 3（スポットライト: add-record 新規登録案内）：「ツアーを完了する」をクリック
+    await expect(tourPopover).toBeVisible({ timeout: 5000 });
+    await expect(page.locator("text=さあ、使ってみましょう！")).toBeVisible({
+      timeout: 5000,
+    });
     const completeBtn = page
       .locator(".driver-popover-done-btn, .driver-popover-next-btn")
       .first();

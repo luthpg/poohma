@@ -225,16 +225,23 @@ function renderRecoveryPaperInfographic(): string {
  * 画像スロットに応じたリッチインフォグラフィックを生成
  */
 function renderInfographic(slot: SlideImageSlot): string {
+  let content = "";
   switch (slot.id) {
     case "welcome-family-share":
-      return renderWelcomeInfographic();
+      content = renderWelcomeInfographic();
+      break;
     case "e2ee-secret-lock":
-      return renderSecretLockInfographic();
+      content = renderSecretLockInfographic();
+      break;
     case "recovery-kit-paper":
-      return renderRecoveryPaperInfographic();
+      content = renderRecoveryPaperInfographic();
+      break;
     default:
       return "";
   }
+
+  const escapedRole = escapeHtml(slot.role);
+  return `<div role="img" aria-label="${escapedRole}">${content}</div>`;
 }
 
 /**

@@ -70,7 +70,7 @@ export const recordDetailIntroStepDefinitions: OnboardingStep[] = [
     type: "slide",
     title: "安心のヒミツ：家族だけの「合言葉」でカギが開く",
     description:
-      "大切なパスワードヒントは、自動でカギがかけられています。運営会社であっても、あなたと家族以外には絶対に読めません。",
+      "大切なパスワードヒントは、自動でカギがかけられています。PoohMaの運営であっても、あなたとご家族以外には読めない安心の仕組みです。",
     imageSlot: {
       id: "e2ee-secret-lock",
       role: "秘密の合言葉を使ってスマホの中でカギを開け閉めする仕組み",
@@ -84,7 +84,7 @@ export const recordDetailIntroStepDefinitions: OnboardingStep[] = [
     driveStep: {
       element: '[data-tour="hint-reveal-btn"]',
       popover: {
-        title: "ためしにカギを開けてみましょう！",
+        title: "試しにカギを開けてみましょう！",
         description:
           "「🔒 クリックして表示」を押してみてください。<br />あなたのスマホの中だけでサッとカギが開き、ヒントが現れます！",
         side: "bottom",
@@ -106,7 +106,7 @@ export const recordDetailReturnStepDefinitions: OnboardingStep[] = [
       popover: {
         title: "カギが開いてヒントが現れました！",
         description:
-          "暗号化されていたヒントが、スマホの中だけで安全に復号されました。<br />あなたとご家族以外には、運営会社であっても絶対に読めない安心の仕組みです。",
+          "暗号化されていたヒントが、スマホの中だけで安全に復号されました。<br />あなたとご家族以外には、PoohMaの運営であっても読めない安心の仕組みです。",
         side: "bottom",
         align: "start",
         nextBtnText: "次へ進む",
@@ -167,11 +167,25 @@ export const dashboardPart2StepDefinitions: OnboardingStep[] = [
   {
     type: "spotlight",
     driveStep: {
+      element: '[data-tour="user-menu"]',
+      popover: {
+        title: "お守りシートの発行場所",
+        description:
+          "右上のアカウントメニューから「家族管理」を開くと、いつでもリカバリーシートを発行・印刷できます。<br />大切な合言葉を忘れてしまう前に、印刷して保管しておくのがおすすめです。",
+        side: "bottom",
+        align: "end",
+        nextBtnText: "次へ",
+      },
+    },
+  },
+  {
+    type: "spotlight",
+    driveStep: {
       element: '[data-tour="add-record"]',
       popover: {
         title: "さあ、使ってみましょう！",
         description:
-          "右上の「＋追加」からアカウントを新しく登録できます。<br />このサンプルは上のバナーからいつでも消せますよ。",
+          "右上の「＋追加」からアカウントを新しく登録できます。<br />このサンプルは上のバナーからいつでも消せます。",
         side: "bottom",
         align: "end",
         doneBtnText: "ツアーを完了する",

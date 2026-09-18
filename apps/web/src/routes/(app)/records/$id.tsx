@@ -241,6 +241,7 @@ function RecordDetailComponent({
   const tourInitRef = useRef(false);
   const [detailIntroTourActive, setDetailIntroTourActive] = useState(false);
   const [detailReturnTourActive, setDetailReturnTourActive] = useState(false);
+  const [detailRevealSucceeded, setDetailRevealSucceeded] = useState(false);
   const isSampleRecord = Boolean(record.isSample);
   const recordId = record._id;
 
@@ -273,6 +274,7 @@ function RecordDetailComponent({
 
   // ヒントが復号されたら、少し余韻（1.2秒）を置いてダッシュボード帰還ツアーを案内
   const handleRevealSuccess = useCallback(() => {
+    setDetailRevealSucceeded(true);
     if (searchParams.onboarding === "detail") {
       setTimeout(() => {
         setDetailReturnTourActive(true);
@@ -924,12 +926,20 @@ function RecordDetailComponent({
           disabled={isNavigating}
           onClick={() => {
             setIsNavigating(true);
-            // オンボーディング中は確実にダッシュボードツアー後半へ進める
-            if (searchParams.onboarding === "detail") {
+            // オンボーディング中は復号成功している場合のみ確実にダッシュボードツアー後半へ進める
+            if (searchParams.onboarding === "detail" && detailRevealSucceeded) {
               setDetailIntroTourActive(false);
               setDetailReturnTourActive(false);
               onboarding.onDetailTourComplete();
               return;
+            }
+            if (
+              searchParams.onboarding === "detail" &&
+              !detailRevealSucceeded
+            ) {
+              setDetailIntroTourActive(false);
+              setDetailReturnTourActive(false);
+              onboarding.onTourClose();
             }
             if (window.history.length > 2) {
               window.history.back();

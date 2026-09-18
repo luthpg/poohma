@@ -37,6 +37,10 @@ describe("Onboarding Tour 概念説明スライドと Driver.js 変換", () => {
       expect(html).toContain("共有中");
       expect(html).toContain("自分のみ");
 
+      // アクセシビリティ (role="img" と aria-label) が正しく設定されていること
+      expect(html).toContain('role="img"');
+      expect(html).toContain('aria-label="家族で安心共有の全体像"');
+
       // XSSエスケープが行われていること
       expect(html).toContain("&lt;script&gt;危険&lt;/script&gt;");
       expect(html).not.toContain("<script>危険</script>");
@@ -46,6 +50,24 @@ describe("Onboarding Tour 概念説明スライドと Driver.js 変換", () => {
 
       // 説明文コンテナが含まれていること
       expect(html).toContain("poohma-tour-slide-text");
+    });
+
+    it("画像スロットの role に特殊文字が含まれている場合でも属性値が安全にエスケープされること", () => {
+      const slideStep: Extract<OnboardingStep, { type: "slide" }> = {
+        type: "slide",
+        title: "エスケープテスト",
+        description: "説明文",
+        imageSlot: {
+          id: "e2ee-secret-lock",
+          role: 'テスト "クォート" & <タグ>',
+        },
+      };
+
+      const html = renderSlideHtml(slideStep);
+      expect(html).toContain(
+        'aria-label="テスト &quot;クォート&quot; &amp; &lt;タグ&gt;"',
+      );
+      expect(html).not.toContain('aria-label="テスト "クォート" & <タグ>"');
     });
 
     it("画像スロットがないスライドでも安全に説明文が出力されること", () => {
@@ -161,9 +183,9 @@ describe("Onboarding Tour 概念説明スライドと Driver.js 変換", () => {
       );
     });
 
-    it("ダッシュボード後半が2ステップ（スライド1 + スポットライト1）で構成されていること", () => {
-      expect(dashboardPart2StepDefinitions).toHaveLength(2);
-      expect(dashboardPart2Steps).toHaveLength(2);
+    it("ダッシュボード後半が3ステップ（スライド1 + スポットライト2）で構成されていること", () => {
+      expect(dashboardPart2StepDefinitions).toHaveLength(3);
+      expect(dashboardPart2Steps).toHaveLength(3);
 
       // Step 1: スライド（recovery-kit-paper）
       expect(dashboardPart2StepDefinitions[0].type).toBe("slide");
@@ -173,8 +195,11 @@ describe("Onboarding Tour 概念説明スライドと Driver.js 変換", () => {
         );
       }
 
-      // Step 2: スポットライト（add-record）
-      expect(dashboardPart2Steps[1].element).toBe('[data-tour="add-record"]');
+      // Step 2: スポットライト（user-menu: お守りシート発行場所）
+      expect(dashboardPart2Steps[1].element).toBe('[data-tour="user-menu"]');
+
+      // Step 3: スポットライト（add-record: 新規登録）
+      expect(dashboardPart2Steps[2].element).toBe('[data-tour="add-record"]');
     });
 
     it("全3箇所の画像スケルトンが明確な役割を持っていること", () => {

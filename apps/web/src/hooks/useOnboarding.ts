@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { useLocation, useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -45,6 +45,7 @@ export function useOnboarding() {
   const { activeAccount } = useAccount();
   const { getMasterKey, requireUnlock } = usePasscode();
   const navigate = useNavigate();
+  const location = useLocation();
   const completeOnboardingMutation = useMutation(
     api.onboarding.completeOnboarding,
   );
@@ -70,19 +71,19 @@ export function useOnboarding() {
   }, [activeAccount]);
 
   /**
-   * URLの `onboarding` クエリパラメータを型安全に除去する
+   * 現在の画面パスを維持したまま、URLの `onboarding` クエリパラメータを型安全に除去する
    */
   const clearOnboardingQuery = useCallback(() => {
     navigate({
-      to: "/dashboard",
-      search: (prev: Record<string, unknown>): DashboardSearchParams => {
+      to: location.pathname,
+      search: (prev: Record<string, unknown>) => {
         const next = { ...prev };
         delete next.onboarding;
-        return next as DashboardSearchParams;
+        return next;
       },
       replace: true,
     });
-  }, [navigate]);
+  }, [navigate, location.pathname]);
 
   // 完了処理の共通ヘルパー（DB更新 + authUser クエリの無効化 + クエリ削除）
   const completeAndSync = useCallback(async () => {
