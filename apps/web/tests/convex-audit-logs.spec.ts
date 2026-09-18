@@ -1,5 +1,3 @@
-import { defineSchema, defineTable } from "convex/server";
-import { v } from "convex/values";
 import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
 import { api, internal } from "../convex/_generated/api";
@@ -593,12 +591,14 @@ describe("監査ログ (Audit Log) & 閲覧履歴 (View Log) の統合テスト"
 
       // 閲覧ログ
       oldViewLogId = await ctx.db.insert("viewLogs", {
+        accountId: dummyAccountId,
         userId: "test_user",
         actorDisplayName: "テストアクター",
         recordId,
         createdAt: oneHundredEightyOneDaysAgo,
       });
       recentViewLogId = await ctx.db.insert("viewLogs", {
+        accountId: dummyAccountId,
         userId: "test_user",
         actorDisplayName: "テストアクター",
         recordId,
@@ -751,88 +751,5 @@ describe("監査ログ (Audit Log) & 閲覧履歴 (View Log) の統合テスト"
     expect(categories).toContain("view");
     // 新しい順にソートされていること
     expect(allLogs[0].createdAt).toBeGreaterThanOrEqual(allLogs[1].createdAt);
-  });
-
-  // 8. マイグレーションテスト (migrateHintViewsToViewLogsInternal)
-  it("マイグレーション: 過去の auditLogs 内の HINT_VIEW レコードが viewLogs へ移行され、auditLogs から削除されること", async () => {
-    const legacySchema = defineSchema({
-      ...schema.tables,
-      auditLogs: defineTable({
-        ...schema.tables.auditLogs.validator.fields,
-        action: v.union(
-          v.literal("RECORD_CREATE"),
-          v.literal("RECORD_UPDATE"),
-          v.literal("RECORD_DELETE"),
-          v.literal("HINT_VIEW"),
-          v.literal("SHARE_SETTING_CHANGED"),
-          v.literal("ADMIN_CHANGED"),
-        ),
-      }),
-    });
-    const t = convexTest(legacySchema, modules);
-    let recordId!: Id<"serviceRecords">;
-
-    await t.run(async (ctx) => {
-      const accountId = await ctx.db.insert("users", {
-        userId: "user_mig",
-        email: "mig@example.com",
-        familyRole: "admin",
-        updatedAt: Date.now(),
-      });
-
-      recordId = await ctx.db.insert("serviceRecords", {
-        stableId: crypto.randomUUID(),
-        title: "Mig Target",
-        sortKey: computeSortKey("Mig Target"),
-        userId: "user_mig",
-        accountId,
-        ownerType: "user",
-        admins: [],
-        tags: [],
-        updatedAt: Date.now(),
-      });
-
-      // 過去形式の HINT_VIEW を直接挿入（テスト用バイパス）
-      await ctx.db.insert("auditLogs", {
-        userId: "user_mig",
-        actorDisplayName: "過去の閲覧者",
-        recordId,
-        ownerType: "user",
-        // biome-ignore lint/suspicious/noExplicitAny: 旧形式ドキュメントシミュレーションのため一時的にany許容
-        action: "HINT_VIEW" as any,
-        createdAt: 1000,
-      });
-
-      // 通常の変更系ログも挿入
-      await ctx.db.insert("auditLogs", {
-        userId: "user_mig",
-        actorDisplayName: "過去の作成者",
-        recordId,
-        ownerType: "user",
-        action: "RECORD_CREATE",
-        createdAt: 2000,
-      });
-    });
-
-    // マイグレーション実行
-    const result = await t.mutation(
-      internal.records.migrateHintViewsToViewLogsInternal,
-      {},
-    );
-    expect(result.migratedCount).toBe(1);
-
-    await t.run(async (ctx) => {
-      // auditLogs には RECORD_CREATE のみが残り、HINT_VIEW は削除されていること
-      const remainingAudit = await ctx.db.query("auditLogs").collect();
-      expect(remainingAudit).toHaveLength(1);
-      expect(remainingAudit[0].action).toBe("RECORD_CREATE");
-
-      // viewLogs に HINT_VIEW が移行されていること
-      const views = await ctx.db.query("viewLogs").collect();
-      expect(views).toHaveLength(1);
-      expect(views[0].actorDisplayName).toBe("過去の閲覧者");
-      expect(views[0].recordId).toBe(recordId);
-      expect(views[0].createdAt).toBe(1000);
-    });
   });
 });

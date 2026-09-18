@@ -2055,37 +2055,6 @@ export const cleanupOldViewLogsInternal = internalMutation({
   },
 });
 
-/**
- * ワンショットマイグレーション:
- * 既存の auditLogs から HINT_VIEW のレコードを viewLogs に移行し、auditLogs から削除する。
- */
-export const migrateHintViewsToViewLogsInternal = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    const allLogs = await ctx.db.query("auditLogs").collect();
-    let migratedCount = 0;
-
-    for (const log of allLogs) {
-      if ((log as { action?: string }).action === "HINT_VIEW") {
-        if (log.recordId) {
-          await ctx.db.insert("viewLogs", {
-            familyId: log.familyId,
-            accountId: log.accountId,
-            userId: log.userId,
-            actorDisplayName: log.actorDisplayName,
-            recordId: log.recordId,
-            createdAt: log.createdAt,
-          });
-        }
-        await ctx.db.delete(log._id);
-        migratedCount++;
-      }
-    }
-
-    return { migratedCount };
-  },
-});
-
 /** 閲覧権限を確認し、単一レコードの閲覧履歴を新しい順に取得する（利用率可視化・監査照会用）。 */
 export const getRecordViewLogs = authenticatedQuery({
   args: {
