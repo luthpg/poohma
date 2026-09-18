@@ -88,7 +88,7 @@ export function useOnboarding() {
   }, [navigate, location.pathname]);
 
   // 完了処理の共通ヘルパー（DB更新 + authUser クエリの無効化 + クエリ削除）
-  const completeAndSync = useCallback(async () => {
+  const completeAndSync = useCallback(async (): Promise<boolean> => {
     // レースコンディション防止のため、非同期通信前に直ちにローカル状態を完了にしてクエリを消去
     setPhase("completed");
     clearOnboardingQuery();
@@ -100,8 +100,10 @@ export function useOnboarding() {
       });
       // ★重要: TanStack Query の authUser キャッシュを更新し、AccountProvider に最新の onboardingVersion を反映
       await queryClient.invalidateQueries({ queryKey: ["authUser"] });
+      return true;
     } catch (_e) {
-      // 完了ステータスの更新失敗時は静かに無視
+      // 完了ステータスの更新失敗時は静かに false を返却（生エラーは露出させない）
+      return false;
     }
   }, [
     activeAccount?._id,
@@ -129,7 +131,10 @@ export function useOnboarding() {
   const skipOnboarding = useCallback(async () => {
     setIsLoading(true);
     try {
-      await completeAndSync();
+      const success = await completeAndSync();
+      if (!success) {
+        toast.error("オンボーディング完了の保存に失敗しました。");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -242,8 +247,12 @@ export function useOnboarding() {
    * ダッシュボードツアー（後半）完了 → オンボーディング完了
    */
   const onDashboardTour2Complete = useCallback(async () => {
-    await completeAndSync();
-    toast.success("ツアーが完了しました！自由にお使いください。");
+    const success = await completeAndSync();
+    if (success) {
+      toast.success("ツアーが完了しました！自由にお使いください。");
+    } else {
+      toast.error("ツアー完了の保存に失敗しました。");
+    }
   }, [completeAndSync]);
 
   /**
