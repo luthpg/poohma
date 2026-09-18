@@ -371,10 +371,9 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 | --------- | --------------------- | --------- |
 | recordId | Id<serviceRecords> | 閲覧対象レコードID |
 | familyId | Id<families>(optional) | 家族共有レコードの場合の家族ID |
-| accountId | Id<users>(optional) | 閲覧者のPoohMa Account ID（削除後は参照切れ考慮） |
+| accountId | Id<users> | 閲覧者のPoohMa Account ID |
 | userId | string | 閲覧者のFirebase UID |
 | actorDisplayName | string | 閲覧時点の表示名（脱退・削除後の表示維持用） |
-| type | "HINT_VIEW" | 閲覧種別 |
 | createdAt | number | 閲覧日時（epoch ms） |
 
 インデックス: by_recordId_createdAt（レコード別閲覧履歴）, by_familyId_createdAt（家族別閲覧履歴）, by_createdAt（定期パージ用）。

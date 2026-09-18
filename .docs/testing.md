@@ -201,8 +201,7 @@ flowchart TD
 | AUDIT-04 | updatedByAccountId・lastViewedAt・lastViewedByAccountId が正しく更新されること (viewLogs と連動) | 統合 | P1 | ✅ 実装済 | `tests/convex-audit-logs.spec.ts` |
 | AUDIT-05 | cleanupOldAuditLogsInternal / cleanupOldViewLogsInternal が 180日超過ログのみを削除し、直近ログを保持すること | 統合 | P1 | ✅ 実装済 | `tests/convex-audit-logs.spec.ts` |
 | AUDIT-06 | CSVエクスポート時に変更系ログと閲覧系ログを統合して降順取得できること | 統合 | P1 | ✅ 実装済 | `tests/convex-audit-logs.spec.ts` |
-| AUDIT-07 | 旧形式の HINT_VIEW ログが migrateHintViewsToViewLogsInternal により viewLogs へ移行・削除されること | 統合 | P1 | ✅ 実装済 | `tests/convex-audit-logs.spec.ts` |
-| AUDIT-08 | 退会ユーザーの問い合わせ対応: 家族消滅・単独退会でも ACCOUNT_DELETE が記録され by_userId_createdAt で追跡できること | 統合 | P1 | ✅ 実装済 | `tests/convex-audit-logs.spec.ts` |
+| AUDIT-07 | 退会ユーザーの問い合わせ対応: 家族消滅・単独退会でも ACCOUNT_DELETE が記録され by_userId_createdAt で追跡できること | 統合 | P1 | ✅ 実装済 | `tests/convex-audit-logs.spec.ts` |
 
 ### 4.6 CSV & OGP (SSRF 防御)
 

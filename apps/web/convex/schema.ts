@@ -273,7 +273,7 @@ export default defineSchema({
 
   viewLogs: defineTable({
     familyId: v.optional(v.id("families")), // 家族共有レコードの場合に設定
-    accountId: v.optional(v.id("users")), // 閲覧者のアカウントID (削除された場合は参照切れ考慮)
+    accountId: v.id("users"), // 閲覧者のアカウントID
     userId: v.string(), // 閲覧者の Firebase UID
     actorDisplayName: v.string(), // 操作時点の表示名 (脱退・削除後の表示維持用)
     recordId: v.id("serviceRecords"), // 対象レコードID
