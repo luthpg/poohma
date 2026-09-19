@@ -86,6 +86,27 @@ function RouteComponent() {
     }
   }, [activeAccount, isAccountLoading, pathname, navigate]);
 
+  // (app) 直下のツアー対象外ルート（家族管理・設定等）に不要な onboarding クエリが残っていたら自動削除
+  const searchParams = new URLSearchParams(location.search);
+  const hasOnboardingParam = searchParams.has("onboarding");
+  useEffect(() => {
+    if (
+      hasOnboardingParam &&
+      !pathname.includes("/dashboard") &&
+      !pathname.includes("/records/")
+    ) {
+      navigate({
+        to: pathname,
+        search: (prev: Record<string, unknown>) => {
+          const next = { ...prev };
+          delete next.onboarding;
+          return next;
+        },
+        replace: true,
+      });
+    }
+  }, [hasOnboardingParam, pathname, navigate]);
+
   // 一度ログイン済みの状態でセッションが切れた場合、レコード画面ではインライン救済（SessionExpiredDialog）に任せて強制遷移・画面ブロッキングを控える
   const isRecordEditRoute = pathname.includes("/records");
   const isRedirectSuppressed =

@@ -60,7 +60,10 @@ import {
   useRecordForm,
 } from "@/hooks/useRecordForm";
 import { attemptSilentReauth, isAuthSessionError } from "@/lib/auth-recovery";
-import { recordDetailSteps } from "@/lib/onboarding/tours";
+import {
+  recordDetailIntroSteps,
+  recordDetailReturnSteps,
+} from "@/lib/onboarding/tours";
 import {
   AUDIT_ACTION_CONFIG,
   DEFAULT_ACTION_CONFIG,
@@ -236,31 +239,48 @@ function RecordDetailComponent({
   // --- オンボーディングツアー（詳細画面用） ---
   const onboarding = useOnboarding();
   const tourInitRef = useRef(false);
-  const [detailTourActive, setDetailTourActive] = useState(false);
+  const [detailIntroTourActive, setDetailIntroTourActive] = useState(false);
+  const [detailReturnTourActive, setDetailReturnTourActive] = useState(false);
+  const [detailRevealSucceeded, setDetailRevealSucceeded] = useState(false);
+  const isSampleRecord = Boolean(record.isSample);
+  const recordId = record._id;
 
   useEffect(() => {
-    if (tourInitRef.current) return;
-
     // クエリパラメータで onboarding=detail が指定されている場合
     if (searchParams.onboarding === "detail") {
-      // レコードがサンプルでない、あるいは不正なアクセスの場合はダッシュボードへ戻す
-      if (record && !record.isSample) {
-        // サンプルが存在しない場合はクエリを消去
+      if (tourInitRef.current) return;
+
+      // 通常レコード（非サンプル）の場合はツアー対象外としてクエリを消去
+      if (!isSampleRecord) {
         navigate({
           to: "/records/$id",
-          params: { id: record._id },
+          params: { id: recordId },
           search: {},
           replace: true,
         });
         return;
       }
 
-      // ツアー起動が確定した段階でフラグを立てる
+      // ツアー起動フラグを立てて導入編ツアーを有効化
       tourInitRef.current = true;
-      const timer = setTimeout(() => setDetailTourActive(true), 500);
-      return () => clearTimeout(timer);
+      setDetailIntroTourActive(true);
     }
-  }, [searchParams.onboarding, record, navigate]);
+  }, [searchParams.onboarding, recordId, isSampleRecord, navigate]);
+
+  // 復号ボタンが押されたら、ツアーモーダルを即座に閉じる（パスコードダイアログやヒントの視認性を確保）
+  const handleRevealStart = useCallback(() => {
+    setDetailIntroTourActive(false);
+  }, []);
+
+  // ヒントが復号されたら、少し余韻（1.2秒）を置いてダッシュボード帰還ツアーを案内
+  const handleRevealSuccess = useCallback(() => {
+    setDetailRevealSucceeded(true);
+    if (searchParams.onboarding === "detail") {
+      setTimeout(() => {
+        setDetailReturnTourActive(true);
+      }, 1200);
+    }
+  }, [searchParams.onboarding]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -860,17 +880,35 @@ function RecordDetailComponent({
 
   return (
     <div className="mx-auto max-w-3xl p-6 pb-28 sm:pb-32">
-      {/* オンボーディングツアー（詳細画面用） */}
+      {/* オンボーディングツアー（詳細画面用: 導入編） */}
       <OnboardingTour
-        steps={recordDetailSteps}
-        isActive={detailTourActive}
+        steps={recordDetailIntroSteps}
+        isActive={detailIntroTourActive}
         onComplete={() => {
-          setDetailTourActive(false);
+          setDetailIntroTourActive(false);
+          setDetailReturnTourActive(true);
+        }}
+        onClose={() => {
+          setDetailIntroTourActive(false);
+          navigate({
+            to: "/records/$id",
+            params: { id: record._id },
+            search: {},
+            replace: true,
+          });
+          onboarding.onTourClose();
+        }}
+      />
+      {/* オンボーディングツアー（詳細画面用: 帰還編） */}
+      <OnboardingTour
+        steps={recordDetailReturnSteps}
+        isActive={detailReturnTourActive}
+        onComplete={() => {
+          setDetailReturnTourActive(false);
           onboarding.onDetailTourComplete();
         }}
         onClose={() => {
-          setDetailTourActive(false);
-          // クローズ時はURLのクエリパラメータも消去してダッシュボードへ戻すか安全に終了
+          setDetailReturnTourActive(false);
           navigate({
             to: "/records/$id",
             params: { id: record._id },
@@ -888,6 +926,21 @@ function RecordDetailComponent({
           disabled={isNavigating}
           onClick={() => {
             setIsNavigating(true);
+            // オンボーディング中は復号成功している場合のみ確実にダッシュボードツアー後半へ進める
+            if (searchParams.onboarding === "detail" && detailRevealSucceeded) {
+              setDetailIntroTourActive(false);
+              setDetailReturnTourActive(false);
+              onboarding.onDetailTourComplete();
+              return;
+            }
+            if (
+              searchParams.onboarding === "detail" &&
+              !detailRevealSucceeded
+            ) {
+              setDetailIntroTourActive(false);
+              setDetailReturnTourActive(false);
+              onboarding.onTourClose();
+            }
             if (window.history.length > 2) {
               window.history.back();
             } else {
@@ -1151,6 +1204,8 @@ function RecordDetailComponent({
                     key={cred.id}
                     cred={cred}
                     recordId={record._id}
+                    onRevealStart={handleRevealStart}
+                    onRevealSuccess={handleRevealSuccess}
                   />
                 ))}
               </div>
@@ -1519,6 +1574,8 @@ function ShareSettingsDialog({
 function CredentialCard({
   cred,
   recordId,
+  onRevealStart,
+  onRevealSuccess,
 }: {
   cred: {
     id: string;
@@ -1530,6 +1587,8 @@ function CredentialCard({
     passwordHintDekIv?: string;
   };
   recordId: Id<"serviceRecords">;
+  onRevealStart?: () => void;
+  onRevealSuccess?: () => void;
 }) {
   const { activeAccountId } = useAccount();
   const { decryptHint, requireUnlock, masterKey } = usePasscode();
@@ -1548,6 +1607,8 @@ function CredentialCard({
 
   const handleReveal = async () => {
     if (!isEncrypted || !cred.passwordHint || !cred.passwordHintIv) return;
+    // ツアーモーダルを即座に非表示にしてパスコードダイアログやヒントの視認性を確保
+    onRevealStart?.();
     setIsDecrypting(true);
     try {
       const unlocked = await requireUnlock();
@@ -1560,6 +1621,8 @@ function CredentialCard({
         cred.passwordHintDekIv,
       );
       setDecryptedHint(plaintext);
+      // 復号成功コールバックを発火（余韻の後に帰還ツアーを開始）
+      onRevealSuccess?.();
 
       // ログ記録 非同期
       logRecordHintViewMut({
@@ -1604,7 +1667,9 @@ function CredentialCard({
         </div>
         <div className="font-sans text-sm text-foreground whitespace-pre-wrap">
           {displayedHint ? (
-            displayedHint
+            <span data-tour="decrypted-hint" className="inline-block">
+              {displayedHint}
+            </span>
           ) : isEncrypted ? (
             <button
               type="button"

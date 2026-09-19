@@ -1,10 +1,13 @@
 import type { DriveStep } from "driver.js";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { toDriveSteps } from "@/lib/onboarding/tours";
+import type { OnboardingStep } from "@/lib/onboarding/types";
 import "./onboarding.css";
 
 interface OnboardingTourProps {
-  steps: DriveStep[];
+  steps: OnboardingStep[] | DriveStep[];
   isActive: boolean;
+  allowClose?: boolean;
   onComplete: () => void;
   onClose: () => void;
 }
@@ -16,6 +19,7 @@ interface OnboardingTourProps {
 export function OnboardingTour({
   steps,
   isActive,
+  allowClose = false,
   onComplete,
   onClose,
 }: OnboardingTourProps) {
@@ -23,6 +27,25 @@ export function OnboardingTour({
     typeof import("driver.js").driver
   > | null>(null);
   const isDestroyedRef = useRef(false);
+  const isFinishedByDoneRef = useRef(false);
+  const isClosedByUserRef = useRef(false);
+
+  // コールバックの最新参照を保持（親の再レンダリングによる useEffect 再実行・即時破棄を防止）
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // steps が OnboardingStep[] の場合も含めて正規化
+  const normalizedSteps = useMemo<DriveStep[]>(() => {
+    if (steps.length === 0) return [];
+    // 最初の要素が OnboardingStep (type プロパティを持つ) かチェック
+    const isCustomSteps = typeof (steps[0] as OnboardingStep).type === "string";
+    if (isCustomSteps) {
+      return toDriveSteps(steps as OnboardingStep[]);
+    }
+    return steps as DriveStep[];
+  }, [steps]);
 
   const destroyDriver = useCallback(() => {
     if (driverRef.current && !isDestroyedRef.current) {
@@ -37,9 +60,11 @@ export function OnboardingTour({
   }, []);
 
   useEffect(() => {
-    if (!isActive || steps.length === 0) return;
+    if (!isActive || normalizedSteps.length === 0) return;
 
     let cancelled = false;
+    isFinishedByDoneRef.current = false;
+    isClosedByUserRef.current = false;
 
     const initDriver = async () => {
       const { driver } = await import("driver.js");
@@ -50,7 +75,8 @@ export function OnboardingTour({
       const driverObj = driver({
         showProgress: true,
         animate: true,
-        allowClose: false,
+        allowClose,
+        showButtons: ["next", "previous", "close"],
         overlayColor: "rgba(0, 0, 0, 0.5)",
         stagePadding: 8,
         stageRadius: 12,
@@ -59,19 +85,56 @@ export function OnboardingTour({
         prevBtnText: "戻る",
         doneBtnText: "完了",
         progressText: "{{current}} / {{total}}",
-        steps,
-        onCloseClick: () => {
+        steps: normalizedSteps,
+        onDoneClick: () => {
+          isFinishedByDoneRef.current = true;
           destroyDriver();
-          onClose();
+          onCompleteRef.current();
+        },
+        onPrevClick: () => {
+          if (driverObj.isFirstStep() && driverObj.isLastStep()) {
+            isClosedByUserRef.current = true;
+            destroyDriver();
+            onCloseRef.current();
+            return;
+          }
+          driverObj.movePrevious();
+        },
+        onCloseClick: () => {
+          isClosedByUserRef.current = true;
+          destroyDriver();
+          onCloseRef.current();
         },
         onDestroyStarted: () => {
-          // 最終ステップで「完了」を押した場合
-          if (driverObj.isLastStep()) {
-            destroyDriver();
-            onComplete();
-          } else {
-            destroyDriver();
-            onClose();
+          if (isClosedByUserRef.current || isFinishedByDoneRef.current) return;
+          destroyDriver();
+          onCloseRef.current();
+        },
+        onPopoverRender: (popover, opts) => {
+          if (popover.closeButton) {
+            popover.closeButton.setAttribute("aria-label", "ツアーを終了");
+            popover.closeButton.setAttribute("title", "ツアーを終了");
+          }
+          // 単一ステップで prevBtnText（例：「このまま家族設定を見る」）が指定されている場合、キャンセル用ボタンとして表示
+          const singleStepPrevBtnText =
+            normalizedSteps.length === 1
+              ? normalizedSteps[0]?.popover?.prevBtnText
+              : undefined;
+
+          if (
+            opts.driver.isFirstStep() &&
+            opts.driver.isLastStep() &&
+            singleStepPrevBtnText &&
+            popover.previousButton
+          ) {
+            popover.previousButton.style.display = "inline-block";
+            popover.previousButton.disabled = false;
+            popover.previousButton.removeAttribute("disabled");
+            popover.previousButton.classList.remove(
+              "driver-popover-btn-disabled",
+            );
+            popover.previousButton.style.pointerEvents = "auto";
+            popover.previousButton.innerText = singleStepPrevBtnText;
           }
         },
       });
@@ -86,7 +149,7 @@ export function OnboardingTour({
       cancelled = true;
       destroyDriver();
     };
-  }, [isActive, steps, onComplete, onClose, destroyDriver]);
+  }, [isActive, normalizedSteps, allowClose, destroyDriver]);
 
   // アンマウント時のクリーンアップ
   useEffect(() => {

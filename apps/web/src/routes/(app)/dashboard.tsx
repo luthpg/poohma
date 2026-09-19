@@ -194,7 +194,11 @@ function RouteComponent() {
   }, [searchParams.q]);
 
   // --- オンボーディング ---
-  const { activeAccountId } = useAccount();
+  const {
+    activeAccount,
+    activeAccountId,
+    isLoading: isAccountLoading,
+  } = useAccount();
   const records = usePersistentQuery<
     NonNullable<typeof api.records.getRecords._returnType>
   >(api.records.getRecords, {
@@ -227,10 +231,21 @@ function RouteComponent() {
 
   // 初回表示時にモーダルを表示、またはURLクエリから復帰
   useEffect(() => {
+    // アカウント情報の読み込みを待機
+    if (isAccountLoading || !activeAccount) return;
+
     if (onboardingSearch.onboarding) {
       const resumed = onboarding.resumeFromQuery(onboardingSearch.onboarding);
-      if (resumed) return;
+      if (resumed) {
+        onboardingInitRef.current = true;
+        return;
+      }
+      // ツアー起動対象外の不要なクエリパラメータは自動削除
+      onboarding.clearOnboardingQuery();
     }
+
+    // 既にオンボーディング進行中・完了済みの場合は自動起動判定をスキップ
+    if (onboarding.phase !== "idle") return;
 
     // レコードの取得完了を待機
     if (records === undefined) return;
@@ -250,13 +265,17 @@ function RouteComponent() {
       onboarding.showModal();
     }
   }, [
+    isAccountLoading,
+    activeAccount,
     records,
     hasRealRecords,
     onboardingSearch.onboarding,
+    onboarding.phase,
     onboarding.needsOnboarding,
     onboarding.showModal,
     onboarding.markCompleted,
     onboarding.resumeFromQuery,
+    onboarding.clearOnboardingQuery,
   ]);
   const viewMode = (searchParams.view || prefs.view || "card") as
     | "card"
@@ -482,6 +501,7 @@ function RouteComponent() {
       <OnboardingTour
         steps={manualDashboardSteps}
         isActive={onboarding.phase === "manual-tour"}
+        allowClose={true}
         onComplete={onboarding.onTourClose}
         onClose={onboarding.onTourClose}
       />
@@ -542,6 +562,7 @@ function RouteComponent() {
 
       {/* レコード一覧 */}
       <RecordListSection
+        isOnboardingTour1Active={onboarding.phase === "dashboard-tour-1"}
         searchParams={searchParams}
         sortParam={sortParam}
         viewMode={viewMode}
@@ -794,6 +815,7 @@ function RecordListSection({
   selectedIds,
   onToggleSelect,
   onSelectAll,
+  isOnboardingTour1Active,
 }: {
   searchParams: z.infer<typeof searchSchema>;
   sortParam: SortParam;
@@ -806,6 +828,7 @@ function RecordListSection({
   selectedIds: string[];
   onToggleSelect: (id: string) => void;
   onSelectAll: (ids: string[]) => void;
+  isOnboardingTour1Active?: boolean;
 }) {
   const { activeAccountId } = useAccount();
   const records = usePersistentQuery<RecordType[]>(api.records.getRecords, {
@@ -965,6 +988,7 @@ function RecordListSection({
                         isSelectMode={isSelectMode}
                         isSelected={selectedIds.includes(record._id)}
                         onToggleSelect={() => onToggleSelect(record._id)}
+                        isOnboardingTour1Active={isOnboardingTour1Active}
                         dataTour={
                           record._id === firstSampleRecordId
                             ? "sample-record"
@@ -979,6 +1003,7 @@ function RecordListSection({
                         isSelectMode={isSelectMode}
                         isSelected={selectedIds.includes(record._id)}
                         onToggleSelect={() => onToggleSelect(record._id)}
+                        isOnboardingTour1Active={isOnboardingTour1Active}
                         dataTour={
                           record._id === firstSampleRecordId
                             ? "sample-record"
@@ -1009,6 +1034,7 @@ function RecordListSection({
                 isSelectMode={isSelectMode}
                 isSelected={selectedIds.includes(record._id)}
                 onToggleSelect={() => onToggleSelect(record._id)}
+                isOnboardingTour1Active={isOnboardingTour1Active}
                 dataTour={
                   record._id === firstSampleRecordId
                     ? "sample-record"
@@ -1023,6 +1049,7 @@ function RecordListSection({
                 isSelectMode={isSelectMode}
                 isSelected={selectedIds.includes(record._id)}
                 onToggleSelect={() => onToggleSelect(record._id)}
+                isOnboardingTour1Active={isOnboardingTour1Active}
                 dataTour={
                   record._id === firstSampleRecordId
                     ? "sample-record"
@@ -1049,6 +1076,7 @@ function ServiceListItem({
   isSelected,
   onToggleSelect,
   dataTour,
+  isOnboardingTour1Active,
 }: {
   record: RecordType;
   onTagClick: (tag: string) => void;
@@ -1056,12 +1084,18 @@ function ServiceListItem({
   isSelected?: boolean;
   onToggleSelect?: () => void;
   dataTour?: string;
+  isOnboardingTour1Active?: boolean;
 }) {
   const isShared = record.ownerType === "family";
   return (
     <Link
       to="/records/$id"
       params={{ id: record._id }}
+      search={
+        dataTour === "sample-record" && isOnboardingTour1Active
+          ? { onboarding: "detail" }
+          : undefined
+      }
       {...(dataTour ? { "data-tour": dataTour } : {})}
       onClick={(e) => {
         if (isSelectMode && onToggleSelect) {
@@ -1165,6 +1199,7 @@ function ServiceCard({
   isSelected,
   onToggleSelect,
   dataTour,
+  isOnboardingTour1Active,
 }: {
   record: RecordType;
   onTagClick: (tag: string) => void;
@@ -1172,11 +1207,17 @@ function ServiceCard({
   isSelected?: boolean;
   onToggleSelect?: () => void;
   dataTour?: string;
+  isOnboardingTour1Active?: boolean;
 }) {
   return (
     <Link
       to="/records/$id"
       params={{ id: record._id }}
+      search={
+        dataTour === "sample-record" && isOnboardingTour1Active
+          ? { onboarding: "detail" }
+          : undefined
+      }
       onClick={(e) => {
         if (isSelectMode && onToggleSelect) {
           e.preventDefault();

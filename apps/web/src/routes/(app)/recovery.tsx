@@ -420,7 +420,7 @@ function RecoveryPageComponent() {
                 value={rawCode}
                 onChange={handleCodeChange}
                 placeholder="ABCD-EFGH-JKMN-PQRT-WXYZ-2345-6789-BCDF"
-                className="w-full font-mono text-sm sm:text-base tracking-wider rounded-lg border bg-background p-3 focus:outline-none focus:ring-2 focus:ring-primary uppercase"
+                className="w-full font-mono text-base tracking-wider rounded-lg border bg-background p-3 focus:outline-none focus:ring-2 focus:ring-primary uppercase"
                 autoCapitalize="characters"
                 autoCorrect="off"
                 spellCheck={false}
@@ -564,7 +564,7 @@ function RecoveryPageComponent() {
                     onChange={(e) => setNewPasscode(e.target.value)}
                     disabled={isSubmittingPasscode}
                     placeholder="8文字以上の安全なパスコード"
-                    className="w-full rounded-lg border bg-background p-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full rounded-lg border bg-background p-3 pr-10 text-base md:text-[14px] focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                   <button
                     type="button"
@@ -599,7 +599,7 @@ function RecoveryPageComponent() {
                     onChange={(e) => setNewPasscodeConfirm(e.target.value)}
                     disabled={isSubmittingPasscode}
                     placeholder="新しい家族パスコード（確認）"
-                    className="w-full rounded-lg border bg-background p-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full rounded-lg border bg-background p-3 pr-10 text-base md:text-[14px] focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                   <button
                     type="button"

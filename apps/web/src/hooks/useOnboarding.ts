@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { useLocation, useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -45,6 +45,7 @@ export function useOnboarding() {
   const { activeAccount } = useAccount();
   const { getMasterKey, requireUnlock } = usePasscode();
   const navigate = useNavigate();
+  const location = useLocation();
   const completeOnboardingMutation = useMutation(
     api.onboarding.completeOnboarding,
   );
@@ -62,30 +63,36 @@ export function useOnboarding() {
 
   // オンボーディング未完了かどうか
   const needsOnboarding = useMemo(() => {
+    // ローカルで完了済みの場合はキャッシュ更新待ちに関わらず未完了と判定しない
+    if (phase === "completed") return false;
     if (!activeAccount) return false;
     // 家族未所属 → オンボーディングの対象外（家族作成後に初めて発動）
     if (!activeAccount.familyId) return false;
     const version = activeAccount.onboardingVersion ?? 0;
     return version < ONBOARDING_CURRENT_VERSION;
-  }, [activeAccount]);
+  }, [activeAccount, phase]);
 
   /**
-   * URLの `onboarding` クエリパラメータを型安全に除去する
+   * 現在の画面パスを維持したまま、URLの `onboarding` クエリパラメータを型安全に除去する
    */
   const clearOnboardingQuery = useCallback(() => {
     navigate({
-      to: "/dashboard",
-      search: (prev: Record<string, unknown>): DashboardSearchParams => {
+      to: location.pathname,
+      search: (prev: Record<string, unknown>) => {
         const next = { ...prev };
         delete next.onboarding;
-        return next as DashboardSearchParams;
+        return next;
       },
       replace: true,
     });
-  }, [navigate]);
+  }, [navigate, location.pathname]);
 
   // 完了処理の共通ヘルパー（DB更新 + authUser クエリの無効化 + クエリ削除）
-  const completeAndSync = useCallback(async () => {
+  const completeAndSync = useCallback(async (): Promise<boolean> => {
+    // レースコンディション防止のため、非同期通信前に直ちにローカル状態を完了にしてクエリを消去
+    setPhase("completed");
+    clearOnboardingQuery();
+
     try {
       await completeOnboardingMutation({
         accountId: activeAccount?._id,
@@ -93,10 +100,10 @@ export function useOnboarding() {
       });
       // ★重要: TanStack Query の authUser キャッシュを更新し、AccountProvider に最新の onboardingVersion を反映
       await queryClient.invalidateQueries({ queryKey: ["authUser"] });
-      setPhase("completed");
-      clearOnboardingQuery();
+      return true;
     } catch (_e) {
-      // 完了ステータスの更新失敗時は静かに無視
+      // 完了ステータスの更新失敗時は静かに false を返却（生エラーは露出させない）
+      return false;
     }
   }, [
     activeAccount?._id,
@@ -113,10 +120,10 @@ export function useOnboarding() {
    * モーダルを表示（初回ダッシュボード到達時に呼ばれる）
    */
   const showModal = useCallback(() => {
-    if (needsOnboarding) {
+    if (needsOnboarding && phase !== "completed") {
       setPhase("modal");
     }
-  }, [needsOnboarding]);
+  }, [needsOnboarding, phase]);
 
   /**
    * 「スキップして空のまま始める」
@@ -124,7 +131,10 @@ export function useOnboarding() {
   const skipOnboarding = useCallback(async () => {
     setIsLoading(true);
     try {
-      await completeAndSync();
+      const success = await completeAndSync();
+      if (!success) {
+        toast.error("オンボーディング完了の保存に失敗しました。");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -229,6 +239,7 @@ export function useOnboarding() {
         ...(prev as DashboardSearchParams),
         onboarding: "part2",
       }),
+      replace: true,
     });
   }, [navigate]);
 
@@ -236,8 +247,12 @@ export function useOnboarding() {
    * ダッシュボードツアー（後半）完了 → オンボーディング完了
    */
   const onDashboardTour2Complete = useCallback(async () => {
-    await completeAndSync();
-    toast.success("ツアーが完了しました！自由にお使いください。");
+    const success = await completeAndSync();
+    if (success) {
+      toast.success("ツアーが完了しました！自由にお使いください。");
+    } else {
+      toast.error("ツアー完了の保存に失敗しました。");
+    }
   }, [completeAndSync]);
 
   /**
@@ -296,9 +311,13 @@ export function useOnboarding() {
         setPhase("manual-tour");
         return true;
       }
-      // サンプルツアー関連のクエリは、オンボーディングが未完了の場合のみ許可
+      // オンボーディング完了済みの場合は、part1/part2/detail/modal の自動復元を行わずクエリ削除を促す
       if (!needsOnboarding) {
         return false;
+      }
+      if (queryParam === "modal") {
+        setPhase("modal");
+        return true;
       }
       if (queryParam === "detail") {
         setPhase("detail-tour");
@@ -306,6 +325,10 @@ export function useOnboarding() {
       }
       if (queryParam === "part2") {
         setPhase("dashboard-tour-2");
+        return true;
+      }
+      if (queryParam === "part1") {
+        setPhase("dashboard-tour-1");
         return true;
       }
       return false;
