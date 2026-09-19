@@ -2,6 +2,7 @@ import { httpRouter } from "convex/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { httpAction } from "./_generated/server";
+import { timingSafeEqual } from "./cryptoUtils";
 
 const http = httpRouter();
 
@@ -11,7 +12,12 @@ http.route({
   handler: httpAction(async (ctx, request) => {
     // Convex側のenv var(npx convex env set / ダッシュボード)。
     const secret = request.headers.get("x-internal-secret");
-    if (!secret || secret !== process.env.CONVEX_INTERNAL_SECRET) {
+    const internalSecret = process.env.CONVEX_INTERNAL_SECRET;
+    if (
+      !secret ||
+      !internalSecret ||
+      !timingSafeEqual(secret, internalSecret)
+    ) {
       return new Response("Unauthorized", { status: 401 });
     }
     let body: { userId: string; accountId?: Id<"users"> } | null = null;

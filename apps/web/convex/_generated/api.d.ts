@@ -17,6 +17,7 @@ import type * as actions from "../actions.js";
 import type * as auditLogs from "../auditLogs.js";
 import type * as contacts from "../contacts.js";
 import type * as crons from "../crons.js";
+import type * as cryptoUtils from "../cryptoUtils.js";
 import type * as customBuilders from "../customBuilders.js";
 import type * as families from "../families.js";
 import type * as http from "../http.js";
@@ -32,6 +33,7 @@ declare const fullApi: ApiFromModules<{
   auditLogs: typeof auditLogs;
   contacts: typeof contacts;
   crons: typeof crons;
+  cryptoUtils: typeof cryptoUtils;
   customBuilders: typeof customBuilders;
   families: typeof families;
   http: typeof http;

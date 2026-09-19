@@ -19,6 +19,7 @@
     "convex:codegen": "convex codegen",
     "test:browser": "vitest run --project=browser-e2ee",
     "build:e2e-bridge": "tsx scripts/build-e2e-bridge.ts",
+    "verify:bundle": "tsx scripts/verify-bundle-safety.ts",
     "fonts:download": "tsx scripts/download-fonts.ts",
     "test:e2e": "pnpm build:e2e-bridge && playwright test",
     "test:e2e:show": "pnpm build:e2e-bridge && playwright test --headed",

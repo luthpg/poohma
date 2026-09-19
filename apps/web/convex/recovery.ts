@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { logAuditEvent } from "./auditLogs";
+import { timingSafeEqual } from "./cryptoUtils";
 import {
   authenticatedMutation,
   familyBoundMutation,
@@ -283,7 +284,7 @@ export const verifyRecoveryOtpAndGetRecoveryData = authenticatedMutation({
 
     const normalizedCode = normalizeRecoveryCode(args.recoveryCode);
     const inputCodeHash = await hashText(normalizedCode);
-    if (inputCodeHash !== family.recoveryCodeHash) {
+    if (!timingSafeEqual(inputCodeHash, family.recoveryCodeHash)) {
       return {
         success: false as const,
         error: "リカバリーコードが正しくありません。入力内容をご確認ください。",
@@ -324,7 +325,7 @@ export const verifyRecoveryOtpAndGetRecoveryData = authenticatedMutation({
     }
 
     const inputHash = await hashText(args.otpCode.trim());
-    if (inputHash !== otpRecord.codeHash) {
+    if (!timingSafeEqual(inputHash, otpRecord.codeHash)) {
       const newAttempts = otpRecord.attempts + 1;
       if (newAttempts >= OTP_MAX_ATTEMPTS) {
         await ctx.db.delete(otpRecord._id);
@@ -411,7 +412,10 @@ export const redeemRecoveryAndRotatePasscode = familyBoundMutation({
       )
       .first();
 
-    if (!sessionRecord || sessionRecord.sessionTokenHash !== tokenHash) {
+    if (
+      !sessionRecord ||
+      !timingSafeEqual(sessionRecord.sessionTokenHash, tokenHash)
+    ) {
       throw new Error(
         "無効な復元認可セッションです。最初からやり直してください。",
       );

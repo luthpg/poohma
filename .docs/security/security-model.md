@@ -49,7 +49,7 @@
 
 - Convex（DB・ビジネスロジック実行基盤）、Firebase（認証）、microCMS（コンテンツ）、Resend（メール送信）、Yahoo!テキスト解析API（ふりがな取得）、Cloudflare Workers/R2（バックアップ）を、可用性・運用インフラとして信頼している。
 - ただしこれらのサービスに対しても、パスワードヒント平文・鍵材料そのものは送信しない設計とし、信頼の範囲を「暗号化済みデータとメタデータの保管・配送」に限定している。
-- サーバー内部のみで完結すべき通信（`getUserByFirebaseUid`）は、共有シークレット（`CONVEX_INTERNAL_SECRET`）をヘッダーで検証する内部専用エンドポイントとして分離している。
+- サーバー内部のみで完結すべき通信（`getUserByFirebaseUid`）は、共有シークレット（`CONVEX_INTERNAL_SECRET`）をヘッダーで検証する内部専用エンドポイントとして分離している。ヘッダーのシークレット照合には定数時間比較（`timingSafeEqual`）を適用し、タイミング攻撃（Timing Attack）によるシークレット推測を防止している。
 - CSP（Content Security Policy）は `apps/web/src/start.ts` のサーバーミドルウェアで全GETリクエストに適用済み（Issue #128、closed）。`default-src 'none'` を基本に、`script-src` はリクエストごとに発行されるnonceと `strict-dynamic` のみを許可し、`frame-ancestors 'none'` でクリックジャッキングを防止する。あわせて `X-Content-Type-Options: nosniff`、`Referrer-Policy: strict-origin-when-cross-origin`、カメラ・マイク・位置情報を無効化しWebAuthn関連APIのみ自オリジンで許可する `Permissions-Policy` も同時に設定される。環境変数 `CSP_MODE` により、強制モードとレポートのみモード（`Content-Security-Policy-Report-Only`）を切り替えられる。
 - XSS が成立しブラウザ内で任意コードが実行可能になった場合、展開済みのマスターキーや画面表示中の平文ヒントは保護できない（クライアント実行環境の健全性を前提とするため）。上記のCSPはこのリスクを軽減する主要な対策の一つだが、完全な防御を保証するものではない。
 - **Google Drive / Google Picker（オプトイン機能）**：リカバリーキットPDFの保存先としてユーザーが任意で選択できる。Firebase Authentication を通じて `drive.file` スコープ（アプリが作成したファイル・フォルダ、および Google Picker を通じてユーザーが明示的に開く、選択する、またはアプリと共有する既存の Drive アイテムにアクセス可能）の追加同意を取得し、マイドライブ直下、新規作成フォルダ（「PoohMa」）、または Google Picker で選択したフォルダ（マイドライブ/共有ドライブ）へクライアントから直接アップロードする。PoohMa のサーバーはこの通信を一切中継せず、ユーザーの既存 Drive 全体への広範なアクセス権は要求しない。この機能を利用しない場合、Google Drive との通信は一切発生しない。
@@ -58,9 +58,21 @@
 
 - パスコード忘却時の復元は、リカバリーコード（高エントロピーなランダム文字列、発行時に一度だけ提示・サーバー非保存）と、登録メールアドレスへの6桁ワンタイムパスワード（Email OTP）の2要素で構成される（Issue #134）。
 - OTP は平文で保存せず SHA-256 ハッシュのみ保持し、有効期限10分・最大試行5回・再送インターバル60秒を課す。
+- リカバリーコードのハッシュ照合（`family.recoveryCodeHash`）、OTPコードのハッシュ照合（`otpRecord.codeHash`）、および認可セッショントークンのハッシュ照合（`sessionRecord.sessionTokenHash`）の全比較処理において、定数時間比較（`timingSafeEqual`）を徹底し、サイドチャネル攻撃によるハッシュ値推測を防止している。
 - OTP 検証成功時に短命なワンタイム認可セッショントークン（`recoverySessions`）を発行し、新パスコードでのマスターキー再ラップを完了した時点でこのトークンを原子的に消費（削除）する。
 - リカバリーキットの発行・再発行・パスコード復元完了時は、家族メンバー全員へ通知メールを送信する。発行者・発行日時は `families.recoveryIssuedByAccountId` / `recoveryIssuedAt` に記録され、家族設定画面で他メンバーに開示される。
 - リカバリーキットPDFの保存方法はローカル保存・印刷・Google Drive（オプトイン）から選択できる。いずれの方法を選んでもPDFの生成・暗号化された値自体はクライアント側で完結しており、PoohMaのサーバーはPDFの内容を受け取らない。
+
+## Audit Logging & Data Lifecycle（監査ログとデータ保全）
+
+- 監査ログ（`auditLogs` テーブル）は完全な追記専用（Append-Only）であり、一般ユーザー・管理者向けのログ変更・削除 API は一切公開されていない。
+- アカウント一括退会処理（`deleteAllAccounts`）および個別削除（`deleteAccount`）のいずれにおいても、各アカウントレコードの物理削除直前に `ACCOUNT_DELETE` の監査ログ（操作者・表示名・解散/脱退家族ID等）が原子的に記録され、事後追跡証跡が欠落しない。
+- 監査ログは `apps/web/convex/crons.ts` の日次バッチ（`cleanupOldAuditLogsInternal`）により、180日間の保持ポリシーに基づいて管理される。
+- また、Cloudflare Workers によるバックアップ基盤（`workers/backup`）が Convex の全テーブルZIPスナップショットを日次で Cloudflare R2（`BACKUP_BUCKET`）に自動保管しており、主DBとは物理的・インフラ境界的に隔離されたイミュータブルな長期保全が行われる。
+
+## CI/CD & Production Build Guardrails
+
+- E2Eテスト用ブラウザブリッジ（`__e2eSignIn` や `firebase-browser-bridge` 等）はテスト環境専用であり、本番JSバンドルへの混入を防止するため、ビルド直後に CI 上で `scripts/verify-bundle-safety.ts`（`verify:bundle`）による静的走査アサーションを実行している。万一本番成果物内にテスト専用シンボルが検出された場合はビルドが即座に失敗する。
 
 ## Session
 

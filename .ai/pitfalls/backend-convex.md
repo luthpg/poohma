@@ -69,3 +69,14 @@ Convex バックエンド開発における落とし穴と回避法です。
 
 - **問題**: メンバーキック時に旧家族のマスターキー情報（`masterKeyEncrypted`, `masterKeyIv`, `masterKeySalt`）だけを退避し、`kdfIterations` や `cryptoVersion` を保存し忘れると、将来 KDF バージョン引き上げ等が行われた際に、被キックユーザーが旧パスコードを入力しても正しい反復回数で鍵導出できずアンラップに失敗する。
 - **回避法**: `pendingExportVaults` テーブルには必ず `kdfIterations` と `cryptoVersion` を含め、キック時点の `family.kdfIterations` / `family.cryptoVersion` をそのまま退避・保存する。
+
+---
+
+### Convex Mutation/Query における `node:crypto` の利用不可と `timingSafeEqual` の実装
+
+- **問題**:
+  - Convex の Action は `"use node;"` ディレクティブにより Node.js ランタイムを利用できるが、**Mutation および Query は Convex 独自の分離サンドボックス（V8ベース）でのみ実行可能**であり、Node.js 組み込みモジュール（`node:crypto`）をインポートできない。
+  - そのため、Mutation 内でシークレットやハッシュ値のタイミング攻撃対策（定数時間比較）を行う際、`crypto.timingSafeEqual` は使用できず、またブラウザ用の Web Crypto API にも同期的な定数時間比較 API は存在しない。
+- **回避法**:
+  - `apps/web/convex/cryptoUtils.ts` に純粋な TypeScript 実装（XOR およびビット演算による定数時間比較ヘルパー `timingSafeEqual`）を用意し、文字列の長さチェック後もループを全文字走査する実装にして早期リターンを防ぐ。
+
