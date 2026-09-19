@@ -71,13 +71,17 @@ export function OnboardingTour({
 
       if (cancelled) return;
 
+      const isDark =
+        typeof document !== "undefined" &&
+        document.documentElement.classList.contains("dark");
+
       isDestroyedRef.current = false;
       const driverObj = driver({
         showProgress: true,
         animate: true,
         allowClose,
         showButtons: ["next", "previous", "close"],
-        overlayColor: "rgba(0, 0, 0, 0.5)",
+        overlayColor: isDark ? "rgba(0, 0, 0, 0.85)" : "rgba(0, 0, 0, 0.65)",
         stagePadding: 8,
         stageRadius: 12,
         popoverClass: "poohma-tour-popover",
