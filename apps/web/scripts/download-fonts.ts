@@ -10,6 +10,10 @@ const FONT_DEST = path.resolve(FONTS_DIR, "NotoSansJP-Regular.ttf");
 const FONT_URL =
   "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf";
 
+/**
+ * Google Fonts 公式リポジトリから Noto Sans JP フォントを取得し、
+ * public/fonts/NotoSansJP-Regular.ttf に配置する
+ */
 async function downloadFont() {
   console.log("Noto Sans JP フォントのダウンロードを開始します...");
   console.log(`取得元 URL: ${FONT_URL}`);

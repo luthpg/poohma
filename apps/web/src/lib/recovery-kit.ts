@@ -131,27 +131,50 @@ export async function generateRecoveryKitPdf({
       fallbackText?: string;
       isBold?: boolean;
       color?: Color;
+      maxWidth?: number;
     },
   ) => {
-    if (jpFont) {
-      page.drawText(text, {
-        x: options.x,
-        y: options.y,
-        size: options.size,
-        font: jpFont,
-        color: options.color ?? rgb(0.1, 0.1, 0.15),
-      });
-    } else {
-      const font = options.isBold ? fontBold : fontRegular;
-      const safeText = sanitizeWinAnsiText(text, options.fallbackText ?? text);
-      page.drawText(safeText, {
-        x: options.x,
-        y: options.y,
-        size: options.size,
-        font,
-        color: options.color ?? rgb(0.1, 0.1, 0.15),
-      });
+    let font = jpFont;
+    let renderText = text;
+    if (!font) {
+      font = options.isBold ? fontBold : fontRegular;
+      renderText = sanitizeWinAnsiText(text, options.fallbackText ?? text);
     }
+
+    let fontSize = options.size;
+    if (options.maxWidth && options.maxWidth > 0) {
+      try {
+        const textWidth = font.widthOfTextAtSize(renderText, fontSize);
+        if (textWidth > options.maxWidth) {
+          // まずフォントサイズを縮小して収まるか試行（下限 7pt）
+          const scaledSize = fontSize * (options.maxWidth / textWidth);
+          if (scaledSize >= 7) {
+            fontSize = Math.floor(scaledSize * 10) / 10;
+          } else {
+            // 7pt でも収まらない極端に長い文字列は末尾を "..." に切り詰め
+            fontSize = 7;
+            while (
+              renderText.length > 3 &&
+              font.widthOfTextAtSize(`${renderText}...`, fontSize) >
+                options.maxWidth
+            ) {
+              renderText = renderText.slice(0, -1);
+            }
+            renderText = `${renderText}...`;
+          }
+        }
+      } catch {
+        // フォントの widthOfTextAtSize で万一例外が出ても元のサイズで描画を続行
+      }
+    }
+
+    page.drawText(renderText, {
+      x: options.x,
+      y: options.y,
+      size: fontSize,
+      font,
+      color: options.color ?? rgb(0.1, 0.1, 0.15),
+    });
   };
 
   // 背景装飾（ヘッダー帯）
@@ -192,6 +215,9 @@ export async function generateRecoveryKitPdf({
     borderWidth: 1,
   });
 
+  // メタデータボックス内の最大許容テキスト幅（右端余白 15pt を考慮）
+  const maxMetaValueWidth = width - 50 - 15 - 170; // 約 360pt
+
   drawJpText("対象家族名:", {
     x: 70,
     y: height - 145,
@@ -207,6 +233,7 @@ export async function generateRecoveryKitPdf({
     isBold: true,
     color: rgb(0.1, 0.1, 0.15),
     fallbackText: "Family",
+    maxWidth: maxMetaValueWidth,
   });
 
   drawJpText("発行日時:", {
@@ -223,6 +250,7 @@ export async function generateRecoveryKitPdf({
     size: 10,
     color: rgb(0.2, 0.2, 0.2),
     fallbackText: formattedDate,
+    maxWidth: maxMetaValueWidth,
   });
 
   drawJpText("発行者:", {
@@ -239,6 +267,7 @@ export async function generateRecoveryKitPdf({
     size: 10,
     color: rgb(0.2, 0.2, 0.2),
     fallbackText: "Family Admin",
+    maxWidth: maxMetaValueWidth,
   });
 
   // リカバリーコードセクション

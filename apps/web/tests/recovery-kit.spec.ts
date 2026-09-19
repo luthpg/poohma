@@ -60,4 +60,19 @@ describe("1.5 リカバリーキット PDF生成・読み取りテスト (src/li
     expect(loadedDoc.getAuthor()).toBe("PoohMa");
     expect(loadedDoc.getSubject()).toBe(recoveryCode);
   });
+
+  it("非常に長い家族名や発行者名が指定されてもテキスト幅制限によりPDFが正常に生成されること", async () => {
+    const recoveryCode = generateRecoveryCode();
+    const pdfBytes = await generateRecoveryKitPdf({
+      familyName:
+        "超長大名誉ある伝統と格式の由緒正しきワールドワイド最高峰ファミリーグループ株式会社東京都渋谷区神南オフィス代表取締役一族",
+      issuedAt: Date.now(),
+      issuerName:
+        "very-extremely-long-admin-issuer-account-name-with-many-subdomains@corporation-headquarters.enterprise.example.co.jp",
+      recoveryCode,
+    });
+
+    expect(pdfBytes).toBeInstanceOf(Uint8Array);
+    expect(pdfBytes.length).toBeGreaterThan(1000);
+  });
 });
