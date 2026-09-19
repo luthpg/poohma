@@ -286,19 +286,44 @@ export const deleteAllAccounts = identityVerifiedMutation({
       const email = account.email;
       const displayName = account.displayName || "ユーザー";
 
-      // 1. 家族に関する処理
+      // 1. 家族に関するメンバー数を特定
+      let otherMembersCount = 0;
       if (account.familyId) {
         const familyId = account.familyId;
-        // 同じ家族のメンバーをカウント
         const familyMembers = await ctx.db
           .query("users")
           .withIndex("by_familyId", (q) => q.eq("familyId", familyId))
           .collect();
+        otherMembersCount = familyMembers.filter(
+          (u) => u._id !== account._id,
+        ).length;
+      }
 
-        const otherMembers = familyMembers.filter((u) => u._id !== account._id);
+      // 2. アカウント完全削除の監査ログを記録（問い合わせ対応・法的証跡用）
+      let detail = `アカウント削除（一括退会）: ${displayName}`;
+      if (account.familyId) {
+        detail +=
+          otherMembersCount === 0
+            ? ` (家族も同時解散: ${account.familyId})`
+            : ` (家族脱退: ${account.familyId})`;
+      }
 
+      await logAuditEvent(ctx, {
+        actor: account,
+        ownerType: "user",
+        ownerFamilyId: account.familyId,
+        targetAccountId: account._id,
+        action: "ACCOUNT_DELETE",
+        metadata: {
+          detail,
+        },
+      });
+
+      // 3. 家族に関する処理
+      if (account.familyId) {
+        const familyId = account.familyId;
         // 他のメンバーがいない場合は家族およびそのレコードも削除
-        if (otherMembers.length === 0) {
+        if (otherMembersCount === 0) {
           const familyRecords = await ctx.db
             .query("serviceRecords")
             .withIndex("by_family_sortKey", (q) => q.eq("familyId", familyId))

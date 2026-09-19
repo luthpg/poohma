@@ -770,6 +770,18 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
         expect(await ctx.db.get(sharedRecId)).not.toBeNull();
         expect(await ctx.db.get(otherAcc)).not.toBeNull();
         expect(await ctx.db.get(sharedFamilyId)).not.toBeNull();
+
+        // 監査ログに ACCOUNT_DELETE が各アカウント分記録されていること
+        const auditLogs = await ctx.db
+          .query("auditLogs")
+          .withIndex("by_userId_createdAt", (q) =>
+            q.eq("userId", "delete_all_multi_user"),
+          )
+          .collect();
+        const deleteLogs = auditLogs.filter(
+          (l) => l.action === "ACCOUNT_DELETE",
+        );
+        expect(deleteLogs).toHaveLength(2);
       });
     });
   });
