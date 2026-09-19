@@ -21,13 +21,34 @@
   max-width: min(440px, calc(100vw - 32px));
 }
 
+/* Driver.js オーバーレイ（黒掛け）の配色調整 */
+.driver-overlay path {
+  fill: rgba(0, 0, 0, 0.65);
+  transition: fill 0.2s ease;
+}
+
+.dark .driver-overlay path,
+html.dark .driver-overlay path {
+  fill: rgba(0, 0, 0, 0.85);
+}
+
+/* ダークモード時のスポットライト強調箇所（アクティブ要素）の視認性向上 */
+.dark .driver-active-element {
+  outline: 2px solid rgba(249, 115, 22, 0.9); /* PoohMa オレンジ */
+  outline-offset: 4px;
+  box-shadow:
+    0 0 0 4px rgba(249, 115, 22, 0.2),
+    0 0 24px rgba(249, 115, 22, 0.35);
+}
+
 .dark .driver-popover.poohma-tour-popover {
   background-color: #18181b;
   color: #f4f4f5;
-  border-color: #27272a;
+  border: 1px solid rgba(255, 255, 255, 0.16);
   box-shadow:
-    0 10px 30px -5px rgba(0, 0, 0, 0.5),
-    0 8px 15px -6px rgba(0, 0, 0, 0.4);
+    0 20px 40px -10px rgba(0, 0, 0, 0.8),
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 8px 20px -6px rgba(0, 0, 0, 0.6);
 }
 
 .driver-popover.poohma-tour-popover .driver-popover-title {
