@@ -78,5 +78,6 @@ Convex バックエンド開発における落とし穴と回避法です。
   - Convex の Action は `"use node;"` ディレクティブにより Node.js ランタイムを利用できるが、**Mutation および Query は Convex 独自の分離サンドボックス（V8ベース）でのみ実行可能**であり、Node.js 組み込みモジュール（`node:crypto`）をインポートできない。
   - そのため、Mutation 内でシークレットやハッシュ値のタイミング攻撃対策（定数時間比較）を行う際、`crypto.timingSafeEqual` は使用できず、またブラウザ用の Web Crypto API にも同期的な定数時間比較 API は存在しない。
 - **回避法**:
-  - `apps/web/convex/cryptoUtils.ts` に純粋な TypeScript 実装（XOR およびビット演算による定数時間比較ヘルパー `timingSafeEqual`）を用意し、文字列の長さチェック後もループを全文字走査する実装にして早期リターンを防ぐ。
+  - `apps/web/convex/cryptoUtils.ts` に純粋な TypeScript 実装（XOR およびビット演算による定数時間比較ヘルパー `timingSafeEqual`）を用意する。
+  - ループ回数を `Math.max(a.length, b.length)` のように入力や秘密値の長さに依存させると、外部から長さを変えて送信された際に時間差変曲点から秘密値長が推測されるリスク（CWE-208）や巨大入力による CPU 枯渇 DoS（CWE-400）が生じるため、**走査ステップ数を固定上限（`FIXED_COMPARE_LENGTH = 256`）に完全固定**し、長さ不一致ビットを蓄積して比較する。
 

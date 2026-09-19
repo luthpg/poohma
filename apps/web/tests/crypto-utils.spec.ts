@@ -49,4 +49,18 @@ describe("timingSafeEqual", () => {
     // @ts-expect-error テスト用不正入力
     expect(timingSafeEqual(123, 123)).toBe(false);
   });
+
+  it("256文字ちょうどの文字列が正しく比較されること", () => {
+    const str256 = "a".repeat(256);
+    expect(timingSafeEqual(str256, str256)).toBe(true);
+    expect(timingSafeEqual(str256, `${"a".repeat(255)}b`)).toBe(false);
+  });
+
+  it("256文字を超える入力（巨大ペイロード・上限超過）で安全に false を返すこと", () => {
+    const str300 = "x".repeat(300);
+    // 256文字を超える場合は同一であっても安全のため false（上限保護）
+    expect(timingSafeEqual(str300, str300)).toBe(false);
+    expect(timingSafeEqual(str300, "x".repeat(256))).toBe(false);
+    expect(timingSafeEqual("secret", "s".repeat(1000))).toBe(false);
+  });
 });
