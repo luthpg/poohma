@@ -1,5 +1,11 @@
+import {
+  type Color,
+  PDFDocument,
+  type PDFFont,
+  rgb,
+  StandardFonts,
+} from "@cantoo/pdf-lib";
 import jsQR from "jsqr";
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import QRCode from "qrcode";
 import { isValidRecoveryCode, normalizeRecoveryCode } from "./crypto";
 
@@ -8,6 +14,45 @@ export interface RecoveryKitPdfParams {
   issuedAt: number;
   issuerName: string;
   recoveryCode: string;
+}
+
+let cachedFontBytes: ArrayBuffer | null = null;
+
+/**
+ * Noto Sans JP フォント（TTF）を動的にロードしてキャッシュ
+ * ブラウザ環境では fetch、Node.js 環境（Vitest等）では fs から取得
+ */
+export async function loadNotoSansJpFont(): Promise<ArrayBuffer | null> {
+  if (cachedFontBytes) {
+    return cachedFontBytes;
+  }
+
+  try {
+    if (typeof window !== "undefined" && typeof fetch !== "undefined") {
+      const res = await fetch("/fonts/NotoSansJP-Regular.ttf");
+      if (!res.ok) return null;
+      cachedFontBytes = await res.arrayBuffer();
+      return cachedFontBytes;
+    }
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const fontPath = path.resolve(
+      process.cwd(),
+      "public/fonts/NotoSansJP-Regular.ttf",
+    );
+    if (fs.existsSync(fontPath)) {
+      const buffer = await fs.promises.readFile(fontPath);
+      cachedFontBytes = buffer.buffer.slice(
+        buffer.byteOffset,
+        buffer.byteOffset + buffer.byteLength,
+      ) as ArrayBuffer;
+      return cachedFontBytes;
+    }
+  } catch {
+    // フォント読み込み失敗時はフォールバックへ
+  }
+
+  return null;
 }
 
 /**
@@ -35,8 +80,23 @@ export async function generateRecoveryKitPdf({
 }: RecoveryKitPdfParams): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
 
+  // 日本語フォント（Noto Sans JP）のロードと fontkit の動的登録
+  let jpFont: PDFFont | null = null;
+  try {
+    const fontBytes = await loadNotoSansJpFont();
+    if (fontBytes) {
+      const fontkit = await import("@cantoo/fontkit").then(
+        (m) => m.default || m,
+      );
+      pdfDoc.registerFontkit(fontkit);
+      jpFont = await pdfDoc.embedFont(fontBytes, { subset: true });
+    }
+  } catch {
+    // フォント埋め込み失敗時は標準フォントで安全にフォールバック
+  }
+
   // PDF メタデータの設定（ファイル直接アップロード時の安全・確実な復元用）
-  pdfDoc.setTitle("PoohMa - Emergency Recovery Kit");
+  pdfDoc.setTitle("PoohMa - 非常用リカバリーキット");
   pdfDoc.setAuthor("PoohMa");
   pdfDoc.setSubject(recoveryCode);
   pdfDoc.setKeywords([recoveryCode, "PoohMa", "RecoveryKit", "E2EE"]);
@@ -49,7 +109,73 @@ export async function generateRecoveryKitPdf({
   const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontMono = await pdfDoc.embedFont(StandardFonts.CourierBold);
 
-  const formattedDate = `${new Date(issuedAt).toISOString().replace("T", " ").slice(0, 19)} UTC`;
+  // 日本時間（JST）表記の日時文字列
+  const formattedDate = `${new Date(issuedAt).toLocaleString("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  })} JST`;
+
+  // テキスト描画ヘルパー（日本語フォント利用可能時は jpFont、不可時は WinAnsi サニタイズ）
+  const drawJpText = (
+    text: string,
+    options: {
+      x: number;
+      y: number;
+      size: number;
+      fallbackText?: string;
+      isBold?: boolean;
+      color?: Color;
+      maxWidth?: number;
+    },
+  ) => {
+    let font = jpFont;
+    let renderText = text;
+    if (!font) {
+      font = options.isBold ? fontBold : fontRegular;
+      renderText = sanitizeWinAnsiText(text, options.fallbackText ?? text);
+    }
+
+    let fontSize = options.size;
+    if (options.maxWidth && options.maxWidth > 0) {
+      try {
+        const textWidth = font.widthOfTextAtSize(renderText, fontSize);
+        if (textWidth > options.maxWidth) {
+          // まずフォントサイズを縮小して収まるか試行（下限 7pt）
+          const scaledSize = fontSize * (options.maxWidth / textWidth);
+          if (scaledSize >= 7) {
+            fontSize = Math.floor(scaledSize * 10) / 10;
+          } else {
+            // 7pt でも収まらない極端に長い文字列は末尾を "..." に切り詰め
+            fontSize = 7;
+            while (
+              renderText.length > 3 &&
+              font.widthOfTextAtSize(`${renderText}...`, fontSize) >
+                options.maxWidth
+            ) {
+              renderText = renderText.slice(0, -1);
+            }
+            renderText = `${renderText}...`;
+          }
+        }
+      } catch {
+        // フォントの widthOfTextAtSize で万一例外が出ても元のサイズで描画を続行
+      }
+    }
+
+    page.drawText(renderText, {
+      x: options.x,
+      y: options.y,
+      size: fontSize,
+      font,
+      color: options.color ?? rgb(0.1, 0.1, 0.15),
+    });
+  };
 
   // 背景装飾（ヘッダー帯）
   page.drawRectangle({
@@ -61,20 +187,21 @@ export async function generateRecoveryKitPdf({
   });
 
   // ヘッダータイトル
-  page.drawText("PoohMa - Emergency Recovery Kit", {
+  drawJpText("PoohMa - 非常用リカバリーキット", {
     x: 50,
     y: height - 60,
-    size: 22,
-    font: fontBold,
+    size: 20,
+    isBold: true,
     color: rgb(1, 1, 1),
+    fallbackText: "PoohMa - Emergency Recovery Kit",
   });
 
-  page.drawText("MasterKey Recovery & Account Rescue Document", {
+  drawJpText("マスターキー復元・緊急救出用ドキュメント", {
     x: 50,
     y: height - 80,
-    size: 11,
-    font: fontRegular,
+    size: 10.5,
     color: rgb(0.8, 0.85, 0.9),
+    fallbackText: "MasterKey Recovery & Account Rescue Document",
   });
 
   // メタデータボックス
@@ -88,58 +215,69 @@ export async function generateRecoveryKitPdf({
     borderWidth: 1,
   });
 
-  page.drawText("Family Target:", {
+  // メタデータボックス内の最大許容テキスト幅（右端余白 15pt を考慮）
+  const maxMetaValueWidth = width - 50 - 15 - 170; // 約 360pt
+
+  drawJpText("対象家族名:", {
     x: 70,
     y: height - 145,
     size: 10,
-    font: fontBold,
+    isBold: true,
     color: rgb(0.3, 0.35, 0.4),
+    fallbackText: "Family Target:",
   });
-  page.drawText(sanitizeWinAnsiText(familyName, "Family"), {
+  drawJpText(familyName, {
     x: 170,
     y: height - 145,
     size: 11,
-    font: fontBold,
+    isBold: true,
     color: rgb(0.1, 0.1, 0.15),
+    fallbackText: "Family",
+    maxWidth: maxMetaValueWidth,
   });
 
-  page.drawText("Issued At:", {
+  drawJpText("発行日時:", {
     x: 70,
     y: height - 165,
     size: 10,
-    font: fontBold,
+    isBold: true,
     color: rgb(0.3, 0.35, 0.4),
+    fallbackText: "Issued At:",
   });
-  page.drawText(formattedDate, {
+  drawJpText(formattedDate, {
     x: 170,
     y: height - 165,
     size: 10,
-    font: fontRegular,
     color: rgb(0.2, 0.2, 0.2),
+    fallbackText: formattedDate,
+    maxWidth: maxMetaValueWidth,
   });
 
-  page.drawText("Issued By:", {
+  drawJpText("発行者:", {
     x: 70,
     y: height - 185,
     size: 10,
-    font: fontBold,
+    isBold: true,
     color: rgb(0.3, 0.35, 0.4),
+    fallbackText: "Issued By:",
   });
-  page.drawText(sanitizeWinAnsiText(issuerName, "Family Admin"), {
+  drawJpText(issuerName, {
     x: 170,
     y: height - 185,
     size: 10,
-    font: fontRegular,
     color: rgb(0.2, 0.2, 0.2),
+    fallbackText: "Family Admin",
+    maxWidth: maxMetaValueWidth,
   });
 
   // リカバリーコードセクション
-  page.drawText("YOUR RECOVERY CODE (KEEP SECRET)", {
+  drawJpText("復元コード（Recovery Code）※厳重に保管してください", {
     x: 50,
     y: height - 240,
-    size: 12,
-    font: fontBold,
+    size: 11,
+    isBold: true,
     color: rgb(0.8, 0.2, 0.2),
+    fallbackText: "YOUR RECOVERY CODE (KEEP SECRET)",
   });
 
   page.drawRectangle({
@@ -205,29 +343,30 @@ export async function generateRecoveryKitPdf({
   });
 
   // 手順と注意事項
-  page.drawText("How to Recover Your MasterKey", {
+  drawJpText("マスターキーの復元手順", {
     x: 50,
     y: height - 410,
-    size: 13,
-    font: fontBold,
+    size: 12.5,
+    isBold: true,
     color: rgb(0.12, 0.15, 0.2),
+    fallbackText: "How to Recover Your MasterKey",
   });
 
   const instructions = [
-    "1. Access the PoohMa application and click 'Forgot Family Passcode' on the lock screen.",
-    "2. Enter the 32-character Recovery Code above or upload this PDF document.",
-    "3. Check your registered email address and enter the 6-digit Two-Factor Verification Code (OTP).",
-    "4. Set a new Family Passcode to restore full access to your encrypted vault.",
+    "1. PoohMa のロック画面を開き、「家族パスコードをお忘れの場合」をクリックします。",
+    "2. 上記の 32 文字の復元コードを入力するか、この PDF ファイルを直接読み込みます。",
+    "3. 登録メールアドレスに送信される 6 桁の 2 段階認証コード（OTP）を入力します。",
+    "4. 新しい家族パスコードを設定し、暗号化保管庫へのアクセスを復旧します。",
   ];
 
   let curY = height - 435;
   for (const inst of instructions) {
-    page.drawText(inst, {
+    drawJpText(inst, {
       x: 50,
       y: curY,
-      size: 9.5,
-      font: fontRegular,
+      size: 9,
       color: rgb(0.2, 0.25, 0.3),
+      fallbackText: inst,
     });
     curY -= 20;
   }
@@ -244,28 +383,29 @@ export async function generateRecoveryKitPdf({
     borderWidth: 1,
   });
 
-  page.drawText("CRITICAL SECURITY NOTICE", {
+  drawJpText("重要・セキュリティに関する注意事項", {
     x: 70,
     y: curY - 25,
-    size: 10.5,
-    font: fontBold,
+    size: 10,
+    isBold: true,
     color: rgb(0.75, 0.25, 0.1),
+    fallbackText: "CRITICAL SECURITY NOTICE",
   });
 
   const notices = [
-    "- This document is the ONLY way to recover your vault if you forget your Family Passcode.",
-    "- PoohMa uses Zero-Knowledge encryption. Customer Support CANNOT recover your data.",
-    "- Store this document in a safe physical location or an encrypted cloud drive.",
+    "・本ドキュメントは、家族パスコードを忘れた場合にデータを復旧できる唯一の手段です。",
+    "・PoohMa はゼロ知識暗号化を採用しているため、運営やサポートでも復旧できません。",
+    "・紙に印刷して金庫等に物理保管するか、暗号化された安全なストレージに保管してください。",
   ];
 
   let noticeY = curY - 45;
   for (const notice of notices) {
-    page.drawText(notice, {
+    drawJpText(notice, {
       x: 70,
       y: noticeY,
       size: 8.5,
-      font: fontRegular,
       color: rgb(0.4, 0.2, 0.15),
+      fallbackText: notice,
     });
     noticeY -= 16;
   }
@@ -278,20 +418,20 @@ export async function generateRecoveryKitPdf({
     color: rgb(0.8, 0.8, 0.8),
   });
 
-  page.drawText("PoohMa - End-to-End Encrypted Family Password Vault", {
+  drawJpText("PoohMa - 家族向けアカウント共有管理アプリ", {
     x: 50,
     y: 35,
     size: 8,
-    font: fontRegular,
     color: rgb(0.5, 0.5, 0.5),
+    fallbackText: "PoohMa - End-to-End Encrypted Family Password Vault",
   });
 
-  page.drawText(`Page 1 of 1`, {
+  drawJpText("1 / 1 ページ", {
     x: width - 95,
     y: 35,
     size: 8,
-    font: fontRegular,
     color: rgb(0.5, 0.5, 0.5),
+    fallbackText: "Page 1 of 1",
   });
 
   return await pdfDoc.save();

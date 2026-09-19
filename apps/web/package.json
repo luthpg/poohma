@@ -19,11 +19,14 @@
     "convex:codegen": "convex codegen",
     "test:browser": "vitest run --project=browser-e2ee",
     "build:e2e-bridge": "tsx scripts/build-e2e-bridge.ts",
+    "fonts:download": "tsx scripts/download-fonts.ts",
     "test:e2e": "pnpm build:e2e-bridge && playwright test",
     "test:e2e:show": "pnpm build:e2e-bridge && playwright test --headed",
     "test:e2e:ui": "pnpm build:e2e-bridge && playwright test --ui"
   },
   "dependencies": {
+    "@cantoo/fontkit": "^2.0.12",
+    "@cantoo/pdf-lib": "^2.11.1",
     "@convex-dev/rate-limiter": "^0.3.2",
     "@fontsource/geist-mono": "^5.3.0",
     "@fontsource/geist-sans": "^5.3.0",
@@ -68,7 +71,6 @@
     "next-themes": "^0.4.6",
     "nitro": "npm:nitro-nightly@3.0.1-20260731-205209-52abde8a",
     "papaparse": "^5.7.0",
-    "pdf-lib": "^1.17.1",
     "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",
     "radix-ui": "^1.6.7",

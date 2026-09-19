@@ -172,6 +172,8 @@ flowchart TD
 | E2EE-15 | credential 間で DEK を再利用しない | 単体 | P0 | ✅ 実装済 | `tests/crypto.spec.ts` |
 | E2EE-16, 17 | 平文ヒントをサーバーへ送らない・DBは暗号文のみ | 統合 | P0 | ✅ 実装済 | `tests/convex-records.spec.ts` |
 | E2EE-18 | E2EE 実暗号化・復号ラウンドトリップ | E2E | P0 | ✅ 実装済 | `e2e/e2ee-seed-import.spec.ts` |
+| REC-KIT-01〜04 | リカバリーキット PDF生成（日本語・フォント遅延ロード・長文枠外防止）・QRコード画像読み取り | 単体 | P0 | ✅ 実装済 | `tests/recovery-kit.spec.ts` |
+| REC-KIT-05〜12 | リカバリーコード発行・再発行無効化・2段階復元 (Redeem) | 統合 | P0 | ✅ 実装済 | `tests/convex-recovery.spec.ts` |
 
 ### 4.5 Record CRUD & 検索・ソート
 

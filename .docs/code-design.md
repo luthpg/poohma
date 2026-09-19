@@ -88,7 +88,7 @@ Service Worker (Workbox等):
 | CSV処理          | papaparse                                                                                                                    |
 | QRコード          | qrcode.react                                                                                                                 |
 | PWA            | Web App Manifest、iOS standalone判定ロジック（自前実装）、Service Worker（Workbox等）＋IndexedDB（オフラインキャッシュ、FR-PWA-03）                         |
-| PDF生成          | クライアントサイドPDF生成ライブラリ（例: jsPDF等）＋qrcode.react（リカバリーキー印刷用、FR-CRYPT-06）                                                          |
+| PDF生成          | @cantoo/pdf-lib, @cantoo/fontkit（Noto Sans JP サブセット埋め込みによる日本語ベクターPDF生成）＋qrcode（リカバリーキット印刷用、FR-CRYPT-06）                   |
 | 暗号             | Web Crypto API（AES-GCM, PBKDF2）、WebAuthn（PRF拡張）                                                                              |
 | バリデーション        | zod, convex-helpers（customQuery/customMutation）                                                                              |
 | 監視             | Vercel Analytics, Vercel Speed Insights                                                                                      |
@@ -744,7 +744,7 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
      を生成し、画面上に表示する（サーバーには平文はもちろん、導出可能な形でも一切送信しない）
   2. リカバリーコードと新規ソルトから PBKDF2-SHA256（300,000回）でAES-GCM鍵（リカバリー導出鍵）を導出
   3. 展開済みのマスターキーをリカバリー導出鍵でwrap
-  4. リカバリーコードとQRコード、発行日時・対象家族名を記載したA4印刷・保管用PDF（pdf-libでクライアントサイド生成）を作成
+  4. リカバリーコードとQRコード、発行日時（JST表記）・対象家族名・発行者名を記載したA4印刷・保管用PDF（@cantoo/pdf-lib および @cantoo/fontkit を用い、Noto Sans JP をサブセット埋め込みしてクライアントサイドで完全日本語ベクターテキスト生成）を作成。ドキュメント全体（手順・警告・フッター）を日本語化し、PDFリーダーでの文字選択・コピー・検索に対応。長い家族名やメールアドレスに対しては maxWidth による動的フォントサイズ縮小および末尾省略（...）を適用し、メタデータ枠外へのはみ出しを防止
   5. PDF生成完了後、Mutation recovery.registerRecoveryKit を呼び出し、
      recoveryMasterKeyEncrypted / recoveryMasterKeyIv / recoveryMasterKeySalt を更新（旧情報は即時無効化）
   6. 家族メンバー全員へリカバリーキット発行・再発行通知メールを送信
