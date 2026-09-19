@@ -327,13 +327,20 @@ export function useRecordForm(
     [values, baselineValues, targetRecordId],
   );
 
+  interface PendingOgpRequest {
+    reqId: number;
+    url: string;
+    promise: Promise<{
+      title?: string;
+      image?: string;
+      description?: string;
+    } | null>;
+  }
+
   const furiganaReqIdRef = useRef(0);
   const furiganaPromiseRef = useRef<Promise<string | null> | null>(null);
-  const ogpPromiseRef = useRef<Promise<{
-    title?: string;
-    image?: string;
-    description?: string;
-  } | null> | null>(null);
+  const ogpReqIdRef = useRef(0);
+  const pendingOgpRef = useRef<PendingOgpRequest | null>(null);
 
   const getOgpInfo = useAction(api.actions.getOgpInfo);
   const getFurigana = useAction(api.actions.getFurigana);
@@ -343,7 +350,8 @@ export function useRecordForm(
   const reset = useCallback((next: Partial<RecordFormValues>) => {
     furiganaReqIdRef.current += 1;
     furiganaPromiseRef.current = null;
-    ogpPromiseRef.current = null;
+    ogpReqIdRef.current += 1;
+    pendingOgpRef.current = null;
     setIsFetchingFurigana(false);
     setIsFetchingOgp(false);
     const nextValues: RecordFormValues = {
@@ -369,6 +377,12 @@ export function useRecordForm(
     furiganaReqIdRef.current += 1;
     furiganaPromiseRef.current = null;
     setIsFetchingFurigana(false);
+  }, []);
+
+  const invalidateOgpRequest = useCallback(() => {
+    ogpReqIdRef.current += 1;
+    pendingOgpRef.current = null;
+    setIsFetchingOgp(false);
   }, []);
 
   // ---- ふりがな・OGP 取得 ---------------------------------------------
@@ -426,21 +440,47 @@ export function useRecordForm(
     return fetchFuriganaForTitle(values.title);
   }, [values.title, values.titleReading, fetchFuriganaForTitle]);
 
-  const setUrl = useCallback((url: string) => {
-    setValues((prev) => ({ ...prev, url }));
-  }, []);
+  const setUrl = useCallback(
+    (url: string) => {
+      invalidateOgpRequest();
+      setValues((prev) => {
+        if (prev.url === url) return prev;
+        return {
+          ...prev,
+          url,
+          ogpImage: "",
+          ogpDescription: "",
+        };
+      });
+    },
+    [invalidateOgpRequest],
+  );
 
   const handleUrlBlur = useCallback(() => {
-    if (!values.url) return Promise.resolve(null);
+    const targetUrl = values.url.trim();
+    if (!targetUrl) return Promise.resolve(null);
+
+    ogpReqIdRef.current += 1;
+    const currentReqId = ogpReqIdRef.current;
     setIsFetchingOgp(true);
 
     const promise = (async () => {
       try {
-        const ogp = await getOgpInfo({ url: values.url });
+        const ogp = await getOgpInfo({ url: targetUrl });
+        if (
+          currentReqId !== ogpReqIdRef.current ||
+          valuesRef.current.url.trim() !== targetUrl
+        ) {
+          return null;
+        }
+
         const shouldFetchFuriganaFor =
-          ogp.title && !values.title ? ogp.title : null;
+          ogp.title && !valuesRef.current.title ? ogp.title : null;
 
         setValues((prev) => {
+          if (prev.url.trim() !== targetUrl) {
+            return prev;
+          }
           const next = { ...prev };
           if (ogp.title && !prev.title) {
             next.title = ogp.title;
@@ -457,13 +497,19 @@ export function useRecordForm(
       } catch (_e) {
         return null;
       } finally {
-        setIsFetchingOgp(false);
+        if (currentReqId === ogpReqIdRef.current) {
+          setIsFetchingOgp(false);
+        }
       }
     })();
 
-    ogpPromiseRef.current = promise;
+    pendingOgpRef.current = {
+      reqId: currentReqId,
+      url: targetUrl,
+      promise,
+    };
     return promise;
-  }, [values.url, values.title, getOgpInfo, fetchFuriganaForTitle]);
+  }, [values.url, getOgpInfo, fetchFuriganaForTitle]);
 
   const setMemo = useCallback((memo: string) => {
     setValues((prev) => ({ ...prev, memo }));
@@ -530,8 +576,10 @@ export function useRecordForm(
         description?: string;
       } | null = null;
 
-      if (ogpPromiseRef.current) {
-        ogpResult = await ogpPromiseRef.current;
+      const currentUrl = values.url.trim();
+      const pendingOgp = pendingOgpRef.current;
+      if (pendingOgp && pendingOgp.url === currentUrl) {
+        ogpResult = await pendingOgp.promise;
       }
 
       const filteredCreds = values.credentials.filter(
@@ -582,10 +630,19 @@ export function useRecordForm(
           }),
         );
 
-      const resolvedTitle = values.title || ogpResult?.title || "";
-      const resolvedOgpImage = values.ogpImage || ogpResult?.image || undefined;
+      const isOgpApplicable =
+        Boolean(ogpResult) && pendingOgpRef.current?.url === currentUrl;
+
+      const resolvedTitle =
+        values.title || (isOgpApplicable ? ogpResult?.title : undefined) || "";
+      const resolvedOgpImage =
+        values.ogpImage ||
+        (isOgpApplicable ? ogpResult?.image : undefined) ||
+        undefined;
       const resolvedOgpDescription =
-        values.ogpDescription || ogpResult?.description || undefined;
+        values.ogpDescription ||
+        (isOgpApplicable ? ogpResult?.description : undefined) ||
+        undefined;
 
       return {
         title: resolvedTitle,
