@@ -49,6 +49,7 @@ export function useOnboarding() {
   const completeOnboardingMutation = useMutation(
     api.onboarding.completeOnboarding,
   );
+  const resetOnboardingMutation = useMutation(api.onboarding.resetOnboarding);
   const insertSampleRecordsMutation = useMutation(
     api.onboarding.insertSampleRecords,
   );
@@ -264,11 +265,30 @@ export function useOnboarding() {
   }, [clearOnboardingQuery]);
 
   /**
-   * ツアーを再開
+   * ツアーを再開（DBの完了フラグをリセットし、URLクエリを再セットして前半ツアーを開始）
    */
-  const restartTour = useCallback(() => {
+  const restartTour = useCallback(async () => {
+    try {
+      await resetOnboardingMutation({
+        accountId: activeAccount?._id,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["authUser"] });
+    } catch (_e) {
+      // 失敗時は静かに握る（CWE-209・生エラー非露出の不変条件遵守）
+    }
+
+    navigate({
+      to: "/dashboard",
+      search: (prev: Record<string, unknown>): DashboardSearchParams => ({
+        view: (prev as DashboardSearchParams).view,
+        sort: (prev as DashboardSearchParams).sort,
+        onboarding: "part1",
+      }),
+      replace: true,
+    });
+
     setPhase("dashboard-tour-1");
-  }, []);
+  }, [resetOnboardingMutation, activeAccount?._id, queryClient, navigate]);
 
   /**
    * サンプルデータを一括削除

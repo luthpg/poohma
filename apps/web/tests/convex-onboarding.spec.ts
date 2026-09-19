@@ -53,6 +53,31 @@ describe("オンボーディング Convexバックエンドテスト", () => {
     expect(userAfter3?.onboardingVersion).toBe(2);
   });
 
+  it("resetOnboarding: ツアー再開時に onboardingVersion が 0 にリセットされること", async () => {
+    const t = convexTest(schema, modules);
+
+    let userId!: Id<"users">;
+    await t.run(async (ctx) => {
+      userId = await ctx.db.insert("users", {
+        familyRole: "admin",
+        userId: "user_test_reset",
+        email: "user_reset@example.com",
+        onboardingVersion: 1,
+        updatedAt: Date.now(),
+      });
+    });
+
+    const asUser = t.withIdentity({ subject: "user_test_reset" });
+
+    // リセット実行
+    const res = await asUser.mutation(api.onboarding.resetOnboarding, {});
+    expect(res.success).toBe(true);
+    expect(res.onboardingVersion).toBe(0);
+
+    const userAfter = await t.run(async (ctx) => ctx.db.get(userId));
+    expect(userAfter?.onboardingVersion).toBe(0);
+  });
+
   it("insertSampleRecords & purgeSampleData: サンプルレコードが投入され、isSampleのみ一括削除されること", async () => {
     const t = convexTest(schema, modules);
 

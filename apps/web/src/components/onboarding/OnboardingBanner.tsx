@@ -1,9 +1,10 @@
 import { RotateCcw, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { Spinner } from "@/components/ui/spinner";
 
 interface OnboardingBannerProps {
   isPurging: boolean;
-  onRestartTour: () => void;
+  onRestartTour: () => void | Promise<void>;
   onPurge: () => void;
 }
 
@@ -12,6 +13,17 @@ export function OnboardingBanner({
   onRestartTour,
   onPurge,
 }: OnboardingBannerProps) {
+  const [isRestarting, setIsRestarting] = useState(false);
+
+  const handleRestart = async () => {
+    setIsRestarting(true);
+    try {
+      await onRestartTour();
+    } finally {
+      setIsRestarting(false);
+    }
+  };
+
   return (
     <div
       data-tour="sample-banner"
@@ -32,12 +44,21 @@ export function OnboardingBanner({
       <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
         <button
           type="button"
-          onClick={onRestartTour}
-          disabled={isPurging}
+          onClick={handleRestart}
+          disabled={isPurging || isRestarting}
           className="rounded-lg border border-border/60 bg-card hover:bg-accent px-3 py-1.5 text-xs font-medium text-foreground flex items-center gap-1.5 transition disabled:opacity-50 cursor-pointer shadow-sm"
         >
-          <RotateCcw className="h-3.5 w-3.5 text-muted-foreground" />
-          <span>ツアーを再開</span>
+          {isRestarting ? (
+            <>
+              <Spinner className="h-3.5 w-3.5" />
+              <span>再開中...</span>
+            </>
+          ) : (
+            <>
+              <RotateCcw className="h-3.5 w-3.5 text-muted-foreground" />
+              <span>ツアーを再開</span>
+            </>
+          )}
         </button>
         <button
           type="button"

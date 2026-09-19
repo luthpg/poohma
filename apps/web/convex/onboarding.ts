@@ -32,6 +32,28 @@ export const completeOnboarding = authenticatedMutation({
 });
 
 /**
+ * オンボーディング完了状態をリセット（ツアー再開用）
+ * ユーザーの onboardingVersion を 0 に戻す
+ */
+export const resetOnboarding = authenticatedMutation({
+  args: {
+    accountId: v.optional(v.id("users")),
+  },
+  handler: async (ctx) => {
+    const { user } = ctx;
+    await ctx.db.patch(user._id, {
+      onboardingVersion: 0,
+      updatedAt: Date.now(),
+    });
+
+    return {
+      success: true,
+      onboardingVersion: 0,
+    };
+  },
+});
+
+/**
  * クライアント側で暗号化されたサンプルレコードを一括投入
  */
 export const insertSampleRecords = familyBoundMutation({
