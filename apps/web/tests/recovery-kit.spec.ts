@@ -43,4 +43,21 @@ describe("1.5 リカバリーキット PDF生成・読み取りテスト (src/li
     const extracted = await extractRecoveryCodeFromFile(pdfFile);
     expect(extracted).toBe(recoveryCode.replace(/-/g, ""));
   });
+
+  it("PDFメタデータに日本語タイトルおよびリカバリーコードが正しく設定されること", async () => {
+    const recoveryCode = generateRecoveryCode();
+    const pdfBytes = await generateRecoveryKitPdf({
+      familyName: "田中家",
+      issuedAt: Date.now(),
+      issuerName: "管理者花子",
+      recoveryCode,
+    });
+
+    const { PDFDocument } = await import("@cantoo/pdf-lib");
+    const loadedDoc = await PDFDocument.load(pdfBytes);
+
+    expect(loadedDoc.getTitle()).toBe("PoohMa - 非常用リカバリーキット");
+    expect(loadedDoc.getAuthor()).toBe("PoohMa");
+    expect(loadedDoc.getSubject()).toBe(recoveryCode);
+  });
 });

@@ -744,7 +744,7 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
      を生成し、画面上に表示する（サーバーには平文はもちろん、導出可能な形でも一切送信しない）
   2. リカバリーコードと新規ソルトから PBKDF2-SHA256（300,000回）でAES-GCM鍵（リカバリー導出鍵）を導出
   3. 展開済みのマスターキーをリカバリー導出鍵でwrap
-  4. リカバリーコードとQRコード、発行日時・対象家族名を記載したA4印刷・保管用PDF（pdf-libでクライアントサイド生成）を作成
+  4. リカバリーコードとQRコード、発行日時（JST表記）・対象家族名・発行者名を記載したA4印刷・保管用PDF（@cantoo/pdf-lib および @cantoo/fontkit を用い、Noto Sans JP をサブセット埋め込みしてクライアントサイドで完全日本語ベクターテキスト生成）を作成。ドキュメント全体（手順・警告・フッター）を日本語化し、PDFリーダーでの文字選択・コピー・検索に対応
   5. PDF生成完了後、Mutation recovery.registerRecoveryKit を呼び出し、
      recoveryMasterKeyEncrypted / recoveryMasterKeyIv / recoveryMasterKeySalt を更新（旧情報は即時無効化）
   6. 家族メンバー全員へリカバリーキット発行・再発行通知メールを送信

@@ -2237,7 +2237,9 @@ function FamilyComponent() {
               isOpen={isRecoveryKitModalOpen}
               onClose={() => setIsRecoveryKitModalOpen(false)}
               familyName={family.name}
-              issuerName={activeAccount?.displayName || "管理者"}
+              issuerName={
+                activeAccount?.displayName || activeAccount?.email || "管理者"
+              }
               isReissue={recoveryStatus?.hasRecoveryKit ?? false}
             />
           )}
