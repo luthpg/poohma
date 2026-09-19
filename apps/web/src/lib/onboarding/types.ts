@@ -58,7 +58,7 @@ export interface SlideImageSlot {
   role: string;
   /** バッジに表示するテキスト（省略時は「イメージ図」） */
   badgeText?: string;
-  /** アスペクト比（省略時は "16/9"） */
+  /** アスペクト比（省略時は "4/3"） */
   aspectRatio?: "16/9" | "4/3";
   /** 実画像ファイルのパス（省略時は id に対応する標準アセットを使用） */
   src?: string;

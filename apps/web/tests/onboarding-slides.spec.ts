@@ -56,6 +56,21 @@ describe("Onboarding Tour 概念説明スライドと Driver.js 変換", () => {
       expect(html43).toContain("poohma-tour-slide-image-container aspect-4-3");
       expect(html43).toContain('height="480"');
 
+      // aspectRatio 省略時（デフォルトで 4:3 が適用されること）
+      const slideDefault: Extract<OnboardingStep, { type: "slide" }> = {
+        ...slideStep,
+        imageSlot: {
+          id: "welcome-family-share",
+          role: "家族で安心共有の全体像",
+          badgeText: "アプリ概要",
+        },
+      };
+      const htmlDefault = renderSlideHtml(slideDefault);
+      expect(htmlDefault).toContain(
+        "poohma-tour-slide-image-container aspect-4-3",
+      );
+      expect(htmlDefault).toContain('height="480"');
+
       // XSSエスケープが行われていること
       expect(html).toContain("&lt;script&gt;危険&lt;/script&gt;");
       expect(html).not.toContain("<script>危険</script>");

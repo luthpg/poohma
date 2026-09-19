@@ -42,6 +42,7 @@ export const SLIDE_IMAGES: Record<string, string> = {
 
 /**
  * 画像スロットに応じた実画像 HTML を生成
+ * アスペクト比はデフォルトで 4:3（640x480）を使用し、明示的に "16/9" が指定された場合は 16:9（640x360）を出力
  */
 export function renderSlideImage(slot: SlideImageSlot): string {
   const imageSrc = slot.src ?? SLIDE_IMAGES[slot.id];
