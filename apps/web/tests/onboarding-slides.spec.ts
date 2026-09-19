@@ -17,7 +17,7 @@ import type { OnboardingStep } from "@/lib/onboarding/types";
 
 describe("Onboarding Tour 概念説明スライドと Driver.js 変換", () => {
   describe("renderSlideHtml", () => {
-    it("インフォグラフィックを含むスライドのHTMLが正しく生成され、BudouX禁則改行が適用されること", () => {
+    it("実画像を含むスライドのHTMLが正しく生成され、BudouX禁則改行が適用されること", () => {
       const slideStep: Extract<OnboardingStep, { type: "slide" }> = {
         type: "slide",
         title: "テストタイトル",
@@ -33,15 +33,28 @@ describe("Onboarding Tour 概念説明スライドと Driver.js 変換", () => {
 
       const html = renderSlideHtml(slideStep);
 
-      // インフォグラフィックが含まれていること
-      expect(html).toContain("poohma-infographic infographic-welcome");
-      expect(html).toContain("動画配信");
-      expect(html).toContain("共有中");
-      expect(html).toContain("自分のみ");
+      // 実画像コンテナと img 要素が含まれていること
+      expect(html).toContain("poohma-tour-slide-image-container aspect-16-9");
+      expect(html).toContain('src="/welcome-family-share.webp"');
+      expect(html).toContain('alt="家族で安心共有の全体像"');
+      expect(html).toContain('loading="lazy"');
+      expect(html).toContain('width="640"');
+      expect(html).toContain('height="360"');
+      expect(html).toContain('class="poohma-tour-slide-image"');
 
-      // アクセシビリティ (role="img" と aria-label) が正しく設定されていること
-      expect(html).toContain('role="img"');
-      expect(html).toContain('aria-label="家族で安心共有の全体像"');
+      // 4:3 アスペクト比指定時
+      const slide43: Extract<OnboardingStep, { type: "slide" }> = {
+        ...slideStep,
+        imageSlot: {
+          id: "welcome-family-share",
+          role: "家族で安心共有の全体像",
+          badgeText: "アプリ概要",
+          aspectRatio: "4/3",
+        },
+      };
+      const html43 = renderSlideHtml(slide43);
+      expect(html43).toContain("poohma-tour-slide-image-container aspect-4-3");
+      expect(html43).toContain('height="480"');
 
       // XSSエスケープが行われていること
       expect(html).toContain("&lt;script&gt;危険&lt;/script&gt;");
@@ -54,7 +67,7 @@ describe("Onboarding Tour 概念説明スライドと Driver.js 変換", () => {
       expect(html).toContain("poohma-tour-slide-text");
     });
 
-    it("画像スロットの role に特殊文字が含まれている場合でも属性値が安全にエスケープされること", () => {
+    it("画像スロットの role に特殊文字が含まれている場合でも alt 属性値が安全にエスケープされること", () => {
       const slideStep: Extract<OnboardingStep, { type: "slide" }> = {
         type: "slide",
         title: "エスケープテスト",
@@ -67,9 +80,28 @@ describe("Onboarding Tour 概念説明スライドと Driver.js 変換", () => {
 
       const html = renderSlideHtml(slideStep);
       expect(html).toContain(
-        'aria-label="テスト &quot;クォート&quot; &amp; &lt;タグ&gt;"',
+        'alt="テスト &quot;クォート&quot; &amp; &lt;タグ&gt;"',
       );
-      expect(html).not.toContain('aria-label="テスト "クォート" & <タグ>"');
+      expect(html).not.toContain('alt="テスト "クォート" & <タグ>"');
+    });
+
+    it("画像マッピングに存在しない画像スロットの場合はアクセシブルなスケルトンが出力されること", () => {
+      const slideStep: Extract<OnboardingStep, { type: "slide" }> = {
+        type: "slide",
+        title: "フォールバックテスト",
+        description: "説明文",
+        imageSlot: {
+          id: "unknown-image-id",
+          role: "未知の画像",
+          badgeText: "準備中",
+        },
+      };
+
+      const html = renderSlideHtml(slideStep);
+      expect(html).toContain("poohma-tour-skeleton-container");
+      expect(html).toContain('role="img"');
+      expect(html).toContain('aria-label="未知の画像"');
+      expect(html).toContain("準備中");
     });
 
     it("画像スロットがないスライドでも安全に説明文が出力されること", () => {
@@ -80,7 +112,8 @@ describe("Onboarding Tour 概念説明スライドと Driver.js 変換", () => {
       };
 
       const html = renderSlideHtml(slideStep);
-      expect(html).not.toContain("poohma-infographic");
+      expect(html).not.toContain("poohma-tour-slide-image-container");
+      expect(html).not.toContain("poohma-tour-skeleton-container");
       expect(html).toContain("シンプルな");
       expect(html).toContain("<wbr/>");
     });
@@ -244,12 +277,13 @@ describe("Onboarding Tour 概念説明スライドと Driver.js 変換", () => {
       expect(familyCreatedSteps[0].popover?.title).toContain(
         "家族グループができました！",
       );
+      expect(familyCreatedSteps[0].popover?.popoverClass).toContain(
+        "poohma-tour-family-welcome",
+      );
       expect(familyCreatedSteps[0].popover?.doneBtnText).toBe(
-        "ダッシュボードへ移動する",
+        "ダッシュボードへ",
       );
-      expect(familyCreatedSteps[0].popover?.prevBtnText).toBe(
-        "このまま家族設定を見る",
-      );
+      expect(familyCreatedSteps[0].popover?.prevBtnText).toBe("家族設定を見る");
     });
   });
 });

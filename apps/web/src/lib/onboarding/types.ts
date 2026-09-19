@@ -60,6 +60,8 @@ export interface SlideImageSlot {
   badgeText?: string;
   /** アスペクト比（省略時は "16/9"） */
   aspectRatio?: "16/9" | "4/3";
+  /** 実画像ファイルのパス（省略時は id に対応する標準アセットを使用） */
+  src?: string;
 }
 
 /**

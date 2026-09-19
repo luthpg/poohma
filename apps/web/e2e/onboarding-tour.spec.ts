@@ -102,9 +102,9 @@ test.describe("オンボーディングツアーの画面間遷移検証", () =>
     await expect(page.locator("text=家族グループができました！")).toBeVisible({
       timeout: 5000,
     });
-    // サブボタン「このまま家族設定を見る」が活性状態で表示されていること
+    // サブボタン「家族設定を見る」が活性状態で表示されていること
     const stayBtn = page.locator(
-      ".driver-popover-prev-btn:has-text('このまま家族設定を見る')",
+      ".driver-popover-prev-btn:has-text('家族設定を見る')",
     );
     await expect(stayBtn).toBeVisible({ timeout: 5000 });
     await expect(stayBtn).toBeEnabled();
@@ -251,7 +251,7 @@ test.describe("オンボーディングツアーの画面間遷移検証", () =>
     await expect(tourPopover).toBeHidden();
   });
 
-  test("家族作成後に「このまま家族設定を見る」をクリックすると活性状態のボタンでツアーが閉じ、/family にとどまること", async ({
+  test("家族作成後に「家族設定を見る」をクリックすると活性状態のボタンでツアーが閉じ、/family にとどまること", async ({
     page,
   }) => {
     const passcode =
@@ -264,7 +264,7 @@ test.describe("オンボーディングツアーの画面間遷移検証", () =>
     await expect(tourPopover).toBeVisible({ timeout: 10000 });
 
     const stayBtn = page.locator(
-      ".driver-popover-prev-btn:has-text('このまま家族設定を見る')",
+      ".driver-popover-prev-btn:has-text('家族設定を見る')",
     );
     await expect(stayBtn).toBeVisible({ timeout: 5000 });
     await expect(stayBtn).toBeEnabled();
