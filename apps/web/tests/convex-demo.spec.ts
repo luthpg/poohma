@@ -493,6 +493,7 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
         title: "共有サービスA",
         titleReading: "きょうゆうさーびすえー",
         url: "https://example.com/a",
+        ogpImage: "https://example.com/ogp-a.png",
         ogpDescription: "サービスAの説明",
         memo: "メモA",
         tags: ["タグ1", "タグ2"],
@@ -538,6 +539,7 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
     expect(exported.length).toBe(1);
     expect(exported[0].title).toBe("共有サービスA");
     expect(exported[0].titleReading).toBe("きょうゆうさーびすえー");
+    expect(exported[0].ogpImage).toBe("https://example.com/ogp-a.png");
     expect(exported[0].credentials.length).toBe(1);
     expect(exported[0].credentials[0].label).toBe("メイン");
     expect(exported[0].credentials[0].passwordHint).toBe("EncryptedHintA");

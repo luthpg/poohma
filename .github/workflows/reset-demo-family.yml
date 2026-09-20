@@ -56,6 +56,13 @@ jobs:
 
           # 末尾スラッシュの正規化
           BASE_URL="${CONVEX_SITE_URL%/}"
+          case "$BASE_URL" in
+            https://*) ;;
+            *)
+              echo "::error::CONVEX_SITE_URL must start with https://"
+              exit 1
+              ;;
+          esac
           ENDPOINT="${BASE_URL}/resetDemoFamily"
 
           echo "Calling endpoint: ${ENDPOINT}"
@@ -66,7 +73,7 @@ jobs:
             --argjson force "$FORCE" \
             '{ triggeredBy: $triggeredBy, reason: $reason, force: $force }')
 
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${ENDPOINT}" \
+          RESPONSE=$(curl -s --connect-timeout 10 --max-time 60 -w "\n%{http_code}" -X POST "${ENDPOINT}" \
             -H "Content-Type: application/json" \
             -H "x-internal-secret: ${CONVEX_INTERNAL_SECRET}" \
             -d "${PAYLOAD}")
@@ -153,8 +160,8 @@ jobs:
 
           if [ "$JOB_STATUS" = "success" ] && [ -n "$RESPONSE_JSON" ]; then
             IS_SKIPPED=$(echo "$RESPONSE_JSON" | jq -r '.skipped // false')
-            TRIGGERED_BY=$(echo "$RESPONSE_JSON" | jq -r '.triggeredBy // $ACTOR')
-            REASON=$(echo "$RESPONSE_JSON" | jq -r '.reason // $REASON_INPUT')
+            TRIGGERED_BY=$(echo "$RESPONSE_JSON" | jq -r --arg actor "$ACTOR" '.triggeredBy // $actor')
+            REASON=$(echo "$RESPONSE_JSON" | jq -r --arg reason "$REASON_INPUT" '.reason // $reason')
             KICKED_COUNT=$(echo "$RESPONSE_JSON" | jq -r '.kickedGuestsCount // 0')
             DELETED_COUNT=$(echo "$RESPONSE_JSON" | jq -r '.deletedRecordsCount // 0')
             INSERTED_COUNT=$(echo "$RESPONSE_JSON" | jq -r '.insertedRecordsCount // 0')
@@ -229,6 +236,6 @@ jobs:
               }')
           fi
 
-          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+          curl -s --connect-timeout 5 --max-time 15 -X POST "$DISCORD_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -d "$PAYLOAD" || echo "Failed to send Discord webhook."
