@@ -50,7 +50,7 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
     ).rejects.toThrow("Demo family not found for ID:");
   });
 
-  it("DEMO_ADMIN_USER_IDS に一致するユーザーがデモ家族に存在しない場合、例外がスローされること", async () => {
+  it("DEMO_ADMIN_USER_IDS に指定されたユーザーがデモ家族に存在しない場合、例外がスローされること", async () => {
     const t = convexTest(schema, modules);
     let demoFamilyId!: Id<"families">;
     await t.run(async (ctx) => {
@@ -73,11 +73,11 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
     await expect(
       t.mutation(internal.demo.resetDemoFamilyInternal, {}),
     ).rejects.toThrow(
-      "No matching admin users found in the specified demo family matching DEMO_ADMIN_USER_IDS.",
+      'Configured demo admin ID "unmatched_admin_user" is not a member of demo family.',
     );
   });
 
-  it("DEMO_ADMIN_USER_IDS に一致するユーザーの中に familyRole === 'admin' のメンバーがいない場合、例外がスローされること", async () => {
+  it("DEMO_ADMIN_USER_IDS に指定されたユーザーの familyRole が admin ではない（viewer）場合、例外がスローされること", async () => {
     const t = convexTest(schema, modules);
     let demoFamilyId!: Id<"families">;
     await t.run(async (ctx) => {
@@ -100,7 +100,41 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
     await expect(
       t.mutation(internal.demo.resetDemoFamilyInternal, {}),
     ).rejects.toThrow(
-      "No administrator with familyRole 'admin' found among matching demo admin users.",
+      'Configured demo admin ID "matched_viewer_user" does not have familyRole "admin".',
+    );
+  });
+
+  it("複数管理者の指定のうち、1名でも viewer または未所属が含まれる場合、例外がスローされること", async () => {
+    const t = convexTest(schema, modules);
+    let demoFamilyId!: Id<"families">;
+    await t.run(async (ctx) => {
+      demoFamilyId = await ctx.db.insert("families", {
+        name: "Demo Family",
+        updatedAt: Date.now(),
+      });
+      await ctx.db.insert("users", {
+        userId: "valid_admin",
+        email: "admin@example.com",
+        familyId: demoFamilyId,
+        familyRole: "admin",
+        updatedAt: Date.now(),
+      });
+      await ctx.db.insert("users", {
+        userId: "invalid_viewer",
+        email: "viewer@example.com",
+        familyId: demoFamilyId,
+        familyRole: "viewer",
+        updatedAt: Date.now(),
+      });
+    });
+
+    process.env.DEMO_FAMILY_ID = demoFamilyId;
+    process.env.DEMO_ADMIN_USER_IDS = "valid_admin, invalid_viewer";
+
+    await expect(
+      t.mutation(internal.demo.resetDemoFamilyInternal, {}),
+    ).rejects.toThrow(
+      'Configured demo admin ID "invalid_viewer" does not have familyRole "admin".',
     );
   });
 
@@ -555,5 +589,114 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
     ).rejects.toThrow(
       'Invite code "poohma-demo" is already used by another family.',
     );
+  });
+
+  it("ゲストユーザーが他ファミリーに作成した個人レコードおよびVaultは削除されず保護されること", async () => {
+    const t = convexTest(schema, modules);
+    let demoFamilyId!: Id<"families">;
+    let otherFamilyId!: Id<"families">;
+    let guestId!: Id<"users">;
+    let demoRecordId!: Id<"serviceRecords">;
+    let otherRecordId!: Id<"serviceRecords">;
+    let demoVaultId!: Id<"pendingExportVaults">;
+    let otherVaultId!: Id<"pendingExportVaults">;
+
+    await t.run(async (ctx) => {
+      demoFamilyId = await ctx.db.insert("families", {
+        name: "Demo Family",
+        updatedAt: Date.now(),
+      });
+      otherFamilyId = await ctx.db.insert("families", {
+        name: "Other Family",
+        updatedAt: Date.now(),
+      });
+
+      await ctx.db.insert("users", {
+        userId: "demo_admin",
+        email: "admin@example.com",
+        familyId: demoFamilyId,
+        familyRole: "admin",
+        updatedAt: Date.now(),
+      });
+
+      guestId = await ctx.db.insert("users", {
+        userId: "guest_user",
+        email: "guest@example.com",
+        familyId: demoFamilyId,
+        familyRole: "viewer",
+        updatedAt: Date.now(),
+      });
+
+      // デモファミリー内でゲストが作成した個人レコード
+      demoRecordId = await ctx.db.insert("serviceRecords", {
+        title: "デモファミリー内の個人レコード",
+        accountId: guestId,
+        familyId: demoFamilyId,
+        userId: "guest_user",
+        ownerType: "user",
+        tags: [],
+        stableId: crypto.randomUUID(),
+        updatedAt: Date.now(),
+      });
+
+      // 他ファミリーに属する個人レコード（過去データや別所属）
+      otherRecordId = await ctx.db.insert("serviceRecords", {
+        title: "他ファミリーの個人レコード",
+        accountId: guestId,
+        familyId: otherFamilyId,
+        userId: "guest_user",
+        ownerType: "user",
+        tags: [],
+        stableId: crypto.randomUUID(),
+        updatedAt: Date.now(),
+      });
+
+      // デモファミリー由来の vault
+      demoVaultId = await ctx.db.insert("pendingExportVaults", {
+        accountId: guestId,
+        userId: "guest_user",
+        oldFamilyId: demoFamilyId,
+        oldFamilyName: "Demo Family",
+        masterKeyEncrypted: "enc",
+        masterKeyIv: "iv",
+        masterKeySalt: "salt",
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 100000,
+      });
+
+      // 他ファミリー由来の vault
+      otherVaultId = await ctx.db.insert("pendingExportVaults", {
+        accountId: guestId,
+        userId: "guest_user",
+        oldFamilyId: otherFamilyId,
+        oldFamilyName: "Other Family",
+        masterKeyEncrypted: "enc2",
+        masterKeyIv: "iv2",
+        masterKeySalt: "salt2",
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 100000,
+      });
+    });
+
+    process.env.DEMO_FAMILY_ID = demoFamilyId;
+    process.env.DEMO_ADMIN_USER_IDS = "demo_admin";
+
+    await t.mutation(internal.demo.resetDemoFamilyInternal, { force: true });
+
+    // 検証: デモファミリーに属する個人レコードとVaultは削除されるが、他ファミリーのものは残存すること
+    await t.run(async (ctx) => {
+      const demoRec = await ctx.db.get(demoRecordId);
+      const otherRec = await ctx.db.get(otherRecordId);
+      const demoVault = await ctx.db.get(demoVaultId);
+      const otherVault = await ctx.db.get(otherVaultId);
+
+      expect(demoRec).toBeNull();
+      expect(otherRec).not.toBeNull();
+      expect(otherRec?.title).toBe("他ファミリーの個人レコード");
+
+      expect(demoVault).toBeNull();
+      expect(otherVault).not.toBeNull();
+      expect(otherVault?.oldFamilyName).toBe("Other Family");
+    });
   });
 });

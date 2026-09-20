@@ -77,7 +77,23 @@ export const resetDemoFamilyInternal = internalMutation({
       .withIndex("by_familyId", (q) => q.eq("familyId", demoFamilyId))
       .collect();
 
-    // 指定された管理者が所属しているか厳格に環境変数のみで検証（手違いで非管理者が入った場合に備え、familyRole=="admin" のみでの昇格は排除）
+    // 指定された全管理者がデモファミリーに実在し、かつ familyRole === 'admin' であることを厳格に個別照合
+    for (const adminId of adminUserIds) {
+      const member = familyMembers.find(
+        (m) => m.userId === adminId || m._id === adminId,
+      );
+      if (!member) {
+        throw new Error(
+          `Configured demo admin ID "${adminId}" is not a member of demo family.`,
+        );
+      }
+      if (member.familyRole !== "admin") {
+        throw new Error(
+          `Configured demo admin ID "${adminId}" does not have familyRole "admin".`,
+        );
+      }
+    }
+
     const adminMembers = familyMembers.filter(
       (m) => adminUserIds.includes(m.userId) || adminUserIds.includes(m._id),
     );
@@ -86,17 +102,7 @@ export const resetDemoFamilyInternal = internalMutation({
         "No matching admin users found in the specified demo family matching DEMO_ADMIN_USER_IDS.",
       );
     }
-
-    // 家族グループに管理者権限（familyRole === 'admin'）を持つメンバーが0人になりうる場合は異常事態のため拒否
-    const familyAdminRoleMembers = adminMembers.filter(
-      (m) => m.familyRole === "admin",
-    );
-    if (familyAdminRoleMembers.length === 0) {
-      throw new Error(
-        "No administrator with familyRole 'admin' found among matching demo admin users.",
-      );
-    }
-    const primaryAdmin = familyAdminRoleMembers[0];
+    const primaryAdmin = adminMembers[0];
 
     // 2. クールダウンガード（10分以内の多重実行を防止）
     const now = Date.now();
@@ -140,7 +146,7 @@ export const resetDemoFamilyInternal = internalMutation({
       .withIndex("by_family_updatedAt", (q) => q.eq("familyId", demoFamilyId))
       .collect();
 
-    // 4-2. ゲストユーザーが作成した個人レコードを取得
+    // 4-2. ゲストユーザーが作成した個人レコードを取得（デモファミリーに属する個人レコードのみを厳格に対象とし、他家族のレコードを巻き込まない）
     const guestAccountIds = new Set(guestUsers.map((g) => g._id));
     const guestRecords = [];
     for (const guestAccountId of guestAccountIds) {
@@ -148,7 +154,12 @@ export const resetDemoFamilyInternal = internalMutation({
         .query("serviceRecords")
         .withIndex("by_accountId", (q) => q.eq("accountId", guestAccountId))
         .collect();
-      guestRecords.push(...records);
+      const demoPersonalRecords = records.filter(
+        (r) =>
+          r.familyId === demoFamilyId &&
+          (r.ownerType === "user" || !r.ownerType),
+      );
+      guestRecords.push(...demoPersonalRecords);
     }
 
     // レコードの重複排除
@@ -191,14 +202,16 @@ export const resetDemoFamilyInternal = internalMutation({
       deletedRecordsCount++;
     }
 
-    // ゲストの pendingExportVaults があれば削除（ゴミを残さない）
+    // ゲストの pendingExportVaults があれば削除（デモファミリー由来の vault のみ削除）
     for (const guest of guestUsers) {
       const vaults = await ctx.db
         .query("pendingExportVaults")
         .withIndex("by_accountId", (q) => q.eq("accountId", guest._id))
         .collect();
       for (const v of vaults) {
-        await ctx.db.delete(v._id);
+        if (v.oldFamilyId === demoFamilyId) {
+          await ctx.db.delete(v._id);
+        }
       }
     }
 
