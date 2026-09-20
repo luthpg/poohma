@@ -1,0 +1,179 @@
+name: Reset Demo Family
+
+on:
+  schedule:
+    # 毎日午前4:00 JST (19:00 UTC)
+    - cron: '0 19 * * *'
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'リセット実行理由 (例: デモ前準備、定期テストなど)'
+        required: false
+        default: '手動ディスパッチによるリセット'
+        type: string
+      force:
+        description: '10分間のクールダウンガードをバイパスする'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: reset-demo-family
+  cancel-in-progress: false
+
+jobs:
+  reset:
+    name: Reset Demo Family Environment
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Verify Actor Permission
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          echo "Triggered by actor: ${{ github.actor }}"
+          echo "Repository owner: ${{ github.repository_owner }}"
+          if [ "${{ github.actor }}" != "${{ github.repository_owner }}" ]; then
+            echo "::error::Actor '${{ github.actor }}' is not authorized to reset the demo family."
+            exit 1
+          fi
+          echo "Actor authorization verified."
+
+      - name: Trigger Convex Demo Reset via HTTP Action
+        id: trigger_reset
+        env:
+          CONVEX_SITE_URL: ${{ secrets.CONVEX_SITE_URL }}
+          CONVEX_INTERNAL_SECRET: ${{ secrets.CONVEX_INTERNAL_SECRET }}
+          TRIGGERED_BY: ${{ github.actor }}
+          REASON: ${{ github.event.inputs.reason || 'GitHub Actions Cron' }}
+          FORCE: ${{ github.event.inputs.force || false }}
+        run: |
+          if [ -z "$CONVEX_SITE_URL" ] || [ -z "$CONVEX_INTERNAL_SECRET" ]; then
+            echo "::error::CONVEX_SITE_URL or CONVEX_INTERNAL_SECRET is not configured in GitHub Secrets."
+            exit 1
+          fi
+
+          # 末尾スラッシュの正規化
+          BASE_URL="${CONVEX_SITE_URL%/}"
+          ENDPOINT="${BASE_URL}/resetDemoFamily"
+
+          echo "Calling endpoint: ${ENDPOINT}"
+
+          PAYLOAD=$(jq -n \
+            --arg triggeredBy "$TRIGGERED_BY" \
+            --arg reason "$REASON" \
+            --argjson force "$FORCE" \
+            '{ triggeredBy: $triggeredBy, reason: $reason, force: $force }')
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${ENDPOINT}" \
+            -H "Content-Type: application/json" \
+            -H "x-internal-secret: ${CONVEX_INTERNAL_SECRET}" \
+            -d "${PAYLOAD}")
+
+          HTTP_BODY=$(echo "$RESPONSE" | sed '$d')
+          HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
+
+          echo "HTTP Status: ${HTTP_STATUS}"
+          echo "Response: ${HTTP_BODY}"
+
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "::error::Convex reset endpoint failed with HTTP ${HTTP_STATUS}: ${HTTP_BODY}"
+            exit 1
+          fi
+
+          # 結果を環境変数/ステップ出力に保存
+          echo "response_body<<EOF" >> $GITHUB_OUTPUT
+          echo "$HTTP_BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Generate GitHub Step Summary
+        if: always() && steps.trigger_reset.outputs.response_body != ''
+        env:
+          RESPONSE_JSON: ${{ steps.trigger_reset.outputs.response_body }}
+        run: |
+          # レスポンスから値を抽出 (jq は ubuntu-latest に標準搭載)
+          IS_SKIPPED=$(echo "$RESPONSE_JSON" | jq -r '.skipped // false')
+          TRIGGERED_BY=$(echo "$RESPONSE_JSON" | jq -r '.triggeredBy // "N/A"')
+          REASON=$(echo "$RESPONSE_JSON" | jq -r '.reason // "N/A"')
+          KICKED_COUNT=$(echo "$RESPONSE_JSON" | jq -r '.kickedGuestsCount // 0')
+          DELETED_COUNT=$(echo "$RESPONSE_JSON" | jq -r '.deletedRecordsCount // 0')
+          INSERTED_COUNT=$(echo "$RESPONSE_JSON" | jq -r '.insertedRecordsCount // 0')
+          INVITE_CODE=$(echo "$RESPONSE_JSON" | jq -r '.inviteCode // "N/A"')
+
+          cat <<EOF >> $GITHUB_STEP_SUMMARY
+          ## 🔄 Demo Family Reset Result
+
+          | Parameter | Value |
+          | :--- | :--- |
+          | **Status** | $( [ "$IS_SKIPPED" = "true" ] && echo "⏭️ Skipped (Cooldown Active)" || echo "✅ Succeeded" ) |
+          | **Triggered By** | \`${TRIGGERED_BY}\` |
+          | **Reason** | ${REASON} |
+          | **Kicked Guests** | ${KICKED_COUNT} 名 |
+          | **Deleted Records** | ${DELETED_COUNT} 件 |
+          | **Inserted Records** | ${INSERTED_COUNT} 件 |
+          | **Active Invite Code** | \`${INVITE_CODE}\` |
+          | **Timestamp (JST)** | $(TZ=Asia/Tokyo date +'%Y-%m-%d %H:%M:%S JST') |
+
+          EOF
+
+      - name: Notify Discord
+        if: steps.trigger_reset.outputs.response_body != ''
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          RESPONSE_JSON: ${{ steps.trigger_reset.outputs.response_body }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "DISCORD_WEBHOOK_URL is not set. Skipping Discord notification."
+            exit 0
+          fi
+
+          IS_SKIPPED=$(echo "$RESPONSE_JSON" | jq -r '.skipped // false')
+          TRIGGERED_BY=$(echo "$RESPONSE_JSON" | jq -r '.triggeredBy // "N/A"')
+          REASON=$(echo "$RESPONSE_JSON" | jq -r '.reason // "N/A"')
+          KICKED_COUNT=$(echo "$RESPONSE_JSON" | jq -r '.kickedGuestsCount // 0')
+          DELETED_COUNT=$(echo "$RESPONSE_JSON" | jq -r '.deletedRecordsCount // 0')
+          INSERTED_COUNT=$(echo "$RESPONSE_JSON" | jq -r '.insertedRecordsCount // 0')
+          INVITE_CODE=$(echo "$RESPONSE_JSON" | jq -r '.inviteCode // "N/A"')
+
+          if [ "$IS_SKIPPED" = "true" ]; then
+            TITLE="⏭️ [PoohMa] デモファミリーリセット スキップ (クールダウン中)"
+            COLOR=16763904 # Orange
+            DESC="直近10分以内に実行されたためスキップされました。"
+          else
+            TITLE="🔄 [PoohMa] デモファミリーリセット 完了"
+            COLOR=5814783 # Blurple / Blue
+            DESC="デモファミリーが初期状態に復元されました。"
+          fi
+
+          PAYLOAD=$(jq -n \
+            --arg title "$TITLE" \
+            --arg desc "$DESC" \
+            --argjson color "$COLOR" \
+            --arg triggeredBy "$TRIGGERED_BY" \
+            --arg reason "$REASON" \
+            --arg inviteCode "$INVITE_CODE" \
+            --arg kickedCount "${KICKED_COUNT} 名" \
+            --arg deletedCount "${DELETED_COUNT} 件" \
+            --arg insertedCount "${INSERTED_COUNT} 件" \
+            --arg timestamp "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            '{
+              embeds: [
+                {
+                  title: $title,
+                  description: $desc,
+                  color: $color,
+                  fields: [
+                    { name: "実行者", value: $triggeredBy, inline: true },
+                    { name: "理由", value: $reason, inline: true },
+                    { name: "招待コード", value: ("`" + $inviteCode + "`"), inline: true },
+                    { name: "キック人数", value: $kickedCount, inline: true },
+                    { name: "削除レコード", value: $deletedCount, inline: true },
+                    { name: "投入レコード", value: $insertedCount, inline: true }
+                  ],
+                  timestamp: $timestamp
+                }
+              ]
+            }')
+
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" || echo "Failed to send Discord webhook."

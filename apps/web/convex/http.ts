@@ -49,4 +49,56 @@ http.route({
   }),
 });
 
+http.route({
+  path: "/resetDemoFamily",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const secret = request.headers.get("x-internal-secret");
+    const internalSecret = process.env.CONVEX_INTERNAL_SECRET;
+    if (
+      !secret ||
+      !internalSecret ||
+      !timingSafeEqual(secret, internalSecret)
+    ) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+
+    let body: {
+      triggeredBy?: string;
+      reason?: string;
+      force?: boolean;
+    } = {};
+
+    try {
+      const text = await request.text();
+      if (text) {
+        body = JSON.parse(text);
+      }
+    } catch {
+      return new Response("Bad Request: Invalid JSON", { status: 400 });
+    }
+
+    try {
+      const result = await ctx.runMutation(
+        internal.demo.resetDemoFamilyInternal,
+        {
+          triggeredBy:
+            typeof body.triggeredBy === "string" ? body.triggeredBy : undefined,
+          reason: typeof body.reason === "string" ? body.reason : undefined,
+          force: typeof body.force === "boolean" ? body.force : undefined,
+        },
+      );
+
+      return new Response(JSON.stringify(result), {
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (_err) {
+      return new Response(JSON.stringify({ error: "Internal Server Error" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  }),
+});
+
 export default http;

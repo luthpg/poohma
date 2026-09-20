@@ -19,6 +19,7 @@ import type * as contacts from "../contacts.js";
 import type * as crons from "../crons.js";
 import type * as cryptoUtils from "../cryptoUtils.js";
 import type * as customBuilders from "../customBuilders.js";
+import type * as demo from "../demo.js";
 import type * as families from "../families.js";
 import type * as http from "../http.js";
 import type * as onboarding from "../onboarding.js";
@@ -35,6 +36,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   cryptoUtils: typeof cryptoUtils;
   customBuilders: typeof customBuilders;
+  demo: typeof demo;
   families: typeof families;
   http: typeof http;
   onboarding: typeof onboarding;
