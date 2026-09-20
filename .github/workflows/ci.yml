@@ -68,6 +68,7 @@ jobs:
         uses: reviewdog/action-actionlint@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          fail_level: any
 
       - name: Lint & Format Check (Biome)
         run: pnpm run check:ci
