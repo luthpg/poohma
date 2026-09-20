@@ -29,14 +29,20 @@ interface DemoRecord {
 const recordsToInsert: DemoRecord[] = demoRecords;
 
 const COOLDOWN_MS = 10 * 60 * 1000; // 10分間のクールダウン
-const JOIN_REQUEST_EXPIRY_MS = 48 * 60 * 60 * 1000; // 48時間経過した参加申請のみ削除
+const JOIN_REQUEST_EXPIRY_MS = 48 * 60 * 60 * 1000; // pending 参加申請の保護期間（48時間）
 const FAR_FUTURE_MS = 4102415999000; // 2099-12-31 23:59:59 UTC
 
 /**
  * デモファミリーの定期・手動リセット internal mutation
+ *
+ * コア設計原則: リセット境界を跨いだゲストコホート間で互いの痕跡を一切閲覧できないこと。
+ *
  * - ゲスト個人レコードおよび共有レコードの完全削除
  * - 管理者以外のメンバーを kick
- * - 48時間以上経過した joinRequests のみ削除
+ * - approved/rejected の joinRequests を全削除、pending は48時間猶予で保護
+ * - auditLogs / viewLogs のファミリー単位パージ（コホート間漏洩防止）
+ * - デモ固定コード以外の familyInvites を削除
+ * - デモファミリー関連の familyMigrations を削除
  * - demoRecords.json からデモレコードを再投入
  * - 無期限招待コードの維持
  */
@@ -202,6 +208,17 @@ export const resetDemoFamilyInternal = internalMutation({
       deletedRecordsCount++;
     }
 
+    // 4.5 デモファミリーの viewLogs をファミリー単位で一括パージ（コホート間漏洩防止）
+    const remainingViewLogs = await ctx.db
+      .query("viewLogs")
+      .withIndex("by_family_createdAt", (q) => q.eq("familyId", demoFamilyId))
+      .collect();
+    let deletedViewLogsCount = 0;
+    for (const vl of remainingViewLogs) {
+      await ctx.db.delete(vl._id);
+      deletedViewLogsCount++;
+    }
+
     // ゲストの pendingExportVaults があれば削除（デモファミリー由来の vault のみ削除）
     for (const guest of guestUsers) {
       const vaults = await ctx.db
@@ -215,6 +232,24 @@ export const resetDemoFamilyInternal = internalMutation({
       }
     }
 
+    // 4.6 デモファミリー関連の familyMigrations を削除
+    let deletedMigrationsCount = 0;
+    for (const guest of guestUsers) {
+      const migrations = await ctx.db
+        .query("familyMigrations")
+        .withIndex("by_accountId", (q) => q.eq("accountId", guest._id))
+        .collect();
+      for (const mig of migrations) {
+        if (
+          mig.sourceFamilyId === demoFamilyId ||
+          mig.targetFamilyId === demoFamilyId
+        ) {
+          await ctx.db.delete(mig._id);
+          deletedMigrationsCount++;
+        }
+      }
+    }
+
     // 5. ステップ 3: ゲストユーザーのキック（所属解除）
     // ※ メール通知は一切送らない（スパム防止）
     let kickedGuestsCount = 0;
@@ -223,7 +258,9 @@ export const resetDemoFamilyInternal = internalMutation({
       kickedGuestsCount++;
     }
 
-    // 6. ステップ 4: 48時間経過した参加申請のみ削除（直近申請を保護）
+    // 6. ステップ 4: 参加申請のクリーンアップ
+    //    - approved / rejected: 判定済みなので無条件で全削除
+    //    - pending: 直近の申請者保護のため、48時間経過分のみ削除
     const joinRequests = await ctx.db
       .query("joinRequests")
       .withIndex("by_familyId_status", (q) => q.eq("familyId", demoFamilyId))
@@ -232,10 +269,22 @@ export const resetDemoFamilyInternal = internalMutation({
     const joinRequestCutoff = now - JOIN_REQUEST_EXPIRY_MS;
     let deletedJoinRequestsCount = 0;
     for (const req of joinRequests) {
-      if (req.createdAt < joinRequestCutoff) {
+      if (req.status !== "pending" || req.createdAt < joinRequestCutoff) {
         await ctx.db.delete(req._id);
         deletedJoinRequestsCount++;
       }
+    }
+
+    // 6.5 デモファミリーの監査ログを全パージ（コホート間漏洩防止）
+    // ※ クールダウンガード判定は本ステップ到達前（ステップ 2）で完了済みのため影響なし
+    const auditLogs = await ctx.db
+      .query("auditLogs")
+      .withIndex("by_family_createdAt", (q) => q.eq("familyId", demoFamilyId))
+      .collect();
+    let deletedAuditLogsCount = 0;
+    for (const audit of auditLogs) {
+      await ctx.db.delete(audit._id);
+      deletedAuditLogsCount++;
     }
 
     // 7. ステップ 5: 暗号化済みデモレコードの再投入
@@ -285,6 +334,19 @@ export const resetDemoFamilyInternal = internalMutation({
       insertedRecordsCount++;
     }
 
+    // 7.5 デモ固定コード以外の招待を削除（環境汚染防止）
+    const allInvites = await ctx.db
+      .query("familyInvites")
+      .withIndex("by_familyId", (q) => q.eq("familyId", demoFamilyId))
+      .collect();
+    let deletedExtraInvitesCount = 0;
+    for (const inv of allInvites) {
+      if (inv.code !== demoInviteCode) {
+        await ctx.db.delete(inv._id);
+        deletedExtraInvitesCount++;
+      }
+    }
+
     // 8. ステップ 6: 無期限招待コードの維持
     const existingInvite = await ctx.db
       .query("familyInvites")
@@ -330,6 +392,10 @@ export const resetDemoFamilyInternal = internalMutation({
       kickedGuestsCount,
       deletedRecordsCount,
       deletedJoinRequestsCount,
+      deletedAuditLogsCount,
+      deletedViewLogsCount,
+      deletedExtraInvitesCount,
+      deletedMigrationsCount,
       insertedRecordsCount,
       inviteCode: demoInviteCode,
       triggeredBy: args.triggeredBy || "cron",

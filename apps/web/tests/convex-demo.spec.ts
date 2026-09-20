@@ -184,7 +184,7 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
     });
   });
 
-  it("正常系: ゲストキック、ゲスト個人レコード含む完全削除、48時間申請保護、デモレコード再投入、招待コード維持が動作すること", async () => {
+  it("正常系: コホート間データ隔離（レコード・申請・ログ・招待・移行の完全クリーンアップ）が動作すること", async () => {
     const t = convexTest(schema, modules);
 
     let demoFamilyId!: Id<"families">;
@@ -279,24 +279,47 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
         updatedAt: Date.now(),
       });
 
-      // 6. 参加申請: 直近（10時間前）と古い申請（50時間前）を作成
+      // 6. 参加申請: ステータス別に作成
       const now = Date.now();
+
+      // pending (10時間前) — 48h未満なので保護対象
       await ctx.db.insert("joinRequests", {
         familyId: demoFamilyId,
         userId: "new_applicant_recent",
         accountId: guest1Id,
         status: "pending",
-        createdAt: now - 10 * 60 * 60 * 1000, // 10時間前 (保護対象)
+        createdAt: now - 10 * 60 * 60 * 1000,
         updatedAt: now - 10 * 60 * 60 * 1000,
       });
 
+      // pending (50時間前) — 48h超過なので削除対象
       await ctx.db.insert("joinRequests", {
         familyId: demoFamilyId,
         userId: "old_applicant_stale",
         accountId: guest2Id,
         status: "pending",
-        createdAt: now - 50 * 60 * 60 * 1000, // 50時間前 (削除対象)
+        createdAt: now - 50 * 60 * 60 * 1000,
         updatedAt: now - 50 * 60 * 60 * 1000,
+      });
+
+      // approved (10時間前) — 判定済みなので無条件削除対象
+      await ctx.db.insert("joinRequests", {
+        familyId: demoFamilyId,
+        userId: "approved_guest",
+        accountId: guest1Id,
+        status: "approved",
+        createdAt: now - 10 * 60 * 60 * 1000,
+        updatedAt: now - 10 * 60 * 60 * 1000,
+      });
+
+      // rejected (3時間前) — 判定済みなので無条件削除対象
+      await ctx.db.insert("joinRequests", {
+        familyId: demoFamilyId,
+        userId: "rejected_guest",
+        accountId: guest2Id,
+        status: "rejected",
+        createdAt: now - 3 * 60 * 60 * 1000,
+        updatedAt: now - 3 * 60 * 60 * 1000,
       });
 
       // 7. ゲストの exportVault がある場合
@@ -310,6 +333,61 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
         masterKeySalt: "vault_salt",
         createdAt: now,
         expiresAt: now + 30 * 24 * 60 * 60 * 1000,
+      });
+
+      // 8. 過去コホートの監査ログ（リセット後に新コホートから見えてはならない）
+      await ctx.db.insert("auditLogs", {
+        familyId: demoFamilyId,
+        accountId: guest1Id,
+        userId: "guest_uid_1",
+        actorDisplayName: "ゲスト閲覧者1",
+        ownerType: "family",
+        ownerFamilyId: demoFamilyId,
+        action: "RECORD_CREATE",
+        metadata: { targetTitle: "過去コホートのレコード" },
+        createdAt: now - 2 * 60 * 60 * 1000,
+      });
+      await ctx.db.insert("auditLogs", {
+        familyId: demoFamilyId,
+        accountId: admin1Id,
+        userId: "admin_uid_1",
+        actorDisplayName: "デモ管理者1",
+        ownerType: "family",
+        ownerFamilyId: demoFamilyId,
+        action: "MEMBER_JOIN",
+        createdAt: now - 1 * 60 * 60 * 1000,
+      });
+
+      // 9. 過去コホートの閲覧ログ
+      await ctx.db.insert("viewLogs", {
+        familyId: demoFamilyId,
+        accountId: guest1Id,
+        userId: "guest_uid_1",
+        actorDisplayName: "ゲスト閲覧者1",
+        recordId: sharedRecordId,
+        createdAt: now - 30 * 60 * 1000,
+      });
+
+      // 10. ゲストが発行した追加招待コード（デモ固定コード以外）
+      await ctx.db.insert("familyInvites", {
+        familyId: demoFamilyId,
+        code: "guest-extra-invite",
+        createdBy: "guest_uid_1",
+        createdAt: now - 60 * 60 * 1000,
+        expiresAt: now + 24 * 60 * 60 * 1000,
+        useCount: 0,
+      });
+
+      // 11. ゲストの家族移行データ（PREPARED 状態）
+      await ctx.db.insert("familyMigrations", {
+        userId: "guest_uid_1",
+        accountId: guest1Id,
+        sourceFamilyId: demoFamilyId,
+        targetFamilyId: demoFamilyId, // ダミー（実際は別ファミリーだが、テスト簡略化のため同一）
+        serviceRecordIds: [],
+        status: "PREPARED",
+        createdAt: now - 10 * 60 * 1000,
+        expiresAt: now + 20 * 60 * 1000,
       });
     });
 
@@ -328,7 +406,12 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
     expect(result.success).toBe(true);
     expect(result.kickedGuestsCount).toBe(2);
     expect(result.deletedRecordsCount).toBe(2); // 共有1 + ゲスト個人1
-    expect(result.deletedJoinRequestsCount).toBe(1); // 50時間前の申請のみ削除
+    // approved(1) + rejected(1) + 期限切れpending(1) = 3件削除
+    expect(result.deletedJoinRequestsCount).toBe(3);
+    expect(result.deletedAuditLogsCount).toBe(2); // 過去コホートの監査ログ2件
+    expect(result.deletedViewLogsCount).toBeGreaterThanOrEqual(0); // レコード個別削除で先に消える分があるため0以上
+    expect(result.deletedExtraInvitesCount).toBe(1); // guest-extra-invite
+    expect(result.deletedMigrationsCount).toBe(1); // PREPARED 移行データ
     expect(result.insertedRecordsCount).toBeGreaterThan(0); // demoRecords.json から再投入
     expect(result.inviteCode).toBe("poohma-test-demo");
 
@@ -373,7 +456,7 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
         .collect();
       expect(guestVaults.length).toBe(0);
 
-      // 5. 参加申請: 10時間前の申請は残存し、50時間前の申請が消えていること
+      // 5. 参加申請: pending (10時間前) のみ残存し、approved / rejected / 期限切れ pending は消えていること
       const remainingJoinRequests = await ctx.db
         .query("joinRequests")
         .withIndex("by_familyId_status", (q) => q.eq("familyId", demoFamilyId))
@@ -381,25 +464,42 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
 
       expect(remainingJoinRequests.length).toBe(1);
       expect(remainingJoinRequests[0].userId).toBe("new_applicant_recent");
+      expect(remainingJoinRequests[0].status).toBe("pending");
 
-      // 6. デモ用招待コードが 2099 年まで有効に設定されていること
-      const invite = await ctx.db
+      // 6. デモ用招待コードが 2099 年まで有効に設定され、追加招待は消去されていること
+      const allInvites = await ctx.db
         .query("familyInvites")
-        .withIndex("by_code", (q) => q.eq("code", "poohma-test-demo"))
-        .first();
-      expect(invite).not.toBeNull();
-      expect(invite?.familyId).toBe(demoFamilyId);
-      expect(invite?.expiresAt).toBe(4102415999000);
-      expect(invite?.useCount).toBe(0);
+        .withIndex("by_familyId", (q) => q.eq("familyId", demoFamilyId))
+        .collect();
+      expect(allInvites.length).toBe(1); // デモ固定コードのみ
+      expect(allInvites[0].code).toBe("poohma-test-demo");
+      expect(allInvites[0].expiresAt).toBe(4102415999000);
+      expect(allInvites[0].useCount).toBe(0);
 
-      // 7. 監査ログが記録されていること
-      const audit = await ctx.db
+      // 7. 監査ログ: 過去コホートのログは全パージされ、リセット完了ログ1件のみ残存
+      const allAuditLogs = await ctx.db
         .query("auditLogs")
         .withIndex("by_family_createdAt", (q) => q.eq("familyId", demoFamilyId))
-        .order("desc")
-        .first();
-      expect(audit?.action).toBe("FAMILY_UPDATE");
-      expect(audit?.metadata?.detail).toContain("デモファミリー定期リセット");
+        .collect();
+      expect(allAuditLogs.length).toBe(1);
+      expect(allAuditLogs[0].action).toBe("FAMILY_UPDATE");
+      expect(allAuditLogs[0].metadata?.detail).toContain(
+        "デモファミリー定期リセット",
+      );
+
+      // 8. 閲覧ログ: デモファミリー分は全件削除されていること
+      const allViewLogs = await ctx.db
+        .query("viewLogs")
+        .withIndex("by_family_createdAt", (q) => q.eq("familyId", demoFamilyId))
+        .collect();
+      expect(allViewLogs.length).toBe(0);
+
+      // 9. 家族移行データ: デモファミリー関連は全件削除されていること
+      const guestMigrations = await ctx.db
+        .query("familyMigrations")
+        .withIndex("by_accountId", (q) => q.eq("accountId", guest1Id))
+        .collect();
+      expect(guestMigrations.length).toBe(0);
     });
   });
 
