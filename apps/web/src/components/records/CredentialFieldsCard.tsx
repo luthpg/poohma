@@ -1,4 +1,10 @@
-import { Trash2 } from "lucide-react";
+import { Lightbulb, Trash2 } from "lucide-react";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import type { RecordFormCredential } from "@/hooks/useRecordForm";
 
 export interface CredentialFieldsCardProps {
@@ -94,11 +100,43 @@ export function CredentialFieldsCard({
             value={credential.passwordHint}
             onChange={(e) => onChange(index, "passwordHint", e.target.value)}
             autoComplete="off"
-            placeholder="例: 愛犬の名前+結婚記念日"
+            placeholder="思い出すためのヒントを入力"
             className="w-full rounded-md bg-card p-2 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
           />
+          <p className="mt-1.5 text-[11px] text-muted-foreground leading-relaxed">
+            パスワードそのものではなく、思い出すための手がかりメモです。
+          </p>
         </div>
       </div>
+      {index === 0 && (
+        <Accordion
+          type="single"
+          collapsible
+          className="mt-3 border-t border-border/40 pt-1"
+        >
+          <AccordionItem value="hint-guide" className="border-b-0">
+            <AccordionTrigger className="py-1.5 text-[12px] text-muted-foreground hover:text-foreground hover:no-underline font-normal">
+              <span className="inline-flex items-center gap-1.5">
+                <Lightbulb className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                <span>ヒントの考え方ガイド</span>
+              </span>
+            </AccordionTrigger>
+            <AccordionContent className="pt-1 pb-2 text-[12px] text-muted-foreground leading-relaxed">
+              <ul className="space-y-1.5 pl-4 list-disc marker:text-muted-foreground/60">
+                <li>
+                  パスワードにモチーフや共通項があれば、それを日本語で書いてみましょう
+                </li>
+                <li>
+                  このサービスのために普段と変えている要素があれば、その変更点のヒントを付け足しましょう
+                </li>
+                <li>
+                  物理的にメモがある場合は、保管場所だけを書いておくのも有効です
+                </li>
+              </ul>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      )}
     </div>
   );
 }

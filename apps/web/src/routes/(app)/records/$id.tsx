@@ -89,8 +89,8 @@ function RecordDetailPending() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-3xl p-6">
-      <div className="sticky top-16 z-10 -mx-6 -mt-6 mb-6 bg-background/95 px-6 pb-4 pt-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <div className="mx-auto max-w-3xl px-3.5 py-4 sm:p-6">
+      <div className="sticky top-16 z-10 -mx-3.5 -mt-4 mb-4 px-3.5 pb-3 pt-4 sm:-mx-6 sm:-mt-6 sm:mb-6 sm:px-6 sm:pb-4 sm:pt-6 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border/40">
         <Skeleton className="h-5 w-32 rounded-md" />
       </div>
 
@@ -99,7 +99,7 @@ function RecordDetailPending() {
         <Skeleton className="relative aspect-video w-full md:aspect-[21/9] rounded-none" />
 
         {/* 基本情報 */}
-        <div className="p-6 md:p-8">
+        <div className="p-4 sm:p-6 md:p-8">
           <div className="mb-6 flex items-start justify-between">
             <Skeleton className="h-8 w-1/2 rounded-md" />
             <Skeleton className="h-6 w-20 rounded-full" />
@@ -291,6 +291,53 @@ function RecordDetailComponent({
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [shareSuccess, setShareSuccess] = useState(false);
+  const [showHeader, setShowHeader] = useState(true);
+  const lastScrollYRef = useRef(0);
+  const tickingRef = useRef(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (tickingRef.current) return;
+      tickingRef.current = true;
+
+      window.requestAnimationFrame(() => {
+        const currentScrollY = window.scrollY;
+        const diff = currentScrollY - lastScrollYRef.current;
+
+        // ページ最上部付近（50px以下）は常に表示
+        if (currentScrollY <= 50) {
+          setShowHeader(true);
+        } else if (diff > 10) {
+          // 下スクロール 10px 以上で非表示
+          setShowHeader(false);
+        } else if (diff < -5) {
+          // 上スクロール 5px 以上で表示
+          setShowHeader(true);
+        }
+
+        lastScrollYRef.current = currentScrollY;
+        tickingRef.current = false;
+      });
+    };
+
+    // 親ヘッダー（PoohMaロゴバー付近: clientY <= 64）タップ時の復帰リスナー
+    const handleWindowClick = (e: MouseEvent) => {
+      if (e.clientY <= 64) {
+        setShowHeader(true);
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("click", handleWindowClick, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("click", handleWindowClick);
+    };
+  }, []);
+
+  const isHeaderVisible =
+    showHeader || detailIntroTourActive || detailReturnTourActive;
 
   // 同時編集管理用ステート
   const [initialRevision, setInitialRevision] = useState<number | null>(null);
@@ -800,7 +847,7 @@ function RecordDetailComponent({
 
   if (isEditing) {
     return (
-      <div className="mx-auto max-w-3xl p-6 pb-24 sm:pb-32">
+      <div className="mx-auto max-w-3xl px-3.5 py-4 sm:p-6 pb-24 sm:pb-32">
         <h1 className="mb-4 text-[24px] font-semibold tracking-geist-h2 text-foreground">
           サービス情報を編集
         </h1>
@@ -879,7 +926,7 @@ function RecordDetailComponent({
   }
 
   return (
-    <div className="mx-auto max-w-3xl p-6 pb-28 sm:pb-32">
+    <div className="mx-auto max-w-3xl px-3.5 py-4 sm:p-6 pb-28 sm:pb-32">
       {/* オンボーディングツアー（詳細画面用: 導入編） */}
       <OnboardingTour
         steps={recordDetailIntroSteps}
@@ -919,7 +966,13 @@ function RecordDetailComponent({
         }}
       />
       {/* ヘッダーナビゲーション（戻るボタン & 共有ボタン） */}
-      <div className="sticky top-16 z-10 -mx-6 -mt-6 mb-6 bg-background/95 px-6 pb-4 pt-6 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between gap-4 border-b border-border/40">
+      <div
+        className={`sticky top-16 z-10 -mx-3.5 -mt-4 mb-4 px-3.5 pb-3 pt-4 sm:-mx-6 sm:-mt-6 sm:mb-6 sm:px-6 sm:pb-4 sm:pt-6 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between gap-4 border-b border-border/40 transition-all duration-300 ease-in-out ${
+          isHeaderVisible
+            ? "translate-y-0 opacity-100 pointer-events-auto"
+            : "-translate-y-full opacity-0 pointer-events-none"
+        }`}
+      >
         <button
           type="button"
           data-tour="back-to-dashboard"
@@ -1078,7 +1131,7 @@ function RecordDetailComponent({
         </div>
 
         {/* 基本情報 */}
-        <div className="p-6 md:p-8">
+        <div className="p-4 sm:p-6 md:p-8">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-[24px] font-semibold tracking-geist-h2 text-foreground">
               {record.title}
