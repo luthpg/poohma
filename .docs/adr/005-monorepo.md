@@ -24,7 +24,7 @@ pnpm workspace（`pnpm-workspace.yaml`：`apps/*` / `workers/*`）とTurborepo�
 
 - 現状、`apps/web`と`workers/backup`の間でコード共有は発生しておらず、`packages/*`が存在しないシンプルな構成になっている。
 - 今後、複数のアプリケーションやWorkerが暗号化ロジックやスキーマ定義を共有する必要が生じた場合は、`packages/*`ワークスペースを追加する形で拡張することを想定している。加えて、Issue #218「Cloudflare Workers / Pagesへのアプリケーション移管」と #219「Cloudflare移行に伴う外部サービス・Runtime互換性対応」（いずれもopen）が実現すると、`apps/web`のデプロイ先自体が変わり、モノレポ内の構成見直しが必要になる可能性がある。
-- CIは単一ワークフロー（`ci.yml`）でLint・型チェック・ビルド・テストを一括実行しており、`apps/web`と`workers/backup`のどちらか一方の変更でも全体のCIが走る（変更検知によるジョブの絞り込みは現状導入していない）。
+- CIは単一ワークフロー（`ci.yml`）でワークフロー静的解析（actionlint）・Biome Lint・型チェック・ビルド・テストを一括実行しており、`apps/web`と`workers/backup`のどちらか一方の変更でも全体のCIが走る（変更検知によるジョブの絞り込みは現状導入していない）。
 
 ## 関連ドキュメント
 

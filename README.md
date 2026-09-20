@@ -204,6 +204,7 @@ pnpm dev
 | `pnpm build`      | Turborepo 経由で全ワークスペースの本番ビルド      |
 | `pnpm typecheck`  | Turborepo 経由で全ワークスペースの型チェック     |
 | `pnpm check`      | Biomeによる静的解析・フォーマット（自動修正）       |
+| `pnpm lint:workflows` | Docker経由でGitHub Actionsワークフローを静的解析（actionlint + shellcheck） |
 | `pnpm test`       | Turborepo 経由でテスト実行               |
 
 実際のスクリプト名・オプションは `package.json` を正としてください。
