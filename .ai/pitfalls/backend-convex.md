@@ -37,10 +37,10 @@ Convex バックエンド開発における落とし穴と回避法です。
 
 ---
 
-### レコード所有権判定の直接参照
+### レコード所有権・管理者判定のインライン直接評価
 
-- **問題**: `record.ownerType === "family"` や `record.admins` を直接参照すると、移行前の旧レコード（`visibility: "SHARED"`）で正しく判定できない。
-- **回避法**: 必ず `convex/rls.ts` の `getEffectiveOwnerType(record)`, `getEffectiveAdmins(record)` ヘルパーを使用する。
+- **問題**: `record.ownerType === "family"` や `record.admins` を関数ごとにアドホックにインライン評価すると、デフォルト値（`ownerType` 未設定時の `"user"` フォールバック等）の扱い漏れや管理者権限判定の不整合が生じる。
+- **回避法**: 必ず `convex/rls.ts` の `getEffectiveOwnerType(record)`, `getEffectiveAdmins(record)`, `isRecordAdmin(user, record)` ヘルパーを使用する。
 
 ---
 
@@ -80,4 +80,19 @@ Convex バックエンド開発における落とし穴と回避法です。
 - **回避法**:
   - `apps/web/convex/cryptoUtils.ts` に純粋な TypeScript 実装（XOR およびビット演算による定数時間比較ヘルパー `timingSafeEqual`）を用意する。
   - ループ回数を `Math.max(a.length, b.length)` のように入力や秘密値の長さに依存させると、外部から長さを変えて送信された際に時間差変曲点から秘密値長が推測されるリスク（CWE-208）や巨大入力による CPU 枯渇 DoS（CWE-400）が生じるため、**走査ステップ数を固定上限（`FIXED_COMPARE_LENGTH = 256`）に完全固定**し、長さ不一致ビットを蓄積して比較する。
+
+---
+
+### デモファミリーリセットにおける完全リポジトリレス実行とゲストデータ整合性
+
+- **問題**:
+  - 定期実行ジョブ（GitHub Actions cron）で Convex mutation を叩く際、安易に `npx convex run` を使うと設定ファイル参照のためにリポジトリのチェックアウトや Node.js / pnpm のセットアップが必要となり、毎日の実行時間が数分単位に肥大化してリソースを浪費する。
+  - また、デモ環境のリセットにおいて通常の `kickMember`（個人所有レコード保護 + Export Vault 退避 + メール送信）をそのまま呼ぶと、試用ゲストが作成したゴミデータが残り続け、Resend のメール枠も枯渇する。一方で参加申請を全削除すると、前日夜に申請して承認待ちの閲覧者が不意に消去されてしまう。
+- **回避法**:
+  - **HTTP Action 経由の完全リポジトリレス実行**: `http.ts` に `/resetDemoFamily` を配置し、定数時間比較シークレット認証（`x-internal-secret`）を行う。GitHub Actions 側は `actions/checkout` も Node も pnpm も一切不要となり、Ubuntu 標準の `curl` 1行で 1〜2 秒で完了する。
+  - **デモ特化のクリーンアップ整合性**:
+    1. 指定管理者（`DEMO_ADMIN_USER_IDS`）以外のゲストが作成した個人レコード（`ownerType === "user"`）も共有レコード同様にすべて一時データとして完全削除する。
+    2. `pendingExportVaults` への退避およびキック通知メール送信はスキップする。
+    3. `joinRequests` の削除は **作成から 48 時間以上経過した申請のみ** に限定し、直近の申請者を保護する。
+    4. 直近 10 分以内の連続実行は Convex 側のクールダウンガードにより安全にスキップする。
 

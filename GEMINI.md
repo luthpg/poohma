@@ -9,6 +9,8 @@
   - ※ ユーザーから明示的に依頼された新機能実装や機能改善、仕様変更等に伴うプロダクションコード変更は通常通り進めて良い。
 - **コミット前のローカル動的検証（`pnpm test:e2e`）の義務**:
   - UI、認証、E2EE暗号処理、Convexバックエンド連携、データ移行やインポート/エクスポート等、フロントエンドまたは結合動作に影響を与える変更を行った際は、コミット前に必ずローカルで `pnpm test:e2e` を実行し、全テスト合格を確認してからコミットすること。静的チェック（`pnpm verify`）のみで済ませてはならない。
+- **コミット前のワークフロー静的検証（`pnpm lint:workflows`）の義務**:
+  - GitHub Actions ワークフロー（`.github/workflows/*.yml`）の変更・追加を行った際は、コミット前に必ずローカルで `pnpm lint:workflows`（Docker 経由の actionlint + shellcheck）を実行し、全ワークフローのエラー 0 件を確認してからコミットすること。構文ミスや未定義変数のままコミット・プッシュしてはならない。DockerAPIが応答しない場合は、PC側のDocker (Docker Desktop) が未起動の場合があるため、ユーザーに起動依頼を出す。
 - **外部 AI / 静的レビュー指摘（CodeRabbit 等）の審査原則（盲目的追従の禁止）**:
   - CodeRabbit 等の外部 AI レビュアーの指摘をそのまま鵜呑みにしてプロダクションコードに適用してはならない。
   - 特に「フロントエンドへの生エラーメッセージ（`error.message`）露出」「運用方針を無視した過剰なクライアントサイドガードコード」など、PoohMa の不変条件（[`.ai/invariants.md`](./.ai/invariants.md)）やシンプル設計方針（KISS原則）に反する提案は、盲目的に従わず根拠を示して毅然と却下すること。
@@ -49,10 +51,12 @@
 3. **Test (Unit / Integration)**: `pnpm test`
 4. **Build Check**: `pnpm build`
 5. **E2E Test (Dynamic Verification)**: `pnpm test:e2e`
-6. **Full Pipeline**: `pnpm verify`（上記1〜4を一括順次実行）
+6. **Workflow Lint**: `pnpm lint:workflows`（Docker経由で actionlint を実行）
+7. **Full Pipeline**: `pnpm verify`（上記1〜4を一括順次実行）
 
-> **Important (動的テスト事前検証義務)**:
-> UI、認証、E2EE暗号化、Convex、CSV等の変更時は、静的チェックのみでコミットせず、必ずローカルで `pnpm test:e2e` を合格させてからコミットすること。Convex 変更時は事前に `pnpm convex:dev:once` を実行すること。
+> **Important (動的テスト・ワークフロー検証義務)**:
+> - UI、認証、E2EE暗号化、Convex、CSV等の変更時は、静的チェックのみでコミットせず、必ずローカルで `pnpm test:e2e` を合格させてからコミットすること。Convex 変更時は事前に `pnpm convex:dev:once` を実行すること。
+> - GitHub Actions ワークフロー（`.github/workflows/`）変更時は、コミット前に必ずローカルで `pnpm lint:workflows` を実行し合格を確認すること。
 
 ---
 
@@ -107,3 +111,4 @@ poohma/                    # ルート（Turborepo）
 | **スキーマ変更・DBマイグレーション** | [`.ai/domain.md`](./.ai/domain.md)<br>[`.ai/patterns.md`](./.ai/patterns.md)<br>[`.ai/pitfalls/review-and-guardrails.md`](./.ai/pitfalls/review-and-guardrails.md) | ・手動ワンショット移行（CLI）運用<br>・アプリ側に未バックフィル検査ガードを混入させない（自然なフォールバック） |
 | **E2E / ユニットテスト作成・改修・整理** | [`.ai/testing.md`](./.ai/testing.md)<br>[`.ai/workflows/test-refactoring.md`](./.ai/workflows/test-refactoring.md)<br>[`.ai/pitfalls/e2e-testing.md`](./.ai/pitfalls/e2e-testing.md) | ・テスト失敗時のプロダクションコード改変禁止<br>・「削除すると何を見逃すか」基準の重複排除<br>・`convex dev --once` のワンショット実行 |
 | **認証・セッション・暗号(E2EE)** | [`.ai/invariants.md`](./.ai/invariants.md) (1〜4節)<br>[`.ai/pitfalls/auth-session.md`](./.ai/pitfalls/auth-session.md)<br>[`.ai/pitfalls/crypto-e2ee.md`](./.ai/pitfalls/crypto-e2ee.md) | ・長期セッションの Single Source of Truth（Firebase Auth）<br>・Session Cookie の位置付け<br>・鍵階層（DEK / MasterKey / PRF）の破壊防止 |
+| **CI/CD・GitHub Actions 改修** | [`.ai/invariants.md`](./.ai/invariants.md) (第7節)<br>[`.ai/pitfalls/workflow-ci.md`](./.ai/pitfalls/workflow-ci.md) | ・`pnpm lint:workflows` の事前実行義務<br>・`jq --arg` 引数展開<br>・curl タイムアウト必須<br>・変数クォート（SC2086防止） |

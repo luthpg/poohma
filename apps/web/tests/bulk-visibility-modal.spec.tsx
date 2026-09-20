@@ -64,7 +64,7 @@ describe("BulkVisibilityModal Component", () => {
       screen.getByText("選択したレコードを家族全員と共有します。"),
     ).toBeTruthy();
 
-    // 変更方向（PRIVATE → SHARED）と件数
+    // 変更方向（user → family）と件数
     expect(screen.getByText("自分のみ")).toBeTruthy();
     expect(screen.getByText("家族全員に共有")).toBeTruthy();
     expect(screen.getByText("5 件")).toBeTruthy();
@@ -91,7 +91,7 @@ describe("BulkVisibilityModal Component", () => {
       ),
     ).toBeTruthy();
 
-    // 変更方向（SHARED → PRIVATE）と件数（sharedCount: 2 が解除対象）
+    // 変更方向（family → user）と件数（sharedCount: 2 が解除対象）
     expect(screen.getByText("家族全員に共有")).toBeTruthy();
     expect(screen.getByText("自分のみ（個人用）")).toBeTruthy();
     expect(screen.getByText("2 件")).toBeTruthy();

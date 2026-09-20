@@ -1,0 +1,650 @@
+[
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_アップルストア@example.com"
+      },
+      {
+        "label": "サブアカウント",
+        "loginId": "sub_アップルストア@example.com",
+        "passwordHint": "iWjV7ut3BBiGQhQbUtaTHx+ojEAwDRgxPChppN1VKJmx48iJB/h7X/NZOAiu0392L7bJ/6+hml2mx8bk0tDHvyRD",
+        "passwordHintDekEncrypted": "BO0YLhG0y/1uSWj1En/qM5RgVjEAW2LE3e+WNovux6JtQkvX4BOMevOVKIi1rMeN",
+        "passwordHintDekIv": "ulgWo0m7pAMpvYnq",
+        "passwordHintIv": "as1L1iutng35va3U"
+      }
+    ],
+    "memo": "Apple製品購入",
+    "ogpDescription": "下取りや柔軟な支払いオプションで今すぐ購入。パーソナルショッピングのサポートサービスを提供します。送料無料。Apple Storeの魅力のすべてをオンラインでどうぞ。",
+    "tags": [],
+    "title": "アップルストア",
+    "titleReading": "あっぷるすとあ",
+    "url": "https://www.apple.com/jp/shop"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_クックパッド@example.com"
+      }
+    ],
+    "memo": "レシピサイト",
+    "ogpDescription": "利用者数 No.1レシピサービス。食材を検索するだけで今日つくるものがきまります。家庭の簡単実用レシピが多数。自分のレシピを公開できます。",
+    "tags": ["仕事"],
+    "title": "クックパッド",
+    "titleReading": "くっくぱっど",
+    "url": "https://cookpad.com"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_サイゼリヤ公式@example.com",
+        "passwordHint": "B6iQkdPaSIS9dskkPjfQZ4jXWl20lvpzIysqXQMsgLin3Zrt0azQQfiXgp1s8FqtnkDXcsG1sk8=",
+        "passwordHintDekEncrypted": "TnuCDBD3LlWUFo8NyfV/0SM64ElaxZPIH08HqrpI4iByzN3D0EFtFu2dQSsXtdXl",
+        "passwordHintDekIv": "4+WS68PX3O1FA/wq",
+        "passwordHintIv": "WwCUbEmBXTxNi073"
+      },
+      {
+        "label": "サブアカウント",
+        "loginId": "sub_サイゼリヤ公式@example.com"
+      }
+    ],
+    "memo": "ファミレス会員",
+    "tags": ["ショッピング", "メール"],
+    "title": "サイゼリヤ公式",
+    "titleReading": "さいぜりやこうしき"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_ニコニコ動画@example.com",
+        "passwordHint": "DY0g4H7M8fq1JBSB624An0chHWUVi/51hqRcR4JMv4bEHiSt6XZ0FqaDruTHAKHEq29KA3QPQFuAjg==",
+        "passwordHintDekEncrypted": "Qlp65QRDdMLofou4OdtW9YxuWBKQaANQ5uA477/uKk3spX7fMtQIPMlqUCl/unaj",
+        "passwordHintDekIv": "Z7ZcMz35a3c4I+Jn",
+        "passwordHintIv": "8i8YRa24lUd/qjqi"
+      }
+    ],
+    "memo": "動画サイト",
+    "ogpDescription": "日本最大級の動画サービス、ニコニコ（niconico）。動画にコメントを付けて楽しむニコニコ動画や、生放送番組にリアルタイムでコメントを付けられるニコニコ生放送のほか、イラスト・マンガ・最新ニュース・ゲームなど、エンターテイメントを全て無料で楽しめる！",
+    "tags": ["ショッピング"],
+    "title": "ニコニコ動画",
+    "titleReading": "にこにこどうが",
+    "url": "https://www.nicovideo.jp"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_日本経済新聞@example.com",
+        "passwordHint": "4gIi8vuocxi+KsWcD7rW2asNRXzjmv7Uyj7tO/f7FpQiELY5aOh8I67/9aVQRsr/kk4gQSqcqW0=",
+        "passwordHintDekEncrypted": "d3nTpyBMVHaM1cM3lA7Tr4AXd5zHR7n0mPpZfSP0v883BVcCgdfVWwdq1qb4/IHH",
+        "passwordHintDekIv": "kL80yE3F/cDbmDKw",
+        "passwordHintIv": "pCMGtdP3wPVc4tsi"
+      }
+    ],
+    "memo": "ニュース電子版",
+    "ogpDescription": "日本経済新聞の電子版。日経や日経ＢＰの提供する経済、企業、国際、政治、マーケット、情報・通信、社会など各分野のニュース。ビジネス、マネー、IT、スポーツ、住宅、キャリアなどの専門情報も満載。",
+    "tags": [],
+    "title": "日本経済新聞",
+    "titleReading": "にほんけいざいしんぶん",
+    "url": "https://www.nikkei.com"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_ビックカメラ_com@example.com",
+        "passwordHint": "J1oDdoqUIc16UQbfdygzynHXMQFGHH5JsDqDpXk14ZS1Cl8DAmt3kJWb9c4T1ycj1wQ=",
+        "passwordHintDekEncrypted": "5oi6sWifWS805pUyUgwOiiKGX0OXyi06z5mBedK89QiuwER2JZ9WuEn8bzjAwriW",
+        "passwordHintDekIv": "1EuxAluUwB9IEq4u",
+        "passwordHintIv": "UeyLJbi3rUBBLtSw"
+      }
+    ],
+    "memo": "家電通販",
+    "tags": ["クラウド"],
+    "title": "ビックカメラ.com",
+    "titleReading": "びっくかめら.com",
+    "url": "https://www.biccamera.com"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_マネーフォワード@example.com",
+        "passwordHint": "d7o3P4bFn5HxwThRq6OM3o3ITYJNTAMU2JQeDRUwjv06mFQ08PhLEz8qIZ0SrxGl8K+SFQYi4gIMO36V85GvRm4TUQ==",
+        "passwordHintDekEncrypted": "QbCfPXqDHUE0zVX+tGj+3AOB3yjN04yTp6SKuRntUiKyeSY7HM/84EE/ExcNdmKc",
+        "passwordHintDekIv": "xy7GIWtfpMRPj4FL",
+        "passwordHintIv": "zFsKAppNMBqe3LIE"
+      },
+      {
+        "label": "サブアカウント",
+        "loginId": "sub_マネーフォワード@example.com",
+        "passwordHint": "nToS3t7FfHrWaf6/fFcuABm8+VfSgcW+u6FXtkqAcXGaJavokd8qD+R6lZLhjBfng4iozPpqEEc=",
+        "passwordHintDekEncrypted": "BS83mc+jPRJDmsuVfjKo5ZPPGIxGK5n8pbSWct2Tx6pZZpKdtxiOD0KGtlySQ9Uz",
+        "passwordHintDekIv": "EQKz90/Sc2aXAN9v",
+        "passwordHintIv": "is0DH2WiCj35CSLa"
+      }
+    ],
+    "memo": "家計簿・資産管理",
+    "ogpDescription": "すべての人のお金のプラットフォーム MoneyForward - お金・資産管理なら家計簿アプリ「マネーフォワード ME (ミー)」を今すぐダウンロード！法人・個人事業主向け「マネーフォワード クラウド」で会計ソフトなどバックオフィス効率化も",
+    "tags": [],
+    "title": "マネーフォワード",
+    "titleReading": "まねーふぉわーど",
+    "url": "https://moneyforward.com"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_ゆうちょダイレクト@example.com",
+        "passwordHint": "4tJRBDRJrtVPXZHN9cJAiAYT4dJuGaCkSUKdCaYCXVeButC8H6BOV52XNXWcco39JcSPMLo=",
+        "passwordHintDekEncrypted": "wl2+zamP2i33Yb12p8PbNWOB2T8vSlNjtqJqMeXtD415jqDb25nVMv5VIC6eW/L1",
+        "passwordHintDekIv": "8BviI76h8pc4/Do7",
+        "passwordHintIv": "25OYlV8Br4OvpwbP"
+      }
+    ],
+    "memo": "ネットバンキング",
+    "tags": ["学習"],
+    "title": "ゆうちょダイレクト",
+    "titleReading": "ゆうちょだいれくと"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_ワークマンオンライン@example.com",
+        "passwordHint": "K3bPuKICmGYRfGQ2vwOWn+2oDZOR7eB95sliL6076woWuVenI2srUhQ4tBa7H5rdcx6i4WTqH4OZcM7p4utF4u+llYs=",
+        "passwordHintDekEncrypted": "tAuMbul36SNG64gAwNFt/luPF0StUGoutlDeKRPbrVhzXSL3LdVH2DJsMwrjUq1C",
+        "passwordHintDekIv": "yTrgCDfqibvS/o8H",
+        "passwordHintIv": "D5UHshiuHiAnq9mX"
+      },
+      {
+        "label": "サブアカウント",
+        "loginId": "sub_ワークマンオンライン@example.com",
+        "passwordHint": "ZDaLyE7CFZqooTV1TPwymtG76QA30WoaZtpPY89gJzKQYRM7lA==",
+        "passwordHintDekEncrypted": "YjrhnTki4vssPUjI5/ICRcZ2zDEv7qssFZh5wDSehcqBe6VgDImCxgyG+6g52I5W",
+        "passwordHintDekIv": "6YZxk/KtDVxdZle+",
+        "passwordHintIv": "hUoQ7zUeUs0O9ldU"
+      }
+    ],
+    "memo": "作業着・アウトドア",
+    "ogpDescription": "ワークマン公式オンラインストアでの通販は全国のワークマン店舗で受け取れば送料無料！！お買上1万円以上も送料無料！話題のアウトドアウェアや人気の防寒ウェア、かっこいい作業着の店舗取り置きが可能です。ネット通販でも法人対応可能！作業服・作業着の大量注文お任せください。",
+    "tags": [],
+    "title": "ワークマンオンライン",
+    "titleReading": "わーくまんおんらいん",
+    "url": "https://workman.jp"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_adobe_creative_cloud@example.com",
+        "passwordHint": "kuvZVxQn1lyYKE7H4gotFxuhxGhLQa6UJSPAwYY+up2W2xeG6lFtWNUdjCQjeHU2Cpy8baiDPNaOZwd/ok9a5QEgBysCOg==",
+        "passwordHintDekEncrypted": "bhFXESQbxRlCubfOdZM7Vzei3JVROXkUYt84tFs9n32jUuStlrwGMG1CxJNBtQgZ",
+        "passwordHintDekIv": "rUJNE3EC1YnRHqZy",
+        "passwordHintIv": "s7l30OaA0lqDwqIk"
+      }
+    ],
+    "memo": "デザインツール",
+    "ogpDescription": "Adobe is changing the world through digital experiences. We help our customers create, deliver and optimize content and applications.",
+    "tags": ["金融", "ショッピング"],
+    "title": "Adobe Creative Cloud",
+    "url": "https://www.adobe.com"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_amazon@example.com",
+        "passwordHint": "fdaEDnfNVqC2TidRRRoeg/5yR6UceyuLTuePXYyZgb2XnScUrctfyoLIHFhLvzBlNcgY5KIt2+hq79Rt",
+        "passwordHintDekEncrypted": "O38ZzhWSNplK743PyhJ+8HtbR4XSkEBwtGN2fR7Q0Hmb61G+b8mynJmDhJeQF9SW",
+        "passwordHintDekIv": "Btk5Wmspyz2GZQFS",
+        "passwordHintIv": "DoT/s3xU0Cc/iC5D"
+      },
+      {
+        "label": "サブアカウント",
+        "loginId": "sub_amazon@example.com",
+        "passwordHint": "H/R6h/I6yo7tUdjQyE4lUluxR5mnpIP/7qxohu+ALJ0QkI+swTHXCKAcUIA6Nkldedo8yF1U7zElVw==",
+        "passwordHintDekEncrypted": "Nxm4wGI/jGRwj7e6Gw/Oi5ZRJZ6UpDhfJxlPcfojRzgy7Kxq86TWaT7FI36KEJxG",
+        "passwordHintDekIv": "n3hXIbtFH4QPeOXB",
+        "passwordHintIv": "/L8wVLfmQkYeZjkg"
+      }
+    ],
+    "memo": "お買い物用アカウント",
+    "ogpDescription": "Amazon.co.jp 公式サイト。アマゾンで本, 日用品, ファッション, 食品, ベビー用品, カー用品ほか一億種の商品をいつでもお安く。通常配送無料(一部を除く)",
+    "tags": ["ゲーム"],
+    "title": "Amazon",
+    "url": "https://www.amazon.co.jp"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_bitwarden@example.com",
+        "passwordHint": "yuo2bd/uSvOz986sp4lBfD2vqDTtWL7pgxDSJqDhCsdA4XAYzi604zPj8didLSLUdN3mIoZgB6ajOuJy2v1rLpI=",
+        "passwordHintDekEncrypted": "gCG/b5yXX6H1MJuVscBxuiCkycQH4JPjlWMd55PigKZDL4N+s3uQH3BV5vQ+kktm",
+        "passwordHintDekIv": "4UcJ6Hcxm09IScWR",
+        "passwordHintIv": "ZarJi/bEqFbSbcs5"
+      }
+    ],
+    "memo": "パスワードマネージャー",
+    "tags": [],
+    "title": "Bitwarden",
+    "url": "https://vault.bitwarden.com"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_bluesky@example.com",
+        "passwordHint": "FWL/DGBalfbHxCyjpYVGUtCMzHqX7a2sZ62QKYCTG+eZSsWwVdyoPpnArNwdTHQbwu9ACxbW8j2poQ==",
+        "passwordHintDekEncrypted": "ZgyxDy6Xx62leBtNLfsE59qG0zmzUtheGLz5YQ9ovpS9Pk+qDj7McSjjIKd1i+j5",
+        "passwordHintDekIv": "uYssFRuECI68Dp8m",
+        "passwordHintIv": "N5fefElx37ycFywu"
+      }
+    ],
+    "memo": "分散型SNS",
+    "ogpDescription": "Social media as it should be. Find your community among millions of users, unleash your creativity, and have some fun again.",
+    "tags": [],
+    "title": "Bluesky",
+    "url": "https://bsky.app"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_evernote@example.com",
+        "passwordHint": "b5xJbQaa36DGoI7kS/yISzWjvHyBZlLVIA2/uUIt+JU/En5uHyIhJYdt19rjDI1dMAhTsfv7Ej5dFujTml+c1w==",
+        "passwordHintDekEncrypted": "fVDZT17C284LPzcrsGJ8fVWLyU43bDPF7VwexZkDqg3ICQtsfv+QI4A16Zw+8ZSt",
+        "passwordHintDekIv": "KVQZS3nsQIMmd2Cd",
+        "passwordHintIv": "aQjDIJTyy75PU6Xd"
+      }
+    ],
+    "memo": "ノートアプリ",
+    "ogpDescription": "Our note taking app helps you capture and prioritize ideas, projects and to-do lists, so nothing falls through the cracks. Start your free trial today!",
+    "tags": [],
+    "title": "Evernote",
+    "url": "https://evernote.com"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_figma@example.com",
+        "passwordHint": "aKRHrzsLgt+shlUWQRdHnzfKbDfuSdnnuFrFplQ1O8qL6b/GNW2dmE3ilYKStehAuu2yjl98NK89TKrHv18=",
+        "passwordHintDekEncrypted": "Szd7vhE8VSD1CKtpE7tQnoV+DHmVX0JMwmIsuaDoMXjBM3RbtcFRRr8hxfGFrOoB",
+        "passwordHintDekIv": "zVPoIA92M9BeCZrf",
+        "passwordHintIv": "a0tKgbN06znzRJ2v"
+      },
+      {
+        "label": "サブアカウント",
+        "loginId": "sub_figma@example.com"
+      }
+    ],
+    "memo": "UI デザインツール",
+    "ogpDescription": "Figma is the canvas where design, code, and AI come together. From first idea to shipped product — go from concept to production with your whole team, in one place.",
+    "tags": ["ニュース"],
+    "title": "Figma",
+    "url": "https://www.figma.com"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_github@example.com",
+        "passwordHint": "U3Wa68GoQaIdEDepZmcyHUOtOflHBVzwCBHyVPjioCVEc4grvON3tIFLUVZADDqx6kms4gsQBB2FjInHpbYMHfcTUno=",
+        "passwordHintDekEncrypted": "0dgZXenqcOflDT6JEuUgVW42y17u9SbAVa6b8yEQNTSG8FLxPt+sEVRs+OP6CZHz",
+        "passwordHintDekIv": "YFDjnOGJzMfmYPyF",
+        "passwordHintIv": "yZjnPA9Z9rJ/PRgv"
+      }
+    ],
+    "memo": "ソースコード管理",
+    "ogpDescription": "Join the world's most widely adopted, AI-powered developer platform where millions of developers, businesses, and the largest open source community build software that advances humanity.",
+    "tags": ["ゲーム", "動画"],
+    "title": "GitHub",
+    "url": "https://github.com"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_icloud@example.com",
+        "passwordHint": "AdLipJzFsbh5aTturR0rg+AGtpmDhTb0RHwQ4njZWlnP7b0iVGW8xgzSyQFFAmxR9V/dmHWN3DhT",
+        "passwordHintDekEncrypted": "RB2eFlaVUeCoR1AhNeUN0WYwyGCEg+VuA2GrnEcMe89L9HeAp/YrrhBMOSZDYxwl",
+        "passwordHintDekIv": "DkePGF218xaXkHC0",
+        "passwordHintIv": "Qqzk4gYX/BFZI52G"
+      }
+    ],
+    "memo": "Appleクラウド",
+    "ogpDescription": "Log in to iCloud to access your photos, mail, notes, documents and more. Sign in with your Apple Account or create a new account to start using Apple services.",
+    "tags": ["ショッピング"],
+    "title": "iCloud",
+    "url": "https://www.icloud.com"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_instagram@example.com",
+        "passwordHint": "BtTQ9p7CZdaDfvq/4UDzumW7s7jeRybieJZMdrz9QM2dDcvrA7WvJopWaW2OCQVeEB0NqcrtpJbHeqIH/0v+9r6VZK53vQ==",
+        "passwordHintDekEncrypted": "lD8JpWsh2aW+h4g1m7AYV7SrtPfbG49Lz0gr2EcpUgd8+UXvuolSUw5UOUtzZRSZ",
+        "passwordHintDekIv": "tElTjsuRTA8/kRWl",
+        "passwordHintIv": "jWpLgsN/nHncxUoW"
+      }
+    ],
+    "memo": "写真SNS",
+    "ogpDescription": "Create an account or log in to Instagram - Share what you're into with the people who get you.",
+    "tags": ["クラウド"],
+    "title": "Instagram",
+    "url": "https://www.instagram.com"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_kickstarter@example.com",
+        "passwordHint": "kIAfRxiMc2uuZctNOfe/dWzbQJeGIq+dicqB+cfPs11GZ/nPiEMJWrHBUI7VRoxWzGNQ3HEpz1dsxh3anqUf9jc=",
+        "passwordHintDekEncrypted": "ZWJCq7fGKU2W1VuLe+byr+2usncK+2qUmqgBScs4snJicxrgj/cF1AHMl8Qxm95b",
+        "passwordHintDekIv": "y0AH93ygXe+nTlL6",
+        "passwordHintIv": "mJG9394C1mYc5EJF"
+      }
+    ],
+    "memo": "クラウドファンディング",
+    "tags": ["ゲーム"],
+    "title": "Kickstarter",
+    "url": "https://www.kickstarter.com"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_kindle_unlimited@example.com",
+        "passwordHint": "NgM1CuFqmVdn+YSFb+Jtcrxm/2b9loE2T4CoctwZtoWfLx532vZBCHcfLxXskg==",
+        "passwordHintDekEncrypted": "w890UXz7yGaBhSWYiqrw4LEXo6K+FPclV/hDzQplacEgpThRjbWhFLESoso+fT04",
+        "passwordHintDekIv": "/zqaSkziGe9CbdDz",
+        "passwordHintIv": "yV67lKVIduc4sKhV"
+      }
+    ],
+    "memo": "読み放題",
+    "tags": [],
+    "title": "Kindle Unlimited",
+    "url": "https://www.amazon.co.jp/kindle-dbs/hz/subscribe/ku"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_linkbox@example.com",
+        "passwordHint": "rHZ2LwfrbX27GTtxgdvw1kKH5bZpjCOEcjUIMRG+Na3/6r6RW7klIOZbzoo7ZQ/VgzVDAgq4ReE9tW0S+CQ=",
+        "passwordHintDekEncrypted": "SnoMviSfkz+419TCHbavzNPr0mleKEOiIs0UAnXMjOqVQJwjx3yMmx8m3mdk6Q76",
+        "passwordHintDekIv": "Vr4b5KfUFCbXLhQR",
+        "passwordHintIv": "/vytnFicPRkWimJj"
+      }
+    ],
+    "memo": "リンク管理ツール",
+    "ogpDescription": "Your personal bookmark manager",
+    "tags": ["仕事", "ショッピング"],
+    "title": "Linkbox",
+    "url": "https://linkbox.ciderlabs.link"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_microsoft_365@example.com",
+        "passwordHint": "vG5Zeeb3IEQUawiRCkB0/Ked9EHJ/YHlU2xYX3aahJj8xhC23Q/sVpXF/3dkWh9E0ye7gEPuhv7D6F9hoHM86Q==",
+        "passwordHintDekEncrypted": "bh9sDJ2dmxWaiTgx1OXMfRkY4PnZUTX3WB6MeDjRI3ZxH3k5uw3+TbFnFB+l2eXG",
+        "passwordHintDekIv": "8kxCShe2lCExis1i",
+        "passwordHintIv": "gV9bZ07xw6ls5wPB"
+      }
+    ],
+    "memo": "Office ツール",
+    "tags": ["動画"],
+    "title": "Microsoft 365",
+    "url": "https://www.microsoft365.com"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_netflix@example.com",
+        "passwordHint": "RUvbW9RnlPci4i5aMXLwwSybKD/ZctvC6aqdw0FDRWdjxOjwjVBPjbeOwqPNnfx8C4G6IGEAjb2mSjQ0V39fqxf2w6p9VRXoPbjWRw==",
+        "passwordHintDekEncrypted": "TM2M7nWYuQQzUxMeSZaWOHbPA+YPSUoJXQaOjuyAyIKG3YsE9WQdAdd9gHyP7lb6",
+        "passwordHintDekIv": "EWQjAEY41kdrmIht",
+        "passwordHintIv": "EgPJGgYzLp/vYOrP"
+      }
+    ],
+    "memo": "動画ストリーミング",
+    "ogpDescription": "Watch Netflix movies & TV shows online or stream right to your smart TV, game console, PC, Mac, mobile, tablet and more.",
+    "tags": ["金融"],
+    "title": "Netflix",
+    "url": "https://www.netflix.com"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_outlook@example.com",
+        "passwordHint": "OPL7LiBw6h/SesJ8tjbT+MFp9adQtsMPcy577eKQUrhfXSmlG7hQcIhg6bCD2stjBGM/m5mz2IaAEoFyYg==",
+        "passwordHintDekEncrypted": "hlReEsaHFqTr6pwkMe5QCqI0x0ath/veNqOt/jrYIA+ri2tpvAcSBbbfsxLeVQnw",
+        "passwordHintDekIv": "Rg3srS85yOM0gsp2",
+        "passwordHintIv": "r6Z4JJ+GMSObqqpC"
+      },
+      {
+        "label": "サブアカウント",
+        "loginId": "sub_outlook@example.com"
+      }
+    ],
+    "memo": "メールサービス",
+    "tags": ["SNS", "動画"],
+    "title": "Outlook",
+    "url": "https://outlook.live.com"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_poohma@example.com",
+        "passwordHint": "DjGlGPHPZsbXywEU7vCc+YQJcjNWZ21pLyNogUZI3y8Z653nLfq+gjB2M6AOeNFc2aEU8D031pK+otJQ4y5wOK6+iLEsBDg=",
+        "passwordHintDekEncrypted": "M30j6KrehjZkEHZZlSROm8ngFwEL5f1ZR08W8Zw+hZsVV32lnRn7sRXKTtDxzq7A",
+        "passwordHintDekIv": "y7CbegdDhGMkHJk/",
+        "passwordHintIv": "i2wvYF2uQ6zDfk1h"
+      }
+    ],
+    "memo": "パスワード管理アプリ",
+    "ogpDescription": "家族でアカウント情報を安全に共有・管理。パスワードのヒントを暗号化して安全に管理しよう！",
+    "tags": [],
+    "title": "PoohMa",
+    "url": "https://poohma.ciderlabs.link"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_quickbooks@example.com",
+        "passwordHint": "h8EhTs3G4sPtUlhsrD7az5ncp8J9JKQwMKvMumer7c/grzrd56x3iZMVU2Pmaw1S383643nH436345s=",
+        "passwordHintDekEncrypted": "GcDprsBN5lvR/H3pIKdO/XXBjfMOP7Ao5+rS2Jqn6wUMrbg3n4ZV6wdkFGlPc8g3",
+        "passwordHintDekIv": "Q5P7YInstew0eXtN",
+        "passwordHintIv": "CLsuQEB6Rri/Qe5R"
+      }
+    ],
+    "memo": "会計ソフト",
+    "ogpDescription": "Organize & manage your business with the #1 rated solution. Fast & easy setup. Sign up for a free trial to join 7 million businesses already using QuickBooks.",
+    "tags": ["仕事", "金融"],
+    "title": "QuickBooks",
+    "url": "https://quickbooks.intuit.com"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_rakuten@example.com",
+        "passwordHint": "icqzaHC8G7GD0+cSnnEyU4hHjFajpOdoz18ol5axdOLIaKhxGsi/uFpYiyFLtlvhdIC+qUjSpM2AZazwj8M=",
+        "passwordHintDekEncrypted": "HkYAbbUOndSXXTV2wIPWVUqvKCtSePz/JKE1ZIRElBDyiNCQsuUN2OooU5gq1eas",
+        "passwordHintDekIv": "YHTR0pLepjbcjDbo",
+        "passwordHintIv": "c8qQ9Tj1NpqJAphz"
+      }
+    ],
+    "memo": "ネットショッピング",
+    "tags": [],
+    "title": "Rakuten",
+    "url": "https://www.rakuten.co.jp"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_spotify@example.com",
+        "passwordHint": "BurF+Zpp1Jc3xw94Uye1st9lQH/bmh54fwjFc8U7vxoP/F9d/iDKBj076xzHoqkPEqlTb4oqT4avv+DH3FY9QOVOZwOHq0228qYTP71g9TA7z9Ns5Q==",
+        "passwordHintDekEncrypted": "IHhwB7oFUsP9L872DNKLtoHNehhgb1hgZlClhCL5w2ndFT1GZFoGM7vOjG4XPWX1",
+        "passwordHintDekIv": "NB4sPnqnlMH5NIJ2",
+        "passwordHintIv": "RRj2Q0egrGb0YZ+8"
+      }
+    ],
+    "memo": "音楽ストリーミング",
+    "ogpDescription": "Spotify is a digital music service that gives you access to millions of songs.",
+    "tags": [],
+    "title": "Spotify",
+    "url": "https://open.spotify.com"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_unity@example.com"
+      },
+      {
+        "label": "サブアカウント",
+        "loginId": "sub_unity@example.com"
+      }
+    ],
+    "memo": "ゲームエンジン",
+    "ogpDescription": "Develop, deploy, and grow with Unity, the world’s leading 3D game engine. Build for all major platforms from mobile, to PC and console as well as XR, acquire players, monetize your game, and power industrial applications.",
+    "tags": [],
+    "title": "Unity",
+    "url": "https://unity.com"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_whatsapp@example.com"
+      },
+      {
+        "label": "サブアカウント",
+        "loginId": "sub_whatsapp@example.com"
+      }
+    ],
+    "memo": "メッセンジャー",
+    "ogpDescription": "Use WhatsApp Messenger to stay in touch with friends and family. WhatsApp is free and offers simple, secure, reliable messaging and calling, available on phones all over the world.",
+    "tags": ["仕事"],
+    "title": "WhatsApp",
+    "url": "https://www.whatsapp.com"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_wikipedia@example.com"
+      },
+      {
+        "label": "サブアカウント",
+        "loginId": "sub_wikipedia@example.com",
+        "passwordHint": "7MTn6d98hZxlMV4Wo4gM9H+Aen3baj3DxatITjSnZjWJkv2xultipZ6NDb5gFErrJHu7GfWMseQ=",
+        "passwordHintDekEncrypted": "tOqvRj3VfFTVry6Kawab61zXSxh4UtfJZS1umIvg+uo871FHPU90WFY81P1CS1Sf",
+        "passwordHintDekIv": "zx0ARV+kvVZ5iwWQ",
+        "passwordHintIv": "Ff9kIZ7pe2HiWG8S"
+      }
+    ],
+    "memo": "オンライン百科事典",
+    "ogpDescription": "Wikipedia is a free online encyclopedia, created and edited by volunteers around the world and hosted by the Wikimedia Foundation.",
+    "tags": ["SNS", "ツール"],
+    "title": "Wikipedia",
+    "url": "https://www.wikipedia.org"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_youtube_premium@example.com",
+        "passwordHint": "+6SPjE5OhFO7ndo8JK89Dv1bv+o5k11MKdVhH7tX00zk17a7blUMffOGCHbRSVExcoHtkg==",
+        "passwordHintDekEncrypted": "DQ09PNAkBeS3gaApKpxY5YzamzyKw67A9IK3ooxfwp4Xp/X31FJm5xxmdxz9VWCh",
+        "passwordHintDekIv": "UMZrILqSgTQlLE/9",
+        "passwordHintIv": "y7AMNLbdBkjgTW7e"
+      },
+      {
+        "label": "サブアカウント",
+        "loginId": "sub_youtube_premium@example.com"
+      }
+    ],
+    "memo": "動画広告なし",
+    "ogpDescription": "With YouTube Premium, enjoy ad-free access, downloads, and background play on YouTube and YouTube Music.",
+    "tags": ["ショッピング", "学習"],
+    "title": "YouTube Premium",
+    "url": "https://www.youtube.com/premium"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_zenn@example.com",
+        "passwordHint": "j/nKFsLudZIxDzn0RpPZe26gmbEf/FsTrJkg7yvqgH4Ef/DH20lQbJvF4bJrtiO4zrxTo3Ft5Vdq7TnD3/KaLF+NbVHLZuqNPw/thw==",
+        "passwordHintDekEncrypted": "P9wd25Xu/tnhJ8dliiKIBbJ+LQAnUsoZSFcZVPAaqkgT9XdtzdmSmCcZgw4CYbL+",
+        "passwordHintDekIv": "7VPMyptqh5vYOe0Z",
+        "passwordHintIv": "nGnH8sU6yJZkn4qQ"
+      }
+    ],
+    "memo": "技術情報プラットフォーム",
+    "ogpDescription": "Zennはエンジニアが技術・開発についての知見をシェアする場所です。本の販売や、読者からのバッジの受付により対価を受け取ることができます。",
+    "tags": [],
+    "title": "Zenn",
+    "url": "https://zenn.dev"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_zoom@example.com",
+        "passwordHint": "rs5qSfefYaGy6igexVYexEpwg+pGBuyu0XgKBRYM/IwZ01AToXdfWUgg9YRJx+S7D1rCWP0fAqZEt9T5Q0k=",
+        "passwordHintDekEncrypted": "lSs1IleZsv9AzbpY5k89raonJNF8fh+g0pB24QEBARktFrM0BZ0rks3ipJy0kWHo",
+        "passwordHintDekIv": "WDi2J8gUZ27RJVYf",
+        "passwordHintIv": "Yp4ByJCIlf7OYDQe"
+      },
+      {
+        "label": "サブアカウント",
+        "loginId": "sub_zoom@example.com"
+      }
+    ],
+    "memo": "ビデオ会議",
+    "ogpDescription": "Modernize workflows with Zoom's trusted collaboration tools: including video meetings, Zoom Chat, VoIP phone, webinars, whiteboard, contact center, and events.",
+    "tags": ["ツール", "仕事"],
+    "title": "Zoom",
+    "url": "https://zoom.us"
+  },
+  {
+    "credentials": [
+      {
+        "label": "メイン",
+        "loginId": "user_東京都水道局@example.com",
+        "passwordHint": "JRdJuBrl9A72PH1lP+QQuGkAXRN8LvVcuTy8Lgm8OaJueSSaveBd/IgPxR1kqS+rFEAukyt4WUvF3XHANajgWzDmmKguy3ArQEo=",
+        "passwordHintDekEncrypted": "z2CsNyXLdM8GxycaKloYRLQftZ9QWS/U/4LcQSWg4EE3kD06oMgrvCc+eXyjXX5V",
+        "passwordHintDekIv": "q5F6ZpXluS8bnqcI",
+        "passwordHintIv": "5tfvsZygR8Ody44x"
+      },
+      {
+        "label": "サブアカウント",
+        "loginId": "sub_東京都水道局@example.com",
+        "passwordHint": "FUvIbqhv+p2+bWJzuEBc7XOgieaamCcDJoys7tnt2L7FEuJFg8GgCGrf2UMz+btNC4PyyA==",
+        "passwordHintDekEncrypted": "fjd9xD14jYWLWf/LtkfSRWevBSoaYFPUqV5nWt7oNJucOkkPpToZ5HhFLnS9iKfd",
+        "passwordHintDekIv": "VmU6WArWXYNGXa8j",
+        "passwordHintIv": "kX73EbhuOFqk5/ov"
+      }
+    ],
+    "memo": "水道料金支払い",
+    "tags": ["SNS"],
+    "title": "東京都水道局",
+    "titleReading": "とうきょうとすいどうきょく"
+  }
+]

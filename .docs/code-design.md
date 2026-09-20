@@ -33,7 +33,7 @@ PoohMaは、フロントエンドとサーバーサイド処理を単一のTanSt
 [Convex Cloud]
   ├─ Query / Mutation (families / users / records)
   ├─ Action (actions.ts: OGP取得, ふりがな取得, メール送信)
-  ├─ HTTP Action (http.ts: getUserByFirebaseUid ─ 内部シークレット認証)
+  ├─ HTTP Action (http.ts: getUserByFirebaseUid, resetDemoFamily ─ 内部シークレット認証)
   ├─ Cron (crons.ts: 期限切れ家族移行データ・Export Vault・家族招待・編集セッション・監査ログの定期クリーンアップ)
   └─ 外部連携
        ├─ Resend (メール送信)
@@ -573,7 +573,59 @@ ConvexReactClient / TanStack Query の Mutation実行を共通ラッパーでイ
   - 認証状態の監視において、未認証時にサーバー側セッションCookieを用いたサイレント再認証（getCustomTokenFromSession）を行う（checkRevoked: true で検証）
   - ただし localStorage に LOGOUT_FLAG_KEY が存在する場合、または storage イベントで他タブのログアウトを検知した場合はログアウト状態と判定し、サイレント再認証をスキップして即時未認証状態（isAuthenticated=false）に確定させる
   - ユーザーが明示的に再ログインに成功した時点で LOGOUT_FLAG_KEY を削除する
+
+### 5.7 デモファミリー環境 & 定期リセット設計（convex/demo.ts, FR-FAM-14）
+
+ポートフォリオ閲覧者や試用希望者向けに、あらかじめ代表的なサービスレコードが登録された「デモファミリー」を提供し、定期・手動リセットを行う。
+
+```txt
+構成とフロー：
+1. 参加体験（KISS原則・プロダクション保護）:
+   - 既存の招待・参加申請フロー（createJoinRequest → 管理者手動承認 → 合言葉入力）をそのまま利用。
+   - プロダクションコードへの条件分岐や改変は行わず、手動承認により「家族の承認制によるセキュリティ」を実演可能。
+   - 招待コードは有効期限 2099年（FAR_FUTURE_MS）として無期限維持。
+
+2. 定期・手動リセット（convex/demo.ts: resetDemoFamilyInternal）:
+   - 実行契機: GitHub Actions cron（毎日午前4:00 JST）または手動トリガー（workflow_dispatch）
+   - HTTP Action POST /resetDemoFamily（x-internal-secret 定数時間比較認証）経由で呼び出し（完全リポジトリレス実行）
+   - 処理手順:
+     a. 環境変数照合（フェイルセーフ）: DEMO_FAMILY_ID および DEMO_ADMIN_USER_IDS（複数可）の存在・実在を検証。指定管理者が0名またはファミリー管理者権限（familyRole === "admin"）不在時は異常事態として例外送出。
+     b. クールダウンガード: 直近10分以内のリセット監査ログを探索し、存在する場合は安全にスキップ（他操作ログにマスクされない堅牢な判定）。
+     c. 対象特定: DEMO_ADMIN_USER_IDS 以外のメンバーを「ゲスト（guestUsers）」として抽出（手違いで familyRole が admin となっている非管理者も確実にキック）。
+     d. レコード完全消去: 共有レコード（familyId === DEMO_FAMILY_ID）に加え、ゲストが作成した個人レコード（ownerType === "user"）も含めてクレデンシャル・セッション・閲覧ログとともに完全削除。
+     e. ゲストkick: 全ゲストの familyId を undefined に更新（通知メールはスキップ）。
+     f. 申請クリーンアップ: 48時間以上経過した joinRequests のみを削除（直近の承認待ち申請を保護）。
+     g. 初期データ再投入: demoRecords.json（E2Eシード由来の暗号化済み実データ）からレコード・クレデンシャルを一括再作成。
+     h. 招待コード維持: DEMO_INVITE_CODE を 2099 年まで有効に更新・維持。
+     i. 監査ログ記録: 実行者・理由・件数を記録し、結果オブジェクトを返却。
+
+3. データ抽出（convex/demo.ts: exportDemoRecordsInternal）:
+   - GUI/CSVインポートで正常にブラウザ暗号化された実データを Convex DB から demoRecords.json のフォーマットで抽出する internal query。
+   - `pnpm demo:export`（apps/web/scripts/export-demo-records.ts）によりローカル JSON をいつでも最新化可能。
 ```
+
+#### デモ環境 運用手順ガイド（Runbook）
+
+1. **初回セットアップ（環境変数・シークレット）**:
+   - **Convex Dashboard**（または `npx convex env set`）:
+     - `DEMO_FAMILY_ID`: デモファミリーの `Id<"families">`
+     - `DEMO_ADMIN_USER_IDS`: 管理者のユーザーID（カンマ区切りで複数可。PoohMaアカウントID `_id` または Firebase UID のいずれでも可）
+     - `DEMO_INVITE_CODE`: 固定招待コード（例: `5f76e73f-ea8b-485f-900b-ffc61a69d83b`）
+     - `CONVEX_INTERNAL_SECRET`: HTTP Action 認証用シークレット（高エントロピー文字列）
+   - **GitHub Secrets** (Settings > Secrets and variables > Actions):
+     - `CONVEX_SITE_URL`: Convex HTTP Action のベース URL（例: `https://xxxx.convex.site`）
+     - `CONVEX_INTERNAL_SECRET`: 上記 Convex と同一の共有シークレット
+     - `DISCORD_WEBHOOK_URL`（任意）: リセット結果通知先 Discord Webhook URL
+
+2. **デモデータの更新・最新化フロー**:
+   - 管理者アカウントでデモファミリーにログインし、新規レコードの登録や CSV インポート（`apps/web/e2e/fixtures/demo_seed_records.csv`）を実行してブラウザ側で正常に E2EE 暗号化された状態を作成。
+   - ローカルターミナルで `pnpm demo:export` を実行。Convex から暗号化済み共有レコードを抽出し、`apps/web/convex/demoRecords.json` を最新化。
+   - 変更された `demoRecords.json` をコミット・デプロイすることで、次回リセット以降の初期投入データとして永続化。
+
+3. **リセット実行（定期 & 手動）**:
+   - **定期実行**: 毎日午前4:00 JST (19:00 UTC) に GitHub Actions cron により自動実行。
+   - **手動実行**: GitHub Actions の「Reset Demo Family」ワークフローから `workflow_dispatch` で理由（`reason`）および必要に応じて強制フラグ（`force`）を指定して即時実行可能（10分間のクールダウンガード付き）。
+   - **結果確認**: GitHub Actions の Step Summary および Discord Webhook（設定時）に、実行ステータス・招待コード・キック人数・削除/投入件数が出力される。
 
 ## 6. 暗号化設計（E2EE）
 
