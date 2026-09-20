@@ -85,10 +85,12 @@ jobs:
           echo "Response: ${HTTP_BODY}"
 
           # 結果を環境変数/ステップ出力に保存（成否判定前に必ず出力）
-          echo "http_status=${HTTP_STATUS}" >> $GITHUB_OUTPUT
-          echo "response_body<<EOF" >> $GITHUB_OUTPUT
-          echo "$HTTP_BODY" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo "http_status=${HTTP_STATUS}"
+            echo "response_body<<EOF"
+            echo "$HTTP_BODY"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
           if [ "$HTTP_STATUS" -ne 200 ]; then
             echo "::error::Convex reset endpoint failed with HTTP ${HTTP_STATUS}: ${HTTP_BODY}"
@@ -111,7 +113,7 @@ jobs:
             INSERTED_COUNT=$(echo "$RESPONSE_JSON" | jq -r '.insertedRecordsCount // 0')
             INVITE_CODE=$(echo "$RESPONSE_JSON" | jq -r '.inviteCode // "N/A"')
 
-            cat <<EOF >> $GITHUB_STEP_SUMMARY
+            cat <<EOF >> "$GITHUB_STEP_SUMMARY"
           ## 🔄 Demo Family Reset Result
 
           | Parameter | Value |
@@ -128,7 +130,7 @@ jobs:
           EOF
           else
             ERROR_MSG=$(echo "$RESPONSE_JSON" | jq -r '.error // .message // "リセット処理が異常終了しました。"' 2>/dev/null || echo "リセット処理が異常終了しました。")
-            cat <<EOF >> $GITHUB_STEP_SUMMARY
+            cat <<EOF >> "$GITHUB_STEP_SUMMARY"
           ## ❌ Demo Family Reset Failed
 
           | Parameter | Value |

@@ -12,6 +12,7 @@
     "typecheck": "turbo run typecheck",
     "check": "biome check --write",
     "check:ci": "biome ci",
+    "lint:workflows": "docker run --rm -v .:/repo -w /repo rhysd/actionlint:latest",
     "verify": "pnpm typecheck && pnpm check && pnpm test && pnpm build",
     "web": "pnpm -F @poohma/web",
     "convex:dev": "pnpm web exec convex dev",

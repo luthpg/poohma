@@ -49,7 +49,8 @@
 3. **Test (Unit / Integration)**: `pnpm test`
 4. **Build Check**: `pnpm build`
 5. **E2E Test (Dynamic Verification)**: `pnpm test:e2e`
-6. **Full Pipeline**: `pnpm verify`（上記1〜4を一括順次実行）
+6. **Workflow Lint**: `pnpm lint:workflows`（Docker経由で actionlint を実行）
+7. **Full Pipeline**: `pnpm verify`（上記1〜4を一括順次実行）
 
 > **Important (動的テスト事前検証義務)**:
 > UI、認証、E2EE暗号化、Convex、CSV等の変更時は、静的チェックのみでコミットせず、必ずローカルで `pnpm test:e2e` を合格させてからコミットすること。Convex 変更時は事前に `pnpm convex:dev:once` を実行すること。

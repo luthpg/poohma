@@ -64,6 +64,11 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: pnpm --filter @poohma/web exec playwright install-deps chromium
 
+      - name: Run actionlint (Workflow Lint)
+        uses: reviewdog/action-actionlint@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Lint & Format Check (Biome)
         run: pnpm run check:ci
 
