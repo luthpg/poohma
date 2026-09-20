@@ -284,6 +284,11 @@ export const resetDemoFamilyInternal = internalMutation({
         revokedAt: undefined,
       });
     } else {
+      if (existingInvite) {
+        throw new Error(
+          `Invite code "${demoInviteCode}" is already used by another family.`,
+        );
+      }
       await ctx.db.insert("familyInvites", {
         familyId: demoFamilyId,
         code: demoInviteCode,

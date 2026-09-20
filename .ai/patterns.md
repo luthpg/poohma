@@ -51,7 +51,7 @@ requireContentAccess(ctx.user, record);
 requireAdminAccess(ctx.user, record);
 ```
 
-- レコードの `ownerType` や `visibility` を直接判定せず、`getEffectiveOwnerType(record)` や `getEffectiveAdmins(record)` 等のヘルパーを介すことで、スキーマ移行中の旧データと新データを同一ロジックで安全に扱える。
+- レコードの所有権やアクセス権を ad-hoc に判定せず、`rls.ts` のヘルパー（`getEffectiveOwnerType(record)`, `getEffectiveAdmins(record)`, `requireContentAccess`, `requireAdminAccess`）を介すことで、個人所有（`"user"`）と家族共有（`"family"`）の境界を一貫して安全に判定する。
 
 ---
 

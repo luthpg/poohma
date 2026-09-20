@@ -511,4 +511,49 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
       "DekEncryptedA",
     );
   });
+
+  it("デモ招待コードが既に別ファミリーで使用されている場合、例外がスローされること", async () => {
+    const t = convexTest(schema, modules);
+    let demoFamilyId!: Id<"families">;
+    let otherFamilyId!: Id<"families">;
+
+    await t.run(async (ctx) => {
+      demoFamilyId = await ctx.db.insert("families", {
+        name: "Demo Family",
+        updatedAt: Date.now(),
+      });
+      otherFamilyId = await ctx.db.insert("families", {
+        name: "Other Family",
+        updatedAt: Date.now(),
+      });
+
+      await ctx.db.insert("users", {
+        userId: "demo_admin",
+        email: "admin@example.com",
+        familyId: demoFamilyId,
+        familyRole: "admin",
+        updatedAt: Date.now(),
+      });
+
+      // 別ファミリーが同じ招待コードを所有
+      await ctx.db.insert("familyInvites", {
+        familyId: otherFamilyId,
+        code: "poohma-demo",
+        createdBy: "other_user",
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 100000,
+        useCount: 0,
+      });
+    });
+
+    process.env.DEMO_FAMILY_ID = demoFamilyId;
+    process.env.DEMO_ADMIN_USER_IDS = "demo_admin";
+    process.env.DEMO_INVITE_CODE = "poohma-demo";
+
+    await expect(
+      t.mutation(internal.demo.resetDemoFamilyInternal, {}),
+    ).rejects.toThrow(
+      'Invite code "poohma-demo" is already used by another family.',
+    );
+  });
 });

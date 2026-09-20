@@ -17,6 +17,8 @@ on:
         default: false
         type: boolean
 
+permissions: {}
+
 concurrency:
   group: reset-demo-family
   cancel-in-progress: false

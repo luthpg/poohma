@@ -37,10 +37,10 @@ Convex バックエンド開発における落とし穴と回避法です。
 
 ---
 
-### レコード所有権判定の直接参照
+### レコード所有権・管理者判定のインライン直接評価
 
-- **問題**: `record.ownerType === "family"` や `record.admins` を直接参照すると、移行前の旧レコード（`visibility: "SHARED"`）で正しく判定できない。
-- **回避法**: 必ず `convex/rls.ts` の `getEffectiveOwnerType(record)`, `getEffectiveAdmins(record)` ヘルパーを使用する。
+- **問題**: `record.ownerType === "family"` や `record.admins` を関数ごとにアドホックにインライン評価すると、デフォルト値（`ownerType` 未設定時の `"user"` フォールバック等）の扱い漏れや管理者権限判定の不整合が生じる。
+- **回避法**: 必ず `convex/rls.ts` の `getEffectiveOwnerType(record)`, `getEffectiveAdmins(record)`, `isRecordAdmin(user, record)` ヘルパーを使用する。
 
 ---
 

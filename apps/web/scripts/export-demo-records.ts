@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,18 +17,27 @@ const familyId = process.argv[2];
 const argsArg = familyId ? JSON.stringify({ familyId }) : "{}";
 
 try {
-  const isWindows = process.platform === "win32";
-  // Windows PowerShell / cmd でのエスケープ対策
-  const quotedArgs = isWindows
-    ? `"${argsArg.replace(/"/g, '\\"')}"`
-    : `'${argsArg}'`;
-  const cmd = `pnpm exec convex run demo:exportDemoRecordsInternal ${quotedArgs}`;
+  const pnpmExecPath = process.env.npm_execpath;
+  if (!pnpmExecPath) {
+    throw new Error("npm_execpath is missing in environment");
+  }
 
-  const stdout = execSync(cmd, {
-    cwd: webDir,
-    encoding: "utf-8",
-    stdio: ["pipe", "pipe", "inherit"],
-  });
+  const stdout = execFileSync(
+    process.execPath,
+    [
+      pnpmExecPath,
+      "exec",
+      "convex",
+      "run",
+      "demo:exportDemoRecordsInternal",
+      argsArg,
+    ],
+    {
+      cwd: webDir,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "inherit"],
+    },
+  );
 
   const trimmed = stdout.trim();
   const startIdx = trimmed.indexOf("[");

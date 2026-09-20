@@ -27,8 +27,7 @@
 
 - レコード単位のアクセス制御は `convex/rls.ts` に集約している。
   - `requireContentAccess`：レコードの `familyId` とユーザーの `familyId` が一致することに加え、個人所有（`ownerType: "user"` かつ `accountId` 一致）または家族共有（`ownerType: "family"` かつ `ownerFamilyId` 一致）のいずれかであることを検証する。一般メンバー（`viewer`）であっても共有レコードの閲覧・ヒント復号は許可される。
-  - `requireAdminAccess`：編集・削除・共有解除・管理者変更には、個人レコードなら本人、共有レコードならファミリー管理者（`getEffectiveFamilyRole(user) === "admin"`）または `admins` 配列に含まれる個別管理者であることを要求する。共有レコードの公開設定（visibility）改ざんによるIDORはIssue #186で修正済み。非管理者でも誰が管理者かは閲覧可能（Issue #211）。
-  - なお `serviceRecords.visibility` フィールドは `ownerType` モデル導入前のレガシー値であり、`ownerType` を持たない旧データに対する読み取り専用の後方互換フォールバックとしてのみ参照される（`docs/architecture/data-model.md` 参照）。
+  - `requireAdminAccess`：編集・削除・共有解除・管理者変更には、個人レコードなら本人、共有レコードならファミリー管理者（`getEffectiveFamilyRole(user) === "admin"`）または `admins` 配列に含まれる個別管理者であることを要求する。共有レコードの所有権・公開範囲（ownerType）改ざんによるIDORはIssue #186で修正済み。非管理者でも誰が管理者かは閲覧可能（Issue #211）。
 - 現行スキーマは1ユーザー1家族グループ（`users.familyId` が単一値）を前提としており、複数家族の並行所属には対応していない（複数家族対応はIssue #34で一度closeされているが、現行スキーマの制約としては単一家族が前提）。
 
 ## メンバーキックと Export Vault（E2EEデータ保護・持ち出し境界）
