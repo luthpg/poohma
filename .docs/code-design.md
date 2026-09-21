@@ -1028,6 +1028,7 @@ ConvexProviderWithAuth(useConvexFirebaseAuth)
 - 公開レイアウト（`PublicLayout`）は、SSR解決された認証ユーザー情報に基づき、未ログイン時はログインボタン、ログイン時は共通ユーザーアバター（`UserAvatar`）による `UserMenu`（ダッシュボード導線付き）を描画する。
 - 変更インジケーター（FR-REC-29）：レコード編集時、各入力コンテナ左端に `before:bg-orange-500` の視覚的アクセントバーを配置。入力中のガタつき（レイアウトシフト）を完全に防止するため、未変更時も常時余白（`pl-3.5`）を確保し、`opacity` と `scale-y` の滑らかなトランジションで状態を切り替える。復号結果を動的基準値に同期し、新規作成時は抑止する。
 - 固定アクションフッター（FR-REC-30）：レコード詳細閲覧・編集・新規登録の3画面において、最下部固定（`fixed bottom-0` + `backdrop-blur-md` + `pb-safe`）アクションフッターの体験を統一。右端にSubmit相当（オレンジPrimary）、左端に削除ボタン（Destructive、誤タップ防止のため隔離・モバイルではアイコン化）を配置する。
+- 五十音インデックススクロールバー（FR-REC-07）：名前順ソート時に画面右端に配置。タップ時のネイティブ `smooth` ジャンプと、タッチドラッグ時の `requestAnimationFrame` lerp（減速カーブ）による追従スクロールをハイブリッド制御。WebKit / iOS PWA 環境における `scrollTo({ behavior: "smooth" })` 連続呼出しのキューイング暴走を自前rAF制御で回避する。ドラッグ・タップ中は現在および前後のインデックスを画面中央にプレビューするセントラルポップオーバー（ライト/ダーク両対応のグラスモーフィズムカード）を表示。また、iOS Safari / PWA 特有の `:active` 擬似クラス残留による二重ハイライトを防ぐため、状態駆動のアクティブ表示（`activeBubble === key`）と `-webkit-tap-highlight-color: transparent` および `touch-action: none` を適用する。
 
 ### 8.4 状態管理・キャッシュ戦略（TanStack Query vs Convex）
 
