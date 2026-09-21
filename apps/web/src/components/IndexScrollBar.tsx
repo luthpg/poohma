@@ -36,7 +36,11 @@ export function IndexScrollBar({
 
   /** rAF lerp スクロール: ターゲットを差し替えるだけで滑らかに追従する */
   const rafSmoothScrollTo = useCallback((targetTop: number) => {
-    scrollTargetRef.current = Math.max(0, targetTop);
+    const maxScrollTop = Math.max(
+      0,
+      document.documentElement.scrollHeight - window.innerHeight,
+    );
+    scrollTargetRef.current = Math.min(maxScrollTop, Math.max(0, targetTop));
 
     // 既にアニメーションループが動いていれば、ターゲット更新だけで十分
     if (scrollRafRef.current != null) return;
