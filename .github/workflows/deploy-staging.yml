@@ -14,13 +14,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  # ────────────────────────────────────────────────
+  # Job 1: ステージング用ビルド＆デプロイ（通常 Convex URL）
+  # ────────────────────────────────────────────────
+  deploy-staging:
     runs-on: ubuntu-latest
     env:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
       NITRO_PRESET: vercel
       VERCEL: "1"
 
@@ -58,7 +60,7 @@ jobs:
           echo "deploy_url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
 
           vercel alias set "$DEPLOY_URL" "${{ secrets.VERCEL_ALIAS_STAGING }}" --token=${{ secrets.VERCEL_TOKEN }}
-          
+
           # https:// プレフィックスを考慮してエイリアスURLを出力
           ALIAS="${{ secrets.VERCEL_ALIAS_STAGING }}"
           if [[ ! "$ALIAS" =~ ^https?:// ]]; then
@@ -91,10 +93,72 @@ jobs:
 
             ---
             *Updated at: ${{ steps.time.outputs.current_time }}*
-            
 
+  # ────────────────────────────────────────────────
+  # Job 2: E2Eテスト用ビルド＆デプロイ（Convex Preview URL）
+  #   → deploy-staging と並列実行
+  # ────────────────────────────────────────────────
+  deploy-e2e:
+    runs-on: ubuntu-latest
+    outputs:
+      deploy_url: ${{ steps.deploy.outputs.deploy_url }}
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      CONVEX_PREVIEW_DEPLOY_KEY: ${{ secrets.CONVEX_PREVIEW_DEPLOY_KEY }}
+      NITRO_PRESET: vercel
+      VERCEL: "1"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 11.24.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Setup Convex E2E Preview Deployment
+        run: pnpm --filter @poohma/web run setup:e2e-preview
+
+      - name: Pull Vercel Environment Information
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Inject Convex Preview URLs into Vercel Build Environment
+        run: |
+          if [ -f apps/web/e2e/.env.e2e-preview ]; then
+            cat apps/web/e2e/.env.e2e-preview >> .vercel/.env.preview.local
+          fi
+
+      - name: Build Project Artifacts
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy E2E Preview to Vercel
+        id: deploy
+        run: |
+          DEPLOY_URL=$(vercel deploy --prebuilt --archive=tgz --token=${{ secrets.VERCEL_TOKEN }})
+          echo "deploy_url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
+
+  # ────────────────────────────────────────────────
+  # Job 3: E2Eテスト実行（deploy-e2e 完了後）
+  # ────────────────────────────────────────────────
   e2e:
     name: Run Staging E2E
-    needs: deploy
+    needs: deploy-e2e
     uses: ./.github/workflows/e2e-staging.yml
+    with:
+      base_url: ${{ needs.deploy-e2e.outputs.deploy_url }}
     secrets: inherit

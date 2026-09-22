@@ -22,9 +22,12 @@
     "verify:bundle": "tsx scripts/verify-bundle-safety.ts",
     "fonts:download": "tsx scripts/download-fonts.ts",
     "demo:export": "tsx scripts/export-demo-records.ts",
-    "test:e2e": "pnpm build:e2e-bridge && playwright test",
-    "test:e2e:show": "pnpm build:e2e-bridge && playwright test --headed",
-    "test:e2e:ui": "pnpm build:e2e-bridge && playwright test --ui"
+    "setup:e2e-preview": "tsx scripts/setup-e2e-preview.ts",
+    "setup:e2e-preview:clean": "tsx scripts/setup-e2e-preview.ts --clean",
+    "test:e2e": "pnpm setup:e2e-preview && pnpm build:e2e-bridge && playwright test",
+    "test:e2e:show": "pnpm setup:e2e-preview && pnpm build:e2e-bridge && playwright test --headed",
+    "test:e2e:ui": "pnpm setup:e2e-preview && pnpm build:e2e-bridge && playwright test --ui",
+    "test:e2e:clean": "pnpm setup:e2e-preview:clean && pnpm build:e2e-bridge && playwright test"
   },
   "dependencies": {
     "@cantoo/fontkit": "^2.0.12",
