@@ -22,7 +22,7 @@
     "convex:deploy": "pnpm web exec convex deploy",
     "demo:export": "pnpm -F @poohma/web demo:export",
     "prepreview": "pnpm -F @poohma/web exec playwright test e2e/auth.setup.ts --project=setup --no-deps",
-    "preview": "pnpm -F @poohma/web exec playwright open --load-storage=e2e/.auth/e2e-user.json --ignore-https-errors https://localhost:3000/dashboard --device=\"iPhone 17\" --color-scheme=light"
+    "preview": "pnpm -F @poohma/web exec playwright open --load-storage=e2e/.auth/e2e-user.json --ignore-https-errors https://localhost:3100/dashboard --device=\"iPhone 17\" --color-scheme=light"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.13",
