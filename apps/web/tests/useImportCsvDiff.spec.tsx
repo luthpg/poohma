@@ -77,18 +77,18 @@ describe("useImportCsvDiff - パースエラー制御と生エラー非露出", 
     expect(result.current.diffItems).toHaveLength(3);
 
     // 1行目: 正常に CREATE
-    expect(result.current.diffItems[0].action).toBe("CREATE");
-    expect(result.current.diffItems[0].title).toBe("ServiceA");
+    expect(result.current.diffItems[0]?.action).toBe("CREATE");
+    expect(result.current.diffItems[0]?.title).toBe("ServiceA");
 
     // 2行目: FieldMismatch のため ERROR に分類されること
-    expect(result.current.diffItems[1].action).toBe("ERROR");
-    expect(result.current.diffItems[1].errorReason).toBe(
+    expect(result.current.diffItems[1]?.action).toBe("ERROR");
+    expect(result.current.diffItems[1]?.errorReason).toBe(
       "列の数がヘッダーと一致しません（不正な行）",
     );
 
     // 3行目: 正常に CREATE
-    expect(result.current.diffItems[2].action).toBe("CREATE");
-    expect(result.current.diffItems[2].title).toBe("ServiceC");
+    expect(result.current.diffItems[2]?.action).toBe("CREATE");
+    expect(result.current.diffItems[2]?.title).toBe("ServiceC");
 
     // 生エラートーストが表示されていないこと
     expect(mockToast.error).not.toHaveBeenCalledWith(

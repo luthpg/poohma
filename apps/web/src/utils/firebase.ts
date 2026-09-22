@@ -34,7 +34,8 @@ if (isBrowser) {
       auth = getAuth(app);
     }
   } else {
-    app = getApps()[0];
+    // biome-ignore lint/style/noNonNullAssertion: getApps().length !== 0から[0]は必ず存在する
+    app = getApps()[0]!;
     auth = getAuth(app);
   }
   googleProvider = new GoogleAuthProvider();

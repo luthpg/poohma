@@ -160,17 +160,17 @@ describe("Onboarding Tour 概念説明スライドと Driver.js 変換", () => {
       expect(driveSteps).toHaveLength(2);
 
       // 1ステップ目（スライド）: element なし、中央モーダル用クラス付与
-      expect(driveSteps[0].element).toBeUndefined();
-      expect(driveSteps[0].popover?.title).toBe("スライド1");
-      expect(driveSteps[0].popover?.popoverClass).toContain(
+      expect(driveSteps[0]?.element).toBeUndefined();
+      expect(driveSteps[0]?.popover?.title).toBe("スライド1");
+      expect(driveSteps[0]?.popover?.popoverClass).toContain(
         "poohma-tour-slide",
       );
-      expect(driveSteps[0].popover?.nextBtnText).toBe("進む");
-      expect(driveSteps[0].popover?.prevBtnText).toBe("戻る");
+      expect(driveSteps[0]?.popover?.nextBtnText).toBe("進む");
+      expect(driveSteps[0]?.popover?.prevBtnText).toBe("戻る");
 
       // 2ステップ目（スポットライト）: element あり、既存設定を維持
-      expect(driveSteps[1].element).toBe('[data-tour="target-elem"]');
-      expect(driveSteps[1].popover?.title).toBe("スポットライト1");
+      expect(driveSteps[1]?.element).toBe('[data-tour="target-elem"]');
+      expect(driveSteps[1]?.popover?.title).toBe("スポットライト1");
     });
   });
 
@@ -180,16 +180,16 @@ describe("Onboarding Tour 概念説明スライドと Driver.js 変換", () => {
       expect(dashboardPart1Steps).toHaveLength(2);
 
       // Step 1: スライド（welcome-family-share）
-      expect(dashboardPart1StepDefinitions[0].type).toBe("slide");
-      if (dashboardPart1StepDefinitions[0].type === "slide") {
-        expect(dashboardPart1StepDefinitions[0].imageSlot?.id).toBe(
+      expect(dashboardPart1StepDefinitions[0]?.type).toBe("slide");
+      if (dashboardPart1StepDefinitions[0]?.type === "slide") {
+        expect(dashboardPart1StepDefinitions[0]?.imageSlot?.id).toBe(
           "welcome-family-share",
         );
       }
 
       // Step 2: スポットライト（sample-record）
-      expect(dashboardPart1StepDefinitions[1].type).toBe("spotlight");
-      expect(dashboardPart1Steps[1].element).toBe(
+      expect(dashboardPart1StepDefinitions[1]?.type).toBe("spotlight");
+      expect(dashboardPart1Steps[1]?.element).toBe(
         '[data-tour="sample-record"]',
       );
     });
@@ -199,36 +199,38 @@ describe("Onboarding Tour 概念説明スライドと Driver.js 変換", () => {
       expect(recordDetailSteps).toHaveLength(4);
 
       // Step 1: スライド（e2ee-secret-lock）
-      expect(recordDetailStepDefinitions[0].type).toBe("slide");
-      if (recordDetailStepDefinitions[0].type === "slide") {
-        expect(recordDetailStepDefinitions[0].imageSlot?.id).toBe(
+      expect(recordDetailStepDefinitions[0]?.type).toBe("slide");
+      if (recordDetailStepDefinitions[0]?.type === "slide") {
+        expect(recordDetailStepDefinitions[0]?.imageSlot?.id).toBe(
           "e2ee-secret-lock",
         );
       }
 
       // Step 2: スポットライト（hint-reveal-btn）
-      expect(recordDetailSteps[1].element).toBe(
+      expect(recordDetailSteps[1]?.element).toBe(
         '[data-tour="hint-reveal-btn"]',
       );
 
       // Step 3: スポットライト（decrypted-hint）
-      expect(recordDetailSteps[2].element).toBe('[data-tour="decrypted-hint"]');
+      expect(recordDetailSteps[2]?.element).toBe(
+        '[data-tour="decrypted-hint"]',
+      );
 
       // Step 4: スポットライト（back-to-dashboard）
-      expect(recordDetailSteps[3].element).toBe(
+      expect(recordDetailSteps[3]?.element).toBe(
         '[data-tour="back-to-dashboard"]',
       );
 
       // 分割ツアー（導入編2ステップ + 帰還編2ステップ）としても正しく構成されていること
       expect(recordDetailIntroSteps).toHaveLength(2);
-      expect(recordDetailIntroSteps[1].element).toBe(
+      expect(recordDetailIntroSteps[1]?.element).toBe(
         '[data-tour="hint-reveal-btn"]',
       );
       expect(recordDetailReturnSteps).toHaveLength(2);
-      expect(recordDetailReturnSteps[0].element).toBe(
+      expect(recordDetailReturnSteps[0]?.element).toBe(
         '[data-tour="decrypted-hint"]',
       );
-      expect(recordDetailReturnSteps[1].element).toBe(
+      expect(recordDetailReturnSteps[1]?.element).toBe(
         '[data-tour="back-to-dashboard"]',
       );
     });
@@ -238,18 +240,18 @@ describe("Onboarding Tour 概念説明スライドと Driver.js 変換", () => {
       expect(dashboardPart2Steps).toHaveLength(3);
 
       // Step 1: スライド（recovery-kit-paper）
-      expect(dashboardPart2StepDefinitions[0].type).toBe("slide");
-      if (dashboardPart2StepDefinitions[0].type === "slide") {
-        expect(dashboardPart2StepDefinitions[0].imageSlot?.id).toBe(
+      expect(dashboardPart2StepDefinitions[0]?.type).toBe("slide");
+      if (dashboardPart2StepDefinitions[0]?.type === "slide") {
+        expect(dashboardPart2StepDefinitions[0]?.imageSlot?.id).toBe(
           "recovery-kit-paper",
         );
       }
 
       // Step 2: スポットライト（user-menu: お守りシート発行場所）
-      expect(dashboardPart2Steps[1].element).toBe('[data-tour="user-menu"]');
+      expect(dashboardPart2Steps[1]?.element).toBe('[data-tour="user-menu"]');
 
       // Step 3: スポットライト（add-record: 新規登録）
-      expect(dashboardPart2Steps[2].element).toBe('[data-tour="add-record"]');
+      expect(dashboardPart2Steps[2]?.element).toBe('[data-tour="add-record"]');
     });
 
     it("全3箇所の画像スケルトンが明確な役割を持っていること", () => {
@@ -287,18 +289,20 @@ describe("Onboarding Tour 概念説明スライドと Driver.js 変換", () => {
       expect(familyCreatedStepDefinitions).toHaveLength(1);
       expect(familyCreatedSteps).toHaveLength(1);
 
-      expect(familyCreatedStepDefinitions[0].type).toBe("spotlight");
-      expect(familyCreatedSteps[0].element).toBe('[data-tour="app-logo"]');
-      expect(familyCreatedSteps[0].popover?.title).toContain(
+      expect(familyCreatedStepDefinitions[0]?.type).toBe("spotlight");
+      expect(familyCreatedSteps[0]?.element).toBe('[data-tour="app-logo"]');
+      expect(familyCreatedSteps[0]?.popover?.title).toContain(
         "家族グループができました！",
       );
-      expect(familyCreatedSteps[0].popover?.popoverClass).toContain(
+      expect(familyCreatedSteps[0]?.popover?.popoverClass).toContain(
         "poohma-tour-family-welcome",
       );
-      expect(familyCreatedSteps[0].popover?.doneBtnText).toBe(
+      expect(familyCreatedSteps[0]?.popover?.doneBtnText).toBe(
         "ダッシュボードへ",
       );
-      expect(familyCreatedSteps[0].popover?.prevBtnText).toBe("家族設定を見る");
+      expect(familyCreatedSteps[0]?.popover?.prevBtnText).toBe(
+        "家族設定を見る",
+      );
     });
   });
 });

@@ -205,7 +205,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
       // userA の個人レコードだけが対象であること
       expect(migrationData.records).toHaveLength(1);
-      expect(migrationData.records[0].id).toBe(recordAId);
+      expect(migrationData.records[0]?.id).toBe(recordAId);
 
       // userB のレコードは移行対象に含まれないこと
       expect(
@@ -213,12 +213,12 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
       ).toBe(false);
 
       // userA の credential が対象に含まれていること
-      expect(migrationData.records[0].credentials).toHaveLength(1);
-      expect(migrationData.records[0].credentials[0].id).toBe(credAId);
+      expect(migrationData.records[0]?.credentials).toHaveLength(1);
+      expect(migrationData.records[0]?.credentials[0]?.id).toBe(credAId);
 
       // userB の credential が対象に含まれないこと
       expect(
-        migrationData.records[0].credentials.some(
+        migrationData.records[0]?.credentials.some(
           (credential) => credential.id === credBId,
         ),
       ).toBe(false);
@@ -520,8 +520,8 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         {},
       );
       expect(pendingRequests.length).toBe(1);
-      expect(pendingRequests[0].userId).toBe("applicant_b");
-      expect(pendingRequests[0].displayName).toBe("申請者B");
+      expect(pendingRequests[0]?.userId).toBe("applicant_b");
+      expect(pendingRequests[0]?.displayName).toBe("申請者B");
 
       // 7. 申請者以外の無関係なユーザーは保留中一覧を取得できないこと
       const stranger = t.withIdentity({
@@ -567,11 +567,11 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
       // 参加者自身の個人レコードだけが再暗号化対象であること
       expect(migrationData.records).toHaveLength(1);
-      expect(migrationData.records[0].id).toBe(recordId);
+      expect(migrationData.records[0]?.id).toBe(recordId);
 
       // 参加者自身のcredentialが対象に含まれること
-      expect(migrationData.records[0].credentials).toHaveLength(1);
-      expect(migrationData.records[0].credentials[0].id).toBe(credentialId);
+      expect(migrationData.records[0]?.credentials).toHaveLength(1);
+      expect(migrationData.records[0]?.credentials[0]?.id).toBe(credentialId);
 
       // 12. 再暗号化済みcredentialをcommitする
       //
@@ -1245,7 +1245,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
       );
       expect(migrationData.records.length).toBe(1);
 
-      const targetCredId = migrationData.records[0].credentials[0].id;
+      const targetCredId = migrationData.records[0]!.credentials[0]!.id;
 
       // 3. commit
       const commitRes = await userSolo.mutation(
@@ -1558,8 +1558,8 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
       const r1 = migrationData.records.find((r) => r._id === record1Id);
       const r2 = migrationData.records.find((r) => r._id === record2Id);
       if (!r1 || !r2) throw new Error("Records not found in migration data");
-      const r1CredId = r1.credentials[0].id;
-      const r2CredId = r2.credentials[0].id;
+      const r1CredId = r1.credentials[0]!.id;
+      const r2CredId = r2.credentials[0]!.id;
 
       // recordId を付与してコミット
       await userDup.mutation(api.families.commitFamilyMigration, {

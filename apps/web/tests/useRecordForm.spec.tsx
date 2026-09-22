@@ -66,19 +66,19 @@ describe("useRecordForm", () => {
 
   it("初期生成されたcredentialに一意なIDが付与されていること", () => {
     const { result } = renderHook(() => useRecordForm());
-    expect(result.current.values.credentials[0].id).toBeDefined();
-    expect(typeof result.current.values.credentials[0].id).toBe("string");
-    expect(result.current.values.credentials[0].id?.length).toBeGreaterThan(0);
+    expect(result.current.values.credentials[0]!.id).toBeDefined();
+    expect(typeof result.current.values.credentials[0]!.id).toBe("string");
+    expect(result.current.values.credentials[0]!.id?.length).toBeGreaterThan(0);
   });
 
   it("addCredential で追加されたクレデンシャルに既存と重複しない一意なIDが付与されること", () => {
     const { result } = renderHook(() => useRecordForm());
-    const initialId = result.current.values.credentials[0].id;
+    const initialId = result.current.values.credentials[0]!.id;
 
     act(() => result.current.addCredential());
     expect(result.current.values.credentials).toHaveLength(2);
 
-    const newId = result.current.values.credentials[1].id;
+    const newId = result.current.values.credentials[1]!.id;
     expect(newId).toBeDefined();
     expect(typeof newId).toBe("string");
     expect(newId).not.toBe(initialId);
@@ -92,7 +92,7 @@ describe("useRecordForm", () => {
       result.current.updateCredentialField(0, "label", "1行目");
       result.current.updateCredentialField(0, "loginId", "user1@example.com");
     });
-    const id1 = result.current.values.credentials[0].id;
+    const id1 = result.current.values.credentials[0]!.id;
 
     // 2行目追加 & 設定
     act(() => result.current.addCredential());
@@ -100,7 +100,7 @@ describe("useRecordForm", () => {
       result.current.updateCredentialField(1, "label", "2行目");
       result.current.updateCredentialField(1, "loginId", "user2@example.com");
     });
-    const id2 = result.current.values.credentials[1].id;
+    const id2 = result.current.values.credentials[1]!.id;
 
     // 3行目追加 & 設定
     act(() => result.current.addCredential());
@@ -108,7 +108,7 @@ describe("useRecordForm", () => {
       result.current.updateCredentialField(2, "label", "3行目");
       result.current.updateCredentialField(2, "loginId", "user3@example.com");
     });
-    const id3 = result.current.values.credentials[2].id;
+    const id3 = result.current.values.credentials[2]!.id;
 
     expect(result.current.values.credentials).toHaveLength(3);
 
@@ -298,11 +298,11 @@ describe("useRecordForm", () => {
     });
 
     expect(hookResult?.current.values.title).toBe("Restored Service");
-    expect(hookResult?.current.values.credentials[0].loginId).toBe(
+    expect(hookResult?.current.values.credentials[0]?.loginId).toBe(
       "restored@example.com",
     );
-    expect(hookResult?.current.values.credentials[0].id).toBeDefined();
-    expect(typeof hookResult?.current.values.credentials[0].id).toBe("string");
+    expect(hookResult?.current.values.credentials[0]?.id).toBeDefined();
+    expect(typeof hookResult?.current.values.credentials[0]?.id).toBe("string");
     expect(hookResult?.current.restoredMetadata?.initialRevision).toBe(3);
     expect(hookResult?.current.restoredMetadata?.isEditing).toBe(true);
   });
@@ -340,9 +340,9 @@ describe("useRecordForm", () => {
 
     const creds = hookResult?.current.values.credentials;
     expect(creds).toHaveLength(2);
-    expect(creds?.[0].id).toBeDefined();
-    expect(creds?.[1].id).toBeDefined();
-    expect(creds?.[0].id).not.toBe(creds?.[1].id);
+    expect(creds?.[0]?.id).toBeDefined();
+    expect(creds?.[1]?.id).toBeDefined();
+    expect(creds?.[0]?.id).not.toBe(creds?.[1]?.id);
   });
 
   it("setBaselineValues で基準値が更新され、DBと同じヒントは未変更と判定されること", () => {
@@ -544,7 +544,7 @@ describe("useRecordForm", () => {
 
     expect(submitSuccess).toBe(true);
     expect(submitAction).toHaveBeenCalledTimes(1);
-    const submittedPayload = submitAction.mock.calls[0][0];
+    const submittedPayload = submitAction.mock.calls[0]![0];
     expect(submittedPayload.title).toBe("OGP 取得タイトル");
     expect(submittedPayload.ogpImage).toBe("https://example.com/ogp.jpg");
     expect(submittedPayload.ogpDescription).toBe("OGP 説明文");
@@ -596,7 +596,7 @@ describe("useRecordForm", () => {
 
     expect(submitSuccess).toBe(true);
     expect(submitAction).toHaveBeenCalledTimes(1);
-    const submittedPayload = submitAction.mock.calls[0][0];
+    const submittedPayload = submitAction.mock.calls[0]![0];
     // URL B の payload に URL A の情報が一切混入していないこと
     expect(submittedPayload.url).toBe("https://example-b.com");
     expect(submittedPayload.title).toBe("");
@@ -643,7 +643,7 @@ describe("useRecordForm", () => {
     });
 
     expect(submitSuccess).toBe(true);
-    const submittedPayload = submitAction.mock.calls[0][0];
+    const submittedPayload = submitAction.mock.calls[0]![0];
     expect(submittedPayload.url).toBeUndefined();
     expect(submittedPayload.title).toBe("");
     expect(submittedPayload.ogpImage).toBeUndefined();
@@ -740,7 +740,7 @@ describe("useRecordForm", () => {
     });
 
     expect(submitAction).toHaveBeenCalledTimes(1);
-    const submittedPayload = submitAction.mock.calls[0][0];
+    const submittedPayload = submitAction.mock.calls[0]![0];
     expect(submittedPayload.url).toBe("https://existing.com");
     expect(submittedPayload.ogpImage).toBe("https://existing.com/existing.jpg");
     expect(submittedPayload.ogpDescription).toBe("Existing description");
@@ -777,7 +777,7 @@ describe("useRecordForm", () => {
     });
 
     expect(submitAction).toHaveBeenCalledTimes(1);
-    const submittedPayload = submitAction.mock.calls[0][0];
+    const submittedPayload = submitAction.mock.calls[0]![0];
     expect(submittedPayload.url).toBe("https://new.com");
     expect(submittedPayload.ogpImage).toBeUndefined();
     expect(submittedPayload.ogpDescription).toBeUndefined();

@@ -67,11 +67,12 @@ function MockFormContainer({
         credentials: prev.credentials.filter((_, i) => i !== index),
       })),
     updateCredentialField: (index, field, value) =>
-      setValues((prev) => {
-        const credentials = [...prev.credentials];
-        credentials[index] = { ...credentials[index], [field]: value };
-        return { ...prev, credentials };
-      }),
+      setValues((prev) => ({
+        ...prev,
+        credentials: prev.credentials.map((cred, i) =>
+          i === index ? { ...cred, [field]: value } : cred,
+        ),
+      })),
     reset: (next) =>
       setValues((prev) => ({
         ...prev,

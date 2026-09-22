@@ -288,10 +288,10 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           .withIndex("by_accountId", (q) => q.eq("accountId", accountId))
           .collect();
         expect(events).toHaveLength(1);
-        expect(events[0].deviceId).toBe("new_device_uuid_1");
-        expect(events[0].accountId).toBe(accountId);
-        expect(events[0].userId).toBe("brand_new_uid");
-        expect(events[0].isNewDevice).toBe(true);
+        expect(events[0]?.deviceId).toBe("new_device_uuid_1");
+        expect(events[0]?.accountId).toBe(accountId);
+        expect(events[0]?.userId).toBe("brand_new_uid");
+        expect(events[0]?.isNewDevice).toBe(true);
       });
 
       // 3. 同じ端末から再度 recordLogin（既存端末判定）
@@ -429,7 +429,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
       expect(res.success).toBe(true);
 
       const accounts = await user.query(api.users.getAccounts, {});
-      expect(accounts[0].displayName).toBe("Trimmed Name");
+      expect(accounts[0]?.displayName).toBe("Trimmed Name");
     });
   });
 
@@ -1052,7 +1052,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
       await t.run(async (ctx) => {
         const remaining = await ctx.db.query("loginEvents").collect();
         expect(remaining).toHaveLength(1);
-        expect(remaining[0].deviceId).toBe("recent_dev");
+        expect(remaining[0]?.deviceId).toBe("recent_dev");
       });
     });
 

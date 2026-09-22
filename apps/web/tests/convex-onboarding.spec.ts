@@ -199,14 +199,16 @@ describe("オンボーディング Convexバックエンドテスト", () => {
         .withIndex("by_family_sortKey", (q) => q.eq("familyId", familyId))
         .collect();
       expect(normalRecords).toHaveLength(1);
-      expect(normalRecords[0].title).toBe("通常のサービス");
+      expect(normalRecords[0]?.title).toBe("通常のサービス");
 
       const normalCreds = await ctx.db
         .query("credentials")
-        .withIndex("by_recordId", (q) => q.eq("recordId", normalRecords[0]._id))
+        .withIndex("by_recordId", (q) =>
+          q.eq("recordId", normalRecords[0]!._id),
+        )
         .collect();
       expect(normalCreds).toHaveLength(1);
-      expect(normalCreds[0].loginId).toBe("real_user");
+      expect(normalCreds[0]?.loginId).toBe("real_user");
     });
   });
 });

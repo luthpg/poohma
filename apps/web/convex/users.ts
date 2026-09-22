@@ -57,7 +57,8 @@ export const syncUser = identityVerifiedMutation({
         }
         await ctx.db.patch(account._id, patchData);
       }
-      return existingAccounts[0]._id;
+      // biome-ignore lint/style/noNonNullAssertion: 1件以上取得していることは保証されている
+      return existingAccounts[0]!._id;
     }
 
     // UIDが一致しない → 同じemailの古いレコードがないか確認
@@ -70,7 +71,8 @@ export const syncUser = identityVerifiedMutation({
       // 同じemailで別UIDのレコードが存在
       // → Firebase Auth側でアカウント再作成されたケース
       // 旧UIDを持つ全アカウントのServiceRecordを新UIDに移行
-      const oldUid = existingByEmail[0].userId;
+      // biome-ignore lint/style/noNonNullAssertion: 1件以上取得していることは保証されている
+      const oldUid = existingByEmail[0]!.userId;
       const records = await ctx.db
         .query("serviceRecords")
         .withIndex("by_userId", (q) => q.eq("userId", oldUid))
@@ -118,8 +120,8 @@ export const syncUser = identityVerifiedMutation({
           await ctx.db.patch(account._id, patchData);
         }
       }
-
-      return existingByEmail[0]._id;
+      // biome-ignore lint/style/noNonNullAssertion: 1件以上取得していることは保証されている
+      return existingByEmail[0]!._id;
     }
 
     // 完全に新規のユーザー（デフォルトアカウント作成）

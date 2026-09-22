@@ -13,15 +13,15 @@ describe("オンボーディング サンプルデータ暗号化テスト", () 
     expect(encrypted).toHaveLength(SAMPLE_RECORDS.length);
 
     for (let i = 0; i < SAMPLE_RECORDS.length; i++) {
-      const original = SAMPLE_RECORDS[i];
-      const encRecord = encrypted[i];
+      const original = SAMPLE_RECORDS[i]!;
+      const encRecord = encrypted[i]!;
 
       expect(encRecord.title).toBe(original.title);
       expect(encRecord.credentials).toHaveLength(original.credentials.length);
 
       for (let j = 0; j < original.credentials.length; j++) {
-        const origCred = original.credentials[j];
-        const encCred = encRecord.credentials[j];
+        const origCred = original.credentials[j]!;
+        const encCred = encRecord.credentials[j]!;
 
         // 平文がそのまま保持されていないこと
         expect(encCred.passwordHint).not.toBe(origCred.passwordHint);

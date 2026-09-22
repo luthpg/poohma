@@ -41,7 +41,8 @@ export function ResponsiveNews({
 
   const latestNewsTime = useMemo(() => {
     if (recentNews.length === 0) return 0;
-    const first = recentNews[0];
+    // biome-ignore lint/style/noNonNullAssertion: 1 item 以上は必ずある
+    const first = recentNews[0]!;
     const timeStr = first.published_at || first.publishedAt;
     return timeStr ? new Date(timeStr).getTime() : 0;
   }, [recentNews]);

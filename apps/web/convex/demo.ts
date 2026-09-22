@@ -108,7 +108,8 @@ export const resetDemoFamilyInternal = internalMutation({
         "No matching admin users found in the specified demo family matching DEMO_ADMIN_USER_IDS.",
       );
     }
-    const primaryAdmin = adminMembers[0];
+    // biome-ignore lint/style/noNonNullAssertion: 1件以上必ずあるため
+    const primaryAdmin = adminMembers[0]!;
 
     // 2. クールダウンガード（10分以内の多重実行を防止）
     const now = Date.now();
@@ -316,8 +317,7 @@ export const resetDemoFamilyInternal = internalMutation({
         updatedByAccountId: primaryAdmin._id,
       });
 
-      for (let i = 0; i < recordData.credentials.length; i++) {
-        const cred = recordData.credentials[i];
+      for (const [i, cred] of recordData.credentials.entries()) {
         await ctx.db.insert("credentials", {
           recordId,
           stableId: crypto.randomUUID(),

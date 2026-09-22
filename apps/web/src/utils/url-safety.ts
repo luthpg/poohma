@@ -8,7 +8,7 @@ export function isPrivateIp(ip: string): boolean {
   // IPv4 チェック
   if (net.isIPv4(ip)) {
     const parts = ip.split(".").map(Number);
-    const [a, b] = parts;
+    const [a, b] = parts as [number, number, number, number];
 
     // 10.0.0.0/8
     if (a === 10) return true;
@@ -102,7 +102,8 @@ export async function validateUrlSafety(urlString: string): Promise<string> {
     }
   }
   if (addresses4.length > 0) {
-    return addresses4[0];
+    // biome-ignore lint/style/noNonNullAssertion: addresses4 is not empty
+    return addresses4[0]!;
   }
 
   for (const addr of addresses6) {
@@ -111,7 +112,8 @@ export async function validateUrlSafety(urlString: string): Promise<string> {
     }
   }
   if (addresses6.length > 0) {
-    return addresses6[0];
+    // biome-ignore lint/style/noNonNullAssertion: addresses6 is not empty
+    return addresses6[0]!;
   }
 
   throw new Error("No safe IP addresses found");

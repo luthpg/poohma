@@ -135,7 +135,6 @@ describe("PasscodeProvider E2EE State Management", () => {
     expect(screen.getByText("Locked")).toBeTruthy();
 
     // Trigger unlock prompt
-    // biome-ignore lint/style/noNonNullAssertion: use non-null assertion for testing
     const unlockPromise = requireUnlockRef!();
     unlockPromise.then((res) => {
       unlockResult = res;
@@ -214,7 +213,6 @@ describe("PasscodeProvider E2EE State Management", () => {
       </PasscodeProvider>,
     );
 
-    // biome-ignore lint/style/noNonNullAssertion: use non-null assertion for testing
     requireUnlockRef!();
 
     await waitFor(() => {
@@ -286,7 +284,6 @@ describe("PasscodeProvider E2EE State Management", () => {
     (cryptoLib.deriveKeyFromPasscode as Mock).mockResolvedValue(mockDerivedKey);
     (cryptoLib.unwrapMasterKey as Mock).mockResolvedValue(mockUnwrappedKey);
 
-    // biome-ignore lint/style/noNonNullAssertion: testing ref is non-null
     requireUnlockRef!();
     await waitFor(() => {
       expect(screen.getByText("家族パスコードの入力")).toBeTruthy();
@@ -405,7 +402,6 @@ describe("PasscodeProvider - 誤入力時の指数バックオフ・ロックア
         <TestComponent />
       </PasscodeProvider>,
     );
-    // biome-ignore lint/style/noNonNullAssertion: requireUnlockRef はセットされることが保証されている
     requireUnlockRef!();
     await waitFor(() => {
       expect(screen.getByText("家族パスコードの入力")).toBeTruthy();
@@ -500,7 +496,6 @@ describe("PasscodeProvider - 誤入力時の指数バックオフ・ロックア
     );
 
     // 1回目の失敗
-    // biome-ignore lint/style/noNonNullAssertion: requireUnlockRef はセットされることが保証されている
     requireUnlockRef!();
     await waitFor(() => {
       expect(screen.getByText("家族パスコードの入力")).toBeTruthy();
@@ -531,7 +526,6 @@ describe("PasscodeProvider - 誤入力時の指数バックオフ・ロックア
     });
 
     // 再度ダイアログを開く
-    // biome-ignore lint/style/noNonNullAssertion: requireUnlockRef はセットされることが保証されている
     requireUnlockRef!();
     await waitFor(() => {
       expect(screen.getByText("家族パスコードの入力")).toBeTruthy();
@@ -601,7 +595,6 @@ describe("PasscodeProvider - 生体認証ロック解除とパスコード変更
     );
 
     // ダイアログを開く
-    // biome-ignore lint/style/noNonNullAssertion: testing ref is non-null
     requireUnlockRef!();
 
     await waitFor(() => {
@@ -654,7 +647,6 @@ describe("PasscodeProvider - 生体認証ロック解除とパスコード変更
       </PasscodeProvider>,
     );
 
-    // biome-ignore lint/style/noNonNullAssertion: testing ref is non-null
     requireUnlockRef!();
 
     await waitFor(() => {
@@ -695,7 +687,6 @@ describe("PasscodeProvider - 生体認証ロック解除とパスコード変更
       </PasscodeProvider>,
     );
 
-    // biome-ignore lint/style/noNonNullAssertion: testing ref is non-null
     requireUnlockRef!();
 
     await waitFor(() => {
@@ -741,7 +732,6 @@ describe("PasscodeProvider - 生体認証ロック解除とパスコード変更
       </PasscodeProvider>,
     );
 
-    // biome-ignore lint/style/noNonNullAssertion: testing ref is non-null
     requireUnlockRef!().then((res) => {
       unlockResult = res;
     });

@@ -25,5 +25,17 @@
       "!**/src/styles.css",
       "!**/coverage/**/*"
     ]
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["**/*.spec.{ts,tsx}", "**/*.test.{ts,tsx}"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noNonNullAssertion": "off"
+          }
+        }
+      }
+    }
+  ]
 }

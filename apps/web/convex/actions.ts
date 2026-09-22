@@ -128,7 +128,7 @@ export const getOgpInfo = action({
           /<meta[^>]*http-equiv=["']?content-type["']?[^>]*content=["']?[^"']*charset=([\w-]+)/i,
         );
 
-      if (metaCharsetMatch) {
+      if (metaCharsetMatch?.[1]) {
         const detectedCharset = metaCharsetMatch[1].toLowerCase();
         if (detectedCharset !== "utf-8" && detectedCharset !== "utf8") {
           try {

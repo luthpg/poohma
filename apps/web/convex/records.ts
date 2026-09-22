@@ -533,8 +533,7 @@ export const createRecord = familyBoundMutation({
     });
 
     // credentials テーブルへ挿入
-    for (let i = 0; i < args.credentials.length; i++) {
-      const c = args.credentials[i];
+    for (const [i, c] of args.credentials.entries()) {
       await ctx.db.insert("credentials", {
         recordId,
         stableId: crypto.randomUUID(),
@@ -731,8 +730,7 @@ export const updateRecord = familyBoundMutation({
     // credentials の同期
     const retainedIds = new Set<string>();
 
-    for (let i = 0; i < args.data.credentials.length; i++) {
-      const c = args.data.credentials[i];
+    for (const [i, c] of args.data.credentials.entries()) {
       const normalizedId = c.id
         ? ctx.db.normalizeId("credentials", c.id)
         : null;
@@ -1613,8 +1611,7 @@ export const importRecords = familyBoundMutation({
     const failures: { row: number; reason: string }[] = [];
     let successes = 0;
 
-    for (let i = 0; i < args.records.length; i++) {
-      const record = args.records[i];
+    for (const [i, record] of args.records.entries()) {
       try {
         const parsed = ConvexRecordInputSchema.safeParse(record);
         if (!parsed.success) {
@@ -1674,8 +1671,7 @@ export const importRecords = familyBoundMutation({
           updatedAt: now,
         });
 
-        for (let j = 0; j < record.credentials.length; j++) {
-          const cred = record.credentials[j];
+        for (const [j, cred] of record.credentials.entries()) {
           await ctx.db.insert("credentials", {
             recordId,
             stableId: crypto.randomUUID(),
@@ -2361,8 +2357,7 @@ export const applyImportDiff = familyBoundMutation({
         updatedAt: now,
       });
 
-      for (let j = 0; j < item.credentials.length; j++) {
-        const cred = item.credentials[j];
+      for (const [j, cred] of item.credentials.entries()) {
         await ctx.db.insert("credentials", {
           recordId,
           stableId: crypto.randomUUID(),
@@ -2456,8 +2451,7 @@ export const applyImportDiff = familyBoundMutation({
       await ctx.db.patch(record._id, patchData);
 
       // クレデンシャルの更新
-      for (let j = 0; j < item.credentials.length; j++) {
-        const credInput = item.credentials[j];
+      for (const [j, credInput] of item.credentials.entries()) {
         if (credInput.stableId) {
           const targetCred = credByStableId.get(credInput.stableId);
           if (!targetCred) {

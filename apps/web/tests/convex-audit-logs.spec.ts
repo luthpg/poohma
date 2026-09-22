@@ -223,8 +223,8 @@ describe("監査ログ (Audit Log) & 閲覧履歴 (View Log) の統合テスト"
     });
     // 変更系（RECORD_UPDATE）のみが含まれ、HINT_VIEW は含まれないこと
     expect(sharedLogsForB).toHaveLength(1);
-    expect(sharedLogsForB[0].actorDisplayName).toBe("ユーザーA");
-    expect(sharedLogsForB[0].action).toBe("RECORD_UPDATE");
+    expect(sharedLogsForB[0]?.actorDisplayName).toBe("ユーザーA");
+    expect(sharedLogsForB[0]?.action).toBe("RECORD_UPDATE");
 
     // B が A の個人レコードの履歴を取得しようとすると拒否されること
     await expect(
@@ -245,15 +245,15 @@ describe("監査ログ (Audit Log) & 閲覧履歴 (View Log) の統合テスト"
       paginationOpts: { numItems: 10, cursor: null },
     });
     expect(familyLogs.page).toHaveLength(1);
-    expect(familyLogs.page[0].action).toBe("RECORD_UPDATE");
-    expect(familyLogs.page[0].recordId).toBe(sharedRecordId);
+    expect(familyLogs.page[0]?.action).toBe("RECORD_UPDATE");
+    expect(familyLogs.page[0]?.recordId).toBe(sharedRecordId);
 
     // 閲覧履歴クエリ (getRecordViewLogs) の認可検証
     const sharedViewsForB = await clientB.query(api.records.getRecordViewLogs, {
       recordId: sharedRecordId,
     });
     expect(sharedViewsForB).toHaveLength(1);
-    expect(sharedViewsForB[0].actorDisplayName).toBe("ユーザーA");
+    expect(sharedViewsForB[0]?.actorDisplayName).toBe("ユーザーA");
 
     // 個人レコードの閲覧履歴は他メンバー B から拒否されること (IDOR防止)
     await expect(
@@ -361,7 +361,7 @@ describe("監査ログ (Audit Log) & 閲覧履歴 (View Log) の統合テスト"
       },
     );
     expect(viewLogs.length).toBeGreaterThan(0);
-    expect(viewLogs[0].actorDisplayName).toBe("退会予定パパ");
+    expect(viewLogs[0]?.actorDisplayName).toBe("退会予定パパ");
 
     // 退会ユーザー自身の監査ログ（ACCOUNT_DELETE）が記録され、UIDで追跡可能なこと
     await t.run(async (ctx) => {
@@ -536,8 +536,8 @@ describe("監査ログ (Audit Log) & 閲覧履歴 (View Log) の統合テスト"
     });
 
     expect(staleRecords).toHaveLength(1);
-    expect(staleRecords[0].title).toBe("Old Untouched Record");
-    expect(staleRecords[0].staleDays).toBeGreaterThanOrEqual(180);
+    expect(staleRecords[0]?.title).toBe("Old Untouched Record");
+    expect(staleRecords[0]?.staleDays).toBeGreaterThanOrEqual(180);
   });
 
   // 5. クリーンアップ Cron テスト
@@ -737,8 +737,8 @@ describe("監査ログ (Audit Log) & 閲覧履歴 (View Log) の統合テスト"
       { includeViews: false },
     );
     expect(auditOnly).toHaveLength(1);
-    expect(auditOnly[0].category).toBe("audit");
-    expect(auditOnly[0].action).toBe("RECORD_UPDATE");
+    expect(auditOnly[0]?.category).toBe("audit");
+    expect(auditOnly[0]?.action).toBe("RECORD_UPDATE");
 
     // 2. includeViews: true
     const allLogs = await client.query(
@@ -750,6 +750,8 @@ describe("監査ログ (Audit Log) & 閲覧履歴 (View Log) の統合テスト"
     expect(categories).toContain("audit");
     expect(categories).toContain("view");
     // 新しい順にソートされていること
-    expect(allLogs[0].createdAt).toBeGreaterThanOrEqual(allLogs[1].createdAt);
+    expect(allLogs[0]?.createdAt).toBeGreaterThanOrEqual(
+      allLogs[1]?.createdAt ?? 0,
+    );
   });
 });
