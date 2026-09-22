@@ -36,10 +36,10 @@ describe("CmsRichText (CMS HTML サニタイズおよび XSS 防御)", () => {
 
     const links = container.querySelectorAll("a");
     expect(links).toHaveLength(2);
-    expect(links[0].getAttribute("href")).toBe("https://example.com");
-    expect(links[0].getAttribute("target")).toBe("_blank");
-    expect(links[0].getAttribute("rel")).toBe("noopener noreferrer");
-    expect(links[1].getAttribute("href")).toBe("mailto:support@example.com");
+    expect(links[0]?.getAttribute("href")).toBe("https://example.com");
+    expect(links[0]?.getAttribute("target")).toBe("_blank");
+    expect(links[0]?.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(links[1]?.getAttribute("href")).toBe("mailto:support@example.com");
   });
 
   it("<script> タグが除去され、スクリプト要素が DOM に挿入されないこと (XSS対策)", () => {

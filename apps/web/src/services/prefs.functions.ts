@@ -35,7 +35,8 @@ export const setDashboardPrefsFn = createServerFn({ method: "POST" })
 export function getClientCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined;
   const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-  return match ? decodeURIComponent(match[1]) : undefined;
+  // biome-ignore lint/style/noNonNullAssertion: match が存在する場合、 match[1] は必ず存在する
+  return match ? decodeURIComponent(match[1]!) : undefined;
 }
 
 export function setClientCookie(name: string, value: string, maxAgeDays = 365) {

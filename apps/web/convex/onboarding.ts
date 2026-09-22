@@ -137,8 +137,7 @@ export const insertSampleRecords = familyBoundMutation({
       });
 
       // credentials テーブルへ挿入
-      for (let i = 0; i < recordData.credentials.length; i++) {
-        const c = recordData.credentials[i];
+      for (const [i, c] of recordData.credentials.entries()) {
         await ctx.db.insert("credentials", {
           recordId,
           stableId: crypto.randomUUID(),

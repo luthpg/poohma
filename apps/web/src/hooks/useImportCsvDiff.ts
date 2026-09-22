@@ -243,21 +243,20 @@ export function useImportCsvDiff(options?: UseImportCsvDiffOptions) {
         const seenRecordIdsInCsv = new Map<string, number>(); // stableId -> firstCsvRow
         const preliminaryItems: DiffItem[] = [];
 
-        for (let i = 0; i < data.length; i++) {
-          const row = data[i];
-          const csvRow = i + 2; // ヘッダー行を1行目としたときの行番号
+        for (const [index, row] of data.entries()) {
+          const csvRow = index + 2; // ヘッダー行を1行目としたときの行番号
 
           // 行単位のパースエラー（FieldMismatch 等）がある場合は該当行を ERROR として分類し、正常行の処理を続行
-          if (rowParseErrors.has(i)) {
+          if (rowParseErrors.has(index)) {
             preliminaryItems.push({
-              index: i,
+              index,
               csvRow,
               action: "ERROR",
               title: (row?.Title || "").trim() || "(列数不一致エラー)",
               changedFields: [],
               changes: [],
               errorReason:
-                rowParseErrors.get(i) ||
+                rowParseErrors.get(index) ||
                 "列の数がヘッダーと一致しません（不正な行）",
             });
             continue;
@@ -269,7 +268,7 @@ export function useImportCsvDiff(options?: UseImportCsvDiffOptions) {
           // 1. Title が空の場合はエラー
           if (!title && !recordId) {
             preliminaryItems.push({
-              index: i,
+              index,
               csvRow,
               action: "ERROR",
               title: "(タイトル未入力)",
@@ -286,7 +285,7 @@ export function useImportCsvDiff(options?: UseImportCsvDiffOptions) {
               (row.OwnerType || "").trim().toLowerCase() === "family";
             const warnings = isFamily ? checkAdminWarnings(row.Admins) : [];
             preliminaryItems.push({
-              index: i,
+              index,
               csvRow,
               action: "CREATE",
               title: title || "(無題)",
@@ -308,7 +307,7 @@ export function useImportCsvDiff(options?: UseImportCsvDiffOptions) {
           const prevRow = seenRecordIdsInCsv.get(recordId);
           if (prevRow !== undefined) {
             preliminaryItems.push({
-              index: i,
+              index,
               csvRow,
               action: "ERROR",
               title: title || "(無題)",
@@ -325,7 +324,7 @@ export function useImportCsvDiff(options?: UseImportCsvDiffOptions) {
           const existing = recordByStableId.get(recordId);
           if (!existing) {
             preliminaryItems.push({
-              index: i,
+              index,
               csvRow,
               action: "ERROR",
               title: title || "(無題)",
@@ -372,7 +371,7 @@ export function useImportCsvDiff(options?: UseImportCsvDiffOptions) {
 
           if (credError) {
             preliminaryItems.push({
-              index: i,
+              index,
               csvRow,
               action: "ERROR",
               title: title || existing.title,
@@ -526,7 +525,7 @@ export function useImportCsvDiff(options?: UseImportCsvDiffOptions) {
           const isFamily = (ownerType || existing.ownerType) === "family";
           const warnings = isFamily ? checkAdminWarnings(row.Admins) : [];
           preliminaryItems.push({
-            index: i,
+            index,
             csvRow,
             action: changes.length > 0 ? "UPDATE" : "SKIP",
             title: existing.title,
@@ -539,9 +538,11 @@ export function useImportCsvDiff(options?: UseImportCsvDiffOptions) {
 
         // 7. パスコードアンロックの確認（ヒント暗号化が必要な行がある場合）
         const needsEncryption = data.some((row, i) => {
-          const item = preliminaryItems[i];
-          if (item.action !== "CREATE" && item.action !== "UPDATE")
+          // biome-ignore lint/style/noNonNullAssertion: preliminaryItemsはdataの長さと同じ長さで初期化されているため、存在しないindexは返さない
+          const item = preliminaryItems[i]!;
+          if (item.action !== "CREATE" && item.action !== "UPDATE") {
             return false;
+          }
           for (let cIdx = 1; cIdx <= MAX_CREDENTIALS_PER_RECORD; cIdx++) {
             if ((row[`PasswordHint${cIdx}`] || "").trim()) return true;
           }
@@ -572,7 +573,8 @@ export function useImportCsvDiff(options?: UseImportCsvDiffOptions) {
         const finalItems = await processInChunks(
           preliminaryItems,
           async (item) => {
-            const row = data[item.index];
+            // biome-ignore lint/style/noNonNullAssertion: preliminaryItemsはdataの長さと同じ長さで初期化されているため、存在しないindexは返さない
+            const row = data[item.index]!;
 
             if (item.action === "CREATE") {
               const credentials = [];

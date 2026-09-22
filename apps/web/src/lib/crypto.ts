@@ -371,8 +371,10 @@ export function generateRecoveryCode(): string {
   const chars: string[] = [];
   for (let i = 0; i < 32; i++) {
     // Crockford's Base32 は 32 文字（2^5）のため、下位5ビット (0..31) をマスク抽出してバイアスを排除
-    const idx = randomBytes[i] & 0x1f;
-    chars.push(CROCKFORD_BASE32_ALPHABET[idx]);
+    // biome-ignore lint/style/noNonNullAssertion: 0 <= i < 32 なので randomBytes[i] は必ず存在する
+    const idx = randomBytes[i]! & 0x1f;
+    // biome-ignore lint/style/noNonNullAssertion: 0 <= idx < 32 なので CROCKFORD_BASE32_ALPHABET[idx] は必ず存在する
+    chars.push(CROCKFORD_BASE32_ALPHABET[idx]!);
   }
 
   // 4文字ずつハイフンで区切る (8グループ)
@@ -402,7 +404,8 @@ export function isValidRecoveryCode(code: string): boolean {
   const normalized = normalizeRecoveryCode(code);
   if (normalized.length !== 32) return false;
   for (let i = 0; i < normalized.length; i++) {
-    if (!CROCKFORD_BASE32_ALPHABET.includes(normalized[i])) {
+    // biome-ignore lint/style/noNonNullAssertion: normalized.length === 32 なので normalized[i] は必ず存在する
+    if (!CROCKFORD_BASE32_ALPHABET.includes(normalized[i]!)) {
       return false;
     }
   }

@@ -583,13 +583,13 @@ describe("1.1 暗号化コアロジックの単体テスト (src/lib/crypto.ts)"
         [res3, "hint-record2-cred1"],
       ] as const) {
         const unwrappedDek = await unwrapDEK(
-          res.passwordHintDekEncrypted,
-          res.passwordHintDekIv,
+          res!.passwordHintDekEncrypted,
+          res!.passwordHintDekIv,
           newMasterKey,
         );
         const plain = await decrypt(
-          res.passwordHint,
-          res.passwordHintIv,
+          res!.passwordHint,
+          res!.passwordHintIv,
           unwrappedDek,
         );
         expect(plain).toBe(expectedPlain);

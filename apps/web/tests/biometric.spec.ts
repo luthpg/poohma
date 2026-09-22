@@ -193,7 +193,7 @@ describe("生体認証解除機能のテスト (PRF拡張対応版: src/lib/biom
       expect(navigator.credentials.create).toHaveBeenCalledOnce();
       const createArgs =
         // biome-ignore lint/suspicious/noExplicitAny: for tests
-        vi.mocked(navigator.credentials.create).mock.calls[0][0] as any;
+        vi.mocked(navigator.credentials.create).mock.calls[0]?.[0] as any;
 
       // PRF拡張がリクエストに含まれているか検証
       expect(createArgs.publicKey.extensions?.prf).toBeDefined();
@@ -234,7 +234,7 @@ describe("生体認証解除機能のテスト (PRF拡張対応版: src/lib/biom
       // navigator.credentials.get が呼ばれ、PRF拡張がリクエストされたか検証
       expect(navigator.credentials.get).toHaveBeenCalledOnce();
       const getArgs = // biome-ignore lint/suspicious/noExplicitAny: for tests
-        vi.mocked(navigator.credentials.get).mock.calls[0][0] as any;
+        vi.mocked(navigator.credentials.get).mock.calls[0]?.[0] as any;
       expect(getArgs.publicKey.userVerification).toBe("required");
       expect(getArgs.publicKey.extensions?.prf?.eval?.first).toBeDefined(); // ソルトが渡されているか
     });

@@ -136,7 +136,7 @@ describe("auth-recovery", () => {
 
       expect(restored).not.toBeNull();
       expect(restored?.values.title).toBe("Netflix");
-      expect(restored?.values.credentials[0].passwordHint).toBe(
+      expect(restored?.values.credentials[0]?.passwordHint).toBe(
         "犬の名前+誕生日",
       );
       expect(restored?.initialRevision).toBe(2);

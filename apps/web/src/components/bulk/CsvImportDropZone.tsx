@@ -46,7 +46,8 @@ export function CsvImportDropZone({
 
     const files = e.dataTransfer.files;
     if (files && files.length > 0) {
-      const file = files[0];
+      // biome-ignore lint/style/noNonNullAssertion: 1 item 以上は必ずある
+      const file = files[0]!;
       if (
         file.name.toLowerCase().endsWith(".csv") ||
         file.type === "text/csv"

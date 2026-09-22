@@ -31,8 +31,10 @@ function generate6DigitOtp(): string {
   const array = new Uint32Array(1);
   while (true) {
     crypto.getRandomValues(array);
-    if (array[0] < maxValid) {
-      const num = array[0] % 1_000_000;
+    // biome-ignore lint/style/noNonNullAssertion: arrayは1要素のUint32Arrayなので必ず存在する
+    if (array[0]! < maxValid) {
+      // biome-ignore lint/style/noNonNullAssertion: arrayは1要素のUint32Arrayなので必ず存在する
+      const num = array[0]! % 1_000_000;
       return num.toString().padStart(6, "0");
     }
   }

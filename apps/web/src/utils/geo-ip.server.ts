@@ -26,7 +26,8 @@ function isPrivateOrLocalIp(ip: string): boolean {
   if (ip.startsWith("172.")) {
     const parts = ip.split(".");
     if (parts.length >= 2) {
-      const secondOctet = Number.parseInt(parts[1], 10);
+      // biome-ignore lint/style/noNonNullAssertion: 172.で始まるため、parts[1]は必ず存在する
+      const secondOctet = Number.parseInt(parts[1]!, 10);
       if (secondOctet >= 16 && secondOctet <= 31) {
         return true;
       }

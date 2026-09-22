@@ -391,7 +391,8 @@ export function CsvImportPreviewTable({
                 }}
               >
                 {virtualizer.getVirtualItems().map((virtualRow) => {
-                  const item = filteredItems[virtualRow.index];
+                  // biome-ignore lint/style/noNonNullAssertion: virtualizer.getVirtualItems()が返すindexは存在しないindexを返さない
+                  const item = filteredItems[virtualRow.index]!;
                   const isSelected = selectedIndices.has(item.index);
                   const isExpanded = expandedRows.has(item.index);
 

@@ -314,7 +314,8 @@ export function useRecordForm(
       }
       if (field.startsWith("credential_")) {
         const parts = field.split("_");
-        const index = Number.parseInt(parts[1], 10);
+        // biome-ignore lint/style/noNonNullAssertion: credenital_index_subfield の形式なので 1, 2 は必ず存在する
+        const index = Number.parseInt(parts[1]!, 10);
         const subfield = parts[2] as keyof RecordFormCredential;
         const currentCred = values.credentials[index];
         const initCred = baselineValues?.credentials?.[index];
@@ -552,11 +553,12 @@ export function useRecordForm(
 
   const updateCredentialField = useCallback(
     (index: number, field: keyof RecordFormCredential, value: string) => {
-      setValues((prev) => {
-        const next = [...prev.credentials];
-        next[index] = { ...next[index], [field]: value };
-        return { ...prev, credentials: next };
-      });
+      setValues((prev) => ({
+        ...prev,
+        credentials: prev.credentials.map((cred, i) =>
+          i === index ? { ...cred, [field]: value } : cred,
+        ),
+      }));
     },
     [],
   );

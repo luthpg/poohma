@@ -463,8 +463,8 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
         .collect();
 
       expect(remainingJoinRequests.length).toBe(1);
-      expect(remainingJoinRequests[0].userId).toBe("new_applicant_recent");
-      expect(remainingJoinRequests[0].status).toBe("pending");
+      expect(remainingJoinRequests[0]?.userId).toBe("new_applicant_recent");
+      expect(remainingJoinRequests[0]?.status).toBe("pending");
 
       // 6. デモ用招待コードが 2099 年まで有効に設定され、追加招待は消去されていること
       const allInvites = await ctx.db
@@ -472,9 +472,9 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
         .withIndex("by_familyId", (q) => q.eq("familyId", demoFamilyId))
         .collect();
       expect(allInvites.length).toBe(1); // デモ固定コードのみ
-      expect(allInvites[0].code).toBe("poohma-test-demo");
-      expect(allInvites[0].expiresAt).toBe(4102415999000);
-      expect(allInvites[0].useCount).toBe(0);
+      expect(allInvites[0]?.code).toBe("poohma-test-demo");
+      expect(allInvites[0]?.expiresAt).toBe(4102415999000);
+      expect(allInvites[0]?.useCount).toBe(0);
 
       // 7. 監査ログ: 過去コホートのログは全パージされ、リセット完了ログ1件のみ残存
       const allAuditLogs = await ctx.db
@@ -482,8 +482,8 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
         .withIndex("by_family_createdAt", (q) => q.eq("familyId", demoFamilyId))
         .collect();
       expect(allAuditLogs.length).toBe(1);
-      expect(allAuditLogs[0].action).toBe("FAMILY_UPDATE");
-      expect(allAuditLogs[0].metadata?.detail).toContain(
+      expect(allAuditLogs[0]?.action).toBe("FAMILY_UPDATE");
+      expect(allAuditLogs[0]?.metadata?.detail).toContain(
         "デモファミリー定期リセット",
       );
 
@@ -637,13 +637,13 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
     });
 
     expect(exported.length).toBe(1);
-    expect(exported[0].title).toBe("共有サービスA");
-    expect(exported[0].titleReading).toBe("きょうゆうさーびすえー");
-    expect(exported[0].ogpImage).toBe("https://example.com/ogp-a.png");
-    expect(exported[0].credentials.length).toBe(1);
-    expect(exported[0].credentials[0].label).toBe("メイン");
-    expect(exported[0].credentials[0].passwordHint).toBe("EncryptedHintA");
-    expect(exported[0].credentials[0].passwordHintDekEncrypted).toBe(
+    expect(exported[0]?.title).toBe("共有サービスA");
+    expect(exported[0]?.titleReading).toBe("きょうゆうさーびすえー");
+    expect(exported[0]?.ogpImage).toBe("https://example.com/ogp-a.png");
+    expect(exported[0]?.credentials.length).toBe(1);
+    expect(exported[0]?.credentials[0]?.label).toBe("メイン");
+    expect(exported[0]?.credentials[0]?.passwordHint).toBe("EncryptedHintA");
+    expect(exported[0]?.credentials[0]?.passwordHintDekEncrypted).toBe(
       "DekEncryptedA",
     );
   });

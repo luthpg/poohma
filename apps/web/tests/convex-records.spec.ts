@@ -113,7 +113,7 @@ describe("2.2.1 閲覧権限（ownerType）の境界値テスト (Convex版)", (
     const userB = t.withIdentity({ subject: "user_b", email: "b@example.com" });
     const resB = await userB.query(api.records.getRecords, {});
     expect(resB).toHaveLength(1);
-    expect(resB[0].title).toBe("Shared Record A");
+    expect(resB[0]?.title).toBe("Shared Record A");
 
     // ユーザーCのコンテキストでクエリ (取得できないこと)
     const userC = t.withIdentity({ subject: "user_c", email: "c@example.com" });
@@ -243,8 +243,8 @@ describe("2.2.3 CSVインポートのバリデーションと境界値 (Convex�
 
     expect(result.successes).toBe(2);
     expect(result.failures).toHaveLength(1);
-    expect(result.failures[0].row).toBe(2);
-    expect(result.failures[0].reason).toContain("タイトル");
+    expect(result.failures[0]?.row).toBe(2);
+    expect(result.failures[0]?.reason).toContain("タイトル");
 
     // DBに2件登録されていること
     await t.run(async (ctx) => {
@@ -372,8 +372,8 @@ describe("2.2.3 CSVインポートのバリデーションと境界値 (Convex�
 
     expect(result.successes).toBe(1);
     expect(result.failures).toHaveLength(1);
-    expect(result.failures[0].row).toBe(2);
-    expect(result.failures[0].reason).toContain("20個まで");
+    expect(result.failures[0]?.row).toBe(2);
+    expect(result.failures[0]?.reason).toContain("20個まで");
   });
 });
 
@@ -445,8 +445,8 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
     // getOwnedRecords returns only records manageable by A (A's Private)
     const ownedRecords = await userA.query(api.records.getOwnedRecords, {});
     expect(ownedRecords).toHaveLength(1);
-    expect(ownedRecords[0].title).toBe("A's Private");
-    expect(ownedRecords[0].adminEmails).toBeDefined();
+    expect(ownedRecords[0]?.title).toBe("A's Private");
+    expect(ownedRecords[0]?.adminEmails).toBeDefined();
   });
 
   it("ワンタップ共有 (shareRecord) とワンタップ解除 (unshareRecord) が正しく動作すること", async () => {
@@ -1194,7 +1194,7 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
     // クレデンシャルと管理者メールの検証
     const personalRec = results.find((r) => r.title === "A Personal Record");
     expect(personalRec?.credentials).toHaveLength(1);
-    expect(personalRec?.credentials[0].loginId).toBe("a_login_id");
+    expect(personalRec?.credentials[0]?.loginId).toBe("a_login_id");
 
     const sharedRec = results.find((r) => r.title === "Shared Admin A Record");
     expect(sharedRec?.adminEmails).toEqual(["export_a@example.com"]);
@@ -1295,12 +1295,12 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
 
     editors = await userB.query(api.records.getActiveEditors, { recordId });
     expect(editors).toHaveLength(1);
-    expect(editors[0].accountId).toBe(userAId);
-    expect(editors[0].displayName).toBe("ユーザーA");
-    expect(editors[0].email).toBe("a@example.com");
-    expect(editors[0].isCurrentAccount).toBe(false); // Bから見た場合
+    expect(editors[0]?.accountId).toBe(userAId);
+    expect(editors[0]?.displayName).toBe("ユーザーA");
+    expect(editors[0]?.email).toBe("a@example.com");
+    expect(editors[0]?.isCurrentAccount).toBe(false); // Bから見た場合
 
-    const sessionUpdatedAtA = editors[0].updatedAt;
+    const sessionUpdatedAtA = editors[0]?.updatedAt || 0;
 
     // 2. ユーザーBも編集セッションを開始（複数人の同時編集）
     await userB.mutation(api.records.startEditingSession, { recordId });
@@ -1329,7 +1329,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
     await userA.mutation(api.records.endEditingSession, { recordId });
     editors = await userB.query(api.records.getActiveEditors, { recordId });
     expect(editors).toHaveLength(1);
-    expect(editors[0].accountId).toBe(userBId);
+    expect(editors[0]?.accountId).toBe(userBId);
   });
 
   it("TTL（5分）を超過したセッションが getActiveEditors から自動除外されること", async () => {
@@ -1389,7 +1389,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
       recordId,
     });
     expect(activeEditors).toHaveLength(1);
-    expect(activeEditors[0].accountId).toBe(userAId);
+    expect(activeEditors[0]?.accountId).toBe(userAId);
   });
 
   it("cleanupExpiredEditingSessionsInternal が期限切れセッションだけを削除すること", async () => {
@@ -1444,7 +1444,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
       ctx.db.query("recordEditingSessions").collect(),
     );
     expect(sessions).toHaveLength(1);
-    expect(sessions[0].updatedAt).toBe(now - 5 * 60 * 1000);
+    expect(sessions[0]?.updatedAt).toBe(now - 5 * 60 * 1000);
   });
 
   it("updateRecord で古い revision を渡した場合に CONFLICT エラーで更新が拒否され、一致時は成功してセッションが消去されること", async () => {
@@ -1639,7 +1639,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
     // 各レコードの credentials を検証
     for (const record of records) {
       expect(record.credentials).toHaveLength(1);
-      const cred = record.credentials[0];
+      const cred = record.credentials[0]!;
 
       // 一覧表示・検索用のフィールドが存在すること
       expect(cred._id).toBeDefined();
@@ -1786,10 +1786,11 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
     expect(page1.page).toHaveLength(2);
     expect(page1.isDone).toBe(false);
     expect(page1.continueCursor).toBeDefined();
-    expect(page1.page[0].credentials).toHaveLength(1);
-    expect(page1.page[0].credentials[0].label).toBe("Cred 0");
+    expect(page1.page[0]?.credentials).toHaveLength(1);
+    expect(page1.page[0]?.credentials[0]?.label).toBe("Cred 0");
     expect(
-      (page1.page[0].credentials[0] as Record<string, unknown>).passwordHint,
+      (page1.page[0]?.credentials[0] as Record<string, unknown> | undefined)
+        ?.passwordHint,
     ).toBeUndefined();
 
     // 2ページ目: 前回の continueCursor を渡して 2件取得
@@ -1972,15 +1973,15 @@ describe("2.2.14 CSV差分インポート・安定ID（stableId）検証", () =>
 
     const records = await user.query(api.records.getRecordsForDiffImport, {});
     expect(records.length).toBe(1);
-    const r = records[0];
+    const r = records[0]!;
     expect(r.stableId).toBe(stableUUID);
     expect(r.title).toBe("Diff Target Service");
     expect(r.url).toBe("https://diff.example.com");
     expect(r.memo).toBe("Original Memo");
     expect(r.credentials.length).toBe(1);
-    expect(r.credentials[0].stableId).toBe("cred-uuid-1");
-    expect(r.credentials[0].label).toBe("Main");
-    expect(r.credentials[0].hasPasswordHint).toBe(true);
+    expect(r.credentials[0]?.stableId).toBe("cred-uuid-1");
+    expect(r.credentials[0]?.label).toBe("Main");
+    expect(r.credentials[0]?.hasPasswordHint).toBe(true);
 
     // 暗号文・IVが返却されていないこと（patterns.md #15 最小権限原則）
     expect(

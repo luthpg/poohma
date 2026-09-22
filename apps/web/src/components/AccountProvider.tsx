@@ -144,7 +144,8 @@ export function AccountProvider({
       const exists = accounts.some((a) => a._id === activeAccountId);
       if (!exists || !activeAccountId) {
         // localStorage に有効な ID が保存されているか確認
-        let targetId = accounts[0]._id;
+        // biome-ignore lint/style/noNonNullAssertion: 1 account 以上は必ずある
+        let targetId = accounts[0]!._id;
         if (typeof window !== "undefined") {
           const key = getStorageKey(currentUid);
           const stored =
@@ -164,7 +165,8 @@ export function AccountProvider({
   const activeAccount = useMemo(() => {
     if (!accounts || accounts.length === 0) return null;
     const found = accounts.find((a) => a._id === activeAccountId);
-    return found || accounts[0];
+    // biome-ignore lint/style/noNonNullAssertion: 1 account 以上は必ずある
+    return found || accounts[0]!;
   }, [accounts, activeAccountId]);
 
   const switchAccount = useCallback(
@@ -216,7 +218,8 @@ export function AccountProvider({
       if (accountId === activeAccountId) {
         const remaining = accounts.filter((a) => a._id !== accountId);
         if (remaining.length > 0) {
-          const nextId = remaining[0]._id;
+          // biome-ignore lint/style/noNonNullAssertion: 1 account 以上は必ずある
+          const nextId = remaining[0]!._id;
           setActiveAccountId(nextId);
           if (typeof window !== "undefined") {
             localStorage.setItem(getStorageKey(currentUid), nextId);

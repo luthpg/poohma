@@ -94,6 +94,6 @@ describe("TagInput Component", () => {
 
     const chips = screen.getAllByRole("button", { name: /SNS|仕事|エンタメ/ });
     // 先頭のチップが選択済みの「仕事」になっていること
-    expect(chips[0].textContent).toContain("仕事");
+    expect(chips[0]?.textContent).toContain("仕事");
   });
 });
