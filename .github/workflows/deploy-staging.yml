@@ -134,6 +134,9 @@ jobs:
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
+      - name: Disable email delivery in Convex E2E Preview
+        run: printf 'DISABLE_EMAIL_DELIVERY=true\n' > apps/web/.env.e2e.local
+
       - name: Setup Convex E2E Preview Deployment
         run: pnpm --filter @poohma/web run setup:e2e-preview
 
