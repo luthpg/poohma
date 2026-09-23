@@ -43,3 +43,11 @@ Playwright E2E テストおよびフロントエンド遷移における落と�
 
 - **問題**: CSVインポートテスト（`e2ee-seed-import.spec.ts`）など、数十件のレコードに対してクライアント側 Web Crypto 暗号化、外部 OGP フェッチ、形態素解析（ルビ取得）を順次実行する巨大なジャーニーテストでは、`@playwright/test` のテストごとのデフォルトタイムアウト（30秒）を超えてしまうことがある。これは `playwright.config.ts` の `webServer` 起動タイムアウト（120秒）とは別の設定である。
 - **回避法**: 大量の非同期暗号化・外部通信を伴うテストスイートでは、個別の `test.setTimeout(300_000)` 等で十分なタイムアウト値を明示的に設定する。
+
+---
+
+### 動的 Convex Preview 環境における CSP（Content-Security-Policy）違反
+
+- **問題**: Vercel Preview デプロイメントで動的な Convex Preview Deployment（`preview/e2e-test` 等）を使用する場合、Convex URL は `https://<preview-hash>.convex.cloud` のように動的サブドメインとなる。サーバー側（TanStack Start の `cspMiddleware`）で生成する CSP ヘッダーが本番・開発用の固定 Convex URL のみ許可していると、ブラウザからの WebSocket / HTTPS 接続が CSP 違反でブロックされ、全ミューテーションやサブスクリプションが失敗する。
+- **回避法**: Preview 環境（`VERCEL_ENV === "preview"`）においては、CSP の `connect-src` に `wss://*.convex.cloud https://*.convex.cloud` を含めて任意の Convex Deployment を許可する（Production は引き続き単一ドメインに限定）。
+
