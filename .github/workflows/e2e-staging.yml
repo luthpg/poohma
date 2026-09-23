@@ -59,3 +59,13 @@ jobs:
 
       - name: Run Full-Stack E2E Tests (Playwright)
         run: pnpm --filter @poohma/web run test:e2e
+
+      - name: Upload Playwright Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 7
