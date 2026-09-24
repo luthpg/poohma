@@ -39,7 +39,8 @@
 - **OS / Shell**: Windows (PowerShell)
   - Windows PowerShell 7未満では `&&` 演算子が構文エラーになるため使用禁止。連続実行が必要な場合は、`cmd1` の直後に `$LASTEXITCODE` を確認し、非ゼロなら `throw` してから `cmd2` を実行する（例: `cmd1; if ($LASTEXITCODE -ne 0) { throw "cmd1 failed: $LASTEXITCODE" }; cmd2`）。
   - パスに丸括弧 `()` や `$` が含まれる場合は必ずシングルクォート等で囲む（例: `'src/routes/(app)/records/$id.tsx'`）。
-  - パイプライン（`|`）や引数直接渡しによる日本語文字化けを防ぐため、コミットや PR 作成は必ず **UTF-8 一時ファイルを経由** すること（詳細は [`.ai/workflows/git-workflow.md`](./.ai/workflows/git-workflow.md) 参照）。
+  - パイプライン（`|`）や引数直接渡しによる日本語文字化けを防ぐため、コミットや PR 作成・コメント投稿は必ず **UTF-8 一時ファイルを経由** すること。
+  - **ヒアドキュメントでのダブルクォート（`@" ... "@`）の完全禁止**: PowerShell ではバッククォート `` ` `` がエスケープ文字となるため、ダブルクォートヒアドキュメント内では `` `apps/web/.. `` の `` `a `` がベル文字（0x07）等に誤解釈されてインラインコードやパスが致命的に文字化け・破壊される。テキスト（コミットメッセージ、PR本文、コメント）の定義には**必ずシングルクォートヒアドキュメント（`@' ... '@`）を使用する**こと（詳細は [`.ai/workflows/git-workflow.md`](./.ai/workflows/git-workflow.md) 参照）。
 - **Package Manager**: `pnpm`（`npm`, `yarn` は使用禁止）。
 
 ---
@@ -74,7 +75,9 @@
 
 - **Format**: Conventional Commits 形式に従う（`feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`）。
 - **Body**: 必ず日本語で「なぜこの変更を行ったか」「どのような影響があるか」を明記。
-- **PowerShell 実行手順**: 日本語文字化けおよびエスケープ破壊防止のため、必ず UTF-8 一時ファイルを経由する。具体的なテンプレートスクリプトは [`.ai/workflows/git-workflow.md`](./.ai/workflows/git-workflow.md) を参照。
+- **PowerShell 実行手順（シングルクォートヒアドキュメント必須）**:
+  - 日本語文字化けおよびエスケープ破壊防止のため、必ず **シングルクォートヒアドキュメント（`@' ... '@`）で定義した UTF-8 一時ファイルを経由** すること。ダブルクォート（`@" ... "@`）を使用すると、Markdown のインラインコード記法（`` `code` ``）内の `` `a `` や `` `d `` 等が PowerShell のエスケープ文字として解釈され、ベル文字（0x07）等に化けてテキストが破壊される。
+  - 具体的なテンプレートスクリプトは [`.ai/workflows/git-workflow.md`](./.ai/workflows/git-workflow.md) を参照。
 
 ---
 
