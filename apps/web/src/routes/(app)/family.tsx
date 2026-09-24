@@ -253,6 +253,7 @@ function FamilyComponent() {
     } else {
       // 単一アカウント（PoohMa全体からの退会）: Firebase 再認証 + 全削除 + 退会
       setIsDeletingAccount(true);
+      let convexDeletionCompleted = false;
       try {
         const currentUser = auth?.currentUser;
         if (!currentUser) {
@@ -270,6 +271,7 @@ function FamilyComponent() {
         }
 
         await deleteAllAccountsConvex({});
+        convexDeletionCompleted = true;
         await currentUser.delete();
         try {
           localStorage.setItem(LOGOUT_FLAG_KEY, String(Date.now()));
@@ -281,12 +283,41 @@ function FamilyComponent() {
         } catch (_e) {
           // サーバーセッション失効失敗時も遷移を継続
         }
+        try {
+          if (auth) await signOut(auth);
+        } catch (_e) {
+          // Firebaseサインアウト失敗時も継続
+        }
         clearQueryCache();
         queryClient.clear();
 
         toast.success("退会処理が完了しました");
         window.location.href = "/";
       } catch (error) {
+        if (convexDeletionCompleted) {
+          try {
+            localStorage.setItem(LOGOUT_FLAG_KEY, String(Date.now()));
+          } catch (_e) {
+            // localStorage利用不可時は無視
+          }
+          try {
+            await logout();
+          } catch (_e) {
+            // サーバーセッション失効失敗時も後続のクリーンアップを継続
+          }
+          try {
+            if (auth) await signOut(auth);
+          } catch (_e) {
+            // Firebase認証解除失敗時もキャッシュ削除を継続
+          }
+          clearQueryCache();
+          queryClient.clear();
+          toast.error(
+            "退会処理中にエラーが発生しましたが、アカウントデータは削除されました。",
+          );
+          window.location.href = "/";
+          return;
+        }
         const err = error as { code?: string; message?: string };
         if (err?.code === "auth/requires-recent-login") {
           toast.error(

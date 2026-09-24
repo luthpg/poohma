@@ -5,7 +5,11 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
-import { GoogleAuthProvider, reauthenticateWithPopup } from "firebase/auth";
+import {
+  GoogleAuthProvider,
+  reauthenticateWithPopup,
+  signOut,
+} from "firebase/auth";
 import { AlertTriangle, ChevronRight, Database, Download } from "lucide-react";
 import { type SubmitEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -147,6 +151,7 @@ function SettingsComponent() {
 
   const handleDeleteAccount = async () => {
     setIsDeleting(true);
+    let convexDeletionCompleted = false;
     try {
       const currentUser = auth?.currentUser;
       if (!currentUser) {
@@ -166,6 +171,7 @@ function SettingsComponent() {
 
       // 2. 再認証成功後、Convexで全アカウント削除を実行
       await deleteAllAccountsConvex({});
+      convexDeletionCompleted = true;
 
       // 3. Convex削除成功後にFirebase Auth ユーザーの削除
       await currentUser.delete();
@@ -180,12 +186,41 @@ function SettingsComponent() {
       } catch (_e) {
         // サーバーセッション失効失敗時も遷移を継続
       }
+      try {
+        if (auth) await signOut(auth);
+      } catch (_e) {
+        // Firebaseサインアウト失敗時も継続
+      }
       clearQueryCache();
       queryClient.clear();
 
       toast.success("退会処理が完了しました");
       window.location.href = "/";
     } catch (error) {
+      if (convexDeletionCompleted) {
+        try {
+          localStorage.setItem(LOGOUT_FLAG_KEY, String(Date.now()));
+        } catch (_e) {
+          // localStorage利用不可時は無視
+        }
+        try {
+          await logout();
+        } catch (_e) {
+          // サーバーセッション失効失敗時も後続のクリーンアップを継続
+        }
+        try {
+          if (auth) await signOut(auth);
+        } catch (_e) {
+          // Firebase認証解除失敗時もキャッシュ削除を継続
+        }
+        clearQueryCache();
+        queryClient.clear();
+        toast.error(
+          "退会処理中にエラーが発生しましたが、アカウントデータは削除されました。",
+        );
+        window.location.href = "/";
+        return;
+      }
       const err = error as { code?: string; message?: string };
       if (err?.code === "auth/requires-recent-login") {
         toast.error(
