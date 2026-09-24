@@ -23,11 +23,11 @@ describe("SEO / JSON-LD セキュリティユーティリティ", () => {
       expect(result).not.toContain("secret");
     });
 
-    it("終了タグに空白が含まれる <script > や </script >、<style > も安全に除去されること", () => {
+    it("終了タグに属性や空白・改行が含まれる不正なタグ（</script foo='bar'>, </script\\t\\n bar>等）も中身ごと安全に除去されること", () => {
       const malicious =
-        "前<script type='text/javascript' >alert(1);</script >中<style >body{color:red;}</style  >後";
+        '前<script src="foo">alert(1)</script foo="bar">中<script \n>alert(2)</script\t\n bar>後<style type="text/css">body{color:red;}</style invalid>完了';
       const result = stripHtmlTags(malicious);
-      expect(result).toBe("前 中 後");
+      expect(result).toBe("前 中 後 完了");
       expect(result).not.toContain("alert");
       expect(result).not.toContain("color:red");
     });

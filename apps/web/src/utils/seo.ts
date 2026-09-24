@@ -8,8 +8,8 @@ export function stripHtmlTags(input: string): string {
 
   // 1. <script>...</script> および <style>...</style> ブロックを中身ごと非貪欲に除去
   let text = input
-    .replace(/<script\b[\s\S]*?<\/script\s*>/gi, " ")
-    .replace(/<style\b[\s\S]*?<\/style\s*>/gi, " ");
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script[^>]*>/gi, " ")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style[^>]*>/gi, " ");
 
   // 2. HTMLタグの繰り返し除去（<[^<>]+> により、タグ外テキストの巻き込みやネストすり抜けを完全防止）
   let prev = "";
