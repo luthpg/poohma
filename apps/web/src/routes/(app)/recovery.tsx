@@ -12,9 +12,8 @@ import {
   ShieldAlert,
   ShieldCheck,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { PasscodeStrengthMeter } from "@/components/PasscodeStrengthMeter";
 import { Button } from "@/components/ui/button";
 import {
   InputOTP,
@@ -22,6 +21,7 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { Spinner } from "@/components/ui/spinner";
+import { MIN_PASSCODE_LENGTH } from "@/constants/passcode";
 import { useAccount } from "@/hooks/useAccount";
 import {
   CURRENT_KDF_ITERATIONS,
@@ -35,11 +35,13 @@ import {
   wrapMasterKey,
 } from "@/lib/crypto";
 import { extractRecoveryCodeFromFile } from "@/lib/recovery-kit";
-import {
-  evaluatePasscodeStrength,
-  MIN_PASSCODE_LENGTH,
-} from "@/utils/passcode-strength";
 import { api } from "../../../convex/_generated/api";
+
+const PasscodeStrengthMeter = lazy(() =>
+  import("@/components/PasscodeStrengthMeter").then((m) => ({
+    default: m.PasscodeStrengthMeter,
+  })),
+);
 
 export const Route = createFileRoute("/(app)/recovery")({
   component: RecoveryPageComponent,
@@ -242,6 +244,9 @@ function RecoveryPageComponent() {
       return;
     }
 
+    const { evaluatePasscodeStrength } = await import(
+      "@/utils/passcode-strength"
+    );
     const strength = evaluatePasscodeStrength(newPasscode);
     if (!strength.isValid) {
       toast.error(strength.reasons[0]);
@@ -578,7 +583,9 @@ function RecoveryPageComponent() {
                     )}
                   </button>
                 </div>
-                <PasscodeStrengthMeter passcode={newPasscode} />
+                <Suspense fallback={null}>
+                  <PasscodeStrengthMeter passcode={newPasscode} />
+                </Suspense>
               </div>
 
               <div className="space-y-1.5">

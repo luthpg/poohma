@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import {
+  lazy,
   type SubmitEvent,
   Suspense,
   useEffect,
@@ -30,12 +31,15 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
+import { DashboardEmptyState } from "@/components/dashboard/DashboardEmptyState";
+import {
+  DashboardTagCloud,
+  TagCloudSkeleton,
+} from "@/components/dashboard/DashboardTagCloud";
 import { IndexScrollBar } from "@/components/IndexScrollBar";
 import { OnboardingBanner } from "@/components/onboarding/OnboardingBanner";
 import { OnboardingModal } from "@/components/onboarding/OnboardingModal";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
-import { BulkAdminModal } from "@/components/records/BulkAdminModal";
-import { BulkVisibilityModal } from "@/components/records/BulkVisibilityModal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TagInput } from "@/components/ui/tag-input";
 import { useAccount } from "@/hooks/useAccount";
@@ -89,62 +93,16 @@ export const Route = createFileRoute("/(app)/dashboard")({
   component: RouteComponent,
 });
 
-// タグクラウド用のスケルトン
-function TagCloudSkeleton() {
-  return (
-    <div className="mt-4 flex overflow-x-auto py-1.5 gap-2.5 no-scrollbar scroll-smooth items-center">
-      <Skeleton className="h-[28px] w-16 rounded-full" />
-      <Skeleton className="h-[28px] w-20 rounded-full" />
-      <Skeleton className="h-[28px] w-14 rounded-full" />
-      <Skeleton className="h-[28px] w-18 rounded-full" />
-    </div>
-  );
-}
-
-/**
- * 利用可能なタグを表示し、選択されたタグを通知するタグクラウド。
- */
-function TagCloud({
-  activeTag,
-  onTagClick,
-}: {
-  activeTag: string | undefined;
-  onTagClick: (tag: string) => void;
-}) {
-  const { activeAccountId } = useAccount();
-  const availableTags = usePersistentQuery<string[]>(
-    api.records.getAvailableTags,
-    { accountId: activeAccountId || undefined },
-  );
-
-  if (availableTags === undefined) return <TagCloudSkeleton />;
-  const validTags = Array.isArray(availableTags)
-    ? availableTags.filter((t): t is string => typeof t === "string")
-    : [];
-  if (validTags.length === 0) return null;
-
-  return (
-    <div className="mt-4 flex overflow-x-auto py-1.5 gap-2.5 no-scrollbar scroll-smooth items-center">
-      {validTags.map((t: string) => {
-        const isActive = activeTag === t;
-        return (
-          <button
-            key={t}
-            type="button"
-            onClick={() => onTagClick(t)}
-            className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-medium transition-all duration-200 ${
-              isActive
-                ? "bg-orange-500 text-white shadow-md scale-105"
-                : "bg-card text-muted-foreground border border-border/40 shadow-sm hover:border-orange-500/50 hover:text-orange-500 hover:bg-orange-500/5"
-            }`}
-          >
-            #{t}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
+const BulkAdminModal = lazy(() =>
+  import("@/components/records/BulkAdminModal").then((m) => ({
+    default: m.BulkAdminModal,
+  })),
+);
+const BulkVisibilityModal = lazy(() =>
+  import("@/components/records/BulkVisibilityModal").then((m) => ({
+    default: m.BulkVisibilityModal,
+  })),
+);
 
 // レコード一覧用のスケルトン
 function RecordListSkeleton() {
@@ -555,7 +513,7 @@ function RouteComponent() {
         {/* タグクラウド (フィルター) - Suspense化 */}
         <div data-tour="tag-cloud">
           <Suspense fallback={<TagCloudSkeleton />}>
-            <TagCloud
+            <DashboardTagCloud
               activeTag={searchParams.tag}
               onTagClick={handleTagClick}
             />
@@ -654,31 +612,39 @@ function RouteComponent() {
       )}
 
       {/* 共有設定モーダル */}
-      <BulkVisibilityModal
-        isOpen={activeModal === "visibility"}
-        selectedCount={selectedIds.length}
-        privateCount={selectedPrivateCount}
-        sharedCount={selectedSharedCount}
-        unshareableCount={unshareableRecords.length}
-        excludedUnshareRecords={excludedUnshareRecords}
-        onShare={handleBulkShare}
-        onUnshare={handleBulkUnshare}
-        onClose={() => setActiveModal(null)}
-      />
+      {activeModal === "visibility" && (
+        <Suspense fallback={null}>
+          <BulkVisibilityModal
+            isOpen={true}
+            selectedCount={selectedIds.length}
+            privateCount={selectedPrivateCount}
+            sharedCount={selectedSharedCount}
+            unshareableCount={unshareableRecords.length}
+            excludedUnshareRecords={excludedUnshareRecords}
+            onShare={handleBulkShare}
+            onUnshare={handleBulkUnshare}
+            onClose={() => setActiveModal(null)}
+          />
+        </Suspense>
+      )}
 
       {/* 管理者一括設定モーダル */}
-      <BulkAdminModal
-        isOpen={activeModal === "admin"}
-        selectedRecords={selectedRecords}
-        familyMembers={family?.users || []}
-        activeAccountId={activeAccountId}
-        onClose={() => setActiveModal(null)}
-        onSuccess={async () => {
-          setActiveModal(null);
-          setSelectedIds([]);
-          setIsSelectMode(false);
-        }}
-      />
+      {activeModal === "admin" && (
+        <Suspense fallback={null}>
+          <BulkAdminModal
+            isOpen={true}
+            selectedRecords={selectedRecords}
+            familyMembers={family?.users || []}
+            activeAccountId={activeAccountId}
+            onClose={() => setActiveModal(null)}
+            onSuccess={async () => {
+              setActiveModal(null);
+              setSelectedIds([]);
+              setIsSelectMode(false);
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* 削除確認モーダル */}
       {activeModal === "delete" && (
@@ -951,11 +917,7 @@ function RecordListSection({
       )}
 
       {records.length === 0 ? (
-        <div className="rounded-lg bg-muted/50 p-12 text-center text-muted-foreground shadow-border">
-          まだ登録されたサービスはありません。
-          <br />
-          右上のボタンから追加してみましょう！
-        </div>
+        <DashboardEmptyState />
       ) : sortParam === "name-asc" ? (
         <>
           <IndexScrollBar

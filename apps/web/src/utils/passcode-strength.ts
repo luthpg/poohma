@@ -4,6 +4,12 @@ import {
   dictionary as commonDictionary,
 } from "@zxcvbn-ts/language-common";
 import { dictionary } from "@zxcvbn-ts/language-en";
+import {
+  MIN_PASSCODE_LENGTH,
+  MIN_PASSCODE_STRENGTH_SCORE,
+} from "@/constants/passcode";
+
+export { MIN_PASSCODE_LENGTH, MIN_PASSCODE_STRENGTH_SCORE };
 
 const factory = new ZxcvbnFactory({
   graphs: adjacencyGraphs,
@@ -12,9 +18,6 @@ const factory = new ZxcvbnFactory({
     ...dictionary,
   },
 });
-
-export const MIN_PASSCODE_LENGTH = 10;
-export const MIN_PASSCODE_STRENGTH_SCORE = 2;
 
 export type PasscodeStrengthResult = {
   score: number;
