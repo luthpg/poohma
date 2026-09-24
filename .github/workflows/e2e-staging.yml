@@ -68,4 +68,6 @@ jobs:
           path: |
             apps/web/playwright-report/
             apps/web/test-results/
+            !apps/web/test-results/**/*.zip
+          if-no-files-found: ignore
           retention-days: 7

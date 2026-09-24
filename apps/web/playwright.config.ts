@@ -42,7 +42,10 @@ export default defineConfig({
   use: {
     baseURL,
     ignoreHTTPSErrors,
-    trace: "on-first-retry",
+    // CI環境（パブリックリポジトリ）での機密ヘッダー・トークン漏洩防止のためCIではoff
+    trace: process.env.CI ? "off" : "on-first-retry",
+    // 失敗時のスクリーンショットを保存してデバッグ性を確保
+    screenshot: "only-on-failure",
   },
   webServer:
     process.env.CI && configuredBaseURL

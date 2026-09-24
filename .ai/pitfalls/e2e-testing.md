@@ -51,3 +51,14 @@ Playwright E2E テストおよびフロントエンド遷移における落と�
 - **問題**: Vercel Preview デプロイメントで動的な Convex Preview Deployment（`preview/e2e-test` 等）を使用する場合、Convex URL は `https://<preview-hash>.convex.cloud` のように動的サブドメインとなる。サーバー側（TanStack Start の `cspMiddleware`）で生成する CSP ヘッダーが本番・開発用の固定 Convex URL のみ許可していると、ブラウザからの WebSocket / HTTPS 接続が CSP 違反でブロックされ、全ミューテーションやサブスクリプションが失敗する。
 - **回避法**: Preview 環境（`VERCEL_ENV === "preview"`）においては、CSP の `connect-src` に `wss://*.convex.cloud https://*.convex.cloud` を含めて任意の Convex Deployment を許可する（Production は引き続き単一ドメインに限定）。
 
+---
+
+### パブリック CI における Playwright トレースと機密ヘッダー漏洩（CWE-200）
+
+- **問題**: Playwright の `trace: "on-first-retry"` をパブリックリポジトリの CI で有効化し、`test-results/` をそのまま GitHub Actions Artifacts にアップロードすると、リトライ時に生成された `trace.zip` のネットワーク HAR ログ内に `x-vercel-protection-bypass` や `CF-Access-Client-Secret`、セッショントークンなどの機密値が記録され、ダウンロード可能な成果物経由で外部漏洩するリスク（CWE-200）がある。
+- **回避法**:
+  1. `playwright.config.ts` で `trace: process.env.CI ? "off" : "on-first-retry"` とし、CI 環境では生ネットワークトレースの記録自体を無効化する（ローカルではデバッグ用に維持）。
+  2. ワークフロー（`upload-artifact`）のパスに `!apps/web/test-results/**/*.zip` を指定し、万が一のアーカイブ生成時もアップロードから完全除外する。
+  3. 失敗時のデバッグには `screenshot: "only-on-failure"` の画像および HTML レポート、ターミナル出力を使用する。
+
+

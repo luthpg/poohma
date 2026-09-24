@@ -103,6 +103,22 @@ try {
     );
   }
 
+  // 4. E2E Preview 環境では常に外部メール送信を無効化（Resend クォータ保護）
+  console.log(
+    `✉️  [setup-e2e-preview] Ensuring DISABLE_EMAIL_DELIVERY=true on "${deploymentName}"...`,
+  );
+  execSync(
+    `pnpm exec convex env set DISABLE_EMAIL_DELIVERY true --deployment ${deploymentName}`,
+    {
+      cwd: webDir,
+      env: {
+        ...process.env,
+        CONVEX_DEPLOY_KEY: previewKey,
+      },
+      stdio: "inherit",
+    },
+  );
+
   console.log(
     `✅ [setup-e2e-preview] Convex Preview environment "${deploymentName}" is ready for E2E tests.`,
   );
