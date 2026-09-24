@@ -24,9 +24,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { useAccount } from "@/hooks/useAccount";
+import { LOGOUT_FLAG_KEY } from "@/hooks/useConvexFirebaseAuth";
 import { useExportCsv } from "@/hooks/useExportCsv";
 import { clearQueryCache } from "@/hooks/usePersistentQuery";
 import { isBiometricEnabledForUser } from "@/lib/biometric";
+import { logout } from "@/services/auth.functions";
 import { auth } from "@/utils/firebase";
 
 export const Route = createFileRoute("/(app)/settings/")({
@@ -165,12 +167,21 @@ function SettingsComponent() {
       // 3. Convex削除成功後にFirebase Auth ユーザーの削除
       await currentUser.delete();
 
-      // 4. キャッシュのクリア
+      try {
+        localStorage.setItem(LOGOUT_FLAG_KEY, String(Date.now()));
+      } catch (_e) {
+        // localStorage利用不可時は無視
+      }
+      try {
+        await logout();
+      } catch (_e) {
+        // サーバーセッション失効失敗時も遷移を継続
+      }
       clearQueryCache();
+      queryClient.clear();
 
       toast.success("退会処理が完了しました");
-      await router.invalidate();
-      await router.navigate({ to: "/" });
+      window.location.href = "/";
     } catch (error) {
       const err = error as { code?: string; message?: string };
       if (err?.code === "auth/requires-recent-login") {
@@ -377,7 +388,11 @@ function SettingsComponent() {
 
         <div className="flex flex-col sm:flex-row gap-3">
           {accounts.length > 1 && (
-            <AlertDialog>
+            <AlertDialog
+              onOpenChange={(open) => {
+                if (!open) setDeleteSubAccountConfirmation("");
+              }}
+            >
               <AlertDialogTrigger asChild>
                 <button
                   type="button"
@@ -470,7 +485,8 @@ function SettingsComponent() {
                     }}
                     disabled={
                       deleteSubAccountConfirmation !== "削除する" ||
-                      isDeletingSubAccount
+                      isDeletingSubAccount ||
+                      isExporting
                     }
                     className="bg-red-500 hover:bg-red-600 focus:ring-red-500 text-white disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
                   >
@@ -488,7 +504,11 @@ function SettingsComponent() {
             </AlertDialog>
           )}
 
-          <AlertDialog>
+          <AlertDialog
+            onOpenChange={(open) => {
+              if (!open) setDeleteConfirmation("");
+            }}
+          >
             <AlertDialogTrigger asChild>
               <button
                 type="button"
@@ -575,7 +595,11 @@ function SettingsComponent() {
                       handleDeleteAccount();
                     }
                   }}
-                  disabled={deleteConfirmation !== "退会する" || isDeleting}
+                  disabled={
+                    deleteConfirmation !== "退会する" ||
+                    isDeleting ||
+                    isExporting
+                  }
                   className="bg-red-500 hover:bg-red-600 focus:ring-red-500 text-white disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
                 >
                   {isDeleting ? (

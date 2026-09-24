@@ -58,7 +58,7 @@ export function AppHeader({ user }: AppHeaderProps) {
             <Link
               to="/records/new"
               data-tour="add-record"
-              className="flex min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 sm:h-9 items-center justify-center rounded-md bg-orange-500 text-[14px] font-medium text-white shadow-border hover:bg-orange-600 transition shrink-0 sm:px-4"
+              className="flex min-h-11 min-w-11 sm:min-w-0 sm:h-9 items-center justify-center rounded-md bg-orange-500 text-[14px] font-medium text-white shadow-border hover:bg-orange-600 transition shrink-0 sm:px-4"
               aria-label="新規登録"
             >
               <Plus className="h-5 w-5 sm:h-4 sm:w-4 sm:mr-1" />

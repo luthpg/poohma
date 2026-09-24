@@ -243,7 +243,6 @@ function FamilyComponent() {
       setIsDeletingAccount(true);
       try {
         await deletePoohMaAccount(activeAccountId);
-        toast.success("アカウントを削除しました");
         setIsDeleteAccountModalOpen(false);
         setDeleteConfirmationText("");
       } catch {
@@ -272,11 +271,21 @@ function FamilyComponent() {
 
         await deleteAllAccountsConvex({});
         await currentUser.delete();
+        try {
+          localStorage.setItem(LOGOUT_FLAG_KEY, String(Date.now()));
+        } catch (_e) {
+          // localStorage利用不可時は無視
+        }
+        try {
+          await logout();
+        } catch (_e) {
+          // サーバーセッション失効失敗時も遷移を継続
+        }
         clearQueryCache();
+        queryClient.clear();
 
         toast.success("退会処理が完了しました");
-        await router.invalidate();
-        await router.navigate({ to: "/" });
+        window.location.href = "/";
       } catch (error) {
         const err = error as { code?: string; message?: string };
         if (err?.code === "auth/requires-recent-login") {
@@ -2783,7 +2792,8 @@ function FamilyComponent() {
               disabled={
                 deleteConfirmationText !==
                   (isMultiAccount ? "削除する" : "退会する") ||
-                isDeletingAccount
+                isDeletingAccount ||
+                isExporting
               }
               className="bg-red-500 hover:bg-red-600 focus:ring-red-500 text-white disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
             >

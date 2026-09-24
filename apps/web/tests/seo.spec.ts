@@ -23,6 +23,15 @@ describe("SEO / JSON-LD セキュリティユーティリティ", () => {
       expect(result).not.toContain("secret");
     });
 
+    it("終了タグに空白が含まれる <script > や </script >、<style > も安全に除去されること", () => {
+      const malicious =
+        "前<script type='text/javascript' >alert(1);</script >中<style >body{color:red;}</style  >後";
+      const result = stripHtmlTags(malicious);
+      expect(result).toBe("前 中 後");
+      expect(result).not.toContain("alert");
+      expect(result).not.toContain("color:red");
+    });
+
     it("連続する空白や改行を単一スペースに正規化すること", () => {
       const html = "<div>  項目1  \n\n  <p>  項目2  </p></div>";
       expect(stripHtmlTags(html)).toBe("項目1 項目2");

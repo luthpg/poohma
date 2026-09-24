@@ -1,10 +1,9 @@
 /**
  * メールテンプレート内リンクやCTA用のベースURLを解決する。
  * 優先順位:
- * 1. process.env.APP_URL（Convex実行時）
- * 2. process.env.VITE_SITE_URL
- * 3. import.meta.env.VITE_SITE_URL（Viteクライアントバンドル時）
- * 4. デフォルト "https://poohma.ciderlabs.link"
+ * 1. process.env.VITE_SITE_URL（Convex / サーバー実行時）
+ * 2. import.meta.env.VITE_SITE_URL（Viteクライアントバンドル時）
+ * 3. デフォルト "https://poohma.ciderlabs.link"
  */
 export function getEmailBaseUrl(): string {
   if (typeof process !== "undefined" && process.env?.VITE_SITE_URL) {
