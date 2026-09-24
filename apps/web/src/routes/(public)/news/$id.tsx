@@ -7,7 +7,10 @@ import { cmsQueries } from "@/utils/cms.queries";
 
 export const Route = createFileRoute("/(public)/news/$id")({
   loader: async ({ context, params }) => {
-    await context.queryClient.ensureQueryData(cmsQueries.newsDetail(params.id));
+    await context.queryClient.query({
+      ...cmsQueries.newsDetail(params.id),
+      staleTime: "static",
+    });
   },
   component: NewsDetailPage,
 });

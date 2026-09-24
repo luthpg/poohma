@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowRight, Globe, Lock } from "lucide-react";
+import { AlertTriangle, ArrowRight, Lock, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -93,10 +93,10 @@ export function BulkVisibilityModal({
               <span className="text-xs text-muted-foreground">現在の内訳:</span>
               <Badge variant="outline" className="text-xs gap-1">
                 <Lock className="size-3 text-muted-foreground" />
-                自分のみ {privateCount} 件
+                自分のみ（個人用） {privateCount} 件
               </Badge>
               <Badge variant="outline" className="text-xs gap-1">
-                <Globe className="size-3 text-blue-500" />
+                <Users className="size-3 text-blue-500" />
                 家族共有 {sharedCount} 件
               </Badge>
             </div>
@@ -109,9 +109,11 @@ export function BulkVisibilityModal({
                 className="flex flex-col items-center gap-2 p-4 rounded-lg border border-border hover:border-orange-500 hover:bg-orange-500/5 transition text-center cursor-pointer focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <Lock className="h-6 w-6 text-muted-foreground" />
-                <span className="font-semibold text-sm">自分のみ</span>
+                <span className="font-semibold text-sm">
+                  自分のみ（個人用）
+                </span>
                 <span className="text-xs text-muted-foreground">
-                  共有を解除（個人用）
+                  共有を解除
                 </span>
               </button>
               <button
@@ -120,8 +122,8 @@ export function BulkVisibilityModal({
                 onClick={() => setStep("confirm-share")}
                 className="flex flex-col items-center gap-2 p-4 rounded-lg border border-border hover:border-blue-500 hover:bg-blue-500/5 transition text-center cursor-pointer focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <Globe className="h-6 w-6 text-blue-500" />
-                <span className="font-semibold text-sm">家族に共有</span>
+                <Users className="h-6 w-6 text-blue-500" />
+                <span className="font-semibold text-sm">家族共有</span>
                 <span className="text-xs text-muted-foreground">
                   家族全員で共有
                 </span>
@@ -155,12 +157,12 @@ export function BulkVisibilityModal({
               <div className="flex items-center justify-center gap-3 p-3.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm">
                 <div className="flex items-center gap-1.5 font-medium text-muted-foreground">
                   <Lock className="size-4" />
-                  <span>自分のみ</span>
+                  <span>自分のみ（個人用）</span>
                 </div>
                 <ArrowRight className="size-4 text-blue-500 shrink-0" />
                 <div className="flex items-center gap-1.5 font-semibold text-blue-600 dark:text-blue-400">
-                  <Globe className="size-4" />
-                  <span>家族全員に共有</span>
+                  <Users className="size-4" />
+                  <span>家族共有</span>
                 </div>
               </div>
 
@@ -215,7 +217,7 @@ export function BulkVisibilityModal({
                   </>
                 ) : (
                   <>
-                    <Globe className="size-4 mr-1.5" />
+                    <Users className="size-4 mr-1.5" />
                     家族に共有する
                   </>
                 )}
@@ -237,8 +239,8 @@ export function BulkVisibilityModal({
               {/* 変更方向ビジュアル */}
               <div className="flex items-center justify-center gap-3 p-3.5 rounded-lg bg-orange-500/10 border border-orange-500/20 text-sm">
                 <div className="flex items-center gap-1.5 font-medium text-blue-600 dark:text-blue-400">
-                  <Globe className="size-4" />
-                  <span>家族全員に共有</span>
+                  <Users className="size-4" />
+                  <span>家族共有</span>
                 </div>
                 <ArrowRight className="size-4 text-orange-500 shrink-0" />
                 <div className="flex items-center gap-1.5 font-semibold text-foreground">

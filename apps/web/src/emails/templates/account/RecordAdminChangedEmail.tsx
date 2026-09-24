@@ -46,7 +46,7 @@ export function RecordAdminChangedEmail({
   changedAccountDisplayName,
   changedByDisplayName,
   changedAt,
-  ctaUrl = "https://poohma.ciderlabs.link/records",
+  ctaUrl = "/records",
 }: Props) {
   const formattedDate = new Date(changedAt).toLocaleString("ja-JP", {
     timeZone: "Asia/Tokyo",
@@ -106,7 +106,7 @@ RecordAdminChangedEmail.PreviewProps = {
   changedAccountDisplayName: "山田 花子",
   changedByDisplayName: "山田 太郎",
   changedAt: Date.now(),
-  ctaUrl: "https://poohma.ciderlabs.link/records",
+  ctaUrl: "/records",
 };
 
 export default RecordAdminChangedEmail;

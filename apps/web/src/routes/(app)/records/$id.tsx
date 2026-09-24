@@ -12,6 +12,7 @@ import {
   Check,
   Copy,
   History,
+  Lock,
   Share2,
   Trash2,
   Users,
@@ -1138,23 +1139,30 @@ function RecordDetailComponent({
             </h1>
             <div className="flex items-center gap-2" data-tour="share-status">
               <span
-                className={`shrink-0 rounded-full px-3 py-1 text-[12px] font-medium tracking-wide ${
+                className={`inline-flex items-center gap-1 shrink-0 rounded-full px-2.5 py-1 text-[12px] font-medium tracking-wide ${
                   isShared
                     ? "bg-blue-100/50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
                     : "bg-secondary text-muted-foreground"
                 }`}
               >
-                {isShared
-                  ? `共有中${
-                      (
-                        record.adminUsers
-                          ? record.adminUsers.length
-                          : (record.admins?.length ?? 0)
-                      ) > 0
+                {isShared ? (
+                  <>
+                    <Users className="h-3 w-3" />
+                    <span>
+                      家族共有
+                      {(record.adminUsers
+                        ? record.adminUsers.length
+                        : (record.admins?.length ?? 0)) > 0
                         ? ` (${record.adminUsers ? record.adminUsers.length : record.admins?.length}名管理)`
-                        : ""
-                    }`
-                  : "自分のみ"}
+                        : ""}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="h-3 w-3" />
+                    <span>自分のみ（個人用）</span>
+                  </>
+                )}
               </span>
 
               {/* ワンタップ共有ボタン (個人所有者の場合) */}

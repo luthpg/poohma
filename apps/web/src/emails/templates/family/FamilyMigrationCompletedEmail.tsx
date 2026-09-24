@@ -55,7 +55,7 @@ export const familyMigrationCompletedEmail = defineEmailTemplate({
 FamilyMigrationCompletedEmail.PreviewProps = {
   displayName: "たろう",
   familyName: "鈴木家",
-  ctaUrl: "https://poohma.ciderlabs.link/",
+  ctaUrl: "/",
 };
 
 export default FamilyMigrationCompletedEmail;

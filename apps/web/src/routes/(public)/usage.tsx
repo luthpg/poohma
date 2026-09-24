@@ -40,8 +40,20 @@ import {
   CarouselItem,
 } from "@/components/ui/carousel";
 import { Spinner } from "@/components/ui/spinner";
+import { env } from "@/env/client";
 
 export const Route = createFileRoute("/(public)/usage")({
+  head: () => {
+    const siteUrl = env.VITE_SITE_URL.replace(/\/+$/, "");
+    return {
+      links: [
+        {
+          rel: "canonical",
+          href: `${siteUrl}/usage`,
+        },
+      ],
+    };
+  },
   component: UsagePage,
 });
 

@@ -336,8 +336,8 @@ async function verifyBulkVisibilityFlow(
 
   // 確認画面の要素（タイトル、変更方向、件数）を確認
   await expect(modal.getByText("家族共有への一括変更確認")).toBeVisible();
-  await expect(modal.getByText("自分のみ")).toBeVisible();
-  await expect(modal.getByText("家族全員に共有")).toBeVisible();
+  await expect(modal.getByText("自分のみ（個人用）")).toBeVisible();
+  await expect(modal.getByText("家族共有", { exact: true })).toBeVisible();
   await expect(
     modal.getByText(`${targetIds.length} 件`, { exact: true }),
   ).toBeVisible();
@@ -388,7 +388,7 @@ async function verifyBulkVisibilityFlow(
   await expect(
     modal.getByText("共有解除（個人用）への一括変更確認"),
   ).toBeVisible();
-  await expect(modal.getByText("家族全員に共有")).toBeVisible();
+  await expect(modal.getByText("家族共有", { exact: true })).toBeVisible();
   await expect(modal.getByText("自分のみ（個人用）")).toBeVisible();
   await expect(
     modal.getByText(`${targetIds.length} 件`, { exact: true }),
@@ -516,9 +516,13 @@ async function cleanupTestAccount(
   });
   await expect(deleteBtn).toBeVisible({ timeout: 5000 });
   await deleteBtn.click();
+  const confirmInput = page.locator("input#confirm-delete-subaccount");
+  await expect(confirmInput).toBeVisible({ timeout: 5000 });
+  await confirmInput.fill("削除する");
+
   const confirmBtn = page
     .getByRole("alertdialog")
-    .getByRole("button", { name: "削除する", exact: true });
+    .getByRole("button", { name: "理解した上で削除する", exact: true });
   await expect(confirmBtn).toBeVisible({ timeout: 5000 });
   await confirmBtn.click();
 

@@ -51,7 +51,7 @@ export const familyWelcomeEmail = defineEmailTemplate({
 FamilyWelcomeEmail.PreviewProps = {
   displayName: "たろう",
   familyName: "鈴木家",
-  ctaUrl: "https://poohma.ciderlabs.link/",
+  ctaUrl: "/",
 };
 
 export default FamilyWelcomeEmail;

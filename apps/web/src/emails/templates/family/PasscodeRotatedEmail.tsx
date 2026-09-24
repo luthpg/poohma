@@ -7,7 +7,7 @@ import { defineEmailTemplate } from "../../types";
 const props = v.object({
   displayName: v.string(),
   familyName: v.string(),
-  ctaUrl: v.string(),
+  ctaUrl: v.optional(v.string()),
 });
 
 type Props = Infer<typeof props>;
@@ -33,7 +33,7 @@ const buttonWrapper = {
 export function PasscodeRotatedEmail({
   displayName,
   familyName,
-  ctaUrl,
+  ctaUrl = "/family",
 }: Props) {
   return (
     <Layout preview={`家族「${familyName}」のパスコードが変更されました`}>
@@ -74,7 +74,7 @@ export const passcodeRotatedEmail = defineEmailTemplate({
 PasscodeRotatedEmail.PreviewProps = {
   displayName: "たろう",
   familyName: "鈴木家",
-  ctaUrl: "https://poohma.ciderlabs.link/family",
+  ctaUrl: "/family",
 };
 
 export default PasscodeRotatedEmail;

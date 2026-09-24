@@ -40,7 +40,7 @@ describe("BulkVisibilityModal Component", () => {
     ).toBeTruthy();
 
     // 内訳の確認
-    expect(screen.getByText(/自分のみ 3 件/)).toBeTruthy();
+    expect(screen.getByText(/自分のみ（個人用） 3 件/)).toBeTruthy();
     expect(screen.getByText(/家族共有 2 件/)).toBeTruthy();
 
     // 選択肢ボタンの確認
@@ -65,8 +65,8 @@ describe("BulkVisibilityModal Component", () => {
     ).toBeTruthy();
 
     // 変更方向（user → family）と件数
-    expect(screen.getByText("自分のみ")).toBeTruthy();
-    expect(screen.getByText("家族全員に共有")).toBeTruthy();
+    expect(screen.getByText("自分のみ（個人用）")).toBeTruthy();
+    expect(screen.getByText("家族共有")).toBeTruthy();
     expect(screen.getByText("5 件")).toBeTruthy();
 
     // 確定ボタンの存在
@@ -92,7 +92,7 @@ describe("BulkVisibilityModal Component", () => {
     ).toBeTruthy();
 
     // 変更方向（family → user）と件数（sharedCount: 2 が解除対象）
-    expect(screen.getByText("家族全員に共有")).toBeTruthy();
+    expect(screen.getByText("家族共有")).toBeTruthy();
     expect(screen.getByText("自分のみ（個人用）")).toBeTruthy();
     expect(screen.getByText("2 件")).toBeTruthy();
 

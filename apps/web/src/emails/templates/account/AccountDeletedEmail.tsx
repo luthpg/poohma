@@ -36,7 +36,7 @@ const buttonWrapper = {
 export function AccountDeletedEmail({
   displayName,
   deletedAt,
-  ctaUrl = "https://poohma.ciderlabs.link/",
+  ctaUrl = "/",
 }: Props) {
   const formattedDate = new Date(deletedAt).toLocaleString("ja-JP", {
     timeZone: "Asia/Tokyo",
@@ -80,7 +80,7 @@ export const accountDeletedEmail = defineEmailTemplate({
 AccountDeletedEmail.PreviewProps = {
   displayName: "山田 太郎",
   deletedAt: Date.now(),
-  ctaUrl: "https://poohma.ciderlabs.link/",
+  ctaUrl: "/",
 };
 
 export default AccountDeletedEmail;

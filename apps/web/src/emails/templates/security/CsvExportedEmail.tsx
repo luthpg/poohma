@@ -48,7 +48,7 @@ export function CsvExportedEmail({
   os,
   ipAddress,
   location,
-  ctaUrl = "https://poohma.ciderlabs.link/settings",
+  ctaUrl = "/settings",
 }: Props) {
   const formattedDate = new Date(exportedAt).toLocaleString("ja-JP", {
     timeZone: "Asia/Tokyo",
@@ -118,7 +118,7 @@ CsvExportedEmail.PreviewProps = {
   os: "macOS 14.5",
   ipAddress: "203.0.113.1",
   location: "東京都, 日本",
-  ctaUrl: "https://poohma.ciderlabs.link/settings",
+  ctaUrl: "/settings",
 };
 
 export default CsvExportedEmail;

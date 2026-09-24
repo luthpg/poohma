@@ -43,7 +43,7 @@ export function RecoveryKitIssuedEmail({
   issuerName,
   issuedAt,
   isReissue,
-  ctaUrl = "https://poohma.ciderlabs.link/family",
+  ctaUrl = "/family",
 }: Props) {
   const formattedDate = new Date(issuedAt).toLocaleString("ja-JP", {
     timeZone: "Asia/Tokyo",
@@ -101,7 +101,7 @@ RecoveryKitIssuedEmail.PreviewProps = {
   issuerName: "管理者太郎",
   issuedAt: Date.now(),
   isReissue: true,
-  ctaUrl: "https://poohma.ciderlabs.link/family",
+  ctaUrl: "/family",
 };
 
 export default RecoveryKitIssuedEmail;

@@ -66,7 +66,7 @@ JoinApprovedEmail.PreviewProps = {
   displayName: "たろう",
   familyName: "鈴木家",
   variant: "join",
-  ctaUrl: "https://poohma.ciderlabs.link/",
+  ctaUrl: "/",
 };
 
 export default JoinApprovedEmail;

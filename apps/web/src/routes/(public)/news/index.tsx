@@ -5,7 +5,10 @@ import { cmsQueries } from "@/utils/cms.queries";
 
 export const Route = createFileRoute("/(public)/news/")({
   loader: async ({ context }) => {
-    await context.queryClient.ensureQueryData(cmsQueries.newsList());
+    await context.queryClient.query({
+      ...cmsQueries.newsList(),
+      staleTime: "static",
+    });
   },
   component: NewsListPage,
 });

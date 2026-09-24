@@ -1067,7 +1067,6 @@ export const shareRecord = familyBoundMutation({
 
     const family = await ctx.db.get(ctx.familyId);
     const familyName = family?.name ?? "家族";
-    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
 
     await ctx.scheduler.runAfter(
       0,
@@ -1082,7 +1081,7 @@ export const shareRecord = familyBoundMutation({
             changedByDisplayName: ctx.user.displayName || "メンバー",
             changedAt: Date.now(),
             changeSummary: `「${record.title}」が家族共有に設定されました`,
-            ctaUrl: `${appUrl}/records`,
+            ctaUrl: "/records",
           },
         },
       },
@@ -1125,7 +1124,6 @@ export const unshareRecord = familyBoundMutation({
 
     const family = await ctx.db.get(ctx.familyId);
     const familyName = family?.name ?? "家族";
-    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
 
     await ctx.scheduler.runAfter(
       0,
@@ -1140,7 +1138,7 @@ export const unshareRecord = familyBoundMutation({
             changedByDisplayName: ctx.user.displayName || "メンバー",
             changedAt: Date.now(),
             changeSummary: `「${record.title}」の共有が解除され、個人所有に変更されました`,
-            ctaUrl: `${appUrl}/records`,
+            ctaUrl: "/records",
           },
         },
       },
@@ -1191,7 +1189,6 @@ export const addRecordAdmin = recordAdminMutation({
 
       const family = ctx.familyId ? await ctx.db.get(ctx.familyId) : null;
       const familyName = family?.name ?? "家族";
-      const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
       const now = Date.now();
 
       // 新管理者一覧の全メンバーに通知
@@ -1214,7 +1211,7 @@ export const addRecordAdmin = recordAdminMutation({
                     targetUser.displayName || "メンバー",
                   changedByDisplayName: ctx.user.displayName || "メンバー",
                   changedAt: now,
-                  ctaUrl: `${appUrl}/records`,
+                  ctaUrl: "/records",
                 },
               },
             },
@@ -1286,7 +1283,6 @@ export const removeRecordAdmin = recordAdminMutation({
 
     const family = ctx.familyId ? await ctx.db.get(ctx.familyId) : null;
     const familyName = family?.name ?? "家族";
-    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
     const now = Date.now();
 
     // 削除された本人を含む関係者に通知
@@ -1311,7 +1307,7 @@ export const removeRecordAdmin = recordAdminMutation({
                 changedAccountDisplayName: targetUser.displayName || "メンバー",
                 changedByDisplayName: ctx.user.displayName || "メンバー",
                 changedAt: now,
-                ctaUrl: `${appUrl}/records`,
+                ctaUrl: "/records",
               },
             },
           },
@@ -1348,7 +1344,6 @@ export const bulkShareRecords = familyBoundMutation({
     if (count > 0) {
       const family = await ctx.db.get(ctx.familyId);
       const familyName = family?.name ?? "家族";
-      const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
 
       await ctx.scheduler.runAfter(
         0,
@@ -1363,7 +1358,7 @@ export const bulkShareRecords = familyBoundMutation({
               changedByDisplayName: ctx.user.displayName || "メンバー",
               changedAt: Date.now(),
               changeSummary: `${count}件のアカウント情報が家族共有に設定されました`,
-              ctaUrl: `${appUrl}/records`,
+              ctaUrl: "/records",
             },
           },
         },
@@ -1403,7 +1398,6 @@ export const bulkUnshareRecords = familyBoundMutation({
     if (count > 0) {
       const family = await ctx.db.get(ctx.familyId);
       const familyName = family?.name ?? "家族";
-      const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
 
       await ctx.scheduler.runAfter(
         0,
@@ -1418,7 +1412,7 @@ export const bulkUnshareRecords = familyBoundMutation({
               changedByDisplayName: ctx.user.displayName || "メンバー",
               changedAt: Date.now(),
               changeSummary: `${count}件のアカウント情報の家族共有が解除されました`,
-              ctaUrl: `${appUrl}/records`,
+              ctaUrl: "/records",
             },
           },
         },
@@ -1501,8 +1495,6 @@ export const fetchRecordsForExport = authenticatedMutation({
       : [user];
     const emailById = new Map(members.map((m) => [m._id, m.email]));
 
-    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
-
     // エクスポート実行通知メールをスケジュール（サーバー側確実発火）
     await ctx.scheduler.runAfter(
       0,
@@ -1520,7 +1512,7 @@ export const fetchRecordsForExport = authenticatedMutation({
             os: args.os,
             ipAddress: args.ipAddress,
             location: args.location,
-            ctaUrl: `${appUrl}/settings`,
+            ctaUrl: "/settings",
           },
         },
       },

@@ -46,7 +46,7 @@ export function BiometricRemovedEmail({
   os,
   ipAddress,
   location,
-  ctaUrl = "https://poohma.ciderlabs.link/settings",
+  ctaUrl = "/settings",
 }: Props) {
   const formattedDate = new Date(removedAt).toLocaleString("ja-JP", {
     timeZone: "Asia/Tokyo",
@@ -111,7 +111,7 @@ BiometricRemovedEmail.PreviewProps = {
   os: "iOS 17.5",
   ipAddress: "203.0.113.1",
   location: "東京都, 日本",
-  ctaUrl: "https://poohma.ciderlabs.link/settings",
+  ctaUrl: "/settings",
 };
 
 export default BiometricRemovedEmail;

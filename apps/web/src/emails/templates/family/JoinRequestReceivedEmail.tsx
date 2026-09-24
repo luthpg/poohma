@@ -40,7 +40,7 @@ export function JoinRequestReceivedEmail({
   familyName,
   applicantDisplayName,
   applicantEmail,
-  ctaUrl = "https://poohma.ciderlabs.link/family",
+  ctaUrl = "/family",
 }: Props) {
   return (
     <Layout preview={`家族「${familyName}」への参加申請が届きました`}>
@@ -84,7 +84,7 @@ JoinRequestReceivedEmail.PreviewProps = {
   familyName: "鈴木家",
   applicantDisplayName: "はなこ",
   applicantEmail: "[EMAIL_ADDRESS]",
-  ctaUrl: "https://poohma.ciderlabs.link/",
+  ctaUrl: "/family",
 };
 
 export default JoinRequestReceivedEmail;

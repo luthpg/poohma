@@ -5,7 +5,11 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
-import { GoogleAuthProvider, reauthenticateWithPopup } from "firebase/auth";
+import {
+  GoogleAuthProvider,
+  reauthenticateWithPopup,
+  signOut,
+} from "firebase/auth";
 import { AlertTriangle, ChevronRight, Database, Download } from "lucide-react";
 import { type SubmitEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -24,9 +28,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { useAccount } from "@/hooks/useAccount";
+import { LOGOUT_FLAG_KEY } from "@/hooks/useConvexFirebaseAuth";
 import { useExportCsv } from "@/hooks/useExportCsv";
 import { clearQueryCache } from "@/hooks/usePersistentQuery";
 import { isBiometricEnabledForUser } from "@/lib/biometric";
+import { logout } from "@/services/auth.functions";
 import { auth } from "@/utils/firebase";
 
 export const Route = createFileRoute("/(app)/settings/")({
@@ -87,6 +93,10 @@ function SettingsComponent() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeletingSubAccount, setIsDeletingSubAccount] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deleteSubAccountConfirmation, setDeleteSubAccountConfirmation] =
+    useState("");
+  const [isDeleteSubAccountDialogOpen, setIsDeleteSubAccountDialogOpen] =
+    useState(false);
   const { handleExport, isExporting } = useExportCsv();
 
   const updateProfile = useMutation(api.users.updateProfile);
@@ -130,7 +140,8 @@ function SettingsComponent() {
     setIsDeletingSubAccount(true);
     try {
       await deletePoohMaAccount(activeAccountId);
-      toast.success("アカウントを削除しました");
+      setDeleteSubAccountConfirmation("");
+      setIsDeleteSubAccountDialogOpen(false);
     } catch {
       toast.error("アカウントの削除に失敗しました");
     } finally {
@@ -140,6 +151,7 @@ function SettingsComponent() {
 
   const handleDeleteAccount = async () => {
     setIsDeleting(true);
+    let convexDeletionCompleted = false;
     try {
       const currentUser = auth?.currentUser;
       if (!currentUser) {
@@ -159,17 +171,56 @@ function SettingsComponent() {
 
       // 2. 再認証成功後、Convexで全アカウント削除を実行
       await deleteAllAccountsConvex({});
+      convexDeletionCompleted = true;
 
       // 3. Convex削除成功後にFirebase Auth ユーザーの削除
       await currentUser.delete();
 
-      // 4. キャッシュのクリア
+      try {
+        localStorage.setItem(LOGOUT_FLAG_KEY, String(Date.now()));
+      } catch (_e) {
+        // localStorage利用不可時は無視
+      }
+      try {
+        await logout();
+      } catch (_e) {
+        // サーバーセッション失効失敗時も遷移を継続
+      }
+      try {
+        if (auth) await signOut(auth);
+      } catch (_e) {
+        // Firebaseサインアウト失敗時も継続
+      }
       clearQueryCache();
+      queryClient.clear();
 
       toast.success("退会処理が完了しました");
-      await router.invalidate();
-      await router.navigate({ to: "/" });
+      window.location.href = "/";
     } catch (error) {
+      if (convexDeletionCompleted) {
+        try {
+          localStorage.setItem(LOGOUT_FLAG_KEY, String(Date.now()));
+        } catch (_e) {
+          // localStorage利用不可時は無視
+        }
+        try {
+          await logout();
+        } catch (_e) {
+          // サーバーセッション失効失敗時も後続のクリーンアップを継続
+        }
+        try {
+          if (auth) await signOut(auth);
+        } catch (_e) {
+          // Firebase認証解除失敗時もキャッシュ削除を継続
+        }
+        clearQueryCache();
+        queryClient.clear();
+        toast.error(
+          "退会処理中にエラーが発生しましたが、アカウントデータは削除されました。",
+        );
+        window.location.href = "/";
+        return;
+      }
       const err = error as { code?: string; message?: string };
       if (err?.code === "auth/requires-recent-login") {
         toast.error(
@@ -230,7 +281,7 @@ function SettingsComponent() {
               type="text"
               value={currentAccount.email}
               disabled
-              className="w-full rounded-md bg-muted p-2.5 text-base md:text-[14px] text-muted-foreground shadow-sm focus:outline-none opacity-80 cursor-not-allowed"
+              className="input-base cursor-not-allowed opacity-75"
             />
             <p className="mt-1.5 text-[12px] text-muted-foreground">
               メールアドレスは変更できません。
@@ -250,7 +301,7 @@ function SettingsComponent() {
               required
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full rounded-md bg-card p-2.5 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+              className="input-base"
               placeholder="表示名を入力"
             />
           </div>
@@ -364,9 +415,9 @@ function SettingsComponent() {
       </div>
 
       {/* Danger Zone */}
-      <div className="mt-8 rounded-lg border border-red-500/20 bg-red-500/5 p-6 shadow-sm">
-        <h2 className="text-[18px] font-semibold text-red-600 dark:text-red-400 tracking-geist-ui mb-2 flex items-center gap-2">
-          <AlertTriangle className="h-5 w-5" />
+      <div className="mt-8 danger-zone-container">
+        <h2 className="danger-zone-title mb-2">
+          <AlertTriangle className="h-5 w-5 shrink-0" />
           Danger Zone
         </h2>
         <p className="text-[14px] text-muted-foreground mb-6">
@@ -375,7 +426,13 @@ function SettingsComponent() {
 
         <div className="flex flex-col sm:flex-row gap-3">
           {accounts.length > 1 && (
-            <AlertDialog>
+            <AlertDialog
+              open={isDeleteSubAccountDialogOpen}
+              onOpenChange={(open) => {
+                setIsDeleteSubAccountDialogOpen(open);
+                if (!open) setDeleteSubAccountConfirmation("");
+              }}
+            >
               <AlertDialogTrigger asChild>
                 <button
                   type="button"
@@ -389,16 +446,97 @@ function SettingsComponent() {
                   <AlertDialogTitle className="text-red-600 dark:text-red-400">
                     アカウント「{currentAccount.displayName}」を削除しますか？
                   </AlertDialogTitle>
-                  <AlertDialogDescription>
-                    このPoohMaアカウントおよび所属ファミリーのデータが削除されます。他のPoohMaアカウントやFirebaseログインはそのまま保持されます。
+                  <AlertDialogDescription asChild>
+                    <div className="space-y-4 pt-2 text-foreground">
+                      <div className="rounded-md bg-muted p-3 text-[14px]">
+                        <p className="font-semibold mb-2">削除時の注意事項</p>
+                        <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                          <li>
+                            他の家族メンバーがいる場合、このアカウントの個人データのみ削除され、共有データは残ります。
+                          </li>
+                          <li>
+                            このアカウントが最後のメンバーの場合、所属ファミリーと共有データも削除されます。
+                          </li>
+                          <li>
+                            他のPoohMaアカウントやFirebaseログインはそのまま保持されます。
+                          </li>
+                          <li>
+                            削除操作は取り消せません。事前にCSVファイルでの保存をおすすめします。
+                          </li>
+                        </ul>
+                      </div>
+
+                      <div className="flex justify-center py-2">
+                        <button
+                          type="button"
+                          onClick={handleExport}
+                          disabled={isExporting}
+                          className="flex items-center justify-center w-full rounded-md border border-border bg-background px-4 py-2.5 text-[14px] font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                        >
+                          {isExporting ? (
+                            <>
+                              <Spinner className="mr-2 h-4 w-4" />
+                              ダウンロード中...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="mr-2 h-4 w-4" />
+                              CSVファイルをダウンロードする
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label
+                          htmlFor="confirm-delete-subaccount"
+                          className="text-[14px] font-medium text-foreground"
+                        >
+                          確認のため、「
+                          <span className="font-bold text-red-500">
+                            削除する
+                          </span>
+                          」と入力してください
+                        </label>
+                        <input
+                          id="confirm-delete-subaccount"
+                          type="text"
+                          value={deleteSubAccountConfirmation}
+                          onChange={(e) =>
+                            setDeleteSubAccountConfirmation(e.target.value)
+                          }
+                          placeholder="削除する"
+                          className="w-full rounded-md bg-card p-2.5 text-base md:text-[14px] border border-border shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500/50"
+                        />
+                      </div>
+                    </div>
                   </AlertDialogDescription>
                 </AlertDialogHeader>
-                <AlertDialogFooter className="mt-4">
-                  <AlertDialogCancel>キャンセル</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleDeleteSingleAccount}
+                <AlertDialogFooter className="mt-6">
+                  <AlertDialogCancel
                     disabled={isDeletingSubAccount}
-                    className="bg-red-500 hover:bg-red-600 focus:ring-red-500 text-white"
+                    onClick={() => {
+                      if (isDeletingSubAccount) return;
+                      setIsDeleteSubAccountDialogOpen(false);
+                      setDeleteSubAccountConfirmation("");
+                    }}
+                    className="mt-2 sm:mt-0"
+                  >
+                    キャンセル
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (deleteSubAccountConfirmation === "削除する") {
+                        handleDeleteSingleAccount();
+                      }
+                    }}
+                    disabled={
+                      deleteSubAccountConfirmation !== "削除する" ||
+                      isDeletingSubAccount ||
+                      isExporting
+                    }
+                    className="bg-red-500 hover:bg-red-600 focus:ring-red-500 text-white disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
                   >
                     {isDeletingSubAccount ? (
                       <>
@@ -406,7 +544,7 @@ function SettingsComponent() {
                         削除中...
                       </>
                     ) : (
-                      "削除する"
+                      "理解した上で削除する"
                     )}
                   </AlertDialogAction>
                 </AlertDialogFooter>
@@ -414,7 +552,11 @@ function SettingsComponent() {
             </AlertDialog>
           )}
 
-          <AlertDialog>
+          <AlertDialog
+            onOpenChange={(open) => {
+              if (!open) setDeleteConfirmation("");
+            }}
+          >
             <AlertDialogTrigger asChild>
               <button
                 type="button"
@@ -437,7 +579,7 @@ function SettingsComponent() {
                           あなたが登録したアカウント情報はすべて削除されます。
                         </li>
                         <li>
-                          家族と「共有」に設定している情報も、他の家族から見られなくなります。
+                          他の家族メンバーがいる場合、所属ファミリーの共有データは残ります（最後のメンバーの場合は所属ファミリーと共有データも削除されます）。
                         </li>
                         <li>
                           退会操作は取り消せません。事前にCSVファイルでの保存をおすすめします。
@@ -489,7 +631,11 @@ function SettingsComponent() {
               </AlertDialogHeader>
               <AlertDialogFooter className="mt-6">
                 <AlertDialogCancel
-                  onClick={() => setDeleteConfirmation("")}
+                  disabled={isDeleting}
+                  onClick={() => {
+                    if (isDeleting) return;
+                    setDeleteConfirmation("");
+                  }}
                   className="mt-2 sm:mt-0"
                 >
                   キャンセル
@@ -501,7 +647,11 @@ function SettingsComponent() {
                       handleDeleteAccount();
                     }
                   }}
-                  disabled={deleteConfirmation !== "退会する" || isDeleting}
+                  disabled={
+                    deleteConfirmation !== "退会する" ||
+                    isDeleting ||
+                    isExporting
+                  }
                   className="bg-red-500 hover:bg-red-600 focus:ring-red-500 text-white disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
                 >
                   {isDeleting ? (

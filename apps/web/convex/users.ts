@@ -379,7 +379,6 @@ export const deleteAllAccounts = identityVerifiedMutation({
       await ctx.db.delete(account._id);
 
       // 3. アカウント削除通知メール送信
-      const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
       await ctx.scheduler.runAfter(
         0,
         internal.actions.sendTemplatedEmailInternal,
@@ -390,7 +389,7 @@ export const deleteAllAccounts = identityVerifiedMutation({
             props: {
               displayName,
               deletedAt: Date.now(),
-              ctaUrl: `${appUrl}/`,
+              ctaUrl: "/",
             },
           },
         },
@@ -514,7 +513,6 @@ export const deleteAccount = authenticatedMutation({
     await ctx.db.delete(user._id);
 
     // 4. アカウント削除通知メール送信
-    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
     await ctx.scheduler.runAfter(
       0,
       internal.actions.sendTemplatedEmailInternal,
@@ -525,7 +523,7 @@ export const deleteAccount = authenticatedMutation({
           props: {
             displayName,
             deletedAt: Date.now(),
-            ctaUrl: `${appUrl}/`,
+            ctaUrl: "/",
           },
         },
       },
@@ -744,7 +742,6 @@ export const recordLogin = identityVerifiedMutation({
 
     // 新端末と判定された場合のみ警告通知メールを送信
     if (isNewDevice) {
-      const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
       await ctx.scheduler.runAfter(
         0,
         internal.actions.sendTemplatedEmailInternal,
@@ -760,7 +757,7 @@ export const recordLogin = identityVerifiedMutation({
               os: args.os,
               ipAddress: args.ipAddress,
               location: args.location,
-              ctaUrl: `${appUrl}/dashboard`,
+              ctaUrl: "/dashboard",
             },
           },
         },
@@ -815,8 +812,6 @@ export const notifyBiometricEvent = authenticatedMutation({
   handler: async (ctx, args) => {
     const { user } = ctx;
     const now = Date.now();
-    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
-
     if (args.event === "registered") {
       await ctx.scheduler.runAfter(
         0,
@@ -833,7 +828,7 @@ export const notifyBiometricEvent = authenticatedMutation({
               os: args.os,
               ipAddress: args.ipAddress,
               location: args.location,
-              ctaUrl: `${appUrl}/settings`,
+              ctaUrl: "/settings",
             },
           },
         },
@@ -854,7 +849,7 @@ export const notifyBiometricEvent = authenticatedMutation({
               os: args.os,
               ipAddress: args.ipAddress,
               location: args.location,
-              ctaUrl: `${appUrl}/settings`,
+              ctaUrl: "/settings",
             },
           },
         },

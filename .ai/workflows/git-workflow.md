@@ -22,9 +22,14 @@ Windows PowerShell 環境において、日本語文字化けやエスケープ�
 
 ---
 
-## 2. PowerShell での安全なコミット実行手順（文字化け防止）
+## 2. PowerShell での安全なコミット実行手順（文字化け・エスケープ破壊防止）
 
 PowerShell のパイプライン（`|`）や `-m` オプションはデフォルトのエンコーディングにより日本語が `?` に化ける原因になります。コミットを実行する際は、必ず **UTF-8 一時ファイルを経由** してください。
+
+> [!CAUTION]
+> **ヒアドキュメントでのダブルクォート（`@" ... "@`）は完全禁止**
+> PowerShell ではバッククォート `` ` `` がエスケープ文字となるため、ダブルクォートヒアドキュメントを使用すると、Markdown インラインコード記法（例: `` `apps/web/..` ``）内の `` `a `` がベル文字（ASCII 0x07）等に変換されて致命的な文字化け（`◆pps` 等）を引き起こします。
+> 必ず **シングルクォートヒアドキュメント（`@' ... '@`）** を使用してください。
 
 ### 実行スクリプトテンプレート
 
@@ -48,13 +53,14 @@ try {
 
 ## 3. PowerShell での安全な GitHub CLI (`gh`) 実行手順
 
-PowerShell 上で `gh pr create` や `gh issue create` を実行して本文（Body）を渡す場合のルールです。
+PowerShell 上で `gh pr create`、`gh issue create`、`gh pr comment` を実行して本文（Body）を渡す場合のルールです。
 
-- **`--body` フラグで直接ダブルクォート文字列を渡さないこと**（PowerShell が Markdown 内のバッククォート `` ` `` をエスケープ文字として誤解釈し、`\` に化けるため）。
+- **`--body` フラグで直接ダブルクォート文字列を渡さないこと**（PowerShell が Markdown 内のバッククォート `` ` `` をエスケープ文字として誤解釈し、ベル文字やバックスラッシュに化けるため）。
+- **ダブルクォートヒアドキュメント（`@" ... "@`）を使わないこと**（必ず `@' ... '@` を使用すること）。
 - **パイプライン（`|`）で直接 `gh` に渡さないこと**（エンコーディングにより日本語が `?` に化けるため）。
-- 本文を渡す際は、必ず **UTF-8 一時ファイルを作成して `--body-file` に渡す** こと。
+- 本文を渡す際は、必ず **シングルクォートヒアドキュメントで作成した UTF-8 一時ファイルを経由する** こと。
 
-### 実行スクリプトテンプレート
+### PR 作成（`gh pr create`）実行スクリプトテンプレート
 
 ```powershell
 $prBody = @'
@@ -69,5 +75,25 @@ try {
   gh pr create --title "feat: メールテンプレートの追加" --body-file $tmpBodyFile
 } finally {
   Remove-Item -Path $tmpBodyFile -Force
+}
+```
+
+### PR コメント投稿 / 更新（`gh pr comment` / `gh api`）実行スクリプトテンプレート
+
+```powershell
+$commentBody = @'
+### 📝 レビュー対応完了報告
+
+`apps/web/public/llms.txt` の説明を修正しました。
+'@
+$tmpFile = [System.IO.Path]::GetTempFileName()
+[System.IO.File]::WriteAllText($tmpFile, $commentBody, [System.Text.Encoding]::UTF8)
+try {
+  # 新規コメント投稿
+  gh pr comment <PR番号> --body-file $tmpFile
+  # または既存コメント更新
+  # gh api -X PATCH 'repos/{owner}/{repo}/issues/comments/<CommentId>' -F body=@$tmpFile
+} finally {
+  Remove-Item -Path $tmpFile -Force
 }
 ```
