@@ -39,7 +39,7 @@ const cspMiddleware = createMiddleware().server(({ next, request }) => {
       ? [
           `script-src 'strict-dynamic' 'nonce-${nonce}' https://vercel.live`,
           "connect-src 'self' https://vercel.live wss://ws-us3.pusher.com" +
-            (convexHost ? ` wss://${convexHost} https://${convexHost}` : "") +
+            " wss://*.convex.cloud https://*.convex.cloud" +
             " https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://www.googleapis.com https://apis.google.com",
         ]
       : [

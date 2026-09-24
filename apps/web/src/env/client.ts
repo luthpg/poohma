@@ -21,10 +21,61 @@ export const env = createEnv({
   },
 
   /**
-   * What object holds the environment variables at runtime. This is usually
-   * `process.env` or `import.meta.env`.
+   * What object holds the environment variables at runtime.
+   * - Browser: use `import.meta.env` directly to avoid `ReferenceError: process is not defined`
+   * - Server (SSR / Server Functions): prioritize build-time `import.meta.env.VITE_*` (statically replaced by Vite)
+   *   over runtime `process.env` so that Preview deployments use the correct Convex Preview URL.
    */
-  runtimeEnv: typeof window === "undefined" ? process.env : import.meta.env,
+  runtimeEnv:
+    typeof window !== "undefined"
+      ? import.meta.env
+      : {
+          VITE_APP_TITLE:
+            import.meta.env?.VITE_APP_TITLE ??
+            (typeof process !== "undefined"
+              ? process.env.VITE_APP_TITLE
+              : undefined),
+          VITE_FIREBASE_API_KEY:
+            import.meta.env?.VITE_FIREBASE_API_KEY ??
+            (typeof process !== "undefined"
+              ? process.env.VITE_FIREBASE_API_KEY
+              : undefined),
+          VITE_FIREBASE_AUTH_DOMAIN:
+            import.meta.env?.VITE_FIREBASE_AUTH_DOMAIN ??
+            (typeof process !== "undefined"
+              ? process.env.VITE_FIREBASE_AUTH_DOMAIN
+              : undefined),
+          VITE_FIREBASE_PROJECT_ID:
+            import.meta.env?.VITE_FIREBASE_PROJECT_ID ??
+            (typeof process !== "undefined"
+              ? process.env.VITE_FIREBASE_PROJECT_ID
+              : undefined),
+          VITE_FIREBASE_STORAGE_BUCKET:
+            import.meta.env?.VITE_FIREBASE_STORAGE_BUCKET ??
+            (typeof process !== "undefined"
+              ? process.env.VITE_FIREBASE_STORAGE_BUCKET
+              : undefined),
+          VITE_CONVEX_URL:
+            import.meta.env?.VITE_CONVEX_URL ??
+            (typeof process !== "undefined"
+              ? process.env.VITE_CONVEX_URL
+              : undefined),
+          VITE_GITHUB_REPO_URL:
+            import.meta.env?.VITE_GITHUB_REPO_URL ??
+            (typeof process !== "undefined"
+              ? process.env.VITE_GITHUB_REPO_URL
+              : undefined),
+          VITE_GOOGLE_PICKER_API_KEY:
+            import.meta.env?.VITE_GOOGLE_PICKER_API_KEY ??
+            (typeof process !== "undefined"
+              ? process.env.VITE_GOOGLE_PICKER_API_KEY
+              : undefined),
+          VITE_GOOGLE_CLOUD_PROJECT_NUMBER:
+            import.meta.env?.VITE_GOOGLE_CLOUD_PROJECT_NUMBER ??
+            (typeof process !== "undefined"
+              ? process.env.VITE_GOOGLE_CLOUD_PROJECT_NUMBER
+              : undefined),
+        },
 
   /**
    * By default, this library will feed the environment variables directly to

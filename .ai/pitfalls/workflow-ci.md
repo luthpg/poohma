@@ -72,8 +72,8 @@ curl -s --connect-timeout 5 --max-time 15 ...
 CI ワークフロー内でツールを導入する際、`bash <(curl https://raw.githubusercontent.com/.../install.sh)` のようにインターネット上の生スクリプトをパイプ実行すると、サプライチェーン攻撃やネットワーク障害時のビルド不安定化を招く。
 
 ### 対策
-- CI ワークフローでは、コミットハッシュやバージョンタグで固定された公式 GitHub Action（例: `reviewdog/action-actionlint@v1`）を使用する。
-- ローカル検証では、公式 Docker イメージ（`rhysd/actionlint:latest`）を活用する。
+- CI ワークフローでは、コミットハッシュやバージョンタグで固定された公式 GitHub Action（例: `reviewdog/action-actionlint@v1.77.0`）を使用する。
+- ローカル検証では、CI と 100% 同一の検出ルールを維持するため、CI で使われているイメージと同一の `ghcr.io/reviewdog/action-actionlint:v1.77.0` を用いて actionlint を実行する（古い `rhysd/actionlint:latest` は Node 20 非推奨チェック等の新しいルールが未反映で検知漏れの原因となる）。
 
 ---
 
@@ -84,4 +84,6 @@ CI ワークフロー内でツールを導入する際、`bash <(curl https://ra
 ```bash
 pnpm lint:workflows
 ```
-これにより、YAML 構文エラー、`${{ }}` 式の型エラー、未定義 context、および埋め込みシェルスクリプトの shellcheck 指摘をプッシュ前に 100% 確実にローカルで検知・解消できる。
+これにより、YAML 構文エラー、`${{ }}` 式の型エラー、未定義 context、Node ランタイム非推奨、および埋め込みシェルスクリプトの shellcheck 指摘をプッシュ前に 100% 確実にローカルで検知・解消できる。
+Docker Desktop が未起動の場合は起動してから実行すること。
+

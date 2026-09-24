@@ -220,10 +220,24 @@ export const test = base.extend({
 - **アクセス制御（IDOR防止）**: 他家族のメンバーが `getFamilyAuditLogs` / `getRecordAuditLogs` で他家族のログを取得できないこと
 - **TTLクリーンアップ**: `cleanupOldAuditLogsInternal` が180日超過ログのみを削除し、直近ログを保持すること
 
-### E2E テスト実行前のバックエンド反映ルール (`convex dev --once`)
-Playwright E2E テストはローカルのモックではなく、実際の Convex 開発インスタンス（`CONVEX_DEPLOYMENT=dev:...`）と通信する。
-そのため、**スキーマや Convex 関数を追加・変更した後は、必ず E2E テスト実行前に `pnpm -F @poohma/web exec convex dev --once` を実行して開発インスタンスへ最新コードを反映・型同期しておくこと**。
-これを行わずに `pnpm test:e2e` を実行すると、Convex クラウド環境に関数が存在せず `Could not find public function for '...'` が発生してテストが失敗する。
+### E2E テスト実行前のバックエンド反映ルールと Preview Deployment 分離
+
+Playwright E2E テストは、環境汚染とメールクォータ消費を防止するため、**E2E 専用の Convex Preview Deployment（`preview/e2e-test`）を動的に構築・再利用**して実行する。
+
+- **自動セットアップフロー (`pnpm test:e2e`)**:
+  1. `pnpm setup:e2e-preview`:
+     - `CONVEX_PREVIEW_DEPLOY_KEY` を用いて Preview Deployment `e2e-test` を作成・再利用（差分高速デプロイ）。
+     - `--cmd` ヘルパーにより `apps/web/e2e/.env.e2e-preview` へ `VITE_CONVEX_URL` と `VITE_CONVEX_SITE_URL` を自動出力。
+     - `.env.e2e.local` の設定（`DISABLE_EMAIL_DELIVERY=true` 等）を Preview Deployment へ自動反映。
+     - ※ `CONVEX_PREVIEW_DEPLOY_KEY` 未設定時は警告を出力し、通常の dev 環境へ安全にフォールバック。
+  2. `pnpm build:e2e-bridge`: Firebase Custom Token 用ブラウザブリッジをビルド。
+  3. `playwright test`:
+      - ローカルではポート 3100（`reuseExistingServer: false`）で専用 Vite サーバーを起動し、通常の開発サーバー（ポート 3000）を起動したままでも衝突・混同なく独立テスト。
+      - CI（`deploy-staging.yml`）では `deploy-staging`（通常 Convex URL → 固定 alias 割り当て）と `deploy-e2e`（Convex Preview URL → E2E 専用デプロイ）を**並列ジョブ**として実行。E2E テストは `deploy-e2e` が発行する動的 `DEPLOY_URL` に対してのみ実行され、ステージング固定 alias に E2E 用環境変数が混入しない。
+- **Preview 環境の完全初期化 (`pnpm test:e2e:clean`)**:
+  - テストデータを完全にゼロクリアしたい場合は、`pnpm test:e2e:clean`（または `setup:e2e-preview:clean`）を実行すると、Preview Deployment が一旦削除・再作成される。
+- **スキーマや関数の変更時の注意**:
+  - `setup:e2e-preview` は内部で `convex deploy` を実行するため、コード変更は自動的に Preview Deployment へ反映される。手動での `convex dev --once` は不要。
 
 ---
 

@@ -12,7 +12,7 @@
     "typecheck": "turbo run typecheck",
     "check": "biome check --write",
     "check:ci": "biome ci",
-    "lint:workflows": "docker run --rm -v .:/repo -w /repo rhysd/actionlint:latest",
+    "lint:workflows": "docker run --rm --entrypoint actionlint -v .:/repo -w /repo ghcr.io/reviewdog/action-actionlint:v1.77.0",
     "verify": "pnpm typecheck && pnpm check && pnpm test && pnpm build",
     "web": "pnpm -F @poohma/web",
     "convex:dev": "pnpm web exec convex dev",
@@ -22,7 +22,7 @@
     "convex:deploy": "pnpm web exec convex deploy",
     "demo:export": "pnpm -F @poohma/web demo:export",
     "prepreview": "pnpm -F @poohma/web exec playwright test e2e/auth.setup.ts --project=setup --no-deps",
-    "preview": "pnpm -F @poohma/web exec playwright open --load-storage=e2e/.auth/e2e-user.json --ignore-https-errors https://localhost:3000/dashboard --device=\"iPhone 17\" --color-scheme=light"
+    "preview": "pnpm -F @poohma/web exec playwright open --load-storage=e2e/.auth/e2e-user.json --ignore-https-errors https://localhost:3100/dashboard --device=\"iPhone 17\" --color-scheme=light"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.13",
