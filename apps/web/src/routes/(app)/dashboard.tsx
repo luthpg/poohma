@@ -10,9 +10,12 @@ import {
   Globe,
   LayoutGrid,
   List,
+  Lock,
+  Plus,
   ShieldCheck,
   Tag,
   Trash2,
+  Users,
   X,
 } from "lucide-react";
 import {
@@ -857,6 +860,8 @@ function RecordListSection({
     return <RecordListSkeleton />;
   }
 
+  const isNormalList = !searchParams.q?.trim() && !searchParams.tag;
+
   return (
     <>
       {records.length > 0 && (
@@ -957,6 +962,17 @@ function RecordListSection({
             availableGroups={availableGroups}
             className="mt-9 md:mt-4"
           />
+          {isNormalList && (
+            <div className="mb-4">
+              {viewMode === "card" ? (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 lg:gap-6">
+                  <AddRecordCard />
+                </div>
+              ) : (
+                <AddRecordListItem />
+              )}
+            </div>
+          )}
           <div className="space-y-6">
             {groupedRecords.map(({ groupKey, items }) => (
               <div
@@ -1025,6 +1041,8 @@ function RecordListSection({
               : "flex flex-col gap-3"
           }
         >
+          {isNormalList &&
+            (viewMode === "card" ? <AddRecordCard /> : <AddRecordListItem />)}
           {records.map((record) =>
             viewMode === "card" ? (
               <ServiceCard
@@ -1135,13 +1153,23 @@ function ServiceListItem({
               {record.title}
             </span>
             <span
-              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+              className={`inline-flex items-center gap-1 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
                 isShared
                   ? "bg-blue-100/50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
                   : "bg-secondary text-muted-foreground"
               }`}
             >
-              {isShared ? "共有中" : "自分のみ"}
+              {isShared ? (
+                <>
+                  <Users className="h-3 w-3" aria-hidden="true" />
+                  <span>共有中</span>
+                </>
+              ) : (
+                <>
+                  <Lock className="h-3 w-3" aria-hidden="true" />
+                  <span>自分のみ</span>
+                </>
+              )}
             </span>
           </div>
           {record.url && (
@@ -1275,13 +1303,23 @@ function ServiceCard({
           </span>
           {/* 所有設定バッジ */}
           <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] md:text-xs font-medium ${
+            className={`inline-flex items-center gap-1 shrink-0 rounded-full px-2 py-0.5 text-[10px] md:text-xs font-medium ${
               record.ownerType === "family"
                 ? "bg-blue-100/50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
                 : "bg-secondary text-muted-foreground"
             }`}
           >
-            {record.ownerType === "family" ? "共有中" : "自分のみ"}
+            {record.ownerType === "family" ? (
+              <>
+                <Users className="h-3 w-3" aria-hidden="true" />
+                <span>共有中</span>
+              </>
+            ) : (
+              <>
+                <Lock className="h-3 w-3" aria-hidden="true" />
+                <span>自分のみ</span>
+              </>
+            )}
           </span>
         </div>
 
@@ -1328,6 +1366,43 @@ function ServiceCard({
           詳細を見る
         </span>
       </div>
+    </Link>
+  );
+}
+
+// 新規追加用インラインプレースホルダー（カード表示用）
+function AddRecordCard() {
+  return (
+    <Link
+      to="/records/new"
+      className="group relative flex flex-col items-center justify-center min-h-[140px] md:min-h-[160px] rounded-lg border-2 border-dashed border-border/80 bg-muted/20 p-6 text-center shadow-xs transition hover:border-orange-500 hover:bg-orange-500/5 cursor-pointer block"
+      aria-label="新しいサービスを追加"
+    >
+      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-500/10 text-orange-500 mb-2 group-hover:scale-110 transition-transform">
+        <Plus className="h-5 w-5" />
+      </div>
+      <span className="text-[14px] font-semibold text-foreground group-hover:text-orange-500 transition-colors">
+        新しいサービスを追加
+      </span>
+      <span className="text-[12px] text-muted-foreground mt-0.5">
+        パスワードヒントを登録
+      </span>
+    </Link>
+  );
+}
+
+// 新規追加用インラインプレースホルダー（リスト表示用）
+function AddRecordListItem() {
+  return (
+    <Link
+      to="/records/new"
+      className="group flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border/80 bg-muted/20 p-3.5 text-center transition hover:border-orange-500 hover:bg-orange-500/5 cursor-pointer block"
+      aria-label="新しいサービスを追加"
+    >
+      <Plus className="h-4 w-4 text-orange-500" />
+      <span className="text-[13px] font-medium text-foreground group-hover:text-orange-500 transition-colors">
+        新しいサービスを追加
+      </span>
     </Link>
   );
 }

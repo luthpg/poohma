@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Lock, Users } from "lucide-react";
 import { useState } from "react";
 import { SessionExpiredDialog } from "@/components/auth/SessionExpiredDialog";
 import { Spinner } from "@/components/ui/spinner";
@@ -225,17 +225,19 @@ export function RecordForm({
               value="user"
               disabled={!isAdmin}
               aria-label="自分のみ（個人用）"
-              className="flex-1 py-2.5 px-4 text-sm font-medium border rounded-md data-[state=on]:bg-orange-500 data-[state=on]:text-white data-[state=on]:border-orange-500 transition-colors disabled:opacity-60"
+              className="flex-1 py-2.5 px-4 text-sm font-medium border rounded-md data-[state=on]:bg-orange-500 data-[state=on]:text-white data-[state=on]:border-orange-500 transition-colors disabled:opacity-60 inline-flex items-center justify-center gap-1.5"
             >
-              自分のみ（個人用）
+              <Lock className="h-4 w-4" />
+              <span>自分のみ（個人用）</span>
             </ToggleGroupItem>
             <ToggleGroupItem
               value="family"
               disabled={!isAdmin}
               aria-label="家族と共有"
-              className="flex-1 py-2.5 px-4 text-sm font-medium border rounded-md data-[state=on]:bg-blue-600 data-[state=on]:text-white data-[state=on]:border-blue-600 transition-colors disabled:opacity-60"
+              className="flex-1 py-2.5 px-4 text-sm font-medium border rounded-md data-[state=on]:bg-blue-600 data-[state=on]:text-white data-[state=on]:border-blue-600 transition-colors disabled:opacity-60 inline-flex items-center justify-center gap-1.5"
             >
-              家族と共有
+              <Users className="h-4 w-4" />
+              <span>家族と共有</span>
             </ToggleGroupItem>
           </ToggleGroup>
           {!isAdmin && (

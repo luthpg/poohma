@@ -12,7 +12,11 @@ import {
   useQuery,
   useQuery_experimental,
 } from "convex/react";
-import { signOut } from "firebase/auth";
+import {
+  GoogleAuthProvider,
+  reauthenticateWithPopup,
+  signOut,
+} from "firebase/auth";
 import {
   AlertTriangle,
   Ban,
@@ -20,6 +24,7 @@ import {
   ChevronDown,
   Clock,
   Copy,
+  Download,
   Eye,
   EyeOff,
   FileEdit,
@@ -49,6 +54,16 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -67,6 +82,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { useAccount } from "@/hooks/useAccount";
 import { LOGOUT_FLAG_KEY } from "@/hooks/useConvexFirebaseAuth";
+import { useExportCsv } from "@/hooks/useExportCsv";
 import { clearQueryCache } from "@/hooks/usePersistentQuery";
 import {
   isBiometricEnabledForUser,
@@ -154,7 +170,14 @@ function FamilyPending() {
 /** 家族グループの作成、参加、メンバー管理を提供する設定画面。 */
 function FamilyComponent() {
   const { isAuthenticated } = useConvexAuth();
-  const { activeAccountId, activeAccount } = useAccount();
+  const {
+    activeAccountId,
+    activeAccount,
+    accounts,
+    deleteAccount: deletePoohMaAccount,
+  } = useAccount();
+  const { handleExport, isExporting } = useExportCsv();
+  const isMultiAccount = accounts.length > 1;
   const family = useQuery(
     api.families.getFamilyMembers,
     isAuthenticated ? { accountId: activeAccountId || undefined } : "skip",
@@ -206,6 +229,70 @@ function FamilyComponent() {
       window.location.href = "/";
     }
   };
+
+  const [isDeleteAccountModalOpen, setIsDeleteAccountModalOpen] =
+    useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
+  const deleteAllAccountsConvex = useMutation(api.users.deleteAllAccounts);
+
+  const handleDeleteAccount = async () => {
+    if (isMultiAccount) {
+      // サブアカウント（複数アカウント保有時）: 現在のアカウントのみ削除
+      if (!activeAccountId) return;
+      setIsDeletingAccount(true);
+      try {
+        await deletePoohMaAccount(activeAccountId);
+        toast.success("アカウントを削除しました");
+        setIsDeleteAccountModalOpen(false);
+        setDeleteConfirmationText("");
+      } catch {
+        toast.error("アカウントの削除に失敗しました");
+      } finally {
+        setIsDeletingAccount(false);
+      }
+    } else {
+      // 単一アカウント（PoohMa全体からの退会）: Firebase 再認証 + 全削除 + 退会
+      setIsDeletingAccount(true);
+      try {
+        const currentUser = auth?.currentUser;
+        if (!currentUser) {
+          throw new Error("認証情報が見つかりません。再ログインしてください。");
+        }
+
+        try {
+          const provider = new GoogleAuthProvider();
+          provider.setCustomParameters({
+            prompt: "select_account",
+          });
+          await reauthenticateWithPopup(currentUser, provider);
+        } catch {
+          throw new Error("再認証に失敗しました。操作をキャンセルします。");
+        }
+
+        await deleteAllAccountsConvex({});
+        await currentUser.delete();
+        clearQueryCache();
+
+        toast.success("退会処理が完了しました");
+        await router.invalidate();
+        await router.navigate({ to: "/" });
+      } catch (error) {
+        const err = error as { code?: string; message?: string };
+        if (err?.code === "auth/requires-recent-login") {
+          toast.error(
+            "セキュリティ保護のため、最近ログインしていない場合はこの操作を実行できません。一度ログアウトし、再ログインしてからやり直してください。",
+          );
+        } else {
+          toast.error(
+            "退会処理に失敗しました。時間をおいてもう一度お試しください。",
+          );
+        }
+        setIsDeletingAccount(false);
+      }
+    }
+  };
+
   const createFamilyInviteMut = useMutation(api.families.createFamilyInvite);
   const revokeFamilyInviteMut = useMutation(api.families.revokeFamilyInvite);
 
@@ -1462,9 +1549,16 @@ function FamilyComponent() {
               <button
                 type="button"
                 onClick={handleLogout}
-                className="rounded-md bg-card px-3.5 py-1.5 sm:px-4 sm:py-2 text-[13px] sm:text-[14px] font-medium text-red-500 shadow-border hover:bg-accent transition cursor-pointer"
+                className="rounded-md bg-card px-3.5 py-1.5 sm:px-4 sm:py-2 text-[13px] sm:text-[14px] font-medium text-foreground shadow-border hover:bg-accent transition cursor-pointer"
               >
                 ログアウト
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsDeleteAccountModalOpen(true)}
+                className="rounded-md bg-card px-3.5 py-1.5 sm:px-4 sm:py-2 text-[13px] sm:text-[14px] font-medium text-red-500 shadow-border hover:bg-red-500/10 transition cursor-pointer"
+              >
+                {isMultiAccount ? "アカウント削除" : "退会"}
               </button>
             </>
           )}
@@ -2563,9 +2657,150 @@ function FamilyComponent() {
                 </button>
               </form>
             </div>
+
+            {/* 未参加ユーザー向け退会導線 */}
+            <div className="mt-8 border-t border-border pt-6 text-center">
+              <button
+                type="button"
+                onClick={() => setIsDeleteAccountModalOpen(true)}
+                className="text-[13px] font-medium text-red-500 hover:text-red-600 transition underline underline-offset-4 cursor-pointer"
+              >
+                {isMultiAccount
+                  ? "このアカウントの削除はこちら"
+                  : "アカウントの削除・退会はこちら"}
+              </button>
+            </div>
           </div>
         </div>
       )}
+
+      {/* 家族未参加ユーザー向け退会確認ダイアログ */}
+      <AlertDialog
+        open={isDeleteAccountModalOpen}
+        onOpenChange={(open) => {
+          if (!open && !isDeletingAccount) {
+            setIsDeleteAccountModalOpen(false);
+            setDeleteConfirmationText("");
+          }
+        }}
+      >
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-600 dark:text-red-400">
+              {isMultiAccount
+                ? `アカウント「${activeAccount?.displayName || "未設定"}」を削除しますか？`
+                : "本当に退会しますか？"}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-4 pt-2 text-foreground">
+                <div className="rounded-md bg-muted p-3 text-[14px]">
+                  <p className="font-semibold mb-2">
+                    {isMultiAccount ? "削除時の注意事項" : "退会時の注意事項"}
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                    {isMultiAccount ? (
+                      <>
+                        <li>
+                          このPoohMaアカウントおよび関連データが削除されます。
+                        </li>
+                        <li>
+                          他のPoohMaアカウントやログイン情報はそのまま保持されます。
+                        </li>
+                      </>
+                    ) : (
+                      <li>
+                        あなたが登録したアカウント情報はすべて削除され、PoohMa全体から退会となります。
+                      </li>
+                    )}
+                    <li>
+                      削除操作は取り消せません。事前にCSVファイルでの保存をおすすめします。
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="flex justify-center py-2">
+                  <button
+                    type="button"
+                    onClick={handleExport}
+                    disabled={isExporting}
+                    className="flex items-center justify-center w-full rounded-md border border-border bg-background px-4 py-2.5 text-[14px] font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                  >
+                    {isExporting ? (
+                      <>
+                        <Spinner className="mr-2 h-4 w-4" />
+                        ダウンロード中...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="mr-2 h-4 w-4" />
+                        CSVファイルをダウンロードする
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  <label
+                    htmlFor="family-confirm-delete"
+                    className="text-[14px] font-medium text-foreground"
+                  >
+                    確認のため、「
+                    <span className="font-bold text-red-500">
+                      {isMultiAccount ? "削除する" : "退会する"}
+                    </span>
+                    」と入力してください
+                  </label>
+                  <input
+                    id="family-confirm-delete"
+                    type="text"
+                    value={deleteConfirmationText}
+                    onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                    placeholder={isMultiAccount ? "削除する" : "退会する"}
+                    className="w-full rounded-md bg-card p-2.5 text-base md:text-[14px] border border-border shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500/50"
+                  />
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-6">
+            <AlertDialogCancel
+              onClick={() => {
+                setIsDeleteAccountModalOpen(false);
+                setDeleteConfirmationText("");
+              }}
+              className="mt-2 sm:mt-0"
+            >
+              キャンセル
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                const expected = isMultiAccount ? "削除する" : "退会する";
+                if (deleteConfirmationText === expected) {
+                  handleDeleteAccount();
+                }
+              }}
+              disabled={
+                deleteConfirmationText !==
+                  (isMultiAccount ? "削除する" : "退会する") ||
+                isDeletingAccount
+              }
+              className="bg-red-500 hover:bg-red-600 focus:ring-red-500 text-white disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+            >
+              {isDeletingAccount ? (
+                <>
+                  <Spinner className="mr-2 h-4 w-4" />
+                  {isMultiAccount ? "削除中..." : "退会処理中..."}
+                </>
+              ) : isMultiAccount ? (
+                "理解した上で削除する"
+              ) : (
+                "理解した上で退会する"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* メンバーキック確認ダイアログ */}
       <Dialog

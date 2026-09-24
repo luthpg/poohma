@@ -4,13 +4,50 @@ import { Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { FaqAccordion } from "@/components/FaqAccordion";
 import { Button } from "@/components/ui/button";
+import { env } from "@/env/client";
 import { filterAndGroupFaqs } from "@/lib/faq";
 import { cmsQueries } from "@/utils/cms.queries";
 
 export const Route = createFileRoute("/(public)/faq")({
   // SSR時にサーバー側でmicroCMSからデータを先読み（プリフェッチ）
   loader: async ({ context }) => {
-    await context.queryClient.ensureQueryData(cmsQueries.faqs());
+    const faqs = await context.queryClient.query({
+      ...cmsQueries.faqs(),
+      staleTime: "static",
+    });
+    return { faqs };
+  },
+  head: ({ loaderData }) => {
+    const siteUrl = env.VITE_SITE_URL.replace(/\/+$/, "");
+    const faqs = loaderData?.faqs ?? [];
+
+    const jsonLd = {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: faqs.map((faq) => ({
+        "@type": "Question",
+        name: faq.question,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: faq.answer.replace(/<[^>]*>?/gm, ""),
+        },
+      })),
+    };
+
+    return {
+      links: [
+        {
+          rel: "canonical",
+          href: `${siteUrl}/faq`,
+        },
+      ],
+      scripts: [
+        {
+          type: "application/ld+json",
+          children: JSON.stringify(jsonLd),
+        },
+      ],
+    };
   },
   component: RouteComponent,
 });

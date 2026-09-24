@@ -40,7 +40,7 @@ export function NewMemberJoinedEmail({
   familyName,
   newMemberDisplayName,
   newMemberEmail,
-  ctaUrl = "https://poohma.ciderlabs.link/family",
+  ctaUrl = "/family",
 }: Props) {
   return (
     <Layout preview={`家族「${familyName}」に新しいメンバーが参加しました`}>
@@ -84,7 +84,7 @@ NewMemberJoinedEmail.PreviewProps = {
   familyName: "鈴木家",
   newMemberDisplayName: "はなこ",
   newMemberEmail: "hanako@example.com",
-  ctaUrl: "https://poohma.ciderlabs.link/",
+  ctaUrl: "/family",
 };
 
 export default NewMemberJoinedEmail;

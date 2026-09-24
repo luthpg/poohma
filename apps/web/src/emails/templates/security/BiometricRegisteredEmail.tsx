@@ -46,7 +46,7 @@ export function BiometricRegisteredEmail({
   os,
   ipAddress,
   location,
-  ctaUrl = "https://poohma.ciderlabs.link/settings",
+  ctaUrl = "/settings",
 }: Props) {
   const formattedDate = new Date(registeredAt).toLocaleString("ja-JP", {
     timeZone: "Asia/Tokyo",
@@ -112,7 +112,7 @@ BiometricRegisteredEmail.PreviewProps = {
   os: "iOS 17.5",
   ipAddress: "203.0.113.1",
   location: "東京都, 日本",
-  ctaUrl: "https://poohma.ciderlabs.link/settings",
+  ctaUrl: "/settings",
 };
 
 export default BiometricRegisteredEmail;

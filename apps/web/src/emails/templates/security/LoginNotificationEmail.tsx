@@ -47,7 +47,7 @@ export function NewDeviceLoginEmail({
   os,
   ipAddress,
   location,
-  ctaUrl = "https://poohma.ciderlabs.link/dashboard",
+  ctaUrl = "/dashboard",
 }: Props) {
   const formattedDate = new Date(loginAt).toLocaleString("ja-JP", {
     timeZone: "Asia/Tokyo",
@@ -119,7 +119,7 @@ NewDeviceLoginEmail.PreviewProps = {
   os: "Windows 11",
   ipAddress: "203.0.113.1",
   location: "東京都, 日本",
-  ctaUrl: "https://poohma.ciderlabs.link/dashboard",
+  ctaUrl: "/dashboard",
 };
 
 export default NewDeviceLoginEmail;

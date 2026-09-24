@@ -42,7 +42,7 @@ export function ShareSettingChangedEmail({
   changedByDisplayName,
   changedAt,
   changeSummary,
-  ctaUrl = "https://poohma.ciderlabs.link/records",
+  ctaUrl = "/records",
 }: Props) {
   const formattedDate = new Date(changedAt).toLocaleString("ja-JP", {
     timeZone: "Asia/Tokyo",
@@ -92,7 +92,7 @@ ShareSettingChangedEmail.PreviewProps = {
   changedByDisplayName: "山田 太郎",
   changedAt: Date.now(),
   changeSummary: "「Amazon」の共有設定が家族共有に変更されました",
-  ctaUrl: "https://poohma.ciderlabs.link/records",
+  ctaUrl: "/records",
 };
 
 export default ShareSettingChangedEmail;

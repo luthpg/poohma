@@ -87,6 +87,8 @@ function SettingsComponent() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeletingSubAccount, setIsDeletingSubAccount] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deleteSubAccountConfirmation, setDeleteSubAccountConfirmation] =
+    useState("");
   const { handleExport, isExporting } = useExportCsv();
 
   const updateProfile = useMutation(api.users.updateProfile);
@@ -230,7 +232,7 @@ function SettingsComponent() {
               type="text"
               value={currentAccount.email}
               disabled
-              className="w-full rounded-md bg-muted p-2.5 text-base md:text-[14px] text-muted-foreground shadow-sm focus:outline-none opacity-80 cursor-not-allowed"
+              className="input-base cursor-not-allowed opacity-75"
             />
             <p className="mt-1.5 text-[12px] text-muted-foreground">
               メールアドレスは変更できません。
@@ -250,7 +252,7 @@ function SettingsComponent() {
               required
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full rounded-md bg-card p-2.5 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+              className="input-base"
               placeholder="表示名を入力"
             />
           </div>
@@ -364,9 +366,9 @@ function SettingsComponent() {
       </div>
 
       {/* Danger Zone */}
-      <div className="mt-8 rounded-lg border border-red-500/20 bg-red-500/5 p-6 shadow-sm">
-        <h2 className="text-[18px] font-semibold text-red-600 dark:text-red-400 tracking-geist-ui mb-2 flex items-center gap-2">
-          <AlertTriangle className="h-5 w-5" />
+      <div className="mt-8 danger-zone-container">
+        <h2 className="danger-zone-title mb-2">
+          <AlertTriangle className="h-5 w-5 shrink-0" />
           Danger Zone
         </h2>
         <p className="text-[14px] text-muted-foreground mb-6">
@@ -389,16 +391,88 @@ function SettingsComponent() {
                   <AlertDialogTitle className="text-red-600 dark:text-red-400">
                     アカウント「{currentAccount.displayName}」を削除しますか？
                   </AlertDialogTitle>
-                  <AlertDialogDescription>
-                    このPoohMaアカウントおよび所属ファミリーのデータが削除されます。他のPoohMaアカウントやFirebaseログインはそのまま保持されます。
+                  <AlertDialogDescription asChild>
+                    <div className="space-y-4 pt-2 text-foreground">
+                      <div className="rounded-md bg-muted p-3 text-[14px]">
+                        <p className="font-semibold mb-2">削除時の注意事項</p>
+                        <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                          <li>
+                            このPoohMaアカウントおよび所属ファミリーのデータが削除されます。
+                          </li>
+                          <li>
+                            他のPoohMaアカウントやFirebaseログインはそのまま保持されます。
+                          </li>
+                          <li>
+                            削除操作は取り消せません。事前にCSVファイルでの保存をおすすめします。
+                          </li>
+                        </ul>
+                      </div>
+
+                      <div className="flex justify-center py-2">
+                        <button
+                          type="button"
+                          onClick={handleExport}
+                          disabled={isExporting}
+                          className="flex items-center justify-center w-full rounded-md border border-border bg-background px-4 py-2.5 text-[14px] font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                        >
+                          {isExporting ? (
+                            <>
+                              <Spinner className="mr-2 h-4 w-4" />
+                              ダウンロード中...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="mr-2 h-4 w-4" />
+                              CSVファイルをダウンロードする
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label
+                          htmlFor="confirm-delete-subaccount"
+                          className="text-[14px] font-medium text-foreground"
+                        >
+                          確認のため、「
+                          <span className="font-bold text-red-500">
+                            削除する
+                          </span>
+                          」と入力してください
+                        </label>
+                        <input
+                          id="confirm-delete-subaccount"
+                          type="text"
+                          value={deleteSubAccountConfirmation}
+                          onChange={(e) =>
+                            setDeleteSubAccountConfirmation(e.target.value)
+                          }
+                          placeholder="削除する"
+                          className="w-full rounded-md bg-card p-2.5 text-base md:text-[14px] border border-border shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500/50"
+                        />
+                      </div>
+                    </div>
                   </AlertDialogDescription>
                 </AlertDialogHeader>
-                <AlertDialogFooter className="mt-4">
-                  <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                <AlertDialogFooter className="mt-6">
+                  <AlertDialogCancel
+                    onClick={() => setDeleteSubAccountConfirmation("")}
+                    className="mt-2 sm:mt-0"
+                  >
+                    キャンセル
+                  </AlertDialogCancel>
                   <AlertDialogAction
-                    onClick={handleDeleteSingleAccount}
-                    disabled={isDeletingSubAccount}
-                    className="bg-red-500 hover:bg-red-600 focus:ring-red-500 text-white"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (deleteSubAccountConfirmation === "削除する") {
+                        handleDeleteSingleAccount();
+                      }
+                    }}
+                    disabled={
+                      deleteSubAccountConfirmation !== "削除する" ||
+                      isDeletingSubAccount
+                    }
+                    className="bg-red-500 hover:bg-red-600 focus:ring-red-500 text-white disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
                   >
                     {isDeletingSubAccount ? (
                       <>
@@ -406,7 +480,7 @@ function SettingsComponent() {
                         削除中...
                       </>
                     ) : (
-                      "削除する"
+                      "理解した上で削除する"
                     )}
                   </AlertDialogAction>
                 </AlertDialogFooter>

@@ -91,7 +91,6 @@ export const registerRecoveryKit = familyBoundMutation({
       .withIndex("by_familyId", (q) => q.eq("familyId", familyId))
       .collect();
 
-    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
     for (const member of members) {
       await ctx.scheduler.runAfter(
         0,
@@ -106,7 +105,7 @@ export const registerRecoveryKit = familyBoundMutation({
               issuerName: user.displayName || "管理者",
               issuedAt: now,
               isReissue,
-              ctaUrl: `${appUrl}/family`,
+              ctaUrl: "/family",
             },
           },
         },
@@ -449,7 +448,6 @@ export const redeemRecoveryAndRotatePasscode = familyBoundMutation({
       .withIndex("by_familyId", (q) => q.eq("familyId", familyId))
       .collect();
 
-    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
     for (const member of members) {
       if (member._id === user._id) continue;
       await ctx.scheduler.runAfter(
@@ -462,7 +460,7 @@ export const redeemRecoveryAndRotatePasscode = familyBoundMutation({
             props: {
               displayName: member.displayName || "メンバー",
               familyName: family.name,
-              ctaUrl: `${appUrl}/family`,
+              ctaUrl: "/family",
             },
           },
         },

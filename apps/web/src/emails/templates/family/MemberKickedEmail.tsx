@@ -7,7 +7,7 @@ import { defineEmailTemplate } from "../../types";
 const props = v.object({
   displayName: v.string(),
   familyName: v.string(),
-  ctaUrl: v.string(),
+  ctaUrl: v.optional(v.string()),
   expiresInDays: v.optional(v.number()),
 });
 
@@ -31,7 +31,7 @@ const buttonWrapper = {
 export function MemberKickedEmail({
   displayName,
   familyName,
-  ctaUrl,
+  ctaUrl = "/family",
   expiresInDays = 30,
 }: Props) {
   return (
@@ -70,7 +70,7 @@ export const memberKickedEmail = defineEmailTemplate({
 MemberKickedEmail.PreviewProps = {
   displayName: "たろう",
   familyName: "鈴木家",
-  ctaUrl: "https://poohma.ciderlabs.link/family",
+  ctaUrl: "/family",
   expiresInDays: 30,
 };
 

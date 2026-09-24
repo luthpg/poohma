@@ -2,11 +2,26 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { CmsRichText } from "@/components/CmsRichText";
 import { Skeleton } from "@/components/ui/skeleton";
+import { env } from "@/env/client";
 import { cmsQueries } from "@/utils/cms.queries";
 
 export const Route = createFileRoute("/(public)/terms-of-service")({
   loader: async ({ context }) => {
-    await context.queryClient.ensureQueryData(cmsQueries.legal());
+    await context.queryClient.query({
+      ...cmsQueries.legal(),
+      staleTime: "static",
+    });
+  },
+  head: () => {
+    const siteUrl = env.VITE_SITE_URL.replace(/\/+$/, "");
+    return {
+      links: [
+        {
+          rel: "canonical",
+          href: `${siteUrl}/terms-of-service`,
+        },
+      ],
+    };
   },
   pendingComponent: LegalPendingComponent,
   component: TermsOfServiceComponent,

@@ -1331,6 +1331,7 @@ convex/crons.ts に登録されている定期ジョブ一覧:
 | VITE_FIREBASE_PROJECT_ID | 必須 | FirebaseプロジェクトID |
 | VITE_FIREBASE_STORAGE_BUCKET | 必須 | Firebase Storageバケット |
 | VITE_CONVEX_URL | 必須 | ConvexデプロイURL |
+| VITE_SITE_URL | 任意 | アプリの公開サイトURL（デフォルト: https://poohma.ciderlabs.link） |
 
 ### サーバー（src/env/server.ts）
 

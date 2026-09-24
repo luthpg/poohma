@@ -247,7 +247,6 @@ export const createFamily = authenticatedMutation({
 
     await ctx.db.patch(user._id, { familyId, familyRole: "admin" });
 
-    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
     await ctx.scheduler.runAfter(
       0,
       internal.actions.sendTemplatedEmailInternal,
@@ -258,7 +257,7 @@ export const createFamily = authenticatedMutation({
           props: {
             displayName: user.displayName || "メンバー",
             familyName: args.name,
-            ctaUrl: `${appUrl}/dashboard`,
+            ctaUrl: "/dashboard",
           },
         },
       },
@@ -725,7 +724,6 @@ export const commitFamilyMigration = authenticatedMutation({
       await ctx.db.delete(pendingVault._id);
     }
 
-    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
     await ctx.scheduler.runAfter(
       0,
       internal.actions.sendTemplatedEmailInternal,
@@ -736,7 +734,7 @@ export const commitFamilyMigration = authenticatedMutation({
           props: {
             displayName: user.displayName || "メンバー",
             familyName: targetFamily?.name || "",
-            ctaUrl: `${appUrl}/family`,
+            ctaUrl: "/family",
           },
         },
       },
@@ -837,7 +835,6 @@ export const rotatePasscode = familyBoundMutation({
       .query("users")
       .withIndex("by_familyId", (q) => q.eq("familyId", familyId))
       .collect();
-    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
     for (const member of members) {
       if (member._id === ctx.user._id) continue;
       await ctx.scheduler.runAfter(
@@ -850,7 +847,7 @@ export const rotatePasscode = familyBoundMutation({
             props: {
               displayName: member.displayName || "メンバー",
               familyName: family.name,
-              ctaUrl: `${appUrl}/family`,
+              ctaUrl: "/family",
             },
           },
         },
@@ -1154,7 +1151,6 @@ export const createJoinRequest = authenticatedMutation({
       (m) => getEffectiveFamilyRole(m) === "admin",
     );
 
-    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
     for (const admin of familyAdmins) {
       await ctx.scheduler.runAfter(
         0,
@@ -1168,7 +1164,7 @@ export const createJoinRequest = authenticatedMutation({
               familyName: family.name,
               applicantDisplayName: user.displayName || "名無し",
               applicantEmail: user.email,
-              ctaUrl: `${appUrl}/family`,
+              ctaUrl: "/family",
             },
           },
         },
@@ -1373,7 +1369,6 @@ export const approveJoinRequest = familyAdminMutation({
       });
 
       const family = await ctx.db.get(familyId);
-      const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
       await ctx.scheduler.runAfter(
         0,
         internal.actions.sendTemplatedEmailInternal,
@@ -1385,7 +1380,7 @@ export const approveJoinRequest = familyAdminMutation({
               displayName: applicant.displayName || "メンバー",
               familyName: family?.name || "",
               variant: "join",
-              ctaUrl: `${appUrl}/family`,
+              ctaUrl: "/family",
             },
           },
         },
@@ -1397,7 +1392,6 @@ export const approveJoinRequest = familyAdminMutation({
       });
 
       const family = await ctx.db.get(familyId);
-      const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
       await ctx.scheduler.runAfter(
         0,
         internal.actions.sendTemplatedEmailInternal,
@@ -1409,7 +1403,7 @@ export const approveJoinRequest = familyAdminMutation({
               displayName: applicant.displayName || "メンバー",
               familyName: family?.name || "",
               variant: "migration",
-              ctaUrl: `${appUrl}/family`,
+              ctaUrl: "/family",
             },
           },
         },
@@ -1602,7 +1596,6 @@ export const kickMember = familyBoundMutation({
     await ctx.db.patch(targetUser._id, { familyId: undefined });
 
     // 4. 通知メールをスケジュール送信
-    const appUrl = process.env.APP_URL || "https://poohma.ciderlabs.link";
     await ctx.scheduler.runAfter(
       0,
       internal.actions.sendTemplatedEmailInternal,
@@ -1613,7 +1606,7 @@ export const kickMember = familyBoundMutation({
           props: {
             displayName: targetUser.displayName || "メンバー",
             familyName: family.name,
-            ctaUrl: `${appUrl}/family`,
+            ctaUrl: "/family",
             expiresInDays: 30,
           },
         },

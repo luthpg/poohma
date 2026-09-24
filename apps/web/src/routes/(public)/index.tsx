@@ -7,6 +7,38 @@ import { Button } from "@/components/ui/button";
 import { env } from "@/env/client";
 
 export const Route = createFileRoute("/(public)/")({
+  head: () => {
+    const siteUrl = env.VITE_SITE_URL.replace(/\/+$/, "");
+    const jsonLd = {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      name: "PoohMa",
+      applicationCategory: "SecurityApplication",
+      operatingSystem: "Web, iOS, Android",
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "JPY",
+      },
+      description:
+        "家族専用の、パスワードを預からないアカウント管理アプリ。パスワードヒントのエンドツーエンド暗号化（E2EE）により安全に共有します。",
+    };
+
+    return {
+      links: [
+        {
+          rel: "canonical",
+          href: `${siteUrl}/`,
+        },
+      ],
+      scripts: [
+        {
+          type: "application/ld+json",
+          children: JSON.stringify(jsonLd),
+        },
+      ],
+    };
+  },
   component: RouteComponent,
 });
 

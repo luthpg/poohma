@@ -1,5 +1,6 @@
 import { Button as EmailButton } from "@react-email/components";
 import type { ReactNode } from "react";
+import { resolveEmailUrl } from "../config";
 
 interface ButtonProps {
   href: string;
@@ -20,8 +21,9 @@ const buttonStyle = {
 };
 
 export function Button({ href, children }: ButtonProps) {
+  const resolvedHref = resolveEmailUrl(href);
   return (
-    <EmailButton href={href} style={buttonStyle}>
+    <EmailButton href={resolvedHref} style={buttonStyle}>
       {children}
     </EmailButton>
   );
