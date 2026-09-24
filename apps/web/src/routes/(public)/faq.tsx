@@ -12,10 +12,7 @@ import { serializeJsonLd, stripHtmlTags } from "@/utils/seo";
 export const Route = createFileRoute("/(public)/faq")({
   // SSR時にサーバー側でmicroCMSからデータを先読み（プリフェッチ）
   loader: async ({ context }) => {
-    const faqs = await context.queryClient.query({
-      ...cmsQueries.faqs(),
-      staleTime: "static",
-    });
+    const faqs = await context.queryClient.query(cmsQueries.faqs());
     return { faqs };
   },
   head: ({ loaderData }) => {

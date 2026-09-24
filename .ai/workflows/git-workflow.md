@@ -92,7 +92,7 @@ try {
   # 新規コメント投稿
   gh pr comment <PR番号> --body-file $tmpFile
   # または既存コメント更新
-  # gh api -X PATCH repos/{owner}/{repo}/issues/comments/<CommentId> -F body=@$tmpFile
+  # gh api -X PATCH 'repos/{owner}/{repo}/issues/comments/<CommentId>' -F body=@$tmpFile
 } finally {
   Remove-Item -Path $tmpFile -Force
 }
