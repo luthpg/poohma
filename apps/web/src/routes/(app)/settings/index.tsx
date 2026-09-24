@@ -91,6 +91,8 @@ function SettingsComponent() {
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deleteSubAccountConfirmation, setDeleteSubAccountConfirmation] =
     useState("");
+  const [isDeleteSubAccountDialogOpen, setIsDeleteSubAccountDialogOpen] =
+    useState(false);
   const { handleExport, isExporting } = useExportCsv();
 
   const updateProfile = useMutation(api.users.updateProfile);
@@ -134,7 +136,8 @@ function SettingsComponent() {
     setIsDeletingSubAccount(true);
     try {
       await deletePoohMaAccount(activeAccountId);
-      toast.success("アカウントを削除しました");
+      setDeleteSubAccountConfirmation("");
+      setIsDeleteSubAccountDialogOpen(false);
     } catch {
       toast.error("アカウントの削除に失敗しました");
     } finally {
@@ -389,7 +392,9 @@ function SettingsComponent() {
         <div className="flex flex-col sm:flex-row gap-3">
           {accounts.length > 1 && (
             <AlertDialog
+              open={isDeleteSubAccountDialogOpen}
               onOpenChange={(open) => {
+                setIsDeleteSubAccountDialogOpen(open);
                 if (!open) setDeleteSubAccountConfirmation("");
               }}
             >
@@ -471,7 +476,10 @@ function SettingsComponent() {
                 </AlertDialogHeader>
                 <AlertDialogFooter className="mt-6">
                   <AlertDialogCancel
-                    onClick={() => setDeleteSubAccountConfirmation("")}
+                    onClick={() => {
+                      setIsDeleteSubAccountDialogOpen(false);
+                      setDeleteSubAccountConfirmation("");
+                    }}
                     className="mt-2 sm:mt-0"
                   >
                     キャンセル

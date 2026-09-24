@@ -2668,17 +2668,19 @@ function FamilyComponent() {
             </div>
 
             {/* 未参加ユーザー向け退会導線 */}
-            <div className="mt-8 border-t border-border pt-6 text-center">
-              <button
-                type="button"
-                onClick={() => setIsDeleteAccountModalOpen(true)}
-                className="text-[13px] font-medium text-red-500 hover:text-red-600 transition underline underline-offset-4 cursor-pointer"
-              >
-                {isMultiAccount
-                  ? "このアカウントの削除はこちら"
-                  : "アカウントの削除・退会はこちら"}
-              </button>
-            </div>
+            {!family && (
+              <div className="mt-8 border-t border-border pt-6 text-center md:col-span-2">
+                <button
+                  type="button"
+                  onClick={() => setIsDeleteAccountModalOpen(true)}
+                  className="text-[13px] font-medium text-red-500 hover:text-red-600 transition underline underline-offset-4 cursor-pointer"
+                >
+                  {isMultiAccount
+                    ? "このアカウントの削除はこちら"
+                    : "アカウントの削除・退会はこちら"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
