@@ -2775,7 +2775,9 @@ function FamilyComponent() {
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-6">
             <AlertDialogCancel
+              disabled={isDeletingAccount}
               onClick={() => {
+                if (isDeletingAccount) return;
                 setIsDeleteAccountModalOpen(false);
                 setDeleteConfirmationText("");
               }}

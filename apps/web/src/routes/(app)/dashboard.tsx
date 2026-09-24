@@ -962,7 +962,7 @@ function RecordListSection({
             availableGroups={availableGroups}
             className="mt-9 md:mt-4"
           />
-          {isNormalList && (
+          {isNormalList && !isSelectMode && (
             <div className="mb-4">
               {viewMode === "card" ? (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 lg:gap-6">
@@ -1042,6 +1042,7 @@ function RecordListSection({
           }
         >
           {isNormalList &&
+            !isSelectMode &&
             (viewMode === "card" ? <AddRecordCard /> : <AddRecordListItem />)}
           {records.map((record) =>
             viewMode === "card" ? (

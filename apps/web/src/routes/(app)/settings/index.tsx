@@ -417,7 +417,10 @@ function SettingsComponent() {
                         <p className="font-semibold mb-2">削除時の注意事項</p>
                         <ul className="list-disc list-inside space-y-1 text-muted-foreground">
                           <li>
-                            このPoohMaアカウントおよび所属ファミリーのデータが削除されます。
+                            他の家族メンバーがいる場合、このアカウントの個人データのみ削除され、共有データは残ります。
+                          </li>
+                          <li>
+                            このアカウントが最後のメンバーの場合、所属ファミリーと共有データも削除されます。
                           </li>
                           <li>
                             他のPoohMaアカウントやFirebaseログインはそのまま保持されます。
@@ -476,7 +479,9 @@ function SettingsComponent() {
                 </AlertDialogHeader>
                 <AlertDialogFooter className="mt-6">
                   <AlertDialogCancel
+                    disabled={isDeletingSubAccount}
                     onClick={() => {
+                      if (isDeletingSubAccount) return;
                       setIsDeleteSubAccountDialogOpen(false);
                       setDeleteSubAccountConfirmation("");
                     }}
@@ -539,7 +544,7 @@ function SettingsComponent() {
                           あなたが登録したアカウント情報はすべて削除されます。
                         </li>
                         <li>
-                          家族と「共有」に設定している情報も、他の家族から見られなくなります。
+                          他の家族メンバーがいる場合、所属ファミリーの共有データは残ります（最後のメンバーの場合は所属ファミリーと共有データも削除されます）。
                         </li>
                         <li>
                           退会操作は取り消せません。事前にCSVファイルでの保存をおすすめします。
@@ -591,7 +596,11 @@ function SettingsComponent() {
               </AlertDialogHeader>
               <AlertDialogFooter className="mt-6">
                 <AlertDialogCancel
-                  onClick={() => setDeleteConfirmation("")}
+                  disabled={isDeleting}
+                  onClick={() => {
+                    if (isDeleting) return;
+                    setDeleteConfirmation("");
+                  }}
                   className="mt-2 sm:mt-0"
                 >
                   キャンセル
