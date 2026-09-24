@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { env } from "@/env/client";
 import { filterAndGroupFaqs } from "@/lib/faq";
 import { cmsQueries } from "@/utils/cms.queries";
+import { serializeJsonLd, stripHtmlTags } from "@/utils/seo";
 
 export const Route = createFileRoute("/(public)/faq")({
   // SSR時にサーバー側でmicroCMSからデータを先読み（プリフェッチ）
@@ -29,7 +30,7 @@ export const Route = createFileRoute("/(public)/faq")({
         name: faq.question,
         acceptedAnswer: {
           "@type": "Answer",
-          text: faq.answer.replace(/<[^>]*>?/gm, ""),
+          text: stripHtmlTags(faq.answer),
         },
       })),
     };
@@ -44,7 +45,7 @@ export const Route = createFileRoute("/(public)/faq")({
       scripts: [
         {
           type: "application/ld+json",
-          children: JSON.stringify(jsonLd),
+          children: serializeJsonLd(jsonLd),
         },
       ],
     };

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { JpText } from "@/components/JpText";
 import { Button } from "@/components/ui/button";
 import { env } from "@/env/client";
+import { serializeJsonLd } from "@/utils/seo";
 
 export const Route = createFileRoute("/(public)/")({
   head: () => {
@@ -34,7 +35,7 @@ export const Route = createFileRoute("/(public)/")({
       scripts: [
         {
           type: "application/ld+json",
-          children: JSON.stringify(jsonLd),
+          children: serializeJsonLd(jsonLd),
         },
       ],
     };
