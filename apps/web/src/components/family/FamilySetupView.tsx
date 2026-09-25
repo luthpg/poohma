@@ -109,18 +109,31 @@ export function FamilySetupView({
   const handleCreate = async (e: React.SubmitEvent) => {
     e.preventDefault();
     if (isChangingFamily && onChangeFamily) {
-      await onChangeFamily("create", e, {
-        createName,
-        createPasscode,
-        createPasscodeConfirm,
-        joinCode,
-      });
+      if (isLoading) return;
+      setIsLoading(true);
+      try {
+        await onChangeFamily("create", e, {
+          createName,
+          createPasscode,
+          createPasscodeConfirm,
+          joinCode,
+        });
+      } finally {
+        setIsLoading(false);
+      }
       return;
     }
 
-    const { evaluatePasscodeStrength } = await import(
-      "@/utils/passcode-strength"
+    const strengthModule = await import("@/utils/passcode-strength").catch(
+      () => null,
     );
+    if (!strengthModule) {
+      toast.error(
+        "パスコード強度の評価を読み込めませんでした。再試行してください",
+      );
+      return;
+    }
+    const { evaluatePasscodeStrength } = strengthModule;
     const strength = evaluatePasscodeStrength(createPasscode);
     if (!strength.isValid) {
       toast.error(strength.reasons[0]);
@@ -165,12 +178,18 @@ export function FamilySetupView({
   const handleSendJoinRequest = async (e: React.SubmitEvent) => {
     e.preventDefault();
     if (isChangingFamily && onChangeFamily) {
-      await onChangeFamily("join", e, {
-        createName,
-        createPasscode,
-        createPasscodeConfirm,
-        joinCode,
-      });
+      if (isLoading) return;
+      setIsLoading(true);
+      try {
+        await onChangeFamily("join", e, {
+          createName,
+          createPasscode,
+          createPasscodeConfirm,
+          joinCode,
+        });
+      } finally {
+        setIsLoading(false);
+      }
       return;
     }
 
@@ -188,12 +207,17 @@ export function FamilySetupView({
       await queryClient.invalidateQueries({ queryKey: ["authUser"] });
       await router.invalidate();
     } catch (error) {
-      const rawMsg =
-        error instanceof Error ? error.message : "参加申請に失敗しました";
+      const rawMsg = error instanceof Error ? error.message : "";
       if (rawMsg.includes("Invalid invite code")) {
-        toast.error("招待コードが無効か、期限切れです");
-      } else if (rawMsg.includes("ALREADY_REQUESTED")) {
-        toast.error("すでにこの家族への参加申請を送信済みです");
+        toast.error("招待コードが無効です。内容をご確認ください。");
+      } else if (rawMsg.includes("revoked")) {
+        toast.error("この招待リンクは無効化されています。");
+      } else if (rawMsg.includes("expired")) {
+        toast.error("この招待リンクは有効期限が切れています。");
+      } else if (rawMsg.includes("already a member")) {
+        toast.error("すでにこの家族グループに参加しています。");
+      } else if (rawMsg.includes("pending")) {
+        toast.error("すでに申請中の参加リクエストがあります。");
       } else {
         toast.error("参加申請の送信に失敗しました");
       }

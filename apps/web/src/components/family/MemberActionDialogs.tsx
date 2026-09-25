@@ -1,5 +1,5 @@
 import { AlertTriangle, Download, KeyRound } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Id } from "@/../convex/_generated/dataModel";
 import {
   AlertDialog,
@@ -72,6 +72,12 @@ export function MemberActionDialogs<
   onOpenRotatePasscode,
 }: MemberActionDialogsProps<T>) {
   const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
+
+  useEffect(() => {
+    if (!isDeleteAccountModalOpen) {
+      setDeleteConfirmationText("");
+    }
+  }, [isDeleteAccountModalOpen]);
 
   return (
     <>
