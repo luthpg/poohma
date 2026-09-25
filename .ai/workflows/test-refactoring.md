@@ -85,4 +85,4 @@ flowchart TD
 - **ローカル動的検証（`pnpm test:e2e`）の義務**:
   E2E や結合テストに手を入れた際は、静的チェックのみで済ませず、必ず `pnpm test:e2e` を合格させてからコミットする。
 - **UTF-8 一時ファイルを経由したコミット**:
-  Windows PowerShell 環境における文字化け・エスケープ破壊防止のため、コミットメッセージは必ず UTF-8 一時ファイルを経由する（`.ai/workflows/git-workflow.md` 参照）。
+  PowerShell 7 (pwsh) 環境における文字化け・エスケープ破壊防止のため、コミットメッセージは必ず UTF-8 一時ファイルを経由する（`.ai/workflows/git-workflow.md` 参照）。

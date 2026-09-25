@@ -39,8 +39,8 @@
 
 ## 1. Environment & Shell Context
 
-- **OS / Shell**: Windows (PowerShell)
-  - Windows PowerShell 7未満では `&&` 演算子が構文エラーになるため使用禁止。連続実行が必要な場合は、`cmd1` の直後に `$LASTEXITCODE` を確認し、非ゼロなら `throw` してから `cmd2` を実行する（例: `cmd1; if ($LASTEXITCODE -ne 0) { throw "cmd1 failed: $LASTEXITCODE" }; cmd2`）。
+- **OS / Shell**: Windows (PowerShell 7 / pwsh)
+  - PowerShell 7 以降では `&&` 演算子がネイティブでサポートされているため、コマンドのチェーン実行（`cmd1 && cmd2`）が可能。
   - パスに丸括弧 `()` や `$` が含まれる場合は必ずシングルクォート等で囲む（例: `'src/routes/(app)/records/$id.tsx'`）。
   - パイプライン（`|`）や引数直接渡しによる日本語文字化けを防ぐため、コミットや PR 作成・コメント投稿は必ず **UTF-8 一時ファイルを経由** すること。
   - **ヒアドキュメントでのダブルクォート（`@" ... "@`）の完全禁止**: PowerShell ではバッククォート `` ` `` がエスケープ文字となるため、ダブルクォートヒアドキュメント内では `` `apps/web/.. `` の `` `a `` がベル文字（0x07）等に誤解釈されてインラインコードやパスが致命的に文字化け・破壊される。テキスト（コミットメッセージ、PR本文、コメント）の定義には**必ずシングルクォートヒアドキュメント（`@' ... '@`）を使用する**こと（詳細は [`.ai/workflows/git-workflow.md`](./.ai/workflows/git-workflow.md) 参照）。
@@ -56,11 +56,14 @@
 4. **Build Check**: `pnpm build`
 5. **E2E Test (Dynamic Verification)**: `pnpm test:e2e`
 6. **Workflow Lint**: `pnpm lint:workflows`（Docker経由で actionlint を実行）
-7. **Full Pipeline**: `pnpm verify`（上記1〜4を一括順次実行）
+7. **Knowledge Ref Check**: `pnpm check:knowledge`（.ai/ 内のコード参照切れ・陳腐化検証）
+8. **Doc-Sync Check**: `pnpm check:doc-sync`（git差分からのドキュメント更新要否判定）
+9. **Full Pipeline**: `pnpm verify`（上記1〜4を一括順次実行）
 
 > **Important (動的テスト・ワークフロー検証義務)**:
 > - UI、認証、E2EE暗号化、Convex、CSV等の変更時は、静的チェックのみでコミットせず、必ずローカルで `pnpm test:e2e` を合格させてからコミットすること。Convex 変更時は事前に `pnpm convex:dev:once` を実行すること。
 > - GitHub Actions ワークフロー（`.github/workflows/`）変更時は、コミット前に必ずローカルで `pnpm lint:workflows` を実行し合格を確認すること。
+> - コミット前には `pnpm check:doc-sync` および `pnpm check:knowledge` を活用し、ドキュメント同期漏れや参照切れがないことを確認すること。
 
 ---
 
@@ -100,15 +103,20 @@ poohma/                    # ルート（Turborepo）
 │   ├── src/               # フロントエンド（@/* エイリアス）
 │   └── tests/             # ユニット / 結合 / E2E テスト
 ├── workers/backup/        # Cloudflare Workers バックアップ（@poohma/backup）
+├── packages/              # 共通パッケージ
+│   └── knowledge-tools/   # AI開発基盤・Knowledge運用ツール（@poohma/knowledge-tools）
 ├── .ai/                   # AI Knowledge Base（ドメイン、不変条件、落とし穴）
 └── .agents/skills/        # Antigravity 専門スキル
 ```
 
 ---
 
-## 7. Working with `.ai/`（事前参照マトリクス）
+## 7. Knowledge Feedback Loop & Working with `.ai/`
 
-タスク着手時は、以下のマトリクスに従って関連ドキュメント（ピンポイントな小ファイル）を必ず事前に参照し、不変条件に抵触しないかを事前審査してください。詳細な設計思想は [`.ai/README.md`](./.ai/README.md) を参照。
+PoohMa では、AI Agent と人間の協調（Human-in-the-Loop）による継続的な知識運用サイクルを確立しています。
+
+### 7.1 Context Selection（タスク開始時の文脈特定義務）
+タスク着手時は、無作為に作業を開始せず、必ず [`.ai/workflows/context-selection.md`](./.ai/workflows/context-selection.md) に従って関連ドキュメント（ピンポイントな小ファイル）を事前に参照し、不変条件に抵触しないかを事前審査してください。作業開始時には特定した種別と参照先を宣言すること。
 
 | 作業フェーズ / タスク種別 | 必須事前参照ファイル | 特に確認すべき項目・不変条件 |
 | :--- | :--- | :--- |
@@ -118,3 +126,7 @@ poohma/                    # ルート（Turborepo）
 | **E2E / ユニットテスト作成・改修・整理** | [`.ai/testing.md`](./.ai/testing.md)<br>[`.ai/workflows/test-refactoring.md`](./.ai/workflows/test-refactoring.md)<br>[`.ai/pitfalls/e2e-testing.md`](./.ai/pitfalls/e2e-testing.md) | ・テスト失敗時のプロダクションコード改変禁止<br>・「削除すると何を見逃すか」基準の重複排除<br>・`convex dev --once` のワンショット実行 |
 | **認証・セッション・暗号(E2EE)** | [`.ai/invariants.md`](./.ai/invariants.md) (1〜4節)<br>[`.ai/pitfalls/auth-session.md`](./.ai/pitfalls/auth-session.md)<br>[`.ai/pitfalls/crypto-e2ee.md`](./.ai/pitfalls/crypto-e2ee.md) | ・長期セッションの Single Source of Truth（Firebase Auth）<br>・Session Cookie の位置付け<br>・鍵階層（DEK / MasterKey / PRF）の破壊防止 |
 | **CI/CD・GitHub Actions 改修** | [`.ai/invariants.md`](./.ai/invariants.md) (第7節)<br>[`.ai/pitfalls/workflow-ci.md`](./.ai/pitfalls/workflow-ci.md) | ・`pnpm lint:workflows` の事前実行義務<br>・`jq --arg` 引数展開<br>・curl タイムアウト必須<br>・変数クォート（SC2086防止） |
+
+### 7.2 Knowledge Feedback（Human-in-the-Loop 知見還元）
+- 実装・レビュー・CI/E2E対応で得られた普遍的知見は、勝手に書き込まず、必ず [`.ai/workflows/knowledge-feedback.md`](./.ai/workflows/knowledge-feedback.md) の基準とフォーマットに従って「知見草案」をユーザーへ提示し、合意を得てから `.ai/pitfalls/` へ反映すること。
+- コミット前には必ず `pnpm check:knowledge`（参照切れ検知）および `pnpm check:doc-sync`（ドキュメント同期判定）を実行すること。

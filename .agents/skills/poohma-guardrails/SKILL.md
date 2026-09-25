@@ -8,6 +8,10 @@ description: >-
 
 このスキルは、PoohMa における破壊的変更、セキュリティ脆弱性、不変条件違反を未然に防止するための行動指針を提供します。
 
+## 0. タスク着手時の文脈選択（Context Selection 義務）
+
+作業開始時は、[`.ai/workflows/context-selection.md`](../../../.ai/workflows/context-selection.md) に従い、タスク種別（UI、E2EE暗号、Convex/RLS、認証、E2Eテスト、CI等）を特定し、必読ファイルを事前参照した上で方針を提示してください。
+
 ---
 
 ## 1. 必読・最重要不変原則（Core Invariants）
@@ -37,3 +41,9 @@ description: >-
 ## 2. 過去トラ・詳細 Pitfalls 一覧
 
 詳細な過去の失敗事例や実装上の罠は、[`.ai/pitfalls.md`](../../../.ai/pitfalls.md) または各ドメイン別ファイルを参照してください。
+
+---
+
+## 3. Knowledge Feedback Protocol（知見還元）
+
+作業中に再発し得る普遍的な知見・罠を発見した場合、勝手に書き換えることはせず、[`.ai/workflows/knowledge-feedback.md`](../../../.ai/workflows/knowledge-feedback.md) に従ってユーザーに草案を提示（提案と合意の徹底分離）し、合意を得てから `.ai/pitfalls/` へ反映してください。コミット前には `pnpm check:knowledge` および `pnpm check:doc-sync` を実行してください。

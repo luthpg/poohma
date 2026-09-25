@@ -1,13 +1,13 @@
-# Pitfalls: 実行環境 & シェル (Windows PowerShell)
+# Pitfalls: 実行環境 & シェル (PowerShell 7 / Windows)
 
-Windows PowerShell 環境における落とし穴と回避法です。
+PowerShell 7 (pwsh / Windows) 環境における落とし穴と回避法です。
 
 ---
 
-### `&&` 演算子の使用禁止
+### `&&` 演算子によるチェーン実行のサポート
 
-- **問題**: Windows PowerShell 7 未満では `&&` が構文エラー（`トークン '&&' は、このバージョンでは有効なステートメント区切り記号ではありません`）になる。
-- **回避法**: コマンドの連続実行は避け、個別実行する。やむを得ず連続実行する場合は、各外部コマンドの直後に `$LASTEXITCODE` を確認し、非ゼロなら停止する（例: `cmd1; if ($LASTEXITCODE -ne 0) { throw "cmd1 failed: $LASTEXITCODE" }; cmd2`）。
+- **状況**: PowerShell 7（pwsh）では、bash 同様に `cmd1 && cmd2` によるチェーン実行（直前のコマンドが成功した場合のみ後続を実行する制御）がネイティブで利用可能になりました（旧 Windows PowerShell 5.1 で構文エラーとなっていた制限は解消）。
+- **活用**: コマンドの順次実行時は `&&` を活用し、先行ステップが失敗した場合に即座に中断させることができます。
 
 ---
 

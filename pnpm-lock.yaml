@@ -512,6 +512,18 @@ importers:
         specifier: ^6.2.1
         version: 6.2.1
 
+  packages/knowledge-tools:
+    devDependencies:
+      '@types/node':
+        specifier: ^26.5.1
+        version: 26.5.1
+      tsx:
+        specifier: ^4.23.13
+        version: 4.23.13
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
   workers/backup:
     devDependencies:
       '@cloudflare/workers-types':

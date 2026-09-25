@@ -142,7 +142,7 @@ window.addEventListener("storage", (e) => {
 
 ---
 
-## 8. Convex バックエンド関数のテストパターン (`apps/web/tests/convex/`)
+## 8. Convex バックエンド関数のテストパターン (`apps/web/tests/convex-records.spec.ts` 等)
 
 `convex-test` を使用し、認証コンテキスト（`as(user)`）や customBuilders、RLS をモックした統合テストを記述する。
 

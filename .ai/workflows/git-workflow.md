@@ -1,6 +1,6 @@
-# Git & GitHub CLI Workflow in PowerShell
+# Git & GitHub CLI Workflow in PowerShell 7
 
-Windows PowerShell 環境において、日本語文字化けやエスケープ破壊を防ぎながら安全に Git コミットおよび GitHub CLI（`gh`）を実行するためのワークフローです。
+PowerShell 7 (pwsh / Windows) 環境において、日本語文字化けやエスケープ破壊を防ぎながら安全に Git コミットおよび GitHub CLI（`gh`）を実行するためのワークフローです。
 
 ---
 

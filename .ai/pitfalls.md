@@ -14,7 +14,7 @@ AI Agent が誤りやすい点、過去に問題となった点、実装上の�
 | **認証 & セッション管理** | [`.ai/pitfalls/auth-session.md`](pitfalls/auth-session.md) | Firebase Auth Single Source of Truth、Session Cookie 過剰依存、ログアウト競合、リカバリー失効検証、白画面バウンス |
 | **暗号化 (E2EE) & WebAuthn** | [`.ai/pitfalls/crypto-e2ee.md`](pitfalls/crypto-e2ee.md) | WebAuthn PRF の役割、CryptoKey `extractable`、`KDF_VERSIONS` 追記原則 |
 | **E2E テスト & ルーティング** | [`.ai/pitfalls/e2e-testing.md`](pitfalls/e2e-testing.md) | プロダクションコード改変禁止、Playwright CORS 拒否、ログアウト順序、家族状態 UI 分岐、暗号化タイムアウト |
-| **実行環境 & PowerShell** | [`.ai/pitfalls/environment-shell.md`](pitfalls/environment-shell.md) | Windows PowerShell `&&` 禁止、丸括弧パスのエスケープ、UTF-8 一時ファイル経由コミット |
+| **実行環境 & PowerShell** | [`.ai/pitfalls/environment-shell.md`](pitfalls/environment-shell.md) | PowerShell 7 `&&` サポート、丸括弧パスのエスケープ、UTF-8 一時ファイル経由コミット |
 | **UI・設定・モノレポ** | [`.ai/pitfalls/ui-and-misc.md`](pitfalls/ui-and-misc.md) | CI ダミー環境変数、CSP 設定、Google Picker 制約、CSS ネガティブマージン横揺れ |
 
 ---
