@@ -72,40 +72,41 @@ export function PasscodeRotateSection({
 
   const handleChangePasscode = async (e: React.SubmitEvent) => {
     e.preventDefault();
-    const strengthModule = await import("@/utils/passcode-strength").catch(
-      () => null,
-    );
-    if (!strengthModule) {
-      toast.error(
-        "パスコード強度の評価を読み込めませんでした。再試行してください",
-      );
-      return;
-    }
-    const { evaluatePasscodeStrength } = strengthModule;
-    const strength = evaluatePasscodeStrength(newPasscode);
-    if (!strength.isValid) {
-      toast.error(strength.reasons[0]);
-      return;
-    }
-    if (newPasscode !== newPasscodeConfirm) {
-      toast.error("新しいパスコードが一致しません");
-      return;
-    }
-    if (newPasscode === currentPasscode) {
-      toast.error("現在のパスコードと異なるものを設定してください");
-      return;
-    }
-    if (
-      !family?.masterKeyEncrypted ||
-      !family.masterKeyIv ||
-      !family.masterKeySalt
-    ) {
-      toast.error("家族の暗号化情報が初期化されていません");
-      return;
-    }
-
+    if (isChangingPasscode) return;
     setIsChangingPasscode(true);
     try {
+      const strengthModule = await import("@/utils/passcode-strength").catch(
+        () => null,
+      );
+      if (!strengthModule) {
+        toast.error(
+          "パスコード強度の評価を読み込めませんでした。再試行してください",
+        );
+        return;
+      }
+      const { evaluatePasscodeStrength } = strengthModule;
+      const strength = evaluatePasscodeStrength(newPasscode);
+      if (!strength.isValid) {
+        toast.error(strength.reasons[0]);
+        return;
+      }
+      if (newPasscode !== newPasscodeConfirm) {
+        toast.error("新しいパスコードが一致しません");
+        return;
+      }
+      if (newPasscode === currentPasscode) {
+        toast.error("現在のパスコードと異なるものを設定してください");
+        return;
+      }
+      if (
+        !family?.masterKeyEncrypted ||
+        !family.masterKeyIv ||
+        !family.masterKeySalt
+      ) {
+        toast.error("家族の暗号化情報が初期化されていません");
+        return;
+      }
+
       const unlocked = await unlock(currentPasscode);
       if (!unlocked) {
         return;

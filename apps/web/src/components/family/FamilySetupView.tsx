@@ -124,27 +124,29 @@ export function FamilySetupView({
       return;
     }
 
-    const strengthModule = await import("@/utils/passcode-strength").catch(
-      () => null,
-    );
-    if (!strengthModule) {
-      toast.error(
-        "パスコード強度の評価を読み込めませんでした。再試行してください",
-      );
-      return;
-    }
-    const { evaluatePasscodeStrength } = strengthModule;
-    const strength = evaluatePasscodeStrength(createPasscode);
-    if (!strength.isValid) {
-      toast.error(strength.reasons[0]);
-      return;
-    }
-    if (createPasscode !== createPasscodeConfirm) {
-      toast.error("パスコードが一致しません");
-      return;
-    }
+    if (isLoading) return;
     setIsLoading(true);
     try {
+      const strengthModule = await import("@/utils/passcode-strength").catch(
+        () => null,
+      );
+      if (!strengthModule) {
+        toast.error(
+          "パスコード強度の評価を読み込めませんでした。再試行してください",
+        );
+        return;
+      }
+      const { evaluatePasscodeStrength } = strengthModule;
+      const strength = evaluatePasscodeStrength(createPasscode);
+      if (!strength.isValid) {
+        toast.error(strength.reasons[0]);
+        return;
+      }
+      if (createPasscode !== createPasscodeConfirm) {
+        toast.error("パスコードが一致しません");
+        return;
+      }
+
       const salt = generateSalt();
       const passcodeKey = await deriveKeyFromPasscode(
         createPasscode,

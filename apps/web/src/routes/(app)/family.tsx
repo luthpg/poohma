@@ -508,7 +508,7 @@ function FamilyComponent() {
       try {
         await createJoinRequestMut({
           accountId: activeAccountId || undefined,
-          code,
+          code: code.trim(),
         });
         toast.success(
           "参加申請を送信しました。家族メンバーの承認をお待ちください。",
@@ -783,7 +783,7 @@ function FamilyComponent() {
       }
     } else {
       // 「参加」の場合は、承認制のためリクエスト送信に切り替え
-      await handleSendJoinRequest(data.joinCode);
+      await handleSendJoinRequest(data.joinCode.trim());
     }
   };
 
