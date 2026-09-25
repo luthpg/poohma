@@ -46,19 +46,41 @@ function normalizeRef(raw: string): string {
   return clean.trim();
 }
 
+// リポジトリルート起点として扱う接頭辞
+const ROOT_PREFIXES = [
+  "apps/",
+  "workers/",
+  "packages/",
+  ".docs/",
+  ".ai/",
+  ".github/",
+  ".agents/",
+];
+
+function isRootRelative(ref: string): boolean {
+  return ROOT_PREFIXES.some((prefix) => ref.startsWith(prefix));
+}
+
 // 対象となる参照パスのパターン（apps/, workers/, packages/, .docs/, .ai/, .github/, .agents/ 等）
 const REF_PATTERNS = [
   // インラインコード: `apps/...` や `.docs/...`
   /`((?:apps|workers|packages|\.docs|\.ai|\.github|\.agents)\/[^`\s]+)`/g,
-  // Markdownリンク: [...](apps/...) や [...](../apps/...)
-  /\[[^\]]*\]\(((\.{1,2}\/|apps\/|workers\/|packages\/|\.docs\/|\.ai\/|\.github\/|\.agents\/)[^)\s]+)\)/g,
+  // Markdownリンク: [...](path)
+  /\[[^\]]*\]\(([^)\s]+)\)/g,
 ];
 
 // 無視するキーワードやプレースホルダー
 function shouldIgnore(ref: string): boolean {
   if (ref.includes("*") || ref.includes("<") || ref.includes(">")) return true;
   if (ref.includes("...") || ref.includes("${")) return true;
-  if (ref.startsWith("http://") || ref.startsWith("https://")) return true;
+  if (
+    ref.startsWith("http://") ||
+    ref.startsWith("https://") ||
+    ref.startsWith("mailto:") ||
+    ref.startsWith("#")
+  ) {
+    return true;
+  }
   return false;
 }
 
@@ -95,13 +117,12 @@ function checkReferences(): void {
             if (cleanRef && !shouldIgnore(cleanRef)) {
               totalRefs++;
 
-              // 明示的な相対パス (./ または ../) はファイルのディレクトリ起点、
-              // それ以外 (.ai/, .docs/, apps/ など) は ROOT 起点
               let resolvedPath: string;
-              if (cleanRef.startsWith("./") || cleanRef.startsWith("../")) {
-                resolvedPath = path.resolve(path.dirname(file), cleanRef);
-              } else {
+              if (isRootRelative(cleanRef)) {
                 resolvedPath = path.resolve(ROOT_DIR, cleanRef);
+              } else {
+                // 通常の相対パス（workflows/..., pitfalls/..., ./..., ../... 等）はファイルのディレクトリ起点
+                resolvedPath = path.resolve(path.dirname(file), cleanRef);
               }
 
               if (!fs.existsSync(resolvedPath)) {

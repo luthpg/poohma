@@ -93,26 +93,27 @@ function getChangedFiles(): string[] {
     });
     const files = new Set<string>();
 
-    for (const line of output.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
+    for (const rawLine of output.split("\n")) {
+      const line = rawLine.replace(/\r$/, "");
+      if (line.length < 4) continue;
+
       // status line: "XY path" or "XY path -> newpath"
-      const parts = trimmed.substring(3).trim();
-      const actualPath = parts.includes("->")
-        ? parts.split("->")[1]?.trim()
-        : parts;
-      if (actualPath) {
-        // Windowsのバックスラッシュをスラッシュに正規化
-        files.add(actualPath.replace(/\\/g, "/"));
+      const rest = line.substring(3).trim();
+      if (!rest) continue;
+
+      if (rest.includes("->")) {
+        const [oldPath, newPath] = rest.split("->").map((p) => p.trim());
+        if (oldPath) files.add(oldPath.replace(/\\/g, "/"));
+        if (newPath) files.add(newPath.replace(/\\/g, "/"));
+      } else {
+        files.add(rest.replace(/\\/g, "/"));
       }
     }
 
     return Array.from(files);
-  } catch (_error) {
-    console.warn(
-      "⚠️ Failed to execute git command. Falling back to empty diff.",
-    );
-    return [];
+  } catch (error) {
+    console.error("❌ Failed to execute git status command:", error);
+    process.exit(1);
   }
 }
 
