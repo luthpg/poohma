@@ -43,6 +43,9 @@ function normalizeRef(raw: string): string {
   // 前後のクォートや括弧除去
   clean = clean.replace(/^[`'"]+|[`'"]+$/g, "");
 
+  // エスケープされた括弧・バックスラッシュの復元 (\( -> (, \) -> ), \\ -> \)
+  clean = clean.replace(/\\([\\()])/g, "$1");
+
   return clean.trim();
 }
 
@@ -65,8 +68,8 @@ function isRootRelative(ref: string): boolean {
 const REF_PATTERNS = [
   // インラインコード: `apps/...` や `.docs/...`
   /`((?:apps|workers|packages|\.docs|\.ai|\.github|\.agents)\/[^`\s]+)`/g,
-  // Markdownリンク: [...](path) または [...](path "title")（エスケープ引用符対応）
-  /\[[^\]]*\]\(([^)\s]+)(?:\s+(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\([^)]*\)))?\)/g,
+  // Markdownリンク: [...](path) または [...](path "title")（エスケープ引用符・エスケープ括弧対応）
+  /\[[^\]]*\]\(((?:\\.|[^)\\\s])+)(?:\s+(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\([^)]*\)))?\)/g,
 ];
 
 // 無視するキーワードやプレースホルダー
