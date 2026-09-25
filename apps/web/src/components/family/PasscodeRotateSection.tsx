@@ -72,9 +72,16 @@ export function PasscodeRotateSection({
 
   const handleChangePasscode = async (e: React.SubmitEvent) => {
     e.preventDefault();
-    const { evaluatePasscodeStrength } = await import(
-      "@/utils/passcode-strength"
+    const strengthModule = await import("@/utils/passcode-strength").catch(
+      () => null,
     );
+    if (!strengthModule) {
+      toast.error(
+        "パスコード強度の評価を読み込めませんでした。再試行してください",
+      );
+      return;
+    }
+    const { evaluatePasscodeStrength } = strengthModule;
     const strength = evaluatePasscodeStrength(newPasscode);
     if (!strength.isValid) {
       toast.error(strength.reasons[0]);

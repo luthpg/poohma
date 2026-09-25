@@ -672,9 +672,16 @@ function FamilyComponent() {
   ) => {
     e.preventDefault();
     if (action === "create") {
-      const { evaluatePasscodeStrength } = await import(
-        "@/utils/passcode-strength"
+      const strengthModule = await import("@/utils/passcode-strength").catch(
+        () => null,
       );
+      if (!strengthModule) {
+        toast.error(
+          "パスコード強度の評価を読み込めませんでした。再試行してください",
+        );
+        return;
+      }
+      const { evaluatePasscodeStrength } = strengthModule;
       const strength = evaluatePasscodeStrength(data.createPasscode);
       if (!strength.isValid) {
         toast.error(strength.reasons[0]);
