@@ -4,14 +4,7 @@ import {
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
-import {
-  useConvex,
-  useConvexAuth,
-  useMutation,
-  usePaginatedQuery,
-  useQuery,
-  useQuery_experimental,
-} from "convex/react";
+import { useConvex, useConvexAuth, useMutation, useQuery } from "convex/react";
 import {
   GoogleAuthProvider,
   reauthenticateWithPopup,
@@ -19,51 +12,30 @@ import {
 } from "firebase/auth";
 import {
   AlertTriangle,
-  Ban,
   Check,
   ChevronDown,
-  Clock,
-  Copy,
-  Download,
   Eye,
   EyeOff,
   FileEdit,
-  History,
   KeyRound,
-  Plus,
-  QrCode,
   RotateCcw,
-  Share2,
   ShieldCheck,
   UserMinus,
   X,
 } from "lucide-react";
-import { QRCodeCanvas } from "qrcode.react";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
 import { AccountSwitcher } from "@/components/AccountSwitcher";
+import { FamilyAuditLogsSection } from "@/components/family/FamilyAuditLogsSection";
+import { FamilyInviteSection } from "@/components/family/FamilyInviteSection";
+import { FamilySetupView } from "@/components/family/FamilySetupView";
+import { MemberActionDialogs } from "@/components/family/MemberActionDialogs";
+import { PasscodeRotateSection } from "@/components/family/PasscodeRotateSection";
 import { RecoveryKitDialog } from "@/components/family/RecoveryKitDialog";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { usePasscode } from "@/components/PasscodeProvider";
-import { PasscodeStrengthMeter } from "@/components/PasscodeStrengthMeter";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -77,17 +49,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { useAccount } from "@/hooks/useAccount";
 import { LOGOUT_FLAG_KEY } from "@/hooks/useConvexFirebaseAuth";
 import { useExportCsv } from "@/hooks/useExportCsv";
 import { clearQueryCache } from "@/hooks/usePersistentQuery";
-import {
-  isBiometricEnabledForUser,
-  updateBiometricPasscode,
-} from "@/lib/biometric";
 import {
   CURRENT_KDF_ITERATIONS,
   CURRENT_KDF_VERSION,
@@ -103,16 +70,7 @@ import {
 } from "@/lib/crypto";
 import { familyCreatedSteps } from "@/lib/onboarding/tours";
 import { logout } from "@/services/auth.functions";
-import {
-  AUDIT_ACTION_CONFIG,
-  DEFAULT_ACTION_CONFIG,
-  formatFieldName,
-} from "@/utils/audit-log-formatter";
 import { auth } from "@/utils/firebase";
-import {
-  evaluatePasscodeStrength,
-  MIN_PASSCODE_LENGTH,
-} from "@/utils/passcode-strength";
 
 export const Route = createFileRoute("/(app)/family")({
   validateSearch: (
@@ -233,7 +191,6 @@ function FamilyComponent() {
   const [isDeleteAccountModalOpen, setIsDeleteAccountModalOpen] =
     useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
-  const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
   const deleteAllAccountsConvex = useMutation(api.users.deleteAllAccounts);
 
   const handleDeleteAccount = async () => {
@@ -244,7 +201,6 @@ function FamilyComponent() {
       try {
         await deletePoohMaAccount(activeAccountId);
         setIsDeleteAccountModalOpen(false);
-        setDeleteConfirmationText("");
       } catch {
         toast.error("アカウントの削除に失敗しました");
       } finally {
@@ -333,137 +289,11 @@ function FamilyComponent() {
     }
   };
 
-  const createFamilyInviteMut = useMutation(api.families.createFamilyInvite);
-  const revokeFamilyInviteMut = useMutation(api.families.revokeFamilyInvite);
-
   const familyInvites = useQuery(
     api.families.getFamilyInvites,
     family ? { accountId: activeAccountId || undefined } : "skip",
   );
 
-  const [selectedTtl, setSelectedTtl] = useState(10080); // 7日 (分)
-  const [isCreatingInvite, setIsCreatingInvite] = useState(false);
-  const [selectedInviteCode, setSelectedInviteCode] = useState<string | null>(
-    null,
-  );
-
-  const activeInvites =
-    familyInvites?.filter((inv) => inv.status === "active") ?? [];
-  const currentActiveInvite =
-    activeInvites.find((inv) => inv.code === selectedInviteCode) ??
-    activeInvites[0] ??
-    null;
-
-  const downloadOrShareQrCode = async () => {
-    if (!currentActiveInvite) {
-      toast.error("有効な招待コードがありません");
-      return;
-    }
-    const canvas = document.getElementById(
-      "qr-canvas",
-    ) as HTMLCanvasElement | null;
-    if (!canvas) {
-      toast.error("QRコードが見つかりません");
-      return;
-    }
-    try {
-      canvas.toBlob(async (blob) => {
-        if (!blob) {
-          toast.error("画像の生成に失敗しました");
-          return;
-        }
-
-        const fileName = `poohma-invite-${family?.name || "family"}.png`;
-        const file = new File([blob], fileName, { type: "image/png" });
-
-        // Web Share API でファイル共有可能な場合は画像共有を試みる
-        if (navigator.share && navigator.canShare?.({ files: [file] })) {
-          try {
-            await navigator.share({
-              files: [file],
-              title: "PoohMa 家族招待",
-              text: `${family?.name || "家族グループ"}への招待QRコードです。`,
-            });
-            return;
-          } catch (err) {
-            if ((err as Error).name === "AbortError") return;
-            // 共有キャンセルのフォールバックとしてダウンロード
-          }
-        }
-
-        // 非対応またはPC環境の場合はダウンロード
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        toast.success("QRコード画像を保存しました");
-      }, "image/png");
-    } catch (_err) {
-      toast.error("画像の保存に失敗しました");
-    }
-  };
-
-  const shareInviteUrl = async () => {
-    if (!currentActiveInvite) {
-      toast.error("有効な招待コードがありません");
-      return;
-    }
-    const inviteUrl = `${window.location.origin}/family?inviteCode=${currentActiveInvite.code}`;
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: "PoohMa 家族招待",
-          text: `${family?.name}への招待コードです。以下のリンクから参加してください。`,
-          url: inviteUrl,
-        });
-      } catch (err) {
-        if ((err as Error).name !== "AbortError") {
-          toast.error("共有に失敗しました");
-        }
-      }
-    } else {
-      try {
-        await navigator.clipboard.writeText(inviteUrl);
-        toast.success("招待URLをクリップボードにコピーしました");
-      } catch (_err) {
-        toast.error("コピーに失敗しました");
-      }
-    }
-  };
-
-  const handleCreateInvite = async () => {
-    setIsCreatingInvite(true);
-    try {
-      const res = await createFamilyInviteMut({
-        accountId: activeAccountId || undefined,
-        ttlMinutes: selectedTtl,
-      });
-      setSelectedInviteCode(res.code);
-      toast.success("招待コードを発行しました");
-    } catch (_err) {
-      toast.error("招待コードの発行に失敗しました");
-    } finally {
-      setIsCreatingInvite(false);
-    }
-  };
-
-  const handleRevokeInvite = async (inviteId: Id<"familyInvites">) => {
-    try {
-      await revokeFamilyInviteMut({
-        accountId: activeAccountId || undefined,
-        inviteId,
-      });
-      toast.success("招待コードを無効化しました");
-    } catch (_err) {
-      toast.error("招待コードの無効化に失敗しました");
-    }
-  };
-
-  const createFamilyMut = useMutation(api.families.createFamily);
   const prepareFamilyMigrationMut = useMutation(
     api.families.prepareFamilyMigration,
   );
@@ -480,7 +310,6 @@ function FamilyComponent() {
   );
   const approveJoinRequestMut = useMutation(api.families.approveJoinRequest);
   const rejectJoinRequestMut = useMutation(api.families.rejectJoinRequest);
-  const rotatePasscodeMut = useMutation(api.families.rotatePasscode);
   const kickMemberMut = useMutation(api.families.kickMember);
   const updateMemberRoleMut = useMutation(api.families.updateMemberRole);
   const updateFamilyNameMut = useMutation(api.families.updateFamilyName);
@@ -591,43 +420,12 @@ function FamilyComponent() {
   const [isAbandoningVault, setIsAbandoningVault] = useState(false);
   const [showAbandonConfirm, setShowAbandonConfirm] = useState(false);
 
-  const [createName, setCreateName] = useState("");
-  const [createPasscode, setCreatePasscode] = useState("");
-  const [createPasscodeConfirm, setCreatePasscodeConfirm] = useState("");
-  const [joinCode, setJoinCode] = useState(search.inviteCode || "");
   const [joinPasscode, setJoinPasscode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [showCreatePasscode, setShowCreatePasscode] = useState(false);
-  const [showCreatePasscodeConfirm, setShowCreatePasscodeConfirm] =
-    useState(false);
   const [showJoinPasscode, setShowJoinPasscode] = useState(false);
-
-  const publicFamilyInfoQuery = useQuery_experimental({
-    query: api.families.getFamilyPublicInfo,
-    args: joinCode.trim()
-      ? {
-          accountId: activeAccountId || undefined,
-          code: joinCode.trim(),
-        }
-      : "skip",
-  });
-  const publicFamilyInfo =
-    publicFamilyInfoQuery.status === "success"
-      ? publicFamilyInfoQuery.data
-      : publicFamilyInfoQuery.status === "error"
-        ? null
-        : undefined;
-
-  const [isChangingPasscode, setIsChangingPasscode] = useState(false);
-  const [currentPasscode, setCurrentPasscode] = useState("");
-  const [newPasscode, setNewPasscode] = useState("");
-  const [newPasscodeConfirm, setNewPasscodeConfirm] = useState("");
   const [showRotatePasscodeForm, setShowRotatePasscodeForm] = useState(false);
-  const [showCurrentPasscode, setShowCurrentPasscode] = useState(false);
-  const [showNewPasscode, setShowNewPasscode] = useState(false);
-  const [showNewPasscodeConfirm, setShowNewPasscodeConfirm] = useState(false);
 
-  const { getMasterKey, requireUnlock, unlock } = usePasscode();
+  const { getMasterKey, requireUnlock } = usePasscode();
   const [isChangingFamily, setIsChangingFamily] = useState(
     !!search.inviteCode && family !== undefined && family !== null,
   );
@@ -710,7 +508,7 @@ function FamilyComponent() {
       try {
         await createJoinRequestMut({
           accountId: activeAccountId || undefined,
-          code,
+          code: code.trim(),
         });
         toast.success(
           "参加申請を送信しました。家族メンバーの承認をお待ちください。",
@@ -865,15 +663,31 @@ function FamilyComponent() {
   const handleChangeFamily = async (
     action: "create" | "join",
     e: React.SubmitEvent,
+    data: {
+      createName: string;
+      createPasscode: string;
+      createPasscodeConfirm: string;
+      joinCode: string;
+    },
   ) => {
     e.preventDefault();
     if (action === "create") {
-      const strength = evaluatePasscodeStrength(createPasscode);
+      const strengthModule = await import("@/utils/passcode-strength").catch(
+        () => null,
+      );
+      if (!strengthModule) {
+        toast.error(
+          "パスコード強度の評価を読み込めませんでした。再試行してください",
+        );
+        return;
+      }
+      const { evaluatePasscodeStrength } = strengthModule;
+      const strength = evaluatePasscodeStrength(data.createPasscode);
       if (!strength.isValid) {
         toast.error(strength.reasons[0]);
         return;
       }
-      if (createPasscode !== createPasscodeConfirm) {
+      if (data.createPasscode !== data.createPasscodeConfirm) {
         toast.error("パスコードが一致しません");
         return;
       }
@@ -895,7 +709,7 @@ function FamilyComponent() {
         // 2. 新しいマスターキーの準備
         const salt = generateSalt();
         const passcodeKey = await deriveKeyFromPasscode(
-          createPasscode,
+          data.createPasscode,
           salt,
           CURRENT_KDF_ITERATIONS,
           CURRENT_KDF_VERSION,
@@ -907,7 +721,7 @@ function FamilyComponent() {
         const { migrationId } = await prepareFamilyMigrationMut({
           accountId: activeAccountId || undefined,
           action: "create",
-          name: createName,
+          name: data.createName,
           masterKeyEncrypted: wrapped.encrypted,
           masterKeyIv: wrapped.iv,
           masterKeySalt: salt,
@@ -969,155 +783,8 @@ function FamilyComponent() {
       }
     } else {
       // 「参加」の場合は、承認制のためリクエスト送信に切り替え
-      await handleSendJoinRequest(joinCode);
+      await handleSendJoinRequest(data.joinCode.trim());
     }
-  };
-
-  const handleCreate = async (e: React.SubmitEvent) => {
-    e.preventDefault();
-    const strength = evaluatePasscodeStrength(createPasscode);
-    if (!strength.isValid) {
-      toast.error(strength.reasons[0]);
-      return;
-    }
-    if (createPasscode !== createPasscodeConfirm) {
-      toast.error("パスコードが一致しません");
-      return;
-    }
-    setIsLoading(true);
-    try {
-      // E2EE: マスターキーの生成とラップ
-      const salt = generateSalt();
-      const passcodeKey = await deriveKeyFromPasscode(
-        createPasscode,
-        salt,
-        CURRENT_KDF_ITERATIONS,
-        CURRENT_KDF_VERSION,
-      );
-      const masterKey = await generateMasterKey();
-      const wrapped = await wrapMasterKey(masterKey, passcodeKey);
-
-      await createFamilyMut({
-        accountId: activeAccountId || undefined,
-        name: createName,
-        masterKeyEncrypted: wrapped.encrypted,
-        masterKeyIv: wrapped.iv,
-        masterKeySalt: salt,
-        kdfIterations: CURRENT_KDF_ITERATIONS,
-        cryptoVersion: CURRENT_KDF_VERSION,
-      });
-      await queryClient.invalidateQueries({ queryKey: ["authUser"] });
-      toast.success("家族グループを作成しました。");
-      await router.invalidate();
-      setShowFamilyCreatedTour(true);
-    } catch {
-      toast.error("作成に失敗しました");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleChangePasscode = async (e: React.SubmitEvent) => {
-    e.preventDefault();
-    const strength = evaluatePasscodeStrength(newPasscode);
-    if (!strength.isValid) {
-      toast.error(strength.reasons[0]);
-      return;
-    }
-    if (newPasscode !== newPasscodeConfirm) {
-      toast.error("新しいパスコードが一致しません");
-      return;
-    }
-    if (newPasscode === currentPasscode) {
-      toast.error("現在のパスコードと異なるものを設定してください");
-      return;
-    }
-    if (
-      !family?.masterKeyEncrypted ||
-      !family.masterKeyIv ||
-      !family.masterKeySalt
-    ) {
-      toast.error("家族の暗号化情報が初期化されていません");
-      return;
-    }
-
-    setIsChangingPasscode(true);
-    try {
-      const unlocked = await unlock(currentPasscode);
-      if (!unlocked) {
-        return;
-      }
-      const masterKey = getMasterKey();
-      if (!masterKey) {
-        toast.error("暗号データの読み込みに失敗しました");
-        return;
-      }
-
-      const previousMasterKeyEncrypted = family.masterKeyEncrypted;
-      const newSalt = generateSalt();
-      const newWrappingKey = await deriveKeyFromPasscode(
-        newPasscode,
-        newSalt,
-        CURRENT_KDF_ITERATIONS,
-        CURRENT_KDF_VERSION,
-      );
-      const wrapped = await wrapMasterKey(masterKey, newWrappingKey);
-
-      try {
-        await unwrapMasterKey(wrapped.encrypted, wrapped.iv, newWrappingKey);
-      } catch (_error) {
-        toast.error("鍵の再暗号化に失敗しました。もう一度お試しください");
-        return;
-      }
-
-      await rotatePasscodeMut({
-        accountId: activeAccountId || undefined,
-        previousMasterKeyEncrypted,
-        masterKeyEncrypted: wrapped.encrypted,
-        masterKeyIv: wrapped.iv,
-        masterKeySalt: newSalt,
-        kdfIterations: CURRENT_KDF_ITERATIONS,
-        cryptoVersion: CURRENT_KDF_VERSION,
-      });
-
-      const targetId = activeAccount?.id || (auth?.currentUser?.uid ?? "");
-      if (targetId) {
-        const hasBiometric = await isBiometricEnabledForUser(targetId);
-        if (hasBiometric) {
-          try {
-            await updateBiometricPasscode(targetId, newPasscode);
-          } catch (_error) {
-            toast.error(
-              "生体認証のロック解除情報の更新に失敗しました。設定画面から再設定してください。",
-            );
-          }
-        }
-      }
-
-      await queryClient.invalidateQueries({ queryKey: ["authUser"] });
-      await router.invalidate();
-      toast.success("家族パスコードを変更しました");
-      setCurrentPasscode("");
-      setNewPasscode("");
-      setNewPasscodeConfirm("");
-      setShowRotatePasscodeForm(false);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (message.includes("CONFLICT")) {
-        toast.error(
-          "他のご家族の操作と重なりました。画面を再読み込みしてやり直してください",
-        );
-      } else {
-        toast.error("パスコードの変更に失敗しました");
-      }
-    } finally {
-      setIsChangingPasscode(false);
-    }
-  };
-
-  const handleJoin = async (e: React.SubmitEvent) => {
-    e.preventDefault();
-    await handleSendJoinRequest(joinCode);
   };
 
   // family がまだロード中の場合はペンディングコンポーネントを表示
@@ -1676,225 +1343,11 @@ function FamilyComponent() {
               </div>
             )}
           </div>
-          <div className="mb-8">
-            <div className="mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <h3 className="text-[14px] font-medium text-foreground">
-                招待コード管理
-              </h3>
-              {/* 招待コード新規発行 */}
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <select
-                  value={selectedTtl}
-                  onChange={(e) => setSelectedTtl(Number(e.target.value))}
-                  disabled={isCreatingInvite}
-                  className="rounded-md bg-card px-2.5 py-1.5 text-[13px] font-medium text-foreground shadow-border border border-border focus:outline-none focus:ring-2 focus:ring-orange-500/50 cursor-pointer flex-1 sm:flex-initial"
-                >
-                  <option value={60}>有効期限: 1時間</option>
-                  <option value={1440}>有効期限: 1日</option>
-                  <option value={10080}>有効期限: 7日（推奨）</option>
-                  <option value={43200}>有効期限: 30日</option>
-                </select>
-                <button
-                  type="button"
-                  onClick={handleCreateInvite}
-                  disabled={isCreatingInvite}
-                  className="flex items-center gap-1.5 rounded-md bg-orange-500 px-3 py-1.5 text-[13px] font-medium text-white shadow-border hover:bg-orange-600 transition cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0"
-                >
-                  {isCreatingInvite ? (
-                    <Spinner className="h-3.5 w-3.5" />
-                  ) : (
-                    <Plus className="h-3.5 w-3.5" />
-                  )}
-                  コードを発行
-                </button>
-              </div>
-            </div>
-
-            {currentActiveInvite ? (
-              <div className="flex flex-col md:flex-row items-center gap-6 rounded-md bg-muted/50 p-6 shadow-border-light">
-                <div className="bg-white p-2 rounded-md shadow-sm shrink-0">
-                  <QRCodeCanvas
-                    id="qr-canvas"
-                    value={`${typeof window !== "undefined" ? window.location.origin : ""}/family?inviteCode=${currentActiveInvite.code}`}
-                    size={120}
-                  />
-                </div>
-                <div className="flex-1 w-full space-y-3 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20">
-                        <Check className="h-3 w-3" />
-                        有効な招待
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        有効期限:{" "}
-                        {new Date(currentActiveInvite.expiresAt).toLocaleString(
-                          "ja-JP",
-                        )}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleRevokeInvite(currentActiveInvite._id)
-                      }
-                      className="text-xs text-red-500 hover:text-red-600 hover:underline flex items-center gap-1 cursor-pointer"
-                    >
-                      <Ban className="h-3 w-3" />
-                      無効化
-                    </button>
-                  </div>
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                    <code className="flex-1 font-mono text-[13px] md:text-[14px] font-semibold text-foreground bg-card p-2.5 rounded-md shadow-sm border border-border break-all">
-                      {currentActiveInvite.code}
-                    </code>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(currentActiveInvite.code);
-                        toast.success("招待コードをコピーしました");
-                      }}
-                      className="rounded-md bg-card px-4 py-2.5 text-[14px] font-medium text-foreground shadow-border hover:bg-accent transition whitespace-nowrap cursor-pointer flex items-center justify-center gap-1.5"
-                    >
-                      <Copy className="h-4 w-4" />
-                      コピー
-                    </button>
-                  </div>
-                  <Separator className="my-2" />
-                  <div className="flex flex-col sm:flex-row gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={downloadOrShareQrCode}
-                      className="rounded-md bg-card px-3 py-2 text-[13px] font-medium text-foreground shadow-border hover:bg-accent transition flex items-center justify-center gap-1.5 cursor-pointer flex-1 sm:flex-initial"
-                    >
-                      <QrCode className="h-4 w-4" />
-                      QRコード画像を保存
-                    </button>
-                    <button
-                      type="button"
-                      onClick={shareInviteUrl}
-                      className="rounded-md bg-card px-3 py-2 text-[13px] font-medium text-foreground shadow-border hover:bg-accent transition flex items-center justify-center gap-1.5 cursor-pointer flex-1 sm:flex-initial"
-                    >
-                      <Share2 className="h-4 w-4" />
-                      {typeof navigator !== "undefined" && "share" in navigator
-                        ? "招待URLを共有"
-                        : "招待URLをコピー"}
-                    </button>
-                  </div>
-                  <Separator className="my-2" />
-                  <p className="text-[13px] text-muted-foreground">
-                    このコードまたはQRコードを家族に共有して参加してもらいます。
-                    <br />
-                    参加には家族メンバーの承認が必要です。
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-md border border-dashed border-border bg-muted/20 p-6 text-center">
-                <Clock className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                <p className="text-[14px] font-medium text-foreground">
-                  現在有効な招待コードがありません
-                </p>
-                <p className="text-[12px] text-muted-foreground mt-1 mb-4">
-                  家族メンバーを招待するには、上の「コードを発行」ボタンから有効期限を指定して招待コードを発行してください。
-                </p>
-              </div>
-            )}
-
-            {/* 発行履歴一覧（存在する場合） */}
-            {familyInvites && familyInvites.length > 0 && (
-              <div className="mt-4">
-                <details className="group rounded-md border border-border bg-card p-3 text-xs">
-                  <summary className="font-medium text-foreground cursor-pointer select-none flex items-center justify-between">
-                    <span>
-                      発行済み招待コード履歴 ({familyInvites.length}件)
-                    </span>
-                    <span className="text-muted-foreground group-open:rotate-180 transition-transform">
-                      ▼
-                    </span>
-                  </summary>
-                  <div className="mt-3 divide-y divide-border overflow-x-auto">
-                    {familyInvites.map((inv) => {
-                      const isSelected = currentActiveInvite?._id === inv._id;
-                      return (
-                        <div
-                          key={inv._id}
-                          className={`py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${isSelected ? "bg-accent/40 -mx-3 px-3 rounded" : ""}`}
-                        >
-                          <div className="flex flex-wrap items-center gap-2 min-w-0">
-                            <span
-                              className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${
-                                inv.status === "active"
-                                  ? "bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20"
-                                  : inv.status === "expired"
-                                    ? "bg-muted text-muted-foreground border border-border"
-                                    : "bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20"
-                              }`}
-                            >
-                              {inv.status === "active"
-                                ? "有効"
-                                : inv.status === "expired"
-                                  ? "期限切れ"
-                                  : "無効化済"}
-                            </span>
-                            <code className="font-mono font-medium text-foreground text-[11px] truncate max-w-[180px] sm:max-w-none">
-                              {inv.code}
-                            </code>
-                            <span className="text-muted-foreground text-[11px]">
-                              (申請: {inv.useCount}回)
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-                            <span className="text-muted-foreground text-[11px]">
-                              {inv.status === "revoked"
-                                ? `無効化日時: ${
-                                    // biome-ignore lint/style/noNonNullAssertion: revokedAt is set when status is revoked
-                                    new Date(inv.revokedAt!).toLocaleString(
-                                      "ja-JP",
-                                    )
-                                  }`
-                                : `期限: ${new Date(inv.expiresAt).toLocaleString("ja-JP")}`}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                navigator.clipboard.writeText(inv.code);
-                                toast.success("招待コードをコピーしました");
-                              }}
-                              className="p-1 text-muted-foreground hover:text-foreground rounded hover:bg-muted transition cursor-pointer"
-                              title="コードをコピー"
-                            >
-                              <Copy className="h-3.5 w-3.5" />
-                            </button>
-                            {inv.status === "active" && (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setSelectedInviteCode(inv.code)
-                                  }
-                                  className="px-1.5 py-0.5 text-[11px] text-foreground bg-muted hover:bg-accent rounded border border-border transition cursor-pointer"
-                                >
-                                  QR表示
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRevokeInvite(inv._id)}
-                                  className="px-1.5 py-0.5 text-[11px] text-red-500 hover:bg-red-500/10 rounded transition cursor-pointer"
-                                >
-                                  無効化
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </details>
-              </div>
-            )}
-          </div>
+          <FamilyInviteSection
+            familyName={family.name}
+            familyInvites={familyInvites}
+            activeAccountId={activeAccountId}
+          />
 
           <div>
             <h3 className="mb-4 text-[14px] font-medium text-foreground">
@@ -2102,195 +1555,13 @@ function FamilyComponent() {
           )}
 
           {/* 家族パスコードの変更 */}
-          <div
-            id="rotate-passcode-section"
-            className="mt-8 border-t border-border pt-6"
-          >
-            <div className="mb-4 space-y-1">
-              <div className="flex items-center justify-between gap-3 mb-2">
-                <h3 className="text-[14px] font-medium text-foreground">
-                  家族パスコードの変更
-                </h3>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setShowRotatePasscodeForm(!showRotatePasscodeForm)
-                  }
-                  className="rounded-md bg-card px-3 py-1.5 text-[13px] font-medium text-foreground shadow-border hover:bg-accent transition shrink-0 cursor-pointer"
-                >
-                  {showRotatePasscodeForm ? "閉じる" : "パスコード変更"}
-                </button>
-              </div>
-              <p className="text-[12px] text-muted-foreground leading-relaxed">
-                家族グループやメンバー構成は変更せず、パスコードのみを変更します。
-              </p>
-            </div>
-
-            {showRotatePasscodeForm && (
-              <div className="rounded-md bg-muted/30 p-4 border border-border/50 space-y-4 mt-3">
-                <p className="text-[12px] text-muted-foreground leading-relaxed">
-                  パスコード変更後、
-                  <strong>
-                    他の家族メンバーおよび別端末では次回新パスコードでのロック解除が必要
-                  </strong>
-                  となり、生体認証をご利用の場合は再登録が必要になります。
-                </p>
-                <form onSubmit={handleChangePasscode} className="space-y-3">
-                  <div>
-                    <label
-                      htmlFor="rotate-current-passcode"
-                      className="block text-[13px] font-medium text-foreground mb-1"
-                    >
-                      現在のパスコード <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showCurrentPasscode ? "text" : "password"}
-                        id="rotate-current-passcode"
-                        required
-                        autoCapitalize="off"
-                        autoCorrect="off"
-                        spellCheck={false}
-                        value={currentPasscode}
-                        onChange={(e) => setCurrentPasscode(e.target.value)}
-                        disabled={isChangingPasscode}
-                        placeholder="現在のパスコード"
-                        className="w-full rounded-md bg-card p-2.5 text-base md:text-[14px] pr-10 shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-                      />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setShowCurrentPasscode(!showCurrentPasscode)
-                        }
-                        className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
-                      >
-                        {showCurrentPasscode ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="rotate-new-passcode"
-                      className="block text-[13px] font-medium text-foreground mb-1"
-                    >
-                      新しいパスコード（{MIN_PASSCODE_LENGTH}文字以上）{" "}
-                      <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showNewPasscode ? "text" : "password"}
-                        id="rotate-new-passcode"
-                        required
-                        minLength={MIN_PASSCODE_LENGTH}
-                        autoCapitalize="off"
-                        autoCorrect="off"
-                        spellCheck={false}
-                        value={newPasscode}
-                        onChange={(e) => setNewPasscode(e.target.value)}
-                        disabled={isChangingPasscode}
-                        placeholder={`新しいパスコード（${MIN_PASSCODE_LENGTH}文字以上）`}
-                        className="w-full rounded-md bg-card p-2.5 text-base md:text-[14px] pr-10 shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowNewPasscode(!showNewPasscode)}
-                        className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
-                      >
-                        {showNewPasscode ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                    {newPasscode && (
-                      <div className="mt-2">
-                        <PasscodeStrengthMeter passcode={newPasscode} />
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="rotate-new-passcode-confirm"
-                      className="block text-[13px] font-medium text-foreground mb-1"
-                    >
-                      新しいパスコード（確認）{" "}
-                      <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showNewPasscodeConfirm ? "text" : "password"}
-                        id="rotate-new-passcode-confirm"
-                        required
-                        minLength={MIN_PASSCODE_LENGTH}
-                        autoCapitalize="off"
-                        autoCorrect="off"
-                        spellCheck={false}
-                        value={newPasscodeConfirm}
-                        onChange={(e) => setNewPasscodeConfirm(e.target.value)}
-                        disabled={isChangingPasscode}
-                        placeholder="新しいパスコード（確認）"
-                        className="w-full rounded-md bg-card p-2.5 text-base md:text-[14px] pr-10 shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-                      />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setShowNewPasscodeConfirm(!showNewPasscodeConfirm)
-                        }
-                        className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
-                      >
-                        {showNewPasscodeConfirm ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 flex flex-col-reverse sm:flex-row justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowRotatePasscodeForm(false);
-                        setCurrentPasscode("");
-                        setNewPasscode("");
-                        setNewPasscodeConfirm("");
-                      }}
-                      className="w-full sm:w-auto rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium shadow-sm transition hover:bg-accent text-foreground cursor-pointer text-center"
-                    >
-                      キャンセル
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={
-                        isChangingPasscode ||
-                        !currentPasscode ||
-                        !newPasscode ||
-                        !newPasscodeConfirm
-                      }
-                      className="w-full sm:w-auto flex items-center justify-center rounded-md bg-foreground px-6 py-2 text-[13px] font-medium text-background shadow-lg transition hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                    >
-                      {isChangingPasscode ? (
-                        <>
-                          <Spinner className="mr-2 h-4 w-4" />
-                          変更中...
-                        </>
-                      ) : (
-                        "パスコードを変更する"
-                      )}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-          </div>
+          <PasscodeRotateSection
+            family={family}
+            activeAccountId={activeAccountId}
+            activeAccount={activeAccount}
+            isOpen={showRotatePasscodeForm}
+            onToggle={() => setShowRotatePasscodeForm((prev) => !prev)}
+          />
 
           {/* リカバリーキット（復旧コード） */}
           <div className="mt-8 border-t border-border pt-6">
@@ -2379,7 +1650,7 @@ function FamilyComponent() {
           )}
 
           {/* 家族のアクティビティログ */}
-          <FamilyAuditLogSection activeAccountId={activeAccount?._id} />
+          <FamilyAuditLogsSection activeAccountId={activeAccount?._id} />
 
           <div className="mt-8 border-t border-border pt-6 text-center">
             <button
@@ -2395,580 +1666,49 @@ function FamilyComponent() {
           </div>
         </div>
       ) : (
-        <div className="space-y-6">
-          {!family ? (
-            <>
-              {vaultUnlockedKey && (
-                <div className="rounded-lg bg-green-500/10 p-4 border border-green-500/30 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5">
-                    <Check className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" />
-                    <p className="text-[13px] text-green-700 dark:text-green-300">
-                      旧家族「
-                      <strong>{pendingExportVault?.oldFamilyName}</strong>
-                      」のデータ引き継ぎ準備が完了しました。新しい家族を作成するか、招待から参加すると個人データが再暗号化されて引き継がれます。
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setVaultUnlockedKey(null);
-                      setVaultPasscode("");
-                    }}
-                    className="text-[12px] text-muted-foreground hover:text-foreground underline shrink-0 cursor-pointer"
-                  >
-                    やり直す
-                  </button>
-                </div>
-              )}
-              {search.inviteCode && (
-                <div className="rounded-lg bg-orange-500/10 p-4 border border-orange-500/30 flex flex-col gap-1.5">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-orange-600 dark:text-orange-400">
-                    招待リンクからのアクセス
-                  </span>
-                  <p className="text-sm font-medium text-foreground">
-                    招待コード「
-                    <code className="font-mono bg-background/80 px-1.5 py-0.5 rounded border">
-                      {search.inviteCode}
-                    </code>
-                    」が自動入力されています。
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    「
-                    <strong>
-                      {activeAccount?.displayName ||
-                        activeAccount?.name ||
-                        "アカウント"}
-                    </strong>
-                    」で参加申請します。別のアカウントで参加したい場合は、ヘッダーのアカウント切り替えメニューをご利用ください。
-                  </p>
-                </div>
-              )}
-              <div className="rounded-lg bg-orange-500/10 p-4 border border-orange-500/20">
-                <h2 className="text-[16px] font-semibold text-orange-700 dark:text-orange-400 mb-2">
-                  はじめに：家族グループの作成・参加
-                </h2>
-                <p className="text-[14px] text-orange-700/80 dark:text-orange-400/80 leading-relaxed">
-                  PoohMaは家族間でのアカウント情報の共有を前提としています。
-                  <br />
-                  ダッシュボードやその他の機能を利用するには、まず家族グループを作成するか、既存の家族グループに参加してください。
-                </p>
-              </div>
-            </>
-          ) : (
-            <div className="rounded-lg bg-red-500/10 p-4 border border-red-500/20 mb-6">
-              <div className="flex justify-between items-start mb-2">
-                <h2 className="text-[16px] font-semibold text-red-700 dark:text-red-400">
-                  家族グループの変更
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setIsChangingFamily(false)}
-                  className="text-[14px] px-3 py-1 bg-background rounded-md border shadow-sm text-foreground hover:bg-accent transition"
-                >
-                  キャンセル
-                </button>
-              </div>
-              <p className="text-[14px] text-red-700/80 dark:text-red-400/80 leading-relaxed">
-                新しい家族を作成するか、別の家族の招待コードを入力して参加申請を送信してください。
-                <br />
-                <strong>注意:</strong>{" "}
-                あなたが所有するパスワードヒントは、自動的に新しいグループ用に再暗号化されます。現在のパスコードの入力が求められる場合があります。
-              </p>
-            </div>
-          )}
-
-          {/* 操作対象アカウントの明示 */}
-          <div className="rounded-lg border border-border bg-card p-3 sm:p-4 flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 text-xs">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-muted-foreground shrink-0">
-                操作対象アカウント:
-              </span>
-              <span className="font-semibold text-foreground truncate max-w-[140px] sm:max-w-none">
-                {activeAccount?.displayName ||
-                  activeAccount?.name ||
-                  "アカウント"}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 ml-auto shrink-0">
-              <AccountSwitcher />
-            </div>
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-2">
-            {/* 家族を作成 */}
-            <div className="rounded-lg bg-card p-6 shadow-card transition-shadow">
-              <h2 className="mb-6 text-[18px] font-semibold tracking-geist-ui text-foreground">
-                家族グループを作成
-              </h2>
-              <form
-                onSubmit={
-                  isChangingFamily
-                    ? (e) => handleChangeFamily("create", e)
-                    : handleCreate
-                }
-                className="space-y-5"
-              >
-                <div>
-                  <label
-                    htmlFor="family-name-input"
-                    className="mb-1.5 block text-[14px] font-medium text-foreground"
-                  >
-                    グループ名
-                  </label>
-                  <input
-                    type="text"
-                    id="family-name-input"
-                    required
-                    value={createName}
-                    onChange={(e) => setCreateName(e.target.value)}
-                    placeholder="例: 田中家"
-                    className="w-full rounded-md bg-card p-2.5 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-                  />
-                </div>
-                <div>
-                  <label
-                    htmlFor="family-passcode-input"
-                    className="mb-1.5 block text-[14px] font-medium text-foreground"
-                  >
-                    パスコード <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showCreatePasscode ? "text" : "password"}
-                      id="family-passcode-input"
-                      required
-                      minLength={MIN_PASSCODE_LENGTH}
-                      autoCapitalize="off"
-                      autoCorrect="off"
-                      spellCheck={false}
-                      value={createPasscode}
-                      onChange={(e) => setCreatePasscode(e.target.value)}
-                      placeholder={`${MIN_PASSCODE_LENGTH}文字以上`}
-                      className="w-full rounded-md bg-card p-2.5 text-base md:text-[14px] pr-10 shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowCreatePasscode(!showCreatePasscode)}
-                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
-                    >
-                      {showCreatePasscode ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </button>
-                  </div>
-                  {createPasscode.length > 0 && (
-                    <PasscodeStrengthMeter passcode={createPasscode} />
-                  )}
-                  <p className="mt-1.5 text-[12px] text-muted-foreground">
-                    暗号化に使用します。忘れるとヒントを復旧できません。
-                  </p>
-                </div>
-                <div>
-                  <label
-                    htmlFor="family-passcode-confirm-input"
-                    className="mb-1.5 block text-[14px] font-medium text-foreground"
-                  >
-                    パスコード（確認）
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showCreatePasscodeConfirm ? "text" : "password"}
-                      id="family-passcode-confirm-input"
-                      required
-                      minLength={8}
-                      autoCapitalize="off"
-                      autoCorrect="off"
-                      spellCheck={false}
-                      value={createPasscodeConfirm}
-                      onChange={(e) => setCreatePasscodeConfirm(e.target.value)}
-                      placeholder="もう一度入力"
-                      className="w-full rounded-md bg-card p-2.5 text-base md:text-[14px] pr-10 shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-                    />
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setShowCreatePasscodeConfirm(!showCreatePasscodeConfirm)
-                      }
-                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
-                    >
-                      {showCreatePasscodeConfirm ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="flex items-center justify-center w-full rounded-md bg-orange-500 px-4 py-2.5 text-[14px] font-medium text-white shadow-border transition hover:bg-orange-600 disabled:opacity-50"
-                >
-                  {isLoading ? (
-                    <>
-                      <Spinner className="mr-2 h-4 w-4" />
-                      作成中...
-                    </>
-                  ) : (
-                    "作成する"
-                  )}
-                </button>
-              </form>
-            </div>
-
-            {/* 家族に参加（申請送信） */}
-            <div className="rounded-lg bg-card p-6 shadow-card transition-shadow">
-              <h2 className="mb-6 text-[18px] font-semibold tracking-geist-ui text-foreground">
-                既存の家族に参加
-              </h2>
-              <form
-                onSubmit={
-                  isChangingFamily
-                    ? (e) => handleChangeFamily("join", e)
-                    : handleJoin
-                }
-                className="space-y-5"
-              >
-                <div>
-                  <label
-                    htmlFor="family-join-input"
-                    className="mb-1.5 block text-[14px] font-medium text-foreground"
-                  >
-                    招待コード
-                  </label>
-                  <input
-                    id="family-join-input"
-                    type="text"
-                    required
-                    value={joinCode}
-                    onChange={(e) => setJoinCode(e.target.value)}
-                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                    className="w-full font-mono rounded-md bg-card p-2.5 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-                  />
-                  {joinCode.trim().length > 0 && (
-                    <div className="mt-2 rounded-md bg-muted/40 p-2.5 border border-border text-xs">
-                      {publicFamilyInfo === undefined ? (
-                        <div className="flex items-center gap-1.5 text-muted-foreground">
-                          <Spinner className="h-3 w-3" />
-                          <span>招待コードを確認中...</span>
-                        </div>
-                      ) : publicFamilyInfo ? (
-                        <div className="flex flex-col gap-0.5">
-                          <div className="flex items-center gap-1.5 font-medium text-green-600 dark:text-green-400">
-                            <Check className="h-3.5 w-3.5" />
-                            <span>
-                              参加先: <strong>{publicFamilyInfo.name}</strong>
-                            </span>
-                          </div>
-                          <div className="text-muted-foreground text-[11px]">
-                            有効期限:{" "}
-                            {new Date(
-                              publicFamilyInfo.expiresAt,
-                            ).toLocaleString("ja-JP")}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 text-red-500">
-                          <Ban className="h-3.5 w-3.5" />
-                          <span>無効または期限切れの招待コードです</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <p className="text-[12px] text-muted-foreground leading-relaxed">
-                  招待コードを入力して参加申請を送信します。家族メンバーの承認後に参加が完了します。
-                </p>
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="flex items-center justify-center w-full rounded-md bg-foreground px-4 py-2.5 text-[14px] font-medium text-background shadow-border transition hover:bg-foreground/90 disabled:opacity-50"
-                >
-                  {isLoading ? (
-                    <>
-                      <Spinner className="mr-2 h-4 w-4" />
-                      送信中...
-                    </>
-                  ) : (
-                    "参加申請を送信"
-                  )}
-                </button>
-              </form>
-            </div>
-
-            {/* 未参加ユーザー向け退会導線 */}
-            {!family && (
-              <div className="mt-8 border-t border-border pt-6 text-center md:col-span-2">
-                <button
-                  type="button"
-                  onClick={() => setIsDeleteAccountModalOpen(true)}
-                  className="text-[13px] font-medium text-red-500 hover:text-red-600 transition underline underline-offset-4 cursor-pointer"
-                >
-                  {isMultiAccount
-                    ? "このアカウントの削除はこちら"
-                    : "アカウントの削除・退会はこちら"}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
+        <FamilySetupView
+          family={family}
+          isChangingFamily={isChangingFamily}
+          onCancelChangeFamily={() => setIsChangingFamily(false)}
+          activeAccountId={activeAccountId}
+          activeAccount={activeAccount}
+          searchInviteCode={search.inviteCode}
+          pendingExportVault={pendingExportVault}
+          vaultUnlockedKey={vaultUnlockedKey}
+          setVaultUnlockedKey={setVaultUnlockedKey}
+          setVaultPasscode={setVaultPasscode}
+          onAccountDeleteClick={() => setIsDeleteAccountModalOpen(true)}
+          isMultiAccount={isMultiAccount}
+          onFamilyCreated={() => setShowFamilyCreatedTour(true)}
+          onChangeFamily={handleChangeFamily}
+        />
       )}
 
-      {/* 家族未参加ユーザー向け退会確認ダイアログ */}
-      <AlertDialog
-        open={isDeleteAccountModalOpen}
-        onOpenChange={(open) => {
-          if (!open && !isDeletingAccount) {
-            setIsDeleteAccountModalOpen(false);
-            setDeleteConfirmationText("");
-          }
+      {/* アカウント削除・キック等ダイアログ */}
+      <MemberActionDialogs
+        isDeleteAccountModalOpen={isDeleteAccountModalOpen}
+        setIsDeleteAccountModalOpen={setIsDeleteAccountModalOpen}
+        isMultiAccount={isMultiAccount}
+        activeAccountDisplayName={activeAccount?.displayName}
+        isDeletingAccount={isDeletingAccount}
+        isExporting={isExporting}
+        handleExport={handleExport}
+        handleDeleteAccount={handleDeleteAccount}
+        memberToKick={memberToKick}
+        setMemberToKick={setMemberToKick}
+        isKicking={isKicking}
+        handleKickMember={handleKickMember}
+        kickSuccessNotice={kickSuccessNotice}
+        setKickSuccessNotice={setKickSuccessNotice}
+        onOpenRotatePasscode={() => {
+          setShowRotatePasscodeForm(true);
+          setTimeout(() => {
+            document
+              .getElementById("rotate-passcode-section")
+              ?.scrollIntoView({ behavior: "smooth" });
+          }, 100);
         }}
-      >
-        <AlertDialogContent className="max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-red-600 dark:text-red-400">
-              {isMultiAccount
-                ? `アカウント「${activeAccount?.displayName || "未設定"}」を削除しますか？`
-                : "本当に退会しますか？"}
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-4 pt-2 text-foreground">
-                <div className="rounded-md bg-muted p-3 text-[14px]">
-                  <p className="font-semibold mb-2">
-                    {isMultiAccount ? "削除時の注意事項" : "退会時の注意事項"}
-                  </p>
-                  <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                    {isMultiAccount ? (
-                      <>
-                        <li>
-                          このPoohMaアカウントおよび関連データが削除されます。
-                        </li>
-                        <li>
-                          他のPoohMaアカウントやログイン情報はそのまま保持されます。
-                        </li>
-                      </>
-                    ) : (
-                      <li>
-                        あなたが登録したアカウント情報はすべて削除され、PoohMa全体から退会となります。
-                      </li>
-                    )}
-                    <li>
-                      削除操作は取り消せません。事前にCSVファイルでの保存をおすすめします。
-                    </li>
-                  </ul>
-                </div>
-
-                <div className="flex justify-center py-2">
-                  <button
-                    type="button"
-                    onClick={handleExport}
-                    disabled={isExporting}
-                    className="flex items-center justify-center w-full rounded-md border border-border bg-background px-4 py-2.5 text-[14px] font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-                  >
-                    {isExporting ? (
-                      <>
-                        <Spinner className="mr-2 h-4 w-4" />
-                        ダウンロード中...
-                      </>
-                    ) : (
-                      <>
-                        <Download className="mr-2 h-4 w-4" />
-                        CSVファイルをダウンロードする
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                <div className="space-y-2">
-                  <label
-                    htmlFor="family-confirm-delete"
-                    className="text-[14px] font-medium text-foreground"
-                  >
-                    確認のため、「
-                    <span className="font-bold text-red-500">
-                      {isMultiAccount ? "削除する" : "退会する"}
-                    </span>
-                    」と入力してください
-                  </label>
-                  <input
-                    id="family-confirm-delete"
-                    type="text"
-                    value={deleteConfirmationText}
-                    onChange={(e) => setDeleteConfirmationText(e.target.value)}
-                    placeholder={isMultiAccount ? "削除する" : "退会する"}
-                    className="w-full rounded-md bg-card p-2.5 text-base md:text-[14px] border border-border shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500/50"
-                  />
-                </div>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="mt-6">
-            <AlertDialogCancel
-              disabled={isDeletingAccount}
-              onClick={() => {
-                if (isDeletingAccount) return;
-                setIsDeleteAccountModalOpen(false);
-                setDeleteConfirmationText("");
-              }}
-              className="mt-2 sm:mt-0"
-            >
-              キャンセル
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault();
-                const expected = isMultiAccount ? "削除する" : "退会する";
-                if (deleteConfirmationText === expected) {
-                  handleDeleteAccount();
-                }
-              }}
-              disabled={
-                deleteConfirmationText !==
-                  (isMultiAccount ? "削除する" : "退会する") ||
-                isDeletingAccount ||
-                isExporting
-              }
-              className="bg-red-500 hover:bg-red-600 focus:ring-red-500 text-white disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
-            >
-              {isDeletingAccount ? (
-                <>
-                  <Spinner className="mr-2 h-4 w-4" />
-                  {isMultiAccount ? "削除中..." : "退会処理中..."}
-                </>
-              ) : isMultiAccount ? (
-                "理解した上で削除する"
-              ) : (
-                "理解した上で退会する"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* メンバーキック確認ダイアログ */}
-      <Dialog
-        open={memberToKick !== null}
-        onOpenChange={(open) => {
-          if (!open && !isKicking) setMemberToKick(null);
-        }}
-      >
-        <DialogContent
-          className="bg-card shadow-card sm:max-w-md"
-          showCloseButton={false}
-        >
-          {memberToKick && (
-            <>
-              <div className="flex items-center gap-3 text-red-500">
-                <AlertTriangle className="h-6 w-6 shrink-0" />
-                <DialogTitle className="text-[18px] text-foreground">
-                  メンバーを家族グループから削除
-                </DialogTitle>
-              </div>
-              <DialogDescription asChild>
-                <div className="space-y-3 text-[13px] text-muted-foreground leading-relaxed">
-                  <p>
-                    「
-                    <strong className="text-foreground">
-                      {memberToKick.displayName}
-                    </strong>
-                    」（{memberToKick.email}）を家族グループから削除しますか？
-                  </p>
-                  <ul className="list-disc pl-5 space-y-1">
-                    <li>
-                      対象者が「自分のみ」として登録したデータは、本人が旧パスコードを用いて持ち出すことができます。
-                    </li>
-                    <li>
-                      対象者が家族と「共有」していたデータは、家族グループ側に残ります。
-                    </li>
-                    <li className="text-orange-600 dark:text-orange-400 font-medium">
-                      削除されたメンバーはこれまでのパスコードを記憶しているため、削除後はパスコードの変更を強く推奨します。
-                    </li>
-                  </ul>
-                </div>
-              </DialogDescription>
-              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-2">
-                <button
-                  type="button"
-                  disabled={isKicking}
-                  onClick={() => setMemberToKick(null)}
-                  className="w-full sm:w-auto rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium text-foreground hover:bg-accent transition cursor-pointer text-center"
-                >
-                  キャンセル
-                </button>
-                <button
-                  type="button"
-                  disabled={isKicking}
-                  onClick={handleKickMember}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-md bg-red-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-red-700 transition disabled:opacity-50 cursor-pointer"
-                  data-testid="confirm-kick-btn"
-                >
-                  {isKicking && <Spinner className="h-4 w-4" />}
-                  削除する
-                </button>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* キック後パスコード変更推奨モーダル */}
-      <Dialog
-        open={kickSuccessNotice !== null}
-        onOpenChange={(open) => {
-          if (!open) setKickSuccessNotice(null);
-        }}
-      >
-        <DialogContent
-          className="bg-card shadow-card sm:max-w-md"
-          showCloseButton={false}
-        >
-          {kickSuccessNotice && (
-            <>
-              <div className="flex items-center gap-3 text-orange-500">
-                <KeyRound className="h-6 w-6 shrink-0" />
-                <DialogTitle className="text-[18px] text-foreground">
-                  家族パスコードの変更を推奨します
-                </DialogTitle>
-              </div>
-              <DialogDescription className="text-[13px] leading-relaxed">
-                メンバー「<strong>{kickSuccessNotice.memberName}</strong>
-                」を削除しました。
-                <br />
-                削除されたメンバーはこれまでの家族パスコードを記憶しているため、家族に残された共有データを確実に保護するには、
-                <strong>今すぐパスコードを変更（ローテーション）</strong>
-                することをお勧めします。
-              </DialogDescription>
-              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setKickSuccessNotice(null)}
-                  className="w-full sm:w-auto rounded-md border border-border bg-background px-4 py-2 text-[13px] font-medium text-foreground hover:bg-accent transition cursor-pointer text-center"
-                >
-                  あとで行う
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setKickSuccessNotice(null);
-                    setShowRotatePasscodeForm(true);
-                    setTimeout(() => {
-                      document
-                        .getElementById("rotate-passcode-section")
-                        ?.scrollIntoView({ behavior: "smooth" });
-                    }, 100);
-                  }}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-[13px] font-medium text-white hover:bg-orange-600 transition cursor-pointer"
-                >
-                  <KeyRound className="h-4 w-4" />
-                  今すぐパスコードを変更
-                </button>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      />
 
       {/* 家族作成・参加直後のダッシュボード誘導ツアーステップ */}
       <OnboardingTour
@@ -2987,198 +1727,5 @@ function FamilyComponent() {
         }}
       />
     </div>
-  );
-}
-
-/** 家族共有レコードの監査ログをページネーション付きで表示する。 */
-export function FamilyAuditLogSection({
-  activeAccountId,
-}: {
-  activeAccountId?: Id<"users"> | null;
-}) {
-  const { results, status, loadMore, isLoading } = usePaginatedQuery(
-    api.records.getFamilyAuditLogs,
-    { accountId: activeAccountId || undefined },
-    { initialNumItems: 15 },
-  );
-
-  /** 監査イベントの日時を日本語ロケールで表示できる形式にする。 */
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleString("ja-JP", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  return (
-    <Accordion
-      type="single"
-      collapsible
-      className="mt-8 border-t border-border pt-6"
-    >
-      <AccordionItem value="audit-log" className="border-none">
-        <AccordionTrigger
-          className="py-0 mb-1 hover:no-underline"
-          aria-label="家族のアクティビティログを展開または折りたたむ"
-        >
-          <div className="flex items-center justify-between flex-1">
-            <div className="flex items-center gap-2">
-              <History className="h-4 w-4 text-orange-500" />
-              <h3 className="text-[14px] font-medium text-foreground">
-                家族のアクティビティログ
-              </h3>
-            </div>
-            <span className="text-xs text-muted-foreground hidden sm:block mr-2">
-              直近の変更証跡
-            </span>
-          </div>
-        </AccordionTrigger>
-        <p className="text-[12px] text-muted-foreground mb-3">
-          家族共有レコードに対する登録・更新・共有設定変更・削除などの変更履歴を確認できます。
-        </p>
-        <AccordionContent className="pb-0">
-          {status === "LoadingFirstPage" ? (
-            <div className="flex flex-col items-center justify-center py-10 gap-2 text-muted-foreground text-xs">
-              <Spinner className="h-5 w-5" />
-              <span>アクティビティを読み込み中...</span>
-            </div>
-          ) : results.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-border/80 p-8 text-center text-xs text-muted-foreground">
-              アクティビティログはまだありません。
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <Accordion type="multiple" className="w-full space-y-2">
-                {results.map((log) => {
-                  const config =
-                    AUDIT_ACTION_CONFIG[log.action] || DEFAULT_ACTION_CONFIG;
-                  const Icon = config.icon;
-                  const hasMetadata =
-                    log.metadata?.changedFields?.length || log.metadata?.detail;
-
-                  return (
-                    <AccordionItem
-                      key={log._id}
-                      value={log._id}
-                      className="rounded-lg border border-border/50 bg-card px-3.5 shadow-xs"
-                    >
-                      {hasMetadata ? (
-                        <AccordionTrigger
-                          className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-2.5 gap-1.5 sm:gap-2 hover:no-underline"
-                          aria-label="個別ログの詳細を展開または折りたたむ"
-                        >
-                          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
-                            <span
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border shrink-0 ${config.badgeClass}`}
-                            >
-                              <Icon className="h-3.5 w-3.5" />
-                              <span>{config.label}</span>
-                            </span>
-                            <div className="min-w-0 text-left">
-                              <span className="font-semibold text-foreground text-xs mr-1 sm:mr-2">
-                                {log.actorDisplayName}:
-                              </span>
-                              <span className="text-xs text-muted-foreground break-all sm:break-normal">
-                                {log.metadata?.targetTitle
-                                  ? `${log.metadata.targetTitle}`
-                                  : "対象レコード"}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0 pl-7 sm:pl-0">
-                            <time className="text-[11px] text-muted-foreground font-mono">
-                              {formatDate(log.createdAt)}
-                            </time>
-                          </div>
-                        </AccordionTrigger>
-                      ) : (
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-2.5 gap-1.5 sm:gap-2">
-                          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
-                            <span
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border shrink-0 ${config.badgeClass}`}
-                            >
-                              <Icon className="h-3.5 w-3.5" />
-                              <span>{config.label}</span>
-                            </span>
-                            <div className="min-w-0 text-left">
-                              <span className="font-semibold text-foreground text-xs mr-1 sm:mr-2">
-                                {log.actorDisplayName}:
-                              </span>
-                              <span className="text-xs text-muted-foreground break-all sm:break-normal">
-                                {log.metadata?.targetTitle
-                                  ? `${log.metadata.targetTitle}`
-                                  : "対象レコード"}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex items-center shrink-0 pl-7 sm:pl-0">
-                            <time className="text-[11px] text-muted-foreground font-mono">
-                              {formatDate(log.createdAt)}
-                            </time>
-                          </div>
-                        </div>
-                      )}
-
-                      {hasMetadata ? (
-                        <AccordionContent className="pt-2 pb-3 text-xs text-muted-foreground border-t border-border/40">
-                          <div className="space-y-1 bg-muted/30 p-2.5 rounded-md">
-                            {log.metadata?.changedFields &&
-                              log.metadata.changedFields.length > 0 && (
-                                <div>
-                                  <span className="font-medium text-foreground mr-1.5">
-                                    変更項目:
-                                  </span>
-                                  <span>
-                                    {log.metadata.changedFields
-                                      .map(formatFieldName)
-                                      .join(", ")}
-                                  </span>
-                                </div>
-                              )}
-                            {log.metadata?.detail && (
-                              <div>
-                                <span className="font-medium text-foreground mr-1.5">
-                                  詳細:
-                                </span>
-                                <span>{log.metadata.detail}</span>
-                              </div>
-                            )}
-                          </div>
-                        </AccordionContent>
-                      ) : null}
-                    </AccordionItem>
-                  );
-                })}
-              </Accordion>
-
-              {/* ページネーション（もっと読み込むボタン） */}
-              {status === "CanLoadMore" && (
-                <div className="pt-3 text-center">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => loadMore(15)}
-                    disabled={isLoading}
-                    className="text-xs"
-                  >
-                    {isLoading ? (
-                      <>
-                        <Spinner className="h-3 w-3 mr-1.5" />
-                        読み込み中...
-                      </>
-                    ) : (
-                      "過去のアクティビティをさらに読み込む"
-                    )}
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
   );
 }

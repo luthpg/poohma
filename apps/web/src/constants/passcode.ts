@@ -1,0 +1,2 @@
+export const MIN_PASSCODE_LENGTH = 10;
+export const MIN_PASSCODE_STRENGTH_SCORE = 2;
