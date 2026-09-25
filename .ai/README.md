@@ -26,7 +26,9 @@ PoohMa では、AI Agent が継続的に利用するプロジェクト固有の�
 ├── patterns.md             # PoohMa で実証された実装・調査パターン
 ├── decisions.md            # 重要な設計判断とその背景
 ├── testing.md              # テスト技法（convex-test, E2EE暗号テスト, E2E）
-├── workflows/              # 定型作業手順（Git, CMS, ドキュメント同期等）
+├── workflows/              # 定型作業手順（文脈選択, 知見還元, Git, CMS, ドキュメント同期等）
+│   ├── context-selection.md
+│   ├── knowledge-feedback.md
 │   ├── git-workflow.md
 │   ├── doc-sync.md
 │   ├── test-refactoring.md
@@ -72,3 +74,14 @@ Issue や PR レビューの作業中に、将来の作業でも再利用でき�
 - `.docs/` の単純なコピーやソースコードの要約
 - 根拠のない推測や仮説
 - 現在の実装と矛盾する古い仕様
+
+---
+
+## 5. Knowledge Feedback ツール群 (`packages/knowledge-tools`)
+
+Knowledge の陳腐化防止とドキュメント同期を機械的に支援するため、以下のコマンドが提供されています：
+
+- **`pnpm check:knowledge`**: `.ai/` 配下の Markdown 内のコード・ドキュメント参照パスの実在性を検証（参照切れ・陳腐化の検知）。
+- **`pnpm check:doc-sync`**: `git` の変更差分から同期すべき `.docs/` や `.ai/` をマトリクスに基づいて判定・一覧表示。
+
+運用の詳細は [`.ai/workflows/context-selection.md`](workflows/context-selection.md)、[`.ai/workflows/knowledge-feedback.md`](workflows/knowledge-feedback.md)、[`.ai/workflows/doc-sync.md`](workflows/doc-sync.md) を参照してください。

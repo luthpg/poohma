@@ -1,0 +1,19 @@
+{
+  "name": "@poohma/knowledge-tools",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "check:refs": "tsx src/check-knowledge-refs.ts",
+    "check:doc-sync": "tsx src/check-doc-sync.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.5.1",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "simple-git": "^3.36.0"
+  }
+}

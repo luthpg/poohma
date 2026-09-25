@@ -12,6 +12,8 @@
     "typecheck": "turbo run typecheck",
     "check": "biome check --write",
     "check:ci": "biome ci",
+    "check:knowledge": "pnpm -F @poohma/knowledge-tools check:refs",
+    "check:doc-sync": "pnpm -F @poohma/knowledge-tools check:doc-sync",
     "lint:workflows": "docker run --rm --entrypoint actionlint -v .:/repo -w /repo ghcr.io/reviewdog/action-actionlint:v1.77.0",
     "verify": "pnpm typecheck && pnpm check && pnpm test && pnpm build",
     "web": "pnpm -F @poohma/web",

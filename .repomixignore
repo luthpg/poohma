@@ -1,0 +1,14 @@
+cloudflare-env.d.ts
+.repomixignore
+repomix-*.xml
+**/convex/_generated/*
+*.csv
+*.ttf
+*.svg
+*.png
+*.webp
+*.ico
+*.gif
+**/src/components/ui/*
+routeTree.gen.ts
+pnpm-lock.yaml
