@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { type StatusResult, simpleGit } from "simple-git";
 import { findRepoRoot } from "./repo-root.js";
 
 const ROOT_DIR = findRepoRoot();
@@ -84,43 +84,34 @@ const RULES: Rule[] = [
   },
 ];
 
-function getChangedFiles(): string[] {
+async function getChangedFiles(): Promise<string[]> {
   try {
-    // 未コミットの変更ファイル一覧（ステージング済み + 未ステージング + 未追跡）
-    const output = execSync("git status --porcelain -uall", {
-      cwd: ROOT_DIR,
-      encoding: "utf-8",
-    });
+    const git = simpleGit(ROOT_DIR);
+    const status: StatusResult = await git.status();
     const files = new Set<string>();
 
-    for (const rawLine of output.split("\n")) {
-      const line = rawLine.replace(/\r$/, "");
-      if (line.length < 4) continue;
-
-      // status line: "XY path" or "XY path -> newpath"
-      const rest = line.substring(3).trim();
-      if (!rest) continue;
-
-      if (rest.includes("->")) {
-        const [oldPath, newPath] = rest.split("->").map((p) => p.trim());
-        if (oldPath) files.add(oldPath.replace(/\\/g, "/"));
-        if (newPath) files.add(newPath.replace(/\\/g, "/"));
-      } else {
-        files.add(rest.replace(/\\/g, "/"));
+    for (const file of status.files) {
+      if (file.path) {
+        files.add(file.path.replace(/\\/g, "/"));
       }
+    }
+
+    for (const item of status.renamed) {
+      if (item.from) files.add(item.from.replace(/\\/g, "/"));
+      if (item.to) files.add(item.to.replace(/\\/g, "/"));
     }
 
     return Array.from(files);
   } catch (error) {
-    console.error("❌ Failed to execute git status command:", error);
+    console.error("❌ Failed to get git status:", error);
     process.exit(1);
   }
 }
 
-function runDocSyncCheck(): void {
+async function runDocSyncCheck(): Promise<void> {
   console.log("📋 Checking Doc-Sync requirements for current git changes...\n");
 
-  const changedFiles = getChangedFiles();
+  const changedFiles = await getChangedFiles();
 
   if (changedFiles.length === 0) {
     console.log("✨ No working tree changes detected.");
@@ -205,4 +196,4 @@ function runDocSyncCheck(): void {
   }
 }
 
-runDocSyncCheck();
+await runDocSyncCheck();
