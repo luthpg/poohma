@@ -65,8 +65,8 @@ function isRootRelative(ref: string): boolean {
 const REF_PATTERNS = [
   // インラインコード: `apps/...` や `.docs/...`
   /`((?:apps|workers|packages|\.docs|\.ai|\.github|\.agents)\/[^`\s]+)`/g,
-  // Markdownリンク: [...](path) または [...](path "title")
-  /\[[^\]]*\]\(([^)\s]+)(?:\s+(?:"[^"]*"|'[^']*'|\([^)]*\)))?\)/g,
+  // Markdownリンク: [...](path) または [...](path "title")（エスケープ引用符対応）
+  /\[[^\]]*\]\(([^)\s]+)(?:\s+(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\([^)]*\)))?\)/g,
 ];
 
 // 無視するキーワードやプレースホルダー
