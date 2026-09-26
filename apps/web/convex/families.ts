@@ -950,7 +950,7 @@ export const revokeFamilyInvite = familyAdminMutation({
   },
 });
 
-export const getFamilyInvites = familyBoundQuery({
+export const getFamilyInvites = familyAdminQuery({
   args: {},
   handler: async (ctx) => {
     const { familyId } = ctx;

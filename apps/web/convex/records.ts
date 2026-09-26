@@ -2188,6 +2188,7 @@ export const getRecordsForDiffImport = authenticatedQuery({
           url: r.url,
           memo: r.memo,
           ownerType: r.ownerType,
+          canEdit: isRecordAdmin(user, r),
           adminEmails: (admins ?? [])
             .map((id) => emailById.get(id))
             .filter((email): email is string => !!email),

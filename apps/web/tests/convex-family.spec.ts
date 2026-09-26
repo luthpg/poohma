@@ -804,7 +804,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
       }
     });
 
-    it("一般メンバー（viewer）が createFamilyInvite / revokeFamilyInvite を実行した場合、Access denied で拒否されること", async () => {
+    it("一般メンバー（viewer）が createFamilyInvite / revokeFamilyInvite / getFamilyInvites を実行した場合、Access denied で拒否されること", async () => {
       const t = convexTest(schema, modules);
       let inviteId!: Id<"familyInvites">;
 
@@ -835,6 +835,10 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         subject: "user_viewer_invite",
         email: "viewer_invite@example.com",
       });
+
+      await expect(
+        viewer.query(api.families.getFamilyInvites, {}),
+      ).rejects.toThrow("Access denied: Admin role required");
 
       await expect(
         viewer.mutation(api.families.createFamilyInvite, { ttlMinutes: 10080 }),

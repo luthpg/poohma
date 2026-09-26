@@ -1474,7 +1474,7 @@ function FamilyComponent() {
           </div>
 
           {/* 参加リクエスト一覧 */}
-          {isFamilyAdmin && pendingRequests && pendingRequests.length > 0 && (
+          {pendingRequests && pendingRequests.length > 0 && (
             <div className="mt-8 border-t border-border pt-6">
               <h3 className="mb-4 text-[14px] font-medium text-foreground flex items-center gap-2">
                 参加リクエスト

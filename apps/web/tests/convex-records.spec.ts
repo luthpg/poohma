@@ -2083,6 +2083,58 @@ describe("2.2.14 CSV差分インポート・安定ID（stableId）検証", () =>
     expect(
       (r.credentials[0] as Record<string, unknown>).passwordHintIv,
     ).toBeUndefined();
+    expect(r.canEdit).toBe(true);
+  });
+
+  it("getRecordsForDiffImport: 一般メンバー（viewer）から見た共有レコードの canEdit が正しく false になること", async () => {
+    const t = convexTest(schema, modules);
+    const stableUUID = "33333333-4444-5555-6666-777777777777";
+
+    await t.run(async (ctx) => {
+      const familyId = await ctx.db.insert("families", {
+        name: "Diff Viewer Family",
+        updatedAt: Date.now(),
+      });
+      const adminUserId = await ctx.db.insert("users", {
+        familyRole: "admin",
+        userId: "diff_admin",
+        email: "diff_admin@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+      await ctx.db.insert("users", {
+        familyRole: "viewer",
+        userId: "diff_viewer",
+        email: "diff_viewer@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+      await ctx.db.insert("serviceRecords", {
+        title: "Family Shared Service",
+        url: "https://diff-shared.example.com",
+        userId: "diff_admin",
+        accountId: adminUserId,
+        familyId,
+        ownerType: "family",
+        ownerFamilyId: familyId,
+        admins: [adminUserId],
+        stableId: stableUUID,
+        tags: ["shared"],
+        updatedAt: Date.now(),
+      });
+    });
+
+    const viewer = t.withIdentity({
+      subject: "diff_viewer",
+      email: "diff_viewer@example.com",
+    });
+
+    const records = await viewer.query(api.records.getRecordsForDiffImport, {});
+    expect(records.length).toBe(1);
+    const r = records[0]!;
+    expect(r.stableId).toBe(stableUUID);
+    expect(r.title).toBe("Family Shared Service");
+    expect(r.canEdit).toBe(false);
   });
 
   it("applyImportDiff: 新規作成と差分更新が同一トランザクションで安全に反映されること", async () => {
