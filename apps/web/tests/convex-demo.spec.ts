@@ -757,15 +757,20 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
     );
   });
 
-  it("ゲストユーザーが他ファミリーに作成した個人レコードおよびVaultは削除されず保護されること", async () => {
+  it("他ファミリー保護: ゲストユーザーが他ファミリーに作成した個人レコード・Vault・監査ログ・第三者監査ログは一切削除されず保護されること", async () => {
     const t = convexTest(schema, modules);
     let demoFamilyId!: Id<"families">;
     let otherFamilyId!: Id<"families">;
     let guestId!: Id<"users">;
+    let otherAdminId!: Id<"users">;
     let demoRecordId!: Id<"serviceRecords">;
     let otherRecordId!: Id<"serviceRecords">;
     let demoVaultId!: Id<"pendingExportVaults">;
     let otherVaultId!: Id<"pendingExportVaults">;
+    let otherFamilyAuditId!: Id<"auditLogs">;
+    let otherUserPersonalAuditId!: Id<"auditLogs">;
+    let thirdPartyAuditId!: Id<"auditLogs">;
+    let otherViewLogId!: Id<"viewLogs">;
 
     await t.run(async (ctx) => {
       demoFamilyId = await ctx.db.insert("families", {
@@ -781,6 +786,14 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
         userId: "demo_admin",
         email: "admin@example.com",
         familyId: demoFamilyId,
+        familyRole: "admin",
+        updatedAt: Date.now(),
+      });
+
+      otherAdminId = await ctx.db.insert("users", {
+        userId: "other_admin_uid",
+        email: "other_admin@example.com",
+        familyId: otherFamilyId,
         familyRole: "admin",
         updatedAt: Date.now(),
       });
@@ -817,6 +830,55 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
         updatedAt: Date.now(),
       });
 
+      // 他ファミリーの閲覧ログ
+      otherViewLogId = await ctx.db.insert("viewLogs", {
+        familyId: otherFamilyId,
+        accountId: guestId,
+        userId: "guest_user",
+        actorDisplayName: "ゲストユーザー",
+        recordId: otherRecordId,
+        createdAt: Date.now(),
+      });
+
+      // 他ファミリーのレコード監査ログ
+      otherFamilyAuditId = await ctx.db.insert("auditLogs", {
+        familyId: otherFamilyId,
+        accountId: guestId,
+        userId: "guest_user",
+        actorDisplayName: "ゲストユーザー",
+        recordId: otherRecordId,
+        ownerType: "family",
+        ownerFamilyId: otherFamilyId,
+        action: "RECORD_CREATE",
+        createdAt: Date.now(),
+      });
+
+      // ゲストが他ファミリーで行った個人操作ログ（パスコード更新など、familyId未設定）
+      otherUserPersonalAuditId = await ctx.db.insert("auditLogs", {
+        accountId: guestId,
+        userId: "guest_user",
+        actorDisplayName: "ゲストユーザー",
+        ownerType: "user",
+        targetAccountId: guestId,
+        action: "PASSCODE_ROTATED",
+        metadata: { detail: "他ファミリー所属時のパスコード更新" },
+        createdAt: Date.now() - 5000,
+      });
+
+      // 第三者（他ファミリー管理者）がこのゲストを対象にして行った監査ログ（招待や参加承認など）
+      thirdPartyAuditId = await ctx.db.insert("auditLogs", {
+        familyId: otherFamilyId,
+        accountId: otherAdminId,
+        userId: "other_admin_uid",
+        actorDisplayName: "他ファミリー管理者",
+        ownerType: "family",
+        ownerFamilyId: otherFamilyId,
+        targetAccountId: guestId,
+        action: "MEMBER_JOIN",
+        metadata: { detail: "他ファミリーへの参加承認" },
+        createdAt: Date.now() - 10000,
+      });
+
       // デモファミリー由来の vault
       demoVaultId = await ctx.db.insert("pendingExportVaults", {
         accountId: guestId,
@@ -849,20 +911,32 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
 
     await t.mutation(internal.demo.resetDemoFamilyInternal, { force: true });
 
-    // 検証: デモファミリーに属する個人レコードとVaultは削除されるが、他ファミリーのものは残存すること
+    // 検証: デモファミリーに属する個人レコードとVaultは削除されるが、他ファミリーのデータ・ログは一切削除されず完全保護されること
     await t.run(async (ctx) => {
       const demoRec = await ctx.db.get(demoRecordId);
       const otherRec = await ctx.db.get(otherRecordId);
       const demoVault = await ctx.db.get(demoVaultId);
       const otherVault = await ctx.db.get(otherVaultId);
+      const otherFamilyAudit = await ctx.db.get(otherFamilyAuditId);
+      const otherUserPersonalAudit = await ctx.db.get(otherUserPersonalAuditId);
+      const thirdPartyAudit = await ctx.db.get(thirdPartyAuditId);
+      const otherViewLog = await ctx.db.get(otherViewLogId);
 
+      // デモ内データは削除
       expect(demoRec).toBeNull();
+      expect(demoVault).toBeNull();
+
+      // 他ファミリーデータ・Vaultは完全保護
       expect(otherRec).not.toBeNull();
       expect(otherRec?.title).toBe("他ファミリーの個人レコード");
-
-      expect(demoVault).toBeNull();
       expect(otherVault).not.toBeNull();
       expect(otherVault?.oldFamilyName).toBe("Other Family");
+
+      // 他ファミリーの閲覧ログ・監査ログ・第三者監査ログ・ゲスト個人ログは完全保護
+      expect(otherViewLog).not.toBeNull();
+      expect(otherFamilyAudit).not.toBeNull();
+      expect(otherUserPersonalAudit).not.toBeNull();
+      expect(thirdPartyAudit).not.toBeNull();
     });
   });
 });

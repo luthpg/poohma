@@ -302,36 +302,20 @@ export const resetDemoFamilyInternal = internalMutation({
       }
     }
 
-    // C. デモファミリー所属全メンバー（管理者・ゲスト）の操作ログおよび対象ログ
-    for (const member of familyMembers) {
-      // 操作者としてのログ
-      const userAuditLogs = await ctx.db
+    // C. デモ専用管理者（adminMembers）自身が行ったデモ内操作ログ
+    // ※ 一般ゲストユーザーの個人ログや、第三者ユーザーが実行した監査ログ（targetAccountId 経由等）は、他ファミリーの監査証跡・完全性を保護するため一切削除しない
+    for (const admin of adminMembers) {
+      const adminAuditLogs = await ctx.db
         .query("auditLogs")
-        .withIndex("by_userId_createdAt", (q) => q.eq("userId", member.userId))
+        .withIndex("by_userId_createdAt", (q) => q.eq("userId", admin.userId))
         .collect();
-      for (const audit of userAuditLogs) {
-        if (
-          !audit.familyId ||
-          audit.familyId === demoFamilyId ||
-          audit.ownerFamilyId === demoFamilyId
-        ) {
-          auditLogsToDeleteMap.set(audit._id, audit);
-        }
-      }
+      for (const audit of adminAuditLogs) {
+        // 他ファミリーのIDを持たない、デモ管理者の操作ログのみを削除
+        const belongsToOtherFamily =
+          (audit.familyId != null && audit.familyId !== demoFamilyId) ||
+          (audit.ownerFamilyId != null && audit.ownerFamilyId !== demoFamilyId);
 
-      // 対象者としてのログ
-      const targetAuditLogs = await ctx.db
-        .query("auditLogs")
-        .withIndex("by_targetAccountId_createdAt", (q) =>
-          q.eq("targetAccountId", member._id),
-        )
-        .collect();
-      for (const audit of targetAuditLogs) {
-        if (
-          !audit.familyId ||
-          audit.familyId === demoFamilyId ||
-          audit.ownerFamilyId === demoFamilyId
-        ) {
+        if (!belongsToOtherFamily) {
           auditLogsToDeleteMap.set(audit._id, audit);
         }
       }
