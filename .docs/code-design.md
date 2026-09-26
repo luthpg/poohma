@@ -601,12 +601,14 @@ ConvexReactClient / TanStack Query の Mutation実行を共通ラッパーでイ
      a. 環境変数照合（フェイルセーフ）: DEMO_FAMILY_ID および DEMO_ADMIN_USER_IDS（複数可）の存在・実在を検証。指定管理者が0名またはファミリー管理者権限（familyRole === "admin"）不在時は異常事態として例外送出。
      b. クールダウンガード: 直近10分以内のリセット監査ログを探索し、存在する場合は安全にスキップ（他操作ログにマスクされない堅牢な判定）。
      c. 対象特定: DEMO_ADMIN_USER_IDS 以外のメンバーを「ゲスト（guestUsers）」として抽出（手違いで familyRole が admin となっている非管理者も確実にキック）。
-     d. レコード完全消去: 共有レコード（familyId === DEMO_FAMILY_ID）に加え、ゲストが作成した個人レコード（ownerType === "user"）も含めてクレデンシャル・セッション・閲覧ログとともに完全削除。
-     e. ゲストkick: 全ゲストの familyId を undefined に更新（通知メールはスキップ）。
-     f. 申請クリーンアップ: 48時間以上経過した joinRequests のみを削除（直近の承認待ち申請を保護）。
-     g. 初期データ再投入: demoRecords.json（E2Eシード由来の暗号化済み実データ）からレコード・クレデンシャルを一括再作成。
-     h. 招待コード維持: DEMO_INVITE_CODE を 2099 年まで有効に更新・維持。
-     i. 監査ログ記録: 実行者・理由・件数を記録し、結果オブジェクトを返却。
+     d. レコード完全消去: 共有レコード（familyId === DEMO_FAMILY_ID）に加え、デモファミリー所属メンバー（管理者・ゲスト問わず）が作成した個人レコード（ownerType === "user"）も含めてクレデンシャル・セッションとともに完全削除。
+     e. viewLogs 無条件全削除: レコード単位およびデモファミリー単位（familyId === DEMO_FAMILY_ID）の閲覧ログ（viewLogs）を管理者・ゲスト問わず無条件で全パージ。
+     f. ゲストkick: 全ゲストの familyId を undefined に更新（通知メールはスキップ）。
+     g. 申請クリーンアップ: 承認・拒否済み申請を全削除し、直近48時間以内の pending のみ保護。
+     h. auditLogs 無条件全削除（コホート間隔離・管理者操作網羅）: 管理者による操作（個人レコードCRUD、パスコード更新等）、ゲスト操作、家族操作、削除対象レコードに紐づくすべての auditLogs をインデックスから収集し無条件で完全全パージ。
+     i. 初期データ再投入: demoRecords.json（E2Eシード由来の暗号化済み実データ）からレコード・クレデンシャルを一括再作成。
+     j. 招待コード維持: DEMO_INVITE_CODE を 2099 年まで有効に更新・維持。
+     k. 監査ログ記録: 実行者・理由・件数を記録し、次回以降のクールダウン判定に使用。結果オブジェクトを返却。
 
 3. データ抽出（convex/demo.ts: exportDemoRecordsInternal）:
    - GUI/CSVインポートで正常にブラウザ暗号化された実データを Convex DB から demoRecords.json のフォーマットで抽出する internal query。
