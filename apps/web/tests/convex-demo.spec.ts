@@ -279,6 +279,26 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
         updatedAt: Date.now(),
       });
 
+      // 5.5 管理者が作成した個人レコード (ownerType: "user")
+      const adminPrivateRecordId = await ctx.db.insert("serviceRecords", {
+        title: "管理者の個人レコード",
+        userId: "admin_uid_1",
+        accountId: admin1Id,
+        familyId: demoFamilyId,
+        ownerType: "user",
+        admins: [],
+        tags: ["プライベート"],
+        stableId: crypto.randomUUID(),
+        updatedAt: Date.now(),
+      });
+      await ctx.db.insert("credentials", {
+        recordId: adminPrivateRecordId,
+        stableId: crypto.randomUUID(),
+        label: "管理者個人ID",
+        loginId: "admin-private@example.com",
+        updatedAt: Date.now(),
+      });
+
       // 6. 参加申請: ステータス別に作成
       const now = Date.now();
 
@@ -335,7 +355,7 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
         expiresAt: now + 30 * 24 * 60 * 60 * 1000,
       });
 
-      // 8. 過去コホートの監査ログ（リセット後に新コホートから見えてはならない）
+      // 8. 過去コホートおよび管理者の監査ログ（リセット後に新コホートから見えてはならない）
       await ctx.db.insert("auditLogs", {
         familyId: demoFamilyId,
         accountId: guest1Id,
@@ -357,8 +377,31 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
         action: "MEMBER_JOIN",
         createdAt: now - 1 * 60 * 60 * 1000,
       });
+      // 管理者の個人操作監査ログ（familyId なし、ownerType: "user"）
+      await ctx.db.insert("auditLogs", {
+        accountId: admin1Id,
+        userId: "admin_uid_1",
+        actorDisplayName: "デモ管理者1",
+        ownerType: "user",
+        targetAccountId: admin1Id,
+        action: "PASSCODE_ROTATED",
+        metadata: { detail: "パスコード更新" },
+        createdAt: now - 90 * 60 * 1000,
+      });
+      // 管理者の個人レコード作成監査ログ（familyId なし）
+      await ctx.db.insert("auditLogs", {
+        accountId: admin1Id,
+        userId: "admin_uid_1",
+        actorDisplayName: "デモ管理者1",
+        recordId: adminPrivateRecordId,
+        ownerType: "user",
+        targetAccountId: admin1Id,
+        action: "RECORD_CREATE",
+        metadata: { targetTitle: "管理者の個人レコード" },
+        createdAt: now - 80 * 60 * 1000,
+      });
 
-      // 9. 過去コホートの閲覧ログ
+      // 9. 過去コホートおよび管理者の閲覧ログ
       await ctx.db.insert("viewLogs", {
         familyId: demoFamilyId,
         accountId: guest1Id,
@@ -366,6 +409,22 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
         actorDisplayName: "ゲスト閲覧者1",
         recordId: sharedRecordId,
         createdAt: now - 30 * 60 * 1000,
+      });
+      await ctx.db.insert("viewLogs", {
+        familyId: demoFamilyId,
+        accountId: admin1Id,
+        userId: "admin_uid_1",
+        actorDisplayName: "デモ管理者1",
+        recordId: sharedRecordId,
+        createdAt: now - 25 * 60 * 1000,
+      });
+      // 管理者個人レコードの閲覧ログ（familyId なし）
+      await ctx.db.insert("viewLogs", {
+        accountId: admin1Id,
+        userId: "admin_uid_1",
+        actorDisplayName: "デモ管理者1",
+        recordId: adminPrivateRecordId,
+        createdAt: now - 20 * 60 * 1000,
       });
 
       // 10. ゲストが発行した追加招待コード（デモ固定コード以外）
@@ -405,11 +464,11 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
 
     expect(result.success).toBe(true);
     expect(result.kickedGuestsCount).toBe(2);
-    expect(result.deletedRecordsCount).toBe(2); // 共有1 + ゲスト個人1
+    expect(result.deletedRecordsCount).toBe(3); // 共有1 + ゲスト個人1 + 管理者個人1
     // approved(1) + rejected(1) + 期限切れpending(1) = 3件削除
     expect(result.deletedJoinRequestsCount).toBe(3);
-    expect(result.deletedAuditLogsCount).toBe(2); // 過去コホートの監査ログ2件
-    expect(result.deletedViewLogsCount).toBeGreaterThanOrEqual(0); // レコード個別削除で先に消える分があるため0以上
+    expect(result.deletedAuditLogsCount).toBe(4); // 過去コホート・管理者操作の監査ログ4件
+    expect(result.deletedViewLogsCount).toBeGreaterThanOrEqual(3); // 共有2件 + 個人1件
     expect(result.deletedExtraInvitesCount).toBe(1); // guest-extra-invite
     expect(result.deletedMigrationsCount).toBe(1); // PREPARED 移行データ
     expect(result.insertedRecordsCount).toBeGreaterThan(0); // demoRecords.json から再投入
@@ -428,7 +487,7 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
       expect(guest1?.familyId).toBeUndefined();
       expect(guest2?.familyId).toBeUndefined();
 
-      // 2. 過去の共有レコードおよびゲスト個人レコードが消去されていること
+      // 2. 過去の共有レコードおよび全個人レコードが消去されていること
       const remainingRecords = await ctx.db
         .query("serviceRecords")
         .withIndex("by_family_updatedAt", (q) => q.eq("familyId", demoFamilyId))
@@ -441,13 +500,24 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
       expect(
         remainingRecords.some((r) => r.title === "ゲストの個人レコード"),
       ).toBe(false);
+      expect(
+        remainingRecords.some((r) => r.title === "管理者の個人レコード"),
+      ).toBe(false);
 
-      // 3. ゲスト所有の個人レコードもゼロであること
+      // 3. ゲスト所有・管理者所有の個人レコードもゼロであること
       const guestPrivateRecords = await ctx.db
         .query("serviceRecords")
         .withIndex("by_accountId", (q) => q.eq("accountId", guest1Id))
         .collect();
       expect(guestPrivateRecords.length).toBe(0);
+
+      const adminPrivateRecords = (
+        await ctx.db
+          .query("serviceRecords")
+          .withIndex("by_accountId", (q) => q.eq("accountId", admin1Id))
+          .collect()
+      ).filter((r) => r.ownerType === "user");
+      expect(adminPrivateRecords.length).toBe(0);
 
       // 4. ゲストの vault も削除されていること
       const guestVaults = await ctx.db
@@ -476,22 +546,16 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
       expect(allInvites[0]?.expiresAt).toBe(4102415999000);
       expect(allInvites[0]?.useCount).toBe(0);
 
-      // 7. 監査ログ: 過去コホートのログは全パージされ、リセット完了ログ1件のみ残存
-      const allAuditLogs = await ctx.db
-        .query("auditLogs")
-        .withIndex("by_family_createdAt", (q) => q.eq("familyId", demoFamilyId))
-        .collect();
+      // 7. 監査ログ: 過去コホートおよび管理者の操作ログは全パージされ、リセット完了ログ1件のみ残存
+      const allAuditLogs = await ctx.db.query("auditLogs").collect();
       expect(allAuditLogs.length).toBe(1);
       expect(allAuditLogs[0]?.action).toBe("FAMILY_UPDATE");
       expect(allAuditLogs[0]?.metadata?.detail).toContain(
         "デモファミリー定期リセット",
       );
 
-      // 8. 閲覧ログ: デモファミリー分は全件削除されていること
-      const allViewLogs = await ctx.db
-        .query("viewLogs")
-        .withIndex("by_family_createdAt", (q) => q.eq("familyId", demoFamilyId))
-        .collect();
+      // 8. 閲覧ログ: デモファミリー分（管理者操作含む）は全件削除されていること
+      const allViewLogs = await ctx.db.query("viewLogs").collect();
       expect(allViewLogs.length).toBe(0);
 
       // 9. 家族移行データ: デモファミリー関連は全件削除されていること
