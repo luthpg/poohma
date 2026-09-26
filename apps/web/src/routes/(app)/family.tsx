@@ -1499,55 +1499,63 @@ function FamilyComponent() {
                         {new Date(req.createdAt).toLocaleString("ja-JP")}
                       </span>
                     </div>
-                    <div className="flex flex-col sm:flex-row gap-2 shrink-0 w-full sm:w-auto">
-                      <button
-                        type="button"
-                        disabled={isLoading}
-                        onClick={async () => {
-                          setIsLoading(true);
-                          try {
-                            await approveJoinRequestMut({
-                              accountId: activeAccountId || undefined,
-                              requestId: req.id as Id<"joinRequests">,
-                            });
-                            toast.success(
-                              `${req.displayName} さんの参加を承認しました`,
-                            );
-                          } catch {
-                            toast.error("承認に失敗しました");
-                          } finally {
-                            setIsLoading(false);
-                          }
-                        }}
-                        className="flex items-center justify-center gap-1.5 rounded-md bg-green-600 px-4 py-2 text-[13px] font-medium text-white shadow-border transition hover:bg-green-700 disabled:opacity-50 cursor-pointer w-full sm:w-auto"
-                      >
-                        <Check className="h-3.5 w-3.5" />
-                        承認
-                      </button>
-                      <button
-                        type="button"
-                        disabled={isLoading}
-                        onClick={async () => {
-                          setIsLoading(true);
-                          try {
-                            await rejectJoinRequestMut({
-                              accountId: activeAccountId || undefined,
-                              requestId: req.id as Id<"joinRequests">,
-                            });
-                            toast.success(
-                              `${req.displayName} さんの参加を却下しました`,
-                            );
-                          } catch {
-                            toast.error("却下に失敗しました");
-                          } finally {
-                            setIsLoading(false);
-                          }
-                        }}
-                        className="flex items-center justify-center gap-1.5 rounded-md bg-card px-4 py-2 text-[13px] font-medium text-red-500 shadow-border transition hover:bg-accent disabled:opacity-50 cursor-pointer w-full sm:w-auto"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                        却下
-                      </button>
+                    <div className="flex flex-col sm:flex-row items-center gap-2 shrink-0 w-full sm:w-auto">
+                      {isFamilyAdmin ? (
+                        <>
+                          <button
+                            type="button"
+                            disabled={isLoading}
+                            onClick={async () => {
+                              setIsLoading(true);
+                              try {
+                                await approveJoinRequestMut({
+                                  accountId: activeAccountId || undefined,
+                                  requestId: req.id as Id<"joinRequests">,
+                                });
+                                toast.success(
+                                  `${req.displayName} さんの参加を承認しました`,
+                                );
+                              } catch {
+                                toast.error("承認に失敗しました");
+                              } finally {
+                                setIsLoading(false);
+                              }
+                            }}
+                            className="flex items-center justify-center gap-1.5 rounded-md bg-green-600 px-4 py-2 text-[13px] font-medium text-white shadow-border transition hover:bg-green-700 disabled:opacity-50 cursor-pointer w-full sm:w-auto"
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                            承認
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isLoading}
+                            onClick={async () => {
+                              setIsLoading(true);
+                              try {
+                                await rejectJoinRequestMut({
+                                  accountId: activeAccountId || undefined,
+                                  requestId: req.id as Id<"joinRequests">,
+                                });
+                                toast.success(
+                                  `${req.displayName} さんの参加を却下しました`,
+                                );
+                              } catch {
+                                toast.error("却下に失敗しました");
+                              } finally {
+                                setIsLoading(false);
+                              }
+                            }}
+                            className="flex items-center justify-center gap-1.5 rounded-md bg-card px-4 py-2 text-[13px] font-medium text-red-500 shadow-border transition hover:bg-accent disabled:opacity-50 cursor-pointer w-full sm:w-auto"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                            却下
+                          </button>
+                        </>
+                      ) : (
+                        <span className="text-[12px] text-muted-foreground italic px-2 py-1">
+                          ※承認・却下は管理者のみ行えます
+                        </span>
+                      )}
                     </div>
                   </li>
                 ))}

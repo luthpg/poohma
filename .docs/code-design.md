@@ -897,10 +897,10 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 | getMigrationForEncryption | Query | authenticated | 移行対象データ（暗号化済みDEK等）の取得 |
 | commitFamilyMigration | Mutation | authenticated | 移行の確定（再暗号化データの反映）。prepare時点とcommit時点のレコード一覧を照合する楽観的ロック（競合検知）を適用 |
 | abortFamilyMigration | Mutation | authenticated | 移行の中断 |
-| rotatePasscode | Mutation | familyBound | パスコードのみの変更（masterKeyEncrypted/Iv/Salt/kdfIterationsのみ更新、6.5） |
+| rotatePasscode | Mutation | familyAdmin | パスコードのみの変更（masterKeyEncrypted/Iv/Salt/kdfIterationsのみ更新、ファミリー管理者のみ、6.5） |
 | issueRecoveryKey | Mutation | familyBound | リカバリーキーの発行／再発行（masterKeyRecoveryEncrypted等を保存、6.6） |
 | recoverWithRecoveryKey | Mutation | authenticated | リカバリーキー経由でのマスターキー復元後、新パスコードでの再wrap結果を保存（6.6） |
-| getRecordsForReEncryption | Query | familyBound | 再暗号化対象データ取得（家族所属前提） |
+| getRecordsForReEncryption | Query | familyAdmin | 再暗号化対象データ取得（ファミリー管理者のみ、家族所属前提） |
 | createFamilyInvite | Mutation | familyAdmin | 有効期限付き招待コードの発行（TTL: 15分〜30日、デフォルト7日、ファミリー管理者のみ） |
 | revokeFamilyInvite | Mutation | familyAdmin | 自家族の招待コードの手動失効（ファミリー管理者のみ） |
 | getFamilyInvites | Query | familyAdmin | 自家族の招待コード一覧取得（ステータス: active/expired/revoked付き、ファミリー管理者のみ） |
