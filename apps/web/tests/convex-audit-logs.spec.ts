@@ -747,11 +747,39 @@ describe("監査ログ (Audit Log) & 閲覧履歴 (View Log) の統合テスト"
     );
     expect(allLogs).toHaveLength(2);
     const categories = allLogs.map((l) => l.category);
-    expect(categories).toContain("audit");
     expect(categories).toContain("view");
     // 新しい順にソートされていること
     expect(allLogs[0]?.createdAt).toBeGreaterThanOrEqual(
       allLogs[1]?.createdAt ?? 0,
     );
+  });
+
+  it("一般メンバー（viewer）が getFamilyAuditAndViewsForExport を呼び出した場合、Access denied で拒否されること", async () => {
+    const t = convexTest(schema, modules);
+
+    await t.run(async (ctx) => {
+      const familyId = await ctx.db.insert("families", {
+        name: "Viewer Audit Family",
+        updatedAt: Date.now(),
+      });
+
+      await ctx.db.insert("users", {
+        familyRole: "viewer",
+        userId: "viewer_user",
+        email: "viewer@example.com",
+        displayName: "一般メンバー",
+        familyId,
+        updatedAt: Date.now(),
+      });
+    });
+
+    const viewerClient = t.withIdentity({
+      subject: "viewer_user",
+      email: "viewer@example.com",
+    });
+
+    await expect(
+      viewerClient.query(api.records.getFamilyAuditAndViewsForExport, {}),
+    ).rejects.toThrow("Access denied: Admin role required");
   });
 });

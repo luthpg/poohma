@@ -116,6 +116,8 @@ flowchart TD
 1. `identityVerifiedQuery / Mutation`: Firebase Identity の存在のみを検証（新規ユーザー登録等）
 2. `authenticatedQuery / Mutation`: Identity 検証 + `resolveAccount` によるアカウント所有権チェック（IDOR 防止）
 3. `familyBoundQuery / Mutation`: 上記 + 対象アカウントが家族グループ（`familyId`）に所属していることを強制
+4. `familyAdminQuery / Mutation`: 上記 + 対象アカウントがファミリー管理者（`familyRole === "admin"`）であることを強制（家族設定・招待管理・パスコード変更・リカバリーキット・キック・監査ログ等の管理者専権保護）
+5. `recordAdminMutation`: `familyBound` + 対象レコードが存在し管理者アクセス権（`requireAdminAccess`）を満たすことを検証
 
 ---
 

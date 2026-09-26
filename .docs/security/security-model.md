@@ -18,7 +18,7 @@
   - `identityVerifiedQuery/Mutation`：Firebase Identity の存在のみ検証（新規ユーザー同期など）
   - `authenticatedQuery/Mutation`：Identity検証に加え `resolveAccount` による所有権検証（下記IDOR対策）
   - `familyBoundQuery/Mutation`：上記に加え、対象アカウントが家族グループに所属していることを検証
-  - `familyAdminMutation`：上記に加え、対象アカウントの家族内ロールがファミリー管理者（`familyRole === "admin"`）であることを検証
+  - `familyAdminQuery/Mutation`：上記に加え、対象アカウントの家族内ロールがファミリー管理者（`familyRole === "admin"`）であることを検証
   - `recordAdminMutation`：`familyBound` に加え、対象レコード（`args.id`）が存在し `requireAdminAccess` を満たすことを検証
 - `resolveAccount` は、呼び出し側が任意で渡す `accountId` について、その `users` レコードの `userId`（Firebase UID）が現在ログイン中の `identity.subject` と一致するかを必ず照合し、不一致であれば `Unauthorized` を送出する（他人のアカウントIDを指定してのなりすまし＝IDORの防止）。
 - 上記はコード規約として徹底しており、Lint等による機械的な強制ではない。新規関数追加時のレビュー観点として [Threat Model](./threat-model.md) 6章にも明記している。
@@ -90,8 +90,8 @@
 
 ## 招待・Family membership のセキュリティ
 
-- 招待コードは恒久的な `families._id` から完全に分離した別テーブル（`familyInvites`）のランダム文字列として発行し、有効期限（15分〜30日、既定7日）を必須とする（Issue #132）。既存メンバーはいつでも手動失効できる。
-- 招待コードはあくまで「参加申請を送信する権利」であり、正式な家族参加には既存メンバーによる明示的な承認（`joinRequests` の approve）が必須の二段階構成になっている。
+- 招待コードは恒久的な `families._id` から完全に分離した別テーブル（`familyInvites`）のランダム文字列として発行し、有効期限（15分〜30日、既定7日）を必須とする（Issue #132）。招待コードの発行・失効・閲覧・共有はファミリー管理者の専権事項とし、一般メンバーにはUI表示およびバックエンドAPIの両面で制限される。
+- 招待コードはあくまで「参加申請を送信する権利」であり、正式な家族参加には既存メンバーによる明示的な承認（`joinRequests` の approve）が必須の二段階構成になっている（参加申請の承認・却下は家族全体の相互承認モデルとして一般メンバーも実行可能）。
 - どの招待コード経由で申請が行われたかを `joinRequests.invitedByCode` に記録し、`familyInvites.useCount` で使用回数を追跡できる。
 
 ## 関連ドキュメント

@@ -323,7 +323,9 @@ function FamilyComponent() {
 
   const [isUpdatingRole, setIsUpdatingRole] = useState(false);
 
-  const currentMember = family?.users.find((u) => u.id === activeAccountId);
+  const currentMember =
+    family?.users.find((u) => u.id === activeAccountId) ??
+    family?.users.find((u) => u.userId === activeAccount?.userId);
   const isFamilyAdmin = currentMember?.familyRole === "admin";
 
   const handleStartEditFamilyName = () => {
@@ -389,10 +391,8 @@ function FamilyComponent() {
           ? "ファミリー管理者に変更しました"
           : "メンバーに変更しました",
       );
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "ロールの変更に失敗しました",
-      );
+    } catch (_error) {
+      toast.error("ロールの変更に失敗しました");
     } finally {
       setIsUpdatingRole(false);
     }
@@ -1347,6 +1347,7 @@ function FamilyComponent() {
             familyName={family.name}
             familyInvites={familyInvites}
             activeAccountId={activeAccountId}
+            isAdmin={isFamilyAdmin}
           />
 
           <div>
@@ -1473,7 +1474,7 @@ function FamilyComponent() {
           </div>
 
           {/* 参加リクエスト一覧 */}
-          {pendingRequests && pendingRequests.length > 0 && (
+          {isFamilyAdmin && pendingRequests && pendingRequests.length > 0 && (
             <div className="mt-8 border-t border-border pt-6">
               <h3 className="mb-4 text-[14px] font-medium text-foreground flex items-center gap-2">
                 参加リクエスト
@@ -1561,6 +1562,7 @@ function FamilyComponent() {
             activeAccount={activeAccount}
             isOpen={showRotatePasscodeForm}
             onToggle={() => setShowRotatePasscodeForm((prev) => !prev)}
+            isAdmin={isFamilyAdmin}
           />
 
           {/* リカバリーキット（復旧コード） */}
@@ -1588,16 +1590,18 @@ function FamilyComponent() {
               </div>
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0 w-full sm:w-auto">
-                <button
-                  type="button"
-                  onClick={() => setIsRecoveryKitModalOpen(true)}
-                  className="flex items-center justify-center gap-1.5 rounded-md bg-foreground px-3.5 py-2 sm:py-1.5 text-[13px] font-medium text-background shadow-sm hover:bg-foreground/90 transition cursor-pointer w-full sm:w-auto order-1 sm:order-2"
-                >
-                  <KeyRound className="h-3.5 w-3.5" />
-                  {recoveryStatus?.hasRecoveryKit
-                    ? "再発行する"
-                    : "キットを発行"}
-                </button>
+                {isFamilyAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setIsRecoveryKitModalOpen(true)}
+                    className="flex items-center justify-center gap-1.5 rounded-md bg-foreground px-3.5 py-2 sm:py-1.5 text-[13px] font-medium text-background shadow-sm hover:bg-foreground/90 transition cursor-pointer w-full sm:w-auto order-1 sm:order-2"
+                  >
+                    <KeyRound className="h-3.5 w-3.5" />
+                    {recoveryStatus?.hasRecoveryKit
+                      ? "再発行する"
+                      : "キットを発行"}
+                  </button>
+                )}
                 <Link
                   to="/recovery"
                   className="flex items-center justify-center gap-1.5 rounded-md border border-border bg-background px-3 py-2 sm:py-1.5 text-[13px] font-medium text-foreground shadow-sm hover:bg-muted transition cursor-pointer w-full sm:w-auto order-2 sm:order-1"
@@ -1637,7 +1641,7 @@ function FamilyComponent() {
           </div>
 
           {/* リカバリーキット発行モーダル */}
-          {family && (
+          {family && isFamilyAdmin && (
             <RecoveryKitDialog
               isOpen={isRecoveryKitModalOpen}
               onClose={() => setIsRecoveryKitModalOpen(false)}

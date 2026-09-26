@@ -480,12 +480,21 @@ Convex 側は auth.config.ts の Issuer 設定 (securetoken.google.com/poohma) �
 | identityVerifiedQuery / Mutation | Firebase Identity の存在のみ検証 | ユーザー新規同期処理など |
 | authenticatedQuery / Mutation | Identity検証 + `resolveAccount` によるアカウント解決（所有権検証） | 一般的な認証必須API |
 | familyBoundQuery / Mutation | 上記 + 対象アカウントの `user.familyId` が設定されていること | 家族所属が前提の機能（招待承認、家族固有クエリ等） |
-| familyAdminMutation | 上記 + 対象アカウントの `familyRole === "admin"` であること | 家族設定・メンバーロール変更・キック等の管理者限定機能 |
+| familyAdminQuery / Mutation | 上記 + 対象アカウントの `familyRole === "admin"` であること | 家族設定・メンバーロール変更・キック・暗号再暗号化準備・監査ログ取得等の管理者限定機能 |
 | recordAdminMutation | familyBound + 対象レコード（`args.id`）が存在し `requireAdminAccess` を満たすこと（`ctx.record` 注入） | レコード個別管理者追加・解除等のレコード管理者限定機能 |
 
 #### アカウント解決（resolveAccount）の仕組み
 
-`authenticatedQuery` / `authenticatedMutation` / `familyBoundQuery` / `familyBoundMutation` / `familyAdminMutation` / `recordAdminMutation` は共通引数として `accountId?: v.optional(v.id("users"))` をサポートします。
+`authenticatedQuery` / `authenticatedMutation` / `familyBoundQuery` / `familyBoundMutation` / `familyAdminQuery` / `familyAdminMutation` / `recordAdminMutation` は共通引数として `accountId?: v.optional(v.id("users"))` をサポートします。
+
+#### 5.3.1 フロントエンドにおける管理者セクションの安全な分離（AdminRestrictedSection）
+
+一般メンバーが家族管理画面等の管理者専用機能にアクセスした際、単に操作ボタンを非活性化したり実UIの上にオーバーレイを重ねるだけでは、裏側で不要な Convex Query やフックが購読・実行されてしまうリスクがあります。
+そのため、PoohMa では共通コンポーネント `AdminRestrictedSection` を導入し、以下の二重保護を行います：
+
+1. **実コンポーネントのアンマウント（完全遮断）**: 一般メンバー表示時は children（実コンポーネント）をレンダリングせずアンマウントします。これにより実フック・Convex Query・イベントハンドラが端末上で一切稼働しません。
+2. **静的スケルトン ＋ 中央オーバーレイマスク**: 代替として、機能の外形を模した純粋な静的スケルトン（`pointer-events-none`, `aria-hidden="true"`, `blur`）を背景に配置し、中央にロックアイコンと「管理者機能」メッセージを重ねて描画します。
+3. **React Hooks ルール遵守のラッパー設計**: 実コンポーネントを `*Content` として分離し、最外層のラッパーコンポーネントが `isAdmin` に基づいて `AdminRestrictedSection` または `*Content` を排他的に描画することで、アーリーリターンによるフック呼び出し順序の不整合（Biome `useHookAtTopLevel`）を完全に排除します。
 
 1. `accountId` が明示的に渡された場合：
    - DB から当該 `users` レコードを取得。

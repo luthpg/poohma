@@ -19,6 +19,7 @@ import { logAuditEvent } from "./auditLogs";
 import {
   authenticatedMutation,
   authenticatedQuery,
+  familyAdminQuery,
   familyBoundMutation,
   familyBoundQuery,
   recordAdminMutation,
@@ -1485,7 +1486,7 @@ export const fetchRecordsForExport = authenticatedMutation({
   },
   handler: async (ctx, args) => {
     const { user } = ctx;
-    const records = await collectVisibleRecords(ctx, user, true);
+    const records = await collectVisibleRecords(ctx, user, false);
 
     const members = user.familyId
       ? await ctx.db
@@ -2087,7 +2088,7 @@ export const getRecordViewLogs = authenticatedQuery({
  * 家族監査ログエクスポート用クエリ（CSV出力用）
  * includeViews: true の場合、変更系監査ログと閲覧履歴をマージして時系列順に返却する。
  */
-export const getFamilyAuditAndViewsForExport = familyBoundQuery({
+export const getFamilyAuditAndViewsForExport = familyAdminQuery({
   args: {
     includeViews: v.optional(v.boolean()),
     limit: v.optional(v.number()),
@@ -2166,7 +2167,7 @@ export const getRecordsForDiffImport = authenticatedQuery({
   },
   handler: async (ctx) => {
     const { user } = ctx;
-    const records = await collectVisibleRecords(ctx, user, true);
+    const records = await collectVisibleRecords(ctx, user, false);
 
     const members = user.familyId
       ? await ctx.db

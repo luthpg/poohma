@@ -16,7 +16,7 @@ import {
   authenticatedMutation,
   authenticatedQuery,
   familyAdminMutation,
-  familyBoundMutation,
+  familyAdminQuery,
   familyBoundQuery,
 } from "./customBuilders";
 import { deleteCredentialsForRecord, getCredentialsForRecord } from "./records";
@@ -744,7 +744,7 @@ export const commitFamilyMigration = authenticatedMutation({
   },
 });
 
-export const getRecordsForReEncryption = familyBoundQuery({
+export const getRecordsForReEncryption = familyAdminQuery({
   args: {},
   handler: async (ctx) => {
     const { user } = ctx;
@@ -774,7 +774,7 @@ export const getRecordsForReEncryption = familyBoundQuery({
   },
 });
 
-export const rotatePasscode = familyBoundMutation({
+export const rotatePasscode = familyAdminMutation({
   args: {
     previousMasterKeyEncrypted: v.string(),
     masterKeyEncrypted: v.string(),
@@ -868,7 +868,7 @@ export const rotatePasscode = familyBoundMutation({
   },
 });
 
-export const createFamilyInvite = familyBoundMutation({
+export const createFamilyInvite = familyAdminMutation({
   args: {
     ttlMinutes: v.optional(v.number()),
   },
@@ -919,7 +919,7 @@ export const createFamilyInvite = familyBoundMutation({
   },
 });
 
-export const revokeFamilyInvite = familyBoundMutation({
+export const revokeFamilyInvite = familyAdminMutation({
   args: {
     inviteId: v.id("familyInvites"),
   },
@@ -1512,7 +1512,7 @@ const EXPORT_VAULT_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30日
  * - 共有レコードのadminsを調停（reconcileAdminsOnLeave）
  * - 被キックユーザーへ通知メールを送信
  */
-export const kickMember = familyBoundMutation({
+export const kickMember = familyAdminMutation({
   args: {
     targetAccountId: v.id("users"),
   },
@@ -1522,10 +1522,6 @@ export const kickMember = familyBoundMutation({
     const targetUser = await ctx.db.get(args.targetAccountId);
     if (!targetUser) {
       throw new Error("Target user not found");
-    }
-
-    if (user.familyRole !== "admin") {
-      throw new Error("Access denied: Admin role required");
     }
 
     if (targetUser._id === user._id || targetUser.userId === user.userId) {

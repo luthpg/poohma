@@ -37,21 +37,21 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Issue["既存家族メンバーが招待コード発行<br/>(familyInvites: UUID, TTL)"]
+    Issue["ファミリー管理者が招待コード発行<br/>(familyInvites: UUID, TTL)"]
     Issue -->|"期限切れ / 手動失効 (revokedAt)"| Invalid["無効化 (申請不可)"]
     Issue -->|"有効な招待コードを共有"| Apply["申請者が参加申請を作成<br/>(joinRequests: pending)"]
     
     Apply --> Pending["pending"]
-    Pending -->|"家族管理者が承認 (approveJoinRequest)"| Approved["approved<br/>(user.familyId 更新)"]
-    Pending -->|"家族管理者が拒否 / 申請者が取り下げ"| Rejected["rejected<br/>(アクセス権なし)"]
+    Pending -->|"家族メンバーが承認 (approveJoinRequest)"| Approved["approved<br/>(user.familyId 更新)"]
+    Pending -->|"家族メンバーが拒否 / 申請者が取り下げ"| Rejected["rejected<br/>(アクセス権なし)"]
     
     Approved --> Unlock["家族パスコード入力でマスターキー解除"]
 ```
 
-- **招待コード発行**: 既存家族メンバーが有効期限（15分〜30日）を指定して発行（`createInviteCode`）。いつでも手動失効（`revokeInviteCode`）可能。
+- **招待コード発行**: ファミリー管理者（`familyAdminMutation`）が有効期限（15分〜30日）を指定して発行（`createFamilyInvite`）。いつでも手動失効（`revokeFamilyInvite`）可能。一般メンバーには閲覧・発行を制限（UI上は静的スケルトン＋中央オーバーレイマスク）。
 - **参加申請トリガー**: 申請者が有効な招待コード（リンク/QR）を入力して申請を作成（`createJoinRequestWithInvite`）。
-- **承認時**: 家族の管理者（`familyAdminMutation`）が承認（`approveJoinRequest`）すると、対象アカウントの `user.familyId` が更新され、申請者に通知。
-- **拒否・取り下げ時**: 家族の管理者による拒否（`rejectJoinRequest`）または申請者自身によるキャンセル（`cancelJoinRequest`）により `rejected` となり、家族へのアクセス権は付与されない。
+- **承認時**: 家族メンバー（`familyBoundMutation`）が承認（`approveJoinRequest`）すると、対象アカウントの `user.familyId` が更新され、申請者に通知（家族内相互承認モデル）。
+- **拒否・取り下げ時**: 家族メンバーによる拒否（`rejectJoinRequest`）または申請者自身によるキャンセル（`cancelJoinRequest`）により `rejected` となり、家族へのアクセス権は付与されない。
 - **参加完了後**: 申請者は家族パスコードを入力してマスターキーをロック解除し、家族内での利用を開始する。
 
 ---
@@ -95,7 +95,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Kick["既存メンバーがメンバー除名実行 (kickMember)"] --> VaultCreated["pendingExportVaults 作成<br/>(旧MasterKey暗号文, TTL 30日)"]
+    Kick["ファミリー管理者がメンバー除名実行 (kickMember)"] --> VaultCreated["pendingExportVaults 作成<br/>(旧MasterKey暗号文, TTL 30日)"]
     Kick --> FamilyCleared["被除名者の familyId を未設定（undefined）にクリア<br/>+ 共有レコード管理者調停 (reconcileAdminsOnLeave)<br/>+ 通知メール送信"]
     
     VaultCreated -->|"被除名者が旧パスコード入力<br/>(クライアントで旧MasterKeyアンラップ)"| Unlocked["移行準備完了<br/>(vaultUnlockedKey 保持)"]

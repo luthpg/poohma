@@ -6,6 +6,7 @@ import { lazy, Suspense, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
+import { AdminRestrictedSection } from "@/components/common/AdminRestrictedSection";
 import { usePasscode } from "@/components/PasscodeProvider";
 import { Spinner } from "@/components/ui/spinner";
 import { MIN_PASSCODE_LENGTH } from "@/constants/passcode";
@@ -42,9 +43,26 @@ interface PasscodeRotateSectionProps {
   activeAccount?: { id?: string; displayName?: string } | null;
   isOpen: boolean;
   onToggle: () => void;
+  isAdmin?: boolean;
 }
 
-export function PasscodeRotateSection({
+function PasscodeRotateSkeleton() {
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+      <div>
+        <h3 className="text-[14px] font-medium text-foreground">
+          家族パスコードの変更
+        </h3>
+        <p className="text-[12px] text-muted-foreground leading-relaxed mt-0.5">
+          家族グループやメンバー構成は変更せず、パスコードのみを変更します。
+        </p>
+      </div>
+      <div className="h-8 w-28 rounded-md bg-muted/60 shrink-0" />
+    </div>
+  );
+}
+
+function PasscodeRotateSectionContent({
   family,
   activeAccountId,
   activeAccount,
@@ -178,10 +196,7 @@ export function PasscodeRotateSection({
   };
 
   return (
-    <div
-      id="rotate-passcode-section"
-      className="mt-8 border-t border-border pt-6"
-    >
+    <div>
       <div className="mb-4 space-y-1">
         <div className="flex items-center justify-between gap-3 mb-2">
           <h3 className="text-[14px] font-medium text-foreground">
@@ -361,6 +376,25 @@ export function PasscodeRotateSection({
           </form>
         </div>
       )}
+    </div>
+  );
+}
+
+export function PasscodeRotateSection(props: PasscodeRotateSectionProps) {
+  const { isAdmin = true } = props;
+  return (
+    <div
+      id="rotate-passcode-section"
+      className="mt-8 border-t border-border pt-6"
+    >
+      <AdminRestrictedSection
+        isAdmin={isAdmin}
+        skeleton={<PasscodeRotateSkeleton />}
+        title="管理者機能"
+        message="パスコードの変更（暗号鍵ローテーション）はファミリー管理者のみ行えます。"
+      >
+        <PasscodeRotateSectionContent {...props} />
+      </AdminRestrictedSection>
     </div>
   );
 }

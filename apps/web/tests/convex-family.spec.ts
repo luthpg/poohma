@@ -804,6 +804,47 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
       }
     });
 
+    it("一般メンバー（viewer）が createFamilyInvite / revokeFamilyInvite を実行した場合、Access denied で拒否されること", async () => {
+      const t = convexTest(schema, modules);
+      let inviteId!: Id<"familyInvites">;
+
+      await t.run(async (ctx) => {
+        const familyId = await ctx.db.insert("families", {
+          name: "招待権限家",
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("users", {
+          familyRole: "viewer",
+          userId: "user_viewer_invite",
+          email: "viewer_invite@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+
+        inviteId = await ctx.db.insert("familyInvites", {
+          familyId,
+          code: crypto.randomUUID(),
+          createdBy: "someone",
+          createdAt: Date.now(),
+          expiresAt: Date.now() + 60000,
+          useCount: 0,
+        });
+      });
+
+      const viewer = t.withIdentity({
+        subject: "user_viewer_invite",
+        email: "viewer_invite@example.com",
+      });
+
+      await expect(
+        viewer.mutation(api.families.createFamilyInvite, { ttlMinutes: 10080 }),
+      ).rejects.toThrow("Access denied: Admin role required");
+
+      await expect(
+        viewer.mutation(api.families.revokeFamilyInvite, { inviteId }),
+      ).rejects.toThrow("Access denied: Admin role required");
+    });
+
     it("期限切れの招待コードで参加申請または情報取得を行うとエラーになること", async () => {
       const t = convexTest(schema, modules);
       let familyId!: Id<"families">;
@@ -2720,6 +2761,46 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         }),
       ).rejects.toThrow("User does not belong to a family");
     });
+
+    it("一般メンバー（viewer）が rotatePasscode / getRecordsForReEncryption を実行した場合、Access denied で拒否されること", async () => {
+      const t = convexTest(schema, modules);
+
+      await t.run(async (ctx) => {
+        const familyId = await ctx.db.insert("families", {
+          name: "F_Viewer_Rotate",
+          masterKeyEncrypted: "encKey",
+          masterKeyIv: "iv",
+          masterKeySalt: "salt",
+          updatedAt: 1000,
+        });
+
+        await ctx.db.insert("users", {
+          familyRole: "viewer",
+          userId: "u_viewer_rotate",
+          email: "v_rot@example.com",
+          familyId,
+          updatedAt: 1000,
+        });
+      });
+
+      const viewer = t.withIdentity({
+        subject: "u_viewer_rotate",
+        email: "v_rot@example.com",
+      });
+
+      await expect(
+        viewer.query(api.families.getRecordsForReEncryption, {}),
+      ).rejects.toThrow("Access denied: Admin role required");
+
+      await expect(
+        viewer.mutation(api.families.rotatePasscode, {
+          previousMasterKeyEncrypted: "encKey",
+          masterKeyEncrypted: "newEncKey",
+          masterKeyIv: "newIv",
+          masterKeySalt: "newSalt",
+        }),
+      ).rejects.toThrow("Access denied: Admin role required");
+    });
   });
 
   describe("2.1.13 メンバーキック機能とExport Vault（E2EEデータ持ち出し）の検証", () => {
@@ -2838,6 +2919,43 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
       await expect(
         userA.mutation(api.families.kickMember, { targetAccountId: userA2Id }),
       ).rejects.toThrow("Cannot kick yourself");
+    });
+
+    it("一般メンバー（viewer）が kickMember を実行しようとすると拒否されること", async () => {
+      const t = convexTest(schema, modules);
+      let targetId!: Id<"users">;
+
+      await t.run(async (ctx) => {
+        const familyId = await ctx.db.insert("families", {
+          name: "キック権限家",
+          updatedAt: Date.now(),
+        });
+
+        await ctx.db.insert("users", {
+          familyRole: "viewer",
+          userId: "viewer_kicker",
+          email: "viewer_kicker@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+
+        targetId = await ctx.db.insert("users", {
+          familyRole: "viewer",
+          userId: "victim",
+          email: "victim@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+      });
+
+      const viewer = t.withIdentity({
+        subject: "viewer_kicker",
+        email: "viewer_kicker@example.com",
+      });
+
+      await expect(
+        viewer.mutation(api.families.kickMember, { targetAccountId: targetId }),
+      ).rejects.toThrow("Access denied: Admin role required");
     });
 
     it("別家族のユーザーをキックしようとすると拒否されること", async () => {

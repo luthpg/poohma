@@ -5,6 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import type { Doc, Id } from "@/../convex/_generated/dataModel";
+import { AdminRestrictedSection } from "@/components/common/AdminRestrictedSection";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -17,9 +18,42 @@ interface FamilyInviteSectionProps {
   familyName?: string;
   familyInvites: FamilyInvite[] | undefined;
   activeAccountId?: Id<"users"> | null;
+  isAdmin?: boolean;
 }
 
-export function FamilyInviteSection({
+function FamilyInviteSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+        <div>
+          <h3 className="text-[14px] font-medium text-foreground">
+            招待コード
+          </h3>
+          <p className="text-[12px] text-muted-foreground mt-0.5">
+            家族メンバーを招待するためのコードを発行・管理します。
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-32 rounded-md bg-muted/60" />
+          <div className="h-8 w-24 rounded-md bg-muted/80" />
+        </div>
+      </div>
+      <div className="flex flex-col md:flex-row items-center gap-6 rounded-md bg-muted/30 p-6">
+        <div className="h-28 w-28 rounded-md bg-muted/60 shrink-0" />
+        <div className="flex-1 w-full space-y-3">
+          <div className="h-4 w-32 rounded bg-muted/60" />
+          <div className="h-10 w-full rounded bg-muted/50" />
+          <div className="flex gap-2">
+            <div className="h-8 w-32 rounded bg-muted/60" />
+            <div className="h-8 w-32 rounded bg-muted/60" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FamilyInviteSectionContent({
   family,
   familyName,
   familyInvites,
@@ -363,5 +397,20 @@ export function FamilyInviteSection({
         </div>
       )}
     </div>
+  );
+}
+
+export function FamilyInviteSection(props: FamilyInviteSectionProps) {
+  const { isAdmin = true } = props;
+  return (
+    <AdminRestrictedSection
+      isAdmin={isAdmin}
+      skeleton={<FamilyInviteSkeleton />}
+      title="管理者機能"
+      message="招待コードの発行・管理はファミリー管理者のみ行えます。"
+      className="mb-8 p-6"
+    >
+      <FamilyInviteSectionContent {...props} />
+    </AdminRestrictedSection>
   );
 }

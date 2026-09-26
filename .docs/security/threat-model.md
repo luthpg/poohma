@@ -119,7 +119,7 @@ PoohMaの暗号化アーキテクチャは、3つの信頼領域にまたがる�
 
 ## 6. 開発者向けの安全な実装原則
 
-- 新しいConvex関数を追加する際は、必ず `customBuilders.ts` の `authenticatedQuery` / `familyBoundQuery` 等を経由し、生の `query` / `mutation` を直接エクスポートしない。
+- 新しいConvex関数を追加する際は、必ず `customBuilders.ts` の `authenticatedQuery` / `familyBoundQuery` / `familyAdminQuery` / `familyAdminMutation` 等を経由し、生の `query` / `mutation` を直接エクスポートしない。
 - サーバー側のログ・エラーメッセージに、復号後の平文ヒントやマスターキーを出力しない。
 - 新しいフィールドを `serviceRecords` 等に追加する際は、「これはE2EE暗号化すべき秘密情報か、平文メタデータとして許容できる情報か」を必ず明示的に判断し、本書またはコードコメントに記録する。
 - ユーザー入力を `dangerouslySetInnerHTML` 等でHTMLとして描画しない。CMS由来のリッチテキストは、CmsRichTextコンポーネントのallowlistベースサニタイズを経由して描画する。新しいHTMLタグを許可する場合は、XSS攻撃ベクトルとなりうる要素（script, iframe, object, embed等）でないことを確認し、ALLOWED_TAGSへの追加理由を明記する。
