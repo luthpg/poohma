@@ -46,22 +46,6 @@ interface PasscodeRotateSectionProps {
   isAdmin?: boolean;
 }
 
-function PasscodeRotateSkeleton() {
-  return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
-      <div>
-        <h3 className="text-[14px] font-medium text-foreground">
-          家族パスコードの変更
-        </h3>
-        <p className="text-[12px] text-muted-foreground leading-relaxed mt-0.5">
-          家族グループやメンバー構成は変更せず、パスコードのみを変更します。
-        </p>
-      </div>
-      <div className="h-8 w-28 rounded-md bg-muted/60 shrink-0" />
-    </div>
-  );
-}
-
 function PasscodeRotateSectionContent({
   family,
   activeAccountId,
@@ -197,24 +181,6 @@ function PasscodeRotateSectionContent({
 
   return (
     <div>
-      <div className="mb-4 space-y-1">
-        <div className="flex items-center justify-between gap-3 mb-2">
-          <h3 className="text-[14px] font-medium text-foreground">
-            家族パスコードの変更
-          </h3>
-          <button
-            type="button"
-            onClick={onToggle}
-            className="rounded-md bg-card px-3 py-1.5 text-[13px] font-medium text-foreground shadow-border hover:bg-accent transition shrink-0 cursor-pointer"
-          >
-            {isOpen ? "閉じる" : "パスコード変更"}
-          </button>
-        </div>
-        <p className="text-[12px] text-muted-foreground leading-relaxed">
-          家族グループやメンバー構成は変更せず、パスコードのみを変更します。
-        </p>
-      </div>
-
       {isOpen && (
         <div className="rounded-md bg-muted/30 p-4 border border-border/50 space-y-4 mt-3">
           <p className="text-[12px] text-muted-foreground leading-relaxed">
@@ -381,15 +347,34 @@ function PasscodeRotateSectionContent({
 }
 
 export function PasscodeRotateSection(props: PasscodeRotateSectionProps) {
-  const { isAdmin = true } = props;
+  const { isAdmin = true, isOpen, onToggle } = props;
   return (
     <div
       id="rotate-passcode-section"
       className="mt-8 border-t border-border pt-6"
     >
+      <div className="mb-4 space-y-1">
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <h3 className="text-[14px] font-medium text-foreground">
+            家族パスコードの変更
+          </h3>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={onToggle}
+              className="rounded-md bg-card px-3 py-1.5 text-[13px] font-medium text-foreground shadow-border hover:bg-accent transition shrink-0 cursor-pointer"
+            >
+              {isOpen ? "閉じる" : "パスコード変更"}
+            </button>
+          )}
+        </div>
+        <p className="text-[12px] text-muted-foreground leading-relaxed">
+          家族グループやメンバー構成は変更せず、パスコードのみを変更します。
+        </p>
+      </div>
+
       <AdminRestrictedSection
         isAdmin={isAdmin}
-        skeleton={<PasscodeRotateSkeleton />}
         title="管理者機能"
         message="パスコードの変更（暗号鍵ローテーション）はファミリー管理者のみ行えます。"
       >

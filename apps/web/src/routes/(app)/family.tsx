@@ -1590,7 +1590,7 @@ function FamilyComponent() {
               </div>
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0 w-full sm:w-auto">
-                {isFamilyAdmin && (
+                {isFamilyAdmin ? (
                   <button
                     type="button"
                     onClick={() => setIsRecoveryKitModalOpen(true)}
@@ -1601,6 +1601,10 @@ function FamilyComponent() {
                       ? "再発行する"
                       : "キットを発行"}
                   </button>
+                ) : (
+                  <span className="text-[11px] text-muted-foreground self-center sm:self-auto order-1 sm:order-2">
+                    ※発行は管理者のみ
+                  </span>
                 )}
                 <Link
                   to="/recovery"

@@ -3,17 +3,29 @@ import type React from "react";
 
 interface AdminRestrictedSectionProps {
   isAdmin: boolean;
-  skeleton: React.ReactNode;
+  skeleton?: React.ReactNode;
   children: React.ReactNode;
   title?: string;
   message?: string;
   className?: string;
 }
 
+function DefaultCompactSkeleton() {
+  return (
+    <div className="flex h-28 w-full flex-col justify-center space-y-3 p-4">
+      <div className="flex items-center gap-3">
+        <div className="h-9 w-28 rounded-md bg-muted/70" />
+        <div className="h-9 flex-1 rounded-md bg-muted/40" />
+      </div>
+      <div className="h-3 w-2/3 rounded bg-muted/40" />
+    </div>
+  );
+}
+
 /**
  * ファミリー管理者専用セクションを保護する安全なラッパーコンポーネント
  * 一般メンバー表示時は実コンポーネント（children）をアンマウントし、
- * 純粋な静的スケルトン（skeleton）の上に中央オーバーレイマスクを重ねて表示する。
+ * コンパクトな静的スケルトンの上に中央オーバーレイマスクを重ねて表示する。
  */
 export function AdminRestrictedSection({
   isAdmin,
@@ -29,14 +41,14 @@ export function AdminRestrictedSection({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl border border-border/70 bg-card ${className}`}
+      className={`relative overflow-hidden rounded-xl border border-border/70 bg-card ${className}`}
     >
       {/* 見た目だけの静的スケルトン（実コンポーネント・クエリ・ハンドラは一切存在しない） */}
       <div
         aria-hidden="true"
         className="pointer-events-none select-none opacity-30 blur-[1px] filter"
       >
-        {skeleton}
+        {skeleton ?? <DefaultCompactSkeleton />}
       </div>
 
       {/* 中央のオーバーレイマスク */}
