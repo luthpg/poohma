@@ -42,16 +42,16 @@ flowchart TD
     Issue -->|"有効な招待コードを共有"| Apply["申請者が参加申請を作成<br/>(joinRequests: pending)"]
     
     Apply --> Pending["pending"]
-    Pending -->|"家族メンバーが承認 (approveJoinRequest)"| Approved["approved<br/>(user.familyId 更新)"]
-    Pending -->|"家族メンバーが拒否 / 申請者が取り下げ"| Rejected["rejected<br/>(アクセス権なし)"]
+    Pending -->|"ファミリー管理者が承認 (approveJoinRequest)"| Approved["approved<br/>(user.familyId 更新)"]
+    Pending -->|"ファミリー管理者が拒否 / 申請者が取り下げ"| Rejected["rejected<br/>(アクセス権なし)"]
     
     Approved --> Unlock["家族パスコード入力でマスターキー解除"]
 ```
 
 - **招待コード発行**: ファミリー管理者（`familyAdminMutation`）が有効期限（15分〜30日）を指定して発行（`createFamilyInvite`）。いつでも手動失効（`revokeFamilyInvite`）可能。一般メンバーには閲覧・発行を制限（UI上は静的スケルトン＋中央オーバーレイマスク）。
 - **参加申請トリガー**: 申請者が有効な招待コード（リンク/QR）を入力して申請を作成（`createJoinRequestWithInvite`）。
-- **承認時**: 家族メンバー（`familyBoundMutation`）が承認（`approveJoinRequest`）すると、対象アカウントの `user.familyId` が更新され、申請者に通知（家族内相互承認モデル）。
-- **拒否・取り下げ時**: 家族メンバーによる拒否（`rejectJoinRequest`）または申請者自身によるキャンセル（`cancelJoinRequest`）により `rejected` となり、家族へのアクセス権は付与されない。
+- **承認時**: ファミリー管理者（`familyAdminMutation`）が承認（`approveJoinRequest`）すると、対象アカウントの `user.familyId` が更新され、申請者に通知（一般メンバーは一覧確認のみ可能）。
+- **拒否・取り下げ時**: ファミリー管理者による拒否（`rejectJoinRequest`）または申請者自身によるキャンセル（`cancelJoinRequest`）により `rejected` となり、家族へのアクセス権は付与されない。
 - **参加完了後**: 申請者は家族パスコードを入力してマスターキーをロック解除し、家族内での利用を開始する。
 
 ---

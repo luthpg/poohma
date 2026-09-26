@@ -289,9 +289,16 @@ function FamilyComponent() {
     }
   };
 
+  const currentMember =
+    family?.users.find((u) => u.id === activeAccountId) ??
+    family?.users.find((u) => u.userId === activeAccount?.userId);
+  const isFamilyAdmin = currentMember?.familyRole === "admin";
+
   const familyInvites = useQuery(
     api.families.getFamilyInvites,
-    family ? { accountId: activeAccountId || undefined } : "skip",
+    family && isFamilyAdmin
+      ? { accountId: activeAccountId || undefined }
+      : "skip",
   );
 
   const prepareFamilyMigrationMut = useMutation(
@@ -322,11 +329,6 @@ function FamilyComponent() {
   const [isUpdatingFamilyName, setIsUpdatingFamilyName] = useState(false);
 
   const [isUpdatingRole, setIsUpdatingRole] = useState(false);
-
-  const currentMember =
-    family?.users.find((u) => u.id === activeAccountId) ??
-    family?.users.find((u) => u.userId === activeAccount?.userId);
-  const isFamilyAdmin = currentMember?.familyRole === "admin";
 
   const handleStartEditFamilyName = () => {
     setFamilyNameInput(family?.name || "");
