@@ -5,6 +5,7 @@ import { logAuditEvent } from "./auditLogs";
 import { timingSafeEqual } from "./cryptoUtils";
 import {
   authenticatedMutation,
+  familyAdminMutation,
   familyBoundMutation,
   familyBoundQuery,
 } from "./customBuilders";
@@ -55,7 +56,7 @@ function normalizeRecoveryCode(code: string): string {
 /**
  * リカバリーキット情報の登録 / 再発行（旧Recovery情報の完全上書き）
  */
-export const registerRecoveryKit = familyBoundMutation({
+export const registerRecoveryKit = familyAdminMutation({
   args: {
     recoveryMasterKeyEncrypted: v.string(),
     recoveryMasterKeyIv: v.string(),

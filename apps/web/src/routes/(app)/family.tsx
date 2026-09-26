@@ -289,9 +289,16 @@ function FamilyComponent() {
     }
   };
 
+  const currentMember =
+    family?.users.find((u) => u.id === activeAccountId) ??
+    family?.users.find((u) => u.userId === activeAccount?.userId);
+  const isFamilyAdmin = currentMember?.familyRole === "admin";
+
   const familyInvites = useQuery(
     api.families.getFamilyInvites,
-    family ? { accountId: activeAccountId || undefined } : "skip",
+    family && isFamilyAdmin
+      ? { accountId: activeAccountId || undefined }
+      : "skip",
   );
 
   const prepareFamilyMigrationMut = useMutation(
@@ -322,9 +329,6 @@ function FamilyComponent() {
   const [isUpdatingFamilyName, setIsUpdatingFamilyName] = useState(false);
 
   const [isUpdatingRole, setIsUpdatingRole] = useState(false);
-
-  const currentMember = family?.users.find((u) => u.id === activeAccountId);
-  const isFamilyAdmin = currentMember?.familyRole === "admin";
 
   const handleStartEditFamilyName = () => {
     setFamilyNameInput(family?.name || "");
@@ -389,10 +393,8 @@ function FamilyComponent() {
           ? "ファミリー管理者に変更しました"
           : "メンバーに変更しました",
       );
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "ロールの変更に失敗しました",
-      );
+    } catch (_error) {
+      toast.error("ロールの変更に失敗しました");
     } finally {
       setIsUpdatingRole(false);
     }
@@ -1347,6 +1349,7 @@ function FamilyComponent() {
             familyName={family.name}
             familyInvites={familyInvites}
             activeAccountId={activeAccountId}
+            isAdmin={isFamilyAdmin}
           />
 
           <div>
@@ -1498,55 +1501,63 @@ function FamilyComponent() {
                         {new Date(req.createdAt).toLocaleString("ja-JP")}
                       </span>
                     </div>
-                    <div className="flex flex-col sm:flex-row gap-2 shrink-0 w-full sm:w-auto">
-                      <button
-                        type="button"
-                        disabled={isLoading}
-                        onClick={async () => {
-                          setIsLoading(true);
-                          try {
-                            await approveJoinRequestMut({
-                              accountId: activeAccountId || undefined,
-                              requestId: req.id as Id<"joinRequests">,
-                            });
-                            toast.success(
-                              `${req.displayName} さんの参加を承認しました`,
-                            );
-                          } catch {
-                            toast.error("承認に失敗しました");
-                          } finally {
-                            setIsLoading(false);
-                          }
-                        }}
-                        className="flex items-center justify-center gap-1.5 rounded-md bg-green-600 px-4 py-2 text-[13px] font-medium text-white shadow-border transition hover:bg-green-700 disabled:opacity-50 cursor-pointer w-full sm:w-auto"
-                      >
-                        <Check className="h-3.5 w-3.5" />
-                        承認
-                      </button>
-                      <button
-                        type="button"
-                        disabled={isLoading}
-                        onClick={async () => {
-                          setIsLoading(true);
-                          try {
-                            await rejectJoinRequestMut({
-                              accountId: activeAccountId || undefined,
-                              requestId: req.id as Id<"joinRequests">,
-                            });
-                            toast.success(
-                              `${req.displayName} さんの参加を却下しました`,
-                            );
-                          } catch {
-                            toast.error("却下に失敗しました");
-                          } finally {
-                            setIsLoading(false);
-                          }
-                        }}
-                        className="flex items-center justify-center gap-1.5 rounded-md bg-card px-4 py-2 text-[13px] font-medium text-red-500 shadow-border transition hover:bg-accent disabled:opacity-50 cursor-pointer w-full sm:w-auto"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                        却下
-                      </button>
+                    <div className="flex flex-col sm:flex-row items-center gap-2 shrink-0 w-full sm:w-auto">
+                      {isFamilyAdmin ? (
+                        <>
+                          <button
+                            type="button"
+                            disabled={isLoading}
+                            onClick={async () => {
+                              setIsLoading(true);
+                              try {
+                                await approveJoinRequestMut({
+                                  accountId: activeAccountId || undefined,
+                                  requestId: req.id as Id<"joinRequests">,
+                                });
+                                toast.success(
+                                  `${req.displayName} さんの参加を承認しました`,
+                                );
+                              } catch {
+                                toast.error("承認に失敗しました");
+                              } finally {
+                                setIsLoading(false);
+                              }
+                            }}
+                            className="flex items-center justify-center gap-1.5 rounded-md bg-green-600 px-4 py-2 text-[13px] font-medium text-white shadow-border transition hover:bg-green-700 disabled:opacity-50 cursor-pointer w-full sm:w-auto"
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                            承認
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isLoading}
+                            onClick={async () => {
+                              setIsLoading(true);
+                              try {
+                                await rejectJoinRequestMut({
+                                  accountId: activeAccountId || undefined,
+                                  requestId: req.id as Id<"joinRequests">,
+                                });
+                                toast.success(
+                                  `${req.displayName} さんの参加を却下しました`,
+                                );
+                              } catch {
+                                toast.error("却下に失敗しました");
+                              } finally {
+                                setIsLoading(false);
+                              }
+                            }}
+                            className="flex items-center justify-center gap-1.5 rounded-md bg-card px-4 py-2 text-[13px] font-medium text-red-500 shadow-border transition hover:bg-accent disabled:opacity-50 cursor-pointer w-full sm:w-auto"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                            却下
+                          </button>
+                        </>
+                      ) : (
+                        <span className="text-[12px] text-muted-foreground italic px-2 py-1">
+                          ※承認・却下は管理者のみ行えます
+                        </span>
+                      )}
                     </div>
                   </li>
                 ))}
@@ -1561,6 +1572,7 @@ function FamilyComponent() {
             activeAccount={activeAccount}
             isOpen={showRotatePasscodeForm}
             onToggle={() => setShowRotatePasscodeForm((prev) => !prev)}
+            isAdmin={isFamilyAdmin}
           />
 
           {/* リカバリーキット（復旧コード） */}
@@ -1588,16 +1600,22 @@ function FamilyComponent() {
               </div>
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0 w-full sm:w-auto">
-                <button
-                  type="button"
-                  onClick={() => setIsRecoveryKitModalOpen(true)}
-                  className="flex items-center justify-center gap-1.5 rounded-md bg-foreground px-3.5 py-2 sm:py-1.5 text-[13px] font-medium text-background shadow-sm hover:bg-foreground/90 transition cursor-pointer w-full sm:w-auto order-1 sm:order-2"
-                >
-                  <KeyRound className="h-3.5 w-3.5" />
-                  {recoveryStatus?.hasRecoveryKit
-                    ? "再発行する"
-                    : "キットを発行"}
-                </button>
+                {isFamilyAdmin ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsRecoveryKitModalOpen(true)}
+                    className="flex items-center justify-center gap-1.5 rounded-md bg-foreground px-3.5 py-2 sm:py-1.5 text-[13px] font-medium text-background shadow-sm hover:bg-foreground/90 transition cursor-pointer w-full sm:w-auto order-1 sm:order-2"
+                  >
+                    <KeyRound className="h-3.5 w-3.5" />
+                    {recoveryStatus?.hasRecoveryKit
+                      ? "再発行する"
+                      : "キットを発行"}
+                  </button>
+                ) : (
+                  <span className="text-[11px] text-muted-foreground self-center sm:self-auto order-1 sm:order-2">
+                    ※発行は管理者のみ
+                  </span>
+                )}
                 <Link
                   to="/recovery"
                   className="flex items-center justify-center gap-1.5 rounded-md border border-border bg-background px-3 py-2 sm:py-1.5 text-[13px] font-medium text-foreground shadow-sm hover:bg-muted transition cursor-pointer w-full sm:w-auto order-2 sm:order-1"
@@ -1637,7 +1655,7 @@ function FamilyComponent() {
           </div>
 
           {/* リカバリーキット発行モーダル */}
-          {family && (
+          {family && isFamilyAdmin && (
             <RecoveryKitDialog
               isOpen={isRecoveryKitModalOpen}
               onClose={() => setIsRecoveryKitModalOpen(false)}

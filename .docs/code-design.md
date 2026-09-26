@@ -480,12 +480,21 @@ Convex 側は auth.config.ts の Issuer 設定 (securetoken.google.com/poohma) �
 | identityVerifiedQuery / Mutation | Firebase Identity の存在のみ検証 | ユーザー新規同期処理など |
 | authenticatedQuery / Mutation | Identity検証 + `resolveAccount` によるアカウント解決（所有権検証） | 一般的な認証必須API |
 | familyBoundQuery / Mutation | 上記 + 対象アカウントの `user.familyId` が設定されていること | 家族所属が前提の機能（招待承認、家族固有クエリ等） |
-| familyAdminMutation | 上記 + 対象アカウントの `familyRole === "admin"` であること | 家族設定・メンバーロール変更・キック等の管理者限定機能 |
+| familyAdminQuery / Mutation | 上記 + 対象アカウントの `familyRole === "admin"` であること | 家族設定・メンバーロール変更・キック・暗号再暗号化準備・監査ログ取得等の管理者限定機能 |
 | recordAdminMutation | familyBound + 対象レコード（`args.id`）が存在し `requireAdminAccess` を満たすこと（`ctx.record` 注入） | レコード個別管理者追加・解除等のレコード管理者限定機能 |
 
 #### アカウント解決（resolveAccount）の仕組み
 
-`authenticatedQuery` / `authenticatedMutation` / `familyBoundQuery` / `familyBoundMutation` / `familyAdminMutation` / `recordAdminMutation` は共通引数として `accountId?: v.optional(v.id("users"))` をサポートします。
+`authenticatedQuery` / `authenticatedMutation` / `familyBoundQuery` / `familyBoundMutation` / `familyAdminQuery` / `familyAdminMutation` / `recordAdminMutation` は共通引数として `accountId?: v.optional(v.id("users"))` をサポートします。
+
+#### 5.3.1 フロントエンドにおける管理者セクションの安全な分離（AdminRestrictedSection）
+
+一般メンバーが家族管理画面等の管理者専用機能にアクセスした際、単に操作ボタンを非活性化したり実UIの上にオーバーレイを重ねるだけでは、裏側で不要な Convex Query やフックが購読・実行されてしまうリスクがあります。
+そのため、PoohMa では共通コンポーネント `AdminRestrictedSection` を導入し、以下の二重保護を行います：
+
+1. **実コンポーネントのアンマウント（完全遮断）**: 一般メンバー表示時は children（実コンポーネント）をレンダリングせずアンマウントします。これにより実フック・Convex Query・イベントハンドラが端末上で一切稼働しません。
+2. **静的スケルトン ＋ 中央オーバーレイマスク**: 代替として、機能の外形を模した純粋な静的スケルトン（`pointer-events-none`, `aria-hidden="true"`, `blur`）を背景に配置し、中央にロックアイコンと「管理者機能」メッセージを重ねて描画します。
+3. **React Hooks ルール遵守のラッパー設計**: 実コンポーネントを `*Content` として分離し、最外層のラッパーコンポーネントが `isAdmin` に基づいて `AdminRestrictedSection` または `*Content` を排他的に描画することで、アーリーリターンによるフック呼び出し順序の不整合（Biome `useHookAtTopLevel`）を完全に排除します。
 
 1. `accountId` が明示的に渡された場合：
    - DB から当該 `users` レコードを取得。
@@ -888,13 +897,13 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 | getMigrationForEncryption | Query | authenticated | 移行対象データ（暗号化済みDEK等）の取得 |
 | commitFamilyMigration | Mutation | authenticated | 移行の確定（再暗号化データの反映）。prepare時点とcommit時点のレコード一覧を照合する楽観的ロック（競合検知）を適用 |
 | abortFamilyMigration | Mutation | authenticated | 移行の中断 |
-| rotatePasscode | Mutation | familyBound | パスコードのみの変更（masterKeyEncrypted/Iv/Salt/kdfIterationsのみ更新、6.5） |
+| rotatePasscode | Mutation | familyAdmin | パスコードのみの変更（masterKeyEncrypted/Iv/Salt/kdfIterationsのみ更新、ファミリー管理者のみ、6.5） |
 | issueRecoveryKey | Mutation | familyBound | リカバリーキーの発行／再発行（masterKeyRecoveryEncrypted等を保存、6.6） |
 | recoverWithRecoveryKey | Mutation | authenticated | リカバリーキー経由でのマスターキー復元後、新パスコードでの再wrap結果を保存（6.6） |
-| getRecordsForReEncryption | Query | familyBound | 再暗号化対象データ取得（家族所属前提） |
-| createFamilyInvite | Mutation | familyBound | 有効期限付き招待コードの発行（TTL: 15分〜30日、デフォルト7日） |
-| revokeFamilyInvite | Mutation | familyBound | 自家族の招待コードの手動失効 |
-| getFamilyInvites | Query | familyBound | 自家族の招待コード一覧取得（ステータス: active/expired/revoked付き） |
+| getRecordsForReEncryption | Query | familyAdmin | 再暗号化対象データ取得（ファミリー管理者のみ、家族所属前提） |
+| createFamilyInvite | Mutation | familyAdmin | 有効期限付き招待コードの発行（TTL: 15分〜30日、デフォルト7日、ファミリー管理者のみ） |
+| revokeFamilyInvite | Mutation | familyAdmin | 自家族の招待コードの手動失効（ファミリー管理者のみ） |
+| getFamilyInvites | Query | familyAdmin | 自家族の招待コード一覧取得（ステータス: active/expired/revoked付き、ファミリー管理者のみ） |
 | updateMemberRole | Mutation | familyAdmin | メンバーのロール（admin/viewer）の更新。ファミリー管理者のみ実行可能。家族内に最低1名のファミリー管理者が残るよう検証（最後の管理者の降格を防止） |
 | updateFamilyName | Mutation | familyAdmin | 家族グループ名の変更。ファミリー管理者のみ実行可能。前後の空白トリム・文字数（1〜100文字）バリデーションを適用（Issue #177） |
 | kickMember | Mutation | familyAdmin | メンバーのキック（強制削除）。ファミリー管理者のみ実行可能。最後のファミリー管理者のキックは防止。Export Vaultへのマスターキー退避（TTL: 30日）、admins調停、所属解除、通知メール送信（6.7） |
@@ -921,7 +930,7 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 | addRecordAdmin / removeRecordAdmin | Mutation | recordAdmin | 共有レコードの個別管理者（一般メンバー）の追加・解除（管理者限定・管理者変更通知メール送信。ファミリー管理者の冗長追加は防止） |
 | bulkSetRecordAdmin | Mutation | familyBound | 選択した共有レコード群に対して個別管理者の追加／解除を一括適用（管理者限定） |
 | bulkShareRecords / bulkUnshareRecords | Mutation | familyBound | 選択した個人レコードの一括共有 / 共有レコードの一括共有解除（isRecordAdminで認可検証） |
-| getRecordsForDiffImport | Query | authenticated | CSV差分インポート突合用にアクセス可能なレコード一覧を軽量取得（暗号化フィールドは除外、最小権限原則） |
+| getRecordsForDiffImport | Query | authenticated | CSV差分インポート突合用にアクセス可能なレコード一覧を軽量取得（編集可否を示す `canEdit` 付与、暗号化フィールドは除外、最小権限原則） |
 | applyImportDiff | Mutation | familyBound | CSV差分プレビューで承認された新規登録・更新を一括反映（家族境界・管理者認可検証、非空フィールドのみ更新、監査ログ記録） |
 | createRecord | Mutation | familyBound | レコード新規作成（zodによるサーバー再検証、sortKey自動算出、ownerType: "user" \| "family"、credentials最大10件チェック、stableId自動生成、revision: 0初期化） |
 | updateRecord | Mutation | familyBound | レコード更新（requireAdminAccessチェックにより閲覧専用メンバーによる更新を防止、sortKey再算出、共有解除時は管理者権限を要求、revisionによる楽観的ロック競合検証、forceフラグによる強制上書き、完了時セッション自動削除） |
@@ -941,7 +950,7 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 | getRecordViewLogs | Query | authenticated | 単一レコードの閲覧履歴タイムラインを取得（`by_recordId_createdAt` インデックス使用） |
 | getFamilyAuditLogs | Query | familyBound | 家族全体の監査ログをページネーションで取得（`by_family_createdAt` インデックス使用、降順）。actorDisplayNameをDBから最新化して返す |
 | getRecordAuditLogs | Query | authenticated | 単一レコードの変更履歴タイムラインを取得（最大50件、`by_recordId_createdAt` インデックス使用） |
-| getFamilyAuditAndViewsForExport | Query | familyBound | CSVエクスポート用：家族の変更系監査ログと閲覧ログを統合し降順で取得 |
+| getFamilyAuditAndViewsForExport | Query | familyAdmin | CSVエクスポート用：家族の変更系監査ログと閲覧ログを統合し降順で取得（ファミリー管理者限定） |
 | getStaleRecords | Query | authenticated | 指定日数（デフォルト180日）以上更新されていないレコードを取得（サンプルレコード除外） |
 | cleanupOldAuditLogsInternal | InternalMutation | internal（Cron） | 180日以上経過した監査ログを削除（24時間間隔cronから実行、1回100件バッチ、件数上限到達時は再帰実行） |
 | cleanupOldViewLogsInternal | InternalMutation | internal（Cron） | 180日以上経過した閲覧ログを削除（24時間間隔cronから実行、1回100件バッチ、件数上限到達時は再帰実行） |

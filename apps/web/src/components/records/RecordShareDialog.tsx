@@ -151,7 +151,7 @@ export function ShareSettingsDialog({
             <div className="space-y-2 max-h-40 overflow-y-auto">
               {activeAdminUsers.map((admin) => {
                 const member = familyMembers.find((m) => m.id === admin._id);
-                const isDefaultAdmin = member?.familyRole === "admin";
+                const isFamilyAdmin = member?.familyRole === "admin";
                 return (
                   <div
                     key={admin._id}
@@ -161,7 +161,7 @@ export function ShareSettingsDialog({
                       <div className="font-medium text-foreground flex items-center gap-2">
                         {admin.displayName || "メンバー"}
                         {admin._id === activeAccountId && " (あなた)"}
-                        {isDefaultAdmin ? (
+                        {isFamilyAdmin ? (
                           <span className="rounded bg-secondary text-secondary-foreground text-[10px] px-1.5 py-0.5 font-medium">
                             ファミリー管理者
                           </span>
@@ -177,7 +177,7 @@ export function ShareSettingsDialog({
                         </div>
                       )}
                     </div>
-                    {isAdmin && !isDefaultAdmin && (
+                    {isAdmin && !isFamilyAdmin && (
                       <button
                         type="button"
                         disabled={isSubmitting}
@@ -202,7 +202,7 @@ export function ShareSettingsDialog({
             <div className="space-y-2 max-h-40 overflow-y-auto">
               {familyMembers.map((member) => {
                 const isMemberAdmin = activeAdminIds.includes(member.id);
-                const isDefaultAdmin = member.familyRole === "admin";
+                const isFamilyAdmin = member.familyRole === "admin";
                 return (
                   <div
                     key={member.id}
@@ -220,7 +220,7 @@ export function ShareSettingsDialog({
                       )}
                     </div>
                     <div>
-                      {isDefaultAdmin ? (
+                      {isFamilyAdmin ? (
                         <span className="rounded bg-secondary text-secondary-foreground text-[10px] px-1.5 py-0.5 font-medium">
                           ファミリー管理者
                         </span>

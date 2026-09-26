@@ -147,6 +147,24 @@ export const familyAdminMutation = customMutation(baseMutation, {
 });
 
 /**
+ * 家族のファミリー管理者（familyRole === "admin"）であることを保証するクエリ
+ */
+export const familyAdminQuery = customQuery(baseQuery, {
+  args: {
+    accountId: v.optional(v.id("users")),
+  },
+  input: async (ctx, args) => {
+    const { identity, user } = await resolveAccount(ctx, args.accountId);
+    if (!user.familyId) throw new Error("User does not belong to a family");
+    if (getEffectiveFamilyRole(user) !== "admin") {
+      throw new Error("Access denied: Admin role required");
+    }
+
+    return { ctx: { ...ctx, identity, user, familyId: user.familyId }, args };
+  },
+});
+
+/**
  * レコードの管理者権限を保証し、解決済み record を提供するミューテーション
  */
 export const recordAdminMutation = customMutation(baseMutation, {

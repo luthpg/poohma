@@ -6,6 +6,7 @@ import { lazy, Suspense, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
+import { AdminRestrictedSection } from "@/components/common/AdminRestrictedSection";
 import { usePasscode } from "@/components/PasscodeProvider";
 import { Spinner } from "@/components/ui/spinner";
 import { MIN_PASSCODE_LENGTH } from "@/constants/passcode";
@@ -42,9 +43,10 @@ interface PasscodeRotateSectionProps {
   activeAccount?: { id?: string; displayName?: string } | null;
   isOpen: boolean;
   onToggle: () => void;
+  isAdmin?: boolean;
 }
 
-export function PasscodeRotateSection({
+function PasscodeRotateSectionContent({
   family,
   activeAccountId,
   activeAccount,
@@ -178,28 +180,7 @@ export function PasscodeRotateSection({
   };
 
   return (
-    <div
-      id="rotate-passcode-section"
-      className="mt-8 border-t border-border pt-6"
-    >
-      <div className="mb-4 space-y-1">
-        <div className="flex items-center justify-between gap-3 mb-2">
-          <h3 className="text-[14px] font-medium text-foreground">
-            家族パスコードの変更
-          </h3>
-          <button
-            type="button"
-            onClick={onToggle}
-            className="rounded-md bg-card px-3 py-1.5 text-[13px] font-medium text-foreground shadow-border hover:bg-accent transition shrink-0 cursor-pointer"
-          >
-            {isOpen ? "閉じる" : "パスコード変更"}
-          </button>
-        </div>
-        <p className="text-[12px] text-muted-foreground leading-relaxed">
-          家族グループやメンバー構成は変更せず、パスコードのみを変更します。
-        </p>
-      </div>
-
+    <div>
       {isOpen && (
         <div className="rounded-md bg-muted/30 p-4 border border-border/50 space-y-4 mt-3">
           <p className="text-[12px] text-muted-foreground leading-relaxed">
@@ -361,6 +342,44 @@ export function PasscodeRotateSection({
           </form>
         </div>
       )}
+    </div>
+  );
+}
+
+export function PasscodeRotateSection(props: PasscodeRotateSectionProps) {
+  const { isAdmin = true, isOpen, onToggle } = props;
+  return (
+    <div
+      id="rotate-passcode-section"
+      className="mt-8 border-t border-border pt-6"
+    >
+      <div className="mb-4 space-y-1">
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <h3 className="text-[14px] font-medium text-foreground">
+            家族パスコードの変更
+          </h3>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={onToggle}
+              className="rounded-md bg-card px-3 py-1.5 text-[13px] font-medium text-foreground shadow-border hover:bg-accent transition shrink-0 cursor-pointer"
+            >
+              {isOpen ? "閉じる" : "パスコード変更"}
+            </button>
+          )}
+        </div>
+        <p className="text-[12px] text-muted-foreground leading-relaxed">
+          家族グループやメンバー構成は変更せず、パスコードのみを変更します。
+        </p>
+      </div>
+
+      <AdminRestrictedSection
+        isAdmin={isAdmin}
+        title="管理者機能"
+        message="パスコードの変更（暗号鍵ローテーション）はファミリー管理者のみ行えます。"
+      >
+        <PasscodeRotateSectionContent {...props} />
+      </AdminRestrictedSection>
     </div>
   );
 }

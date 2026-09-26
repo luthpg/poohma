@@ -90,6 +90,39 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
     expect(updatedFamily?.recoveryCodeHash).toBe("RecoveryCodeHash2==");
   });
 
+  it("一般メンバー（viewer）が registerRecoveryKit を実行した場合、Access denied で拒否されること", async () => {
+    const t = convexTest(schema, modules);
+
+    await t.run(async (ctx) => {
+      const familyId = await ctx.db.insert("families", {
+        name: "Viewer Recovery Family",
+        updatedAt: Date.now(),
+      });
+
+      await ctx.db.insert("users", {
+        familyRole: "viewer",
+        userId: "user_viewer_rec",
+        email: "viewer_rec@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+    });
+
+    const viewer = t.withIdentity({
+      subject: "user_viewer_rec",
+      email: "viewer_rec@example.com",
+    });
+
+    await expect(
+      viewer.mutation(api.recovery.registerRecoveryKit, {
+        recoveryMasterKeyEncrypted: "RecoveryEncryptedKey1==",
+        recoveryMasterKeyIv: "RecoveryIv1==",
+        recoveryMasterKeySalt: "RecoverySalt1==",
+        recoveryCodeHash: "RecoveryCodeHash1==",
+      }),
+    ).rejects.toThrow("Access denied: Admin role required");
+  });
+
   it("ハッシュのない既存リカバリーキットでは復元を拒否すること", async () => {
     const t = convexTest(schema, modules);
 

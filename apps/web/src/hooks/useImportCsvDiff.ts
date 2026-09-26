@@ -63,6 +63,7 @@ export interface DiffItem {
   action: DiffAction;
   title: string;
   stableId?: string;
+  canEdit?: boolean;
   changedFields: string[];
   changes: FieldChange[];
   errorReason?: string;
@@ -524,12 +525,28 @@ export function useImportCsvDiff(options?: UseImportCsvDiffOptions) {
 
           const isFamily = (ownerType || existing.ownerType) === "family";
           const warnings = isFamily ? checkAdminWarnings(row.Admins) : [];
+
+          // 編集権限の確認: 編集不可の共有レコードに対して変更がある場合は SKIP 扱い（警告付き）
+          const canEdit = existing.canEdit !== false;
+          let action: DiffAction = "SKIP";
+          if (changes.length > 0) {
+            if (canEdit) {
+              action = "UPDATE";
+            } else {
+              action = "SKIP";
+              warnings.push(
+                "編集権限がない共有レコードのため更新はスキップされます（閲覧のみ）",
+              );
+            }
+          }
+
           preliminaryItems.push({
             index,
             csvRow,
-            action: changes.length > 0 ? "UPDATE" : "SKIP",
+            action,
             title: existing.title,
             stableId: recordId,
+            canEdit,
             changedFields,
             changes,
             warnings: warnings.length > 0 ? warnings : undefined,
@@ -808,7 +825,11 @@ export function useImportCsvDiff(options?: UseImportCsvDiffOptions) {
 
           if (item.action === "CREATE" && item.createPayload) {
             creates.push(item.createPayload);
-          } else if (item.action === "UPDATE" && item.updatePayload) {
+          } else if (
+            item.action === "UPDATE" &&
+            item.updatePayload &&
+            item.canEdit !== false
+          ) {
             updates.push(item.updatePayload);
           }
         }

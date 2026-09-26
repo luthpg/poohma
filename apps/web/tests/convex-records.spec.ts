@@ -1183,12 +1183,12 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
       },
     );
 
-    // Aの個人レコードとAが管理者の家族レコードの2件のみ取得されること
-    expect(results).toHaveLength(2);
+    // Aの個人レコードおよび家族共有レコード全件の3件が取得され、Bの個人レコードは除外されること
+    expect(results).toHaveLength(3);
     const titles = results.map((r) => r.title);
     expect(titles).toContain("A Personal Record");
     expect(titles).toContain("Shared Admin A Record");
-    expect(titles).not.toContain("Shared Admin B Record");
+    expect(titles).toContain("Shared Admin B Record");
     expect(titles).not.toContain("B Personal Record");
 
     // クレデンシャルと管理者メールの検証
@@ -1196,8 +1196,101 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
     expect(personalRec?.credentials).toHaveLength(1);
     expect(personalRec?.credentials[0]?.loginId).toBe("a_login_id");
 
-    const sharedRec = results.find((r) => r.title === "Shared Admin A Record");
-    expect(sharedRec?.adminEmails).toEqual(["export_a@example.com"]);
+    const sharedRecA = results.find((r) => r.title === "Shared Admin A Record");
+    expect(sharedRecA?.adminEmails).toEqual(["export_a@example.com"]);
+
+    const sharedRecB = results.find((r) => r.title === "Shared Admin B Record");
+    expect(sharedRecB?.adminEmails).toEqual(["export_b@example.com"]);
+  });
+
+  it("一般メンバー（viewer）でも閲覧可能な家族共有レコードと自身の個人レコードのみが取得されること", async () => {
+    const t = convexTest(schema, modules);
+
+    let familyId!: Id<"families">;
+    let userAId!: Id<"users">;
+    let userCId!: Id<"users">;
+
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        name: "Viewer Export Family",
+        updatedAt: Date.now(),
+      });
+
+      userAId = await ctx.db.insert("users", {
+        familyRole: "admin",
+        userId: "user_admin_a",
+        email: "admin_a@example.com",
+        displayName: "管理者A",
+        familyId,
+        updatedAt: Date.now(),
+      });
+
+      userCId = await ctx.db.insert("users", {
+        familyRole: "viewer",
+        userId: "user_viewer_c",
+        email: "viewer_c@example.com",
+        displayName: "一般メンバーC",
+        familyId,
+        updatedAt: Date.now(),
+      });
+
+      // Aの個人レコード
+      await ctx.db.insert("serviceRecords", {
+        stableId: crypto.randomUUID(),
+        title: "A Personal Secret",
+        userId: "user_admin_a",
+        accountId: userAId,
+        familyId,
+        ownerType: "user",
+        tags: [],
+        updatedAt: Date.now(),
+      });
+
+      // Cの個人レコード
+      await ctx.db.insert("serviceRecords", {
+        stableId: crypto.randomUUID(),
+        title: "C Personal Record",
+        userId: "user_viewer_c",
+        accountId: userCId,
+        familyId,
+        ownerType: "user",
+        tags: [],
+        updatedAt: Date.now(),
+      });
+
+      // 家族共有レコード
+      await ctx.db.insert("serviceRecords", {
+        stableId: crypto.randomUUID(),
+        title: "Family Shared WiFi",
+        userId: "user_admin_a",
+        accountId: userAId,
+        familyId,
+        ownerType: "family",
+        ownerFamilyId: familyId,
+        admins: [userAId],
+        tags: [],
+        updatedAt: Date.now(),
+      });
+    });
+
+    const userCClient = t.withIdentity({
+      subject: "user_viewer_c",
+      email: "viewer_c@example.com",
+    });
+
+    const results = await userCClient.mutation(
+      api.records.fetchRecordsForExport,
+      {
+        accountId: userCId,
+      },
+    );
+
+    // Cの個人レコードと家族共有レコードの2件のみ取得され、Aの個人レコードは除外されること
+    expect(results).toHaveLength(2);
+    const titles = results.map((r) => r.title);
+    expect(titles).toContain("C Personal Record");
+    expect(titles).toContain("Family Shared WiFi");
+    expect(titles).not.toContain("A Personal Secret");
   });
 
   it("他人の accountId を指定した場合は Unauthorized で拒否されること", async () => {
@@ -1990,6 +2083,58 @@ describe("2.2.14 CSV差分インポート・安定ID（stableId）検証", () =>
     expect(
       (r.credentials[0] as Record<string, unknown>).passwordHintIv,
     ).toBeUndefined();
+    expect(r.canEdit).toBe(true);
+  });
+
+  it("getRecordsForDiffImport: 一般メンバー（viewer）から見た共有レコードの canEdit が正しく false になること", async () => {
+    const t = convexTest(schema, modules);
+    const stableUUID = "33333333-4444-5555-6666-777777777777";
+
+    await t.run(async (ctx) => {
+      const familyId = await ctx.db.insert("families", {
+        name: "Diff Viewer Family",
+        updatedAt: Date.now(),
+      });
+      const adminUserId = await ctx.db.insert("users", {
+        familyRole: "admin",
+        userId: "diff_admin",
+        email: "diff_admin@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+      await ctx.db.insert("users", {
+        familyRole: "viewer",
+        userId: "diff_viewer",
+        email: "diff_viewer@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+      await ctx.db.insert("serviceRecords", {
+        title: "Family Shared Service",
+        url: "https://diff-shared.example.com",
+        userId: "diff_admin",
+        accountId: adminUserId,
+        familyId,
+        ownerType: "family",
+        ownerFamilyId: familyId,
+        admins: [adminUserId],
+        stableId: stableUUID,
+        tags: ["shared"],
+        updatedAt: Date.now(),
+      });
+    });
+
+    const viewer = t.withIdentity({
+      subject: "diff_viewer",
+      email: "diff_viewer@example.com",
+    });
+
+    const records = await viewer.query(api.records.getRecordsForDiffImport, {});
+    expect(records.length).toBe(1);
+    const r = records[0]!;
+    expect(r.stableId).toBe(stableUUID);
+    expect(r.title).toBe("Family Shared Service");
+    expect(r.canEdit).toBe(false);
   });
 
   it("applyImportDiff: 新規作成と差分更新が同一トランザクションで安全に反映されること", async () => {
