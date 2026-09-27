@@ -164,7 +164,7 @@ function RouteComponent() {
   const currentFilter = (searchParams.filter as ScopeFilterType) || "all";
 
   const [searchInput, setSearchInput] = useState(searchParams.q || "");
-  const isComposingRef = useRef(false);
+  const [isComposing, setIsComposing] = useState(false);
 
   useEffect(() => {
     setSearchInput(searchParams.q || "");
@@ -172,7 +172,7 @@ function RouteComponent() {
 
   // デバウンス自動検索（250ms）
   useEffect(() => {
-    if (isComposingRef.current) return;
+    if (isComposing) return;
 
     const timer = setTimeout(() => {
       const trimmed = searchInput.trim();
@@ -189,7 +189,7 @@ function RouteComponent() {
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [searchInput, searchParams.q, navigate]);
+  }, [searchInput, searchParams.q, navigate, isComposing]);
 
   const handleClearSearch = () => {
     setSearchInput("");
@@ -555,11 +555,9 @@ function RouteComponent() {
               type="text"
               data-tour="search-input"
               value={searchInput}
-              onCompositionStart={() => {
-                isComposingRef.current = true;
-              }}
+              onCompositionStart={() => setIsComposing(true)}
               onCompositionEnd={(e) => {
-                isComposingRef.current = false;
+                setIsComposing(false);
                 setSearchInput(e.currentTarget.value);
               }}
               onChange={(e) => setSearchInput(e.target.value)}
