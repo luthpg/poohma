@@ -191,9 +191,10 @@ PoohMa のブランドカラー本体（`#f97316` / orange-500：ロゴや変更
   - Height: `h-[30px]` / `h-8`（ピル型 `rounded-full`、幅 約 85px〜105px）
   - Status Style:
     - すべて (`all`): `bg-card text-foreground border-border/60 hover:bg-accent`
-    - 自分のみ (`personal`): `bg-secondary text-foreground border-border/60 hover:bg-accent`
-    - 共有中 (`shared`): `bg-blue-100/60 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 border-blue-500/30`
+    - 自分のみ (`personal`): `bg-emerald-100/70 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border-emerald-500/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/60`（個人・プライベートを明確に示すエメラルドカラー）
+    - 共有中 (`shared`): `bg-blue-100/60 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border-blue-500/30`
 - Separator: `h-4 w-[1px] bg-border/60 shrink-0`
+- Ownership Badges: ダッシュボード（リスト/カード）およびレコード詳細画面の所有権バッジも同一テーマに統一（共有中: Blue / 自分のみ: Emerald）。
 - Tag Cloud: 残り全幅をスムーズに横スクロール。モバイル（375px幅）でも縦方向をわずか36px（1行）に抑え、タグ領域に約268pxの広いスワイプ領域を確保。
 
 **Visual Accent Bar (Form Modification Indicator)**

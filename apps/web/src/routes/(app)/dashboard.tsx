@@ -1214,10 +1214,10 @@ function ServiceListItem({
               {record.title}
             </span>
             <span
-              className={`inline-flex items-center gap-1 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+              className={`inline-flex items-center gap-1 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium border ${
                 isShared
-                  ? "bg-blue-100/50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
-                  : "bg-secondary text-muted-foreground"
+                  ? "bg-blue-100/60 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-blue-500/20"
+                  : "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-500/20"
               }`}
             >
               {isShared ? (
@@ -1364,10 +1364,10 @@ function ServiceCard({
           </span>
           {/* 所有設定バッジ */}
           <span
-            className={`inline-flex items-center gap-1 shrink-0 rounded-full px-2 py-0.5 text-[10px] md:text-xs font-medium ${
+            className={`inline-flex items-center gap-1 shrink-0 rounded-full px-2 py-0.5 text-[10px] md:text-xs font-medium border ${
               record.ownerType === "family"
-                ? "bg-blue-100/50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
-                : "bg-secondary text-muted-foreground"
+                ? "bg-blue-100/60 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-blue-500/20"
+                : "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-500/20"
             }`}
           >
             {record.ownerType === "family" ? (

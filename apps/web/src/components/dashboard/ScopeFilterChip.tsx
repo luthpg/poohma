@@ -31,7 +31,7 @@ const SCOPE_CONFIG = {
     label: "自分のみ",
     icon: Lock,
     activeClass:
-      "bg-secondary text-foreground border-border/60 hover:bg-accent shadow-xs",
+      "bg-emerald-100/70 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border-emerald-500/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 shadow-xs",
   },
   shared: {
     label: "共有中",
@@ -108,7 +108,9 @@ export function ScopeFilterChip({
                       "h-3.5 w-3.5 shrink-0",
                       key === "shared"
                         ? "text-blue-500"
-                        : "text-muted-foreground",
+                        : key === "personal"
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-muted-foreground",
                     )}
                     aria-hidden="true"
                   />

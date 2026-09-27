@@ -141,27 +141,31 @@ describe("ScopeFilterChip Component", () => {
     ];
 
     const searchRecords = (rawQuery: string, records: typeof mockRecords) => {
-      const q = rawQuery.trim().normalize("NFKC").toLowerCase();
-      if (!q) return records;
-      return records.filter((r) => {
-        const title = r.title.normalize("NFKC").toLowerCase();
-        const titleReading = r.titleReading?.normalize("NFKC").toLowerCase();
-        const url = r.url?.normalize("NFKC").toLowerCase();
-        const tagsMatch = r.tags?.some((t) =>
-          t.normalize("NFKC").toLowerCase().includes(q),
-        );
-        const credsMatch = r.credentials.some((c) => {
-          const label = c.label?.normalize("NFKC").toLowerCase();
-          const loginId = c.loginId?.normalize("NFKC").toLowerCase();
-          return Boolean(label?.includes(q) || loginId?.includes(q));
-        });
+      const rawQ = rawQuery.trim();
+      if (!rawQ) return records;
+      const searchWords = rawQ
+        .normalize("NFKC")
+        .toLowerCase()
+        .split(/\s+/)
+        .filter(Boolean);
+      if (searchWords.length === 0) return records;
 
-        return Boolean(
-          title.includes(q) ||
-            titleReading?.includes(q) ||
-            url?.includes(q) ||
-            tagsMatch ||
-            credsMatch,
+      return records.filter((r) => {
+        const searchableTexts: string[] = [
+          r.title,
+          r.titleReading,
+          r.url,
+          ...(r.tags ?? []),
+          ...r.credentials.flatMap((c) => [c.label, c.loginId]),
+        ]
+          .filter(
+            (text): text is string =>
+              typeof text === "string" && text.length > 0,
+          )
+          .map((text) => text.normalize("NFKC").toLowerCase());
+
+        return searchWords.every((word) =>
+          searchableTexts.some((text) => text.includes(word)),
         );
       });
     };
@@ -185,5 +189,17 @@ describe("ScopeFilterChip Component", () => {
     // 5. ログインIDによる検索
     expect(searchRecords("gmail", mockRecords)).toHaveLength(1);
     expect(searchRecords("gmail", mockRecords)[0]?.title).toBe("Google");
+
+    // 6. 半角スペース区切りの AND 検索（タイトル × タグ）
+    expect(searchRecords("GitHub 仕事", mockRecords)).toHaveLength(1);
+    expect(searchRecords("GitHub 仕事", mockRecords)[0]?.title).toBe("GitHub");
+    expect(searchRecords("GitHub ショッピング", mockRecords)).toHaveLength(0);
+
+    // 7. 全角スペース区切りの AND 検索（読み仮名　×　ログインID）
+    expect(searchRecords("グーグル　gmail", mockRecords)).toHaveLength(1);
+    expect(searchRecords("グーグル　gmail", mockRecords)[0]?.title).toBe(
+      "Google",
+    );
+    expect(searchRecords("グーグル　developer", mockRecords)).toHaveLength(0);
   });
 });

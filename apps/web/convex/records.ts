@@ -224,30 +224,35 @@ export const getRecords = authenticatedQuery({
     if (args.q) {
       const rawQ = args.q.trim();
       if (rawQ) {
-        const q = rawQ.normalize("NFKC").toLowerCase();
-        filtered = filtered.filter((r) => {
-          const title = r.title.normalize("NFKC").toLowerCase();
-          const titleReading = r.titleReading?.normalize("NFKC").toLowerCase();
-          const url = r.url?.normalize("NFKC").toLowerCase();
-          const memo = r.memo?.normalize("NFKC").toLowerCase();
-          const tagsMatch = r.tags?.some((t) =>
-            t.normalize("NFKC").toLowerCase().includes(q),
-          );
-          const credsMatch = r.credentials.some((c) => {
-            const label = c.label?.normalize("NFKC").toLowerCase();
-            const loginId = c.loginId?.normalize("NFKC").toLowerCase();
-            return Boolean(label?.includes(q) || loginId?.includes(q));
-          });
+        // NFKC 正規化により全角スペース（\u3000）も半角スペース（\u0020）に変換される
+        const searchWords = rawQ
+          .normalize("NFKC")
+          .toLowerCase()
+          .split(/\s+/)
+          .filter(Boolean);
 
-          return Boolean(
-            title.includes(q) ||
-              titleReading?.includes(q) ||
-              url?.includes(q) ||
-              tagsMatch ||
-              memo?.includes(q) ||
-              credsMatch,
-          );
-        });
+        if (searchWords.length > 0) {
+          filtered = filtered.filter((r) => {
+            const searchableTexts: string[] = [
+              r.title,
+              r.titleReading,
+              r.url,
+              r.memo,
+              ...(r.tags ?? []),
+              ...r.credentials.flatMap((c) => [c.label, c.loginId]),
+            ]
+              .filter(
+                (text): text is string =>
+                  typeof text === "string" && text.length > 0,
+              )
+              .map((text) => text.normalize("NFKC").toLowerCase());
+
+            // AND 検索: 指定されたすべての単語がいずれかの検索対象フィールドに含まれること
+            return searchWords.every((word) =>
+              searchableTexts.some((text) => text.includes(word)),
+            );
+          });
+        }
       }
     }
 

@@ -1114,10 +1114,10 @@ function RecordDetailComponent({
             </h1>
             <div className="flex items-center gap-2" data-tour="share-status">
               <span
-                className={`inline-flex items-center gap-1 shrink-0 rounded-full px-2.5 py-1 text-[12px] font-medium tracking-wide ${
+                className={`inline-flex items-center gap-1 shrink-0 rounded-full px-2.5 py-1 text-[12px] font-medium tracking-wide border ${
                   isShared
-                    ? "bg-blue-100/50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
-                    : "bg-secondary text-muted-foreground"
+                    ? "bg-blue-100/60 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-blue-500/20"
+                    : "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-500/20"
                 }`}
               >
                 {isShared ? (
