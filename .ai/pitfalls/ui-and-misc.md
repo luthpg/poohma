@@ -121,3 +121,18 @@ UI 実装、外部 API 連携、環境変数、モノレポ設定における落
   - **排他的マウント**: 外側のラッパー側で `isAdmin` を判定し、非管理者時には外形のみを模した静的スケルトン（`AdminRestrictedSection`）のみを返し、管理者時のみ `*Content` をマウントする。
   - これにより、React Hooks のルールを厳格に遵守しつつ、一般メンバー端末では実フックやクエリが一切起動しないクリーンで安全な権限分離が実現できる。
 
+---
+
+### jsdom 環境における Radix UI（shadcn）DropdownMenu / Popover の展開トリガー
+
+- **問題**: `@testing-library/react` を用いた jsdom 環境の単体テストで、`<DropdownMenuTrigger>` に対して `fireEvent.click(trigger)` を実行してもメニューコンテンツが描画されない（Radix UI が PointerEvent などのポインタイベントに依存しており、jsdom の合成イベント差異によって開閉ステートが切り替わらない場合がある）。
+- **回避法**: `fireEvent.keyDown(trigger, { key: "Enter" })` または `{ key: " " }` を送信することで、キーボードアクセシビリティ仕様に則り安全かつ確実にドロップダウンを展開できる。
+
+---
+
+### 日本語 IME 変換中のデバウンス検索誤発火
+
+- **問題**: 検索入力欄に `onChange` + `setTimeout` によるデバウンス検索を導入した際、日本語 IME 入力中の変換途中の未確定文字列（ひらがな等）でデバウンスタイマーが発火し、URL遷移や検索クエリが先行実行されて変換候補が確定・キャンセルされてしまう UX 破綻が起きる。
+- **回避法**: `onCompositionStart` で `isComposing.current = true`、`onCompositionEnd` で `isComposing.current = false` を追跡し、変換中はタイマーをクリアして保留する。また、変換確定（`compositionend`）時に入力値の検索トリガーを適切に再開する。
+
+

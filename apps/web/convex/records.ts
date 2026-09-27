@@ -222,17 +222,33 @@ export const getRecords = authenticatedQuery({
     let filtered = recordsWithCredentials;
 
     if (args.q) {
-      const q = args.q.toLowerCase();
-      filtered = filtered.filter(
-        (r) =>
-          r.title.toLowerCase().includes(q) ||
-          r.memo?.toLowerCase().includes(q) ||
-          r.credentials.some(
-            (c) =>
-              c.label?.toLowerCase().includes(q) ||
-              c.loginId?.toLowerCase().includes(q),
-          ),
-      );
+      const rawQ = args.q.trim();
+      if (rawQ) {
+        const q = rawQ.normalize("NFKC").toLowerCase();
+        filtered = filtered.filter((r) => {
+          const title = r.title.normalize("NFKC").toLowerCase();
+          const titleReading = r.titleReading?.normalize("NFKC").toLowerCase();
+          const url = r.url?.normalize("NFKC").toLowerCase();
+          const memo = r.memo?.normalize("NFKC").toLowerCase();
+          const tagsMatch = r.tags?.some((t) =>
+            t.normalize("NFKC").toLowerCase().includes(q),
+          );
+          const credsMatch = r.credentials.some((c) => {
+            const label = c.label?.normalize("NFKC").toLowerCase();
+            const loginId = c.loginId?.normalize("NFKC").toLowerCase();
+            return Boolean(label?.includes(q) || loginId?.includes(q));
+          });
+
+          return Boolean(
+            title.includes(q) ||
+              titleReading?.includes(q) ||
+              url?.includes(q) ||
+              tagsMatch ||
+              memo?.includes(q) ||
+              credsMatch,
+          );
+        });
+      }
     }
 
     if (args.q) {

@@ -2,11 +2,17 @@ import { api } from "@/../convex/_generated/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAccount } from "@/hooks/useAccount";
 import { usePersistentQuery } from "@/hooks/usePersistentQuery";
+import { cn } from "@/lib/utils";
 
 // タグクラウド用のスケルトン
-export function TagCloudSkeleton() {
+export function TagCloudSkeleton({ className }: { className?: string }) {
   return (
-    <div className="mt-4 flex overflow-x-auto py-1.5 gap-2.5 no-scrollbar scroll-smooth items-center">
+    <div
+      className={cn(
+        "flex overflow-x-auto py-1.5 gap-2.5 no-scrollbar scroll-smooth items-center",
+        className,
+      )}
+    >
       <Skeleton className="h-[28px] w-16 rounded-full" />
       <Skeleton className="h-[28px] w-20 rounded-full" />
       <Skeleton className="h-[28px] w-14 rounded-full" />
@@ -21,9 +27,11 @@ export function TagCloudSkeleton() {
 export function DashboardTagCloud({
   activeTag,
   onTagClick,
+  className,
 }: {
   activeTag: string | undefined;
   onTagClick: (tag: string) => void;
+  className?: string;
 }) {
   const { activeAccountId } = useAccount();
   const availableTags = usePersistentQuery<string[]>(
@@ -31,14 +39,20 @@ export function DashboardTagCloud({
     { accountId: activeAccountId || undefined },
   );
 
-  if (availableTags === undefined) return <TagCloudSkeleton />;
+  if (availableTags === undefined)
+    return <TagCloudSkeleton className={className} />;
   const validTags = Array.isArray(availableTags)
     ? availableTags.filter((t): t is string => typeof t === "string")
     : [];
   if (validTags.length === 0) return null;
 
   return (
-    <div className="mt-4 flex overflow-x-auto py-1.5 gap-2.5 no-scrollbar scroll-smooth items-center">
+    <div
+      className={cn(
+        "flex overflow-x-auto py-1.5 gap-2.5 no-scrollbar scroll-smooth items-center",
+        className,
+      )}
+    >
       {validTags.map((t: string) => {
         const isActive = activeTag === t;
         return (
@@ -46,7 +60,7 @@ export function DashboardTagCloud({
             key={t}
             type="button"
             onClick={() => onTagClick(t)}
-            className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-medium transition-all duration-200 ${
+            className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-medium transition-all duration-200 cursor-pointer ${
               isActive
                 ? "bg-orange-500 text-white shadow-md scale-105"
                 : "bg-card text-muted-foreground border border-border/40 shadow-sm hover:border-orange-500/50 hover:text-orange-500 hover:bg-orange-500/5"
