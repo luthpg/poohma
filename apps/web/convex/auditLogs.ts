@@ -47,9 +47,8 @@ export async function logAuditEvent(
   const now = Date.now();
   await ctx.db.insert("auditLogs", {
     familyId:
-      params.ownerType === "family"
-        ? (params.ownerFamilyId ?? params.actor.familyId)
-        : undefined,
+      params.ownerFamilyId ??
+      (params.ownerType === "family" ? params.actor.familyId : undefined),
     accountId: params.actor._id,
     userId: params.actor.userId,
     actorDisplayName:

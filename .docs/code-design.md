@@ -349,7 +349,7 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 
 | フィールド | 型 | 説明 |
 | --------- | --------------------- | --------- |
-| familyId | Id<families>(optional) | 家族共有レコード操作または家族内操作の場合に設定 |
+| familyId | Id<families>(optional) | 家族共有レコード操作または家族内操作（ownerFamilyId が指定された個人操作等を含む）の場合に設定 |
 | accountId | Id<users>(optional) | 操作者のPoohMa Account ID（削除後は参照切れ考慮） |
 | userId | string | 操作者のFirebase UID |
 | actorDisplayName | string | 操作時点の表示名（脱退・削除後のログ表示維持用） |

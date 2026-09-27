@@ -400,6 +400,18 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
         metadata: { targetTitle: "管理者の個人レコード" },
         createdAt: now - 80 * 60 * 1000,
       });
+      // 過去にデモファミリーに参加していたゲストがアカウント削除を行った際の監査ログ
+      // （ownerType: "user", ownerFamilyId: demoFamilyId, familyId: demoFamilyId）
+      await ctx.db.insert("auditLogs", {
+        familyId: demoFamilyId,
+        userId: "past_deleted_guest_uid",
+        actorDisplayName: "過去の削除済みゲスト",
+        ownerType: "user",
+        ownerFamilyId: demoFamilyId,
+        action: "ACCOUNT_DELETE",
+        metadata: { detail: ` (家族脱退: ${demoFamilyId})` },
+        createdAt: now - 3 * 60 * 60 * 1000,
+      });
 
       // 9. 過去コホートおよび管理者の閲覧ログ
       await ctx.db.insert("viewLogs", {
@@ -467,7 +479,7 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
     expect(result.deletedRecordsCount).toBe(3); // 共有1 + ゲスト個人1 + 管理者個人1
     // approved(1) + rejected(1) + 期限切れpending(1) = 3件削除
     expect(result.deletedJoinRequestsCount).toBe(3);
-    expect(result.deletedAuditLogsCount).toBe(4); // 過去コホート・管理者操作の監査ログ4件
+    expect(result.deletedAuditLogsCount).toBe(5); // 過去コホート・管理者操作・アカウント削除の監査ログ5件
     expect(result.deletedViewLogsCount).toBeGreaterThanOrEqual(3); // 共有2件 + 個人1件
     expect(result.deletedExtraInvitesCount).toBe(1); // guest-extra-invite
     expect(result.deletedMigrationsCount).toBe(1); // PREPARED 移行データ
