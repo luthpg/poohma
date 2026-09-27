@@ -349,7 +349,7 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 
 | フィールド | 型 | 説明 |
 | --------- | --------------------- | --------- |
-| familyId | Id<families>(optional) | 家族共有レコード操作または家族内操作の場合に設定 |
+| familyId | Id<families>(optional) | 家族共有レコード操作または家族内操作（ownerFamilyId が指定された個人操作等を含む）の場合に設定 |
 | accountId | Id<users>(optional) | 操作者のPoohMa Account ID（削除後は参照切れ考慮） |
 | userId | string | 操作者のFirebase UID |
 | actorDisplayName | string | 操作時点の表示名（脱退・削除後のログ表示維持用） |
@@ -601,12 +601,14 @@ ConvexReactClient / TanStack Query の Mutation実行を共通ラッパーでイ
      a. 環境変数照合（フェイルセーフ）: DEMO_FAMILY_ID および DEMO_ADMIN_USER_IDS（複数可）の存在・実在を検証。指定管理者が0名またはファミリー管理者権限（familyRole === "admin"）不在時は異常事態として例外送出。
      b. クールダウンガード: 直近10分以内のリセット監査ログを探索し、存在する場合は安全にスキップ（他操作ログにマスクされない堅牢な判定）。
      c. 対象特定: DEMO_ADMIN_USER_IDS 以外のメンバーを「ゲスト（guestUsers）」として抽出（手違いで familyRole が admin となっている非管理者も確実にキック）。
-     d. レコード完全消去: 共有レコード（familyId === DEMO_FAMILY_ID）に加え、ゲストが作成した個人レコード（ownerType === "user"）も含めてクレデンシャル・セッション・閲覧ログとともに完全削除。
-     e. ゲストkick: 全ゲストの familyId を undefined に更新（通知メールはスキップ）。
-     f. 申請クリーンアップ: 48時間以上経過した joinRequests のみを削除（直近の承認待ち申請を保護）。
-     g. 初期データ再投入: demoRecords.json（E2Eシード由来の暗号化済み実データ）からレコード・クレデンシャルを一括再作成。
-     h. 招待コード維持: DEMO_INVITE_CODE を 2099 年まで有効に更新・維持。
-     i. 監査ログ記録: 実行者・理由・件数を記録し、結果オブジェクトを返却。
+     d. レコード完全消去: 共有レコード（familyId === DEMO_FAMILY_ID）に加え、デモファミリー所属メンバー（管理者・ゲスト問わず）が作成した個人レコード（ownerType === "user"）も含めてクレデンシャル・セッションとともに完全削除。
+     e. viewLogs 無条件全削除: レコード単位およびデモファミリー単位（familyId === DEMO_FAMILY_ID）の閲覧ログ（viewLogs）を管理者・ゲスト問わず無条件で全パージ。
+     f. ゲストkick: 全ゲストの familyId を undefined に更新（通知メールはスキップ）。
+     g. 申請クリーンアップ: 承認・拒否済み申請を全削除し、直近48時間以内の pending のみ保護。
+     h. auditLogs 厳格全削除（デモ共有・デモ内レコード・デモ専用管理者操作の網羅と他ファミリー完全保護）: 共有レコード（familyId === DEMO_FAMILY_ID）、削除対象レコード（共有＋デモ内個人）、およびデモ専用管理者自身が行ったデモ内操作ログ（パスコード更新等）のみを全パージ。他ファミリーのログや第三者が作成した監査証跡（targetAccountId 等）は一切削除せず完全保護。
+     i. 初期データ再投入: demoRecords.json（E2Eシード由来の暗号化済み実データ）からレコード・クレデンシャルを一括再作成。
+     j. 招待コード維持: DEMO_INVITE_CODE を 2099 年まで有効に更新・維持。
+     k. 監査ログ記録: 実行者・理由・件数を記録し、次回以降のクールダウン判定に使用。結果オブジェクトを返却。
 
 3. データ抽出（convex/demo.ts: exportDemoRecordsInternal）:
    - GUI/CSVインポートで正常にブラウザ暗号化された実データを Convex DB から demoRecords.json のフォーマットで抽出する internal query。

@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { computeSortKey } from "../src/utils/index-group";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { logAuditEvent } from "./auditLogs";
 import demoRecords from "./demoRecords.json";
@@ -146,27 +146,28 @@ export const resetDemoFamilyInternal = internalMutation({
       (m) => !adminUserIds.includes(m.userId) && !adminUserIds.includes(m._id),
     );
 
-    // 4. ステップ 2: レコードの完全消去（ゲスト個人レコード＋共有レコード）
+    // 4. ステップ 2: レコードの完全消去（全メンバー個人レコード＋共有レコード）
     // 4-1. 家族共有レコードを取得
     const familyRecords = await ctx.db
       .query("serviceRecords")
       .withIndex("by_family_updatedAt", (q) => q.eq("familyId", demoFamilyId))
       .collect();
 
-    // 4-2. ゲストユーザーが作成した個人レコードを取得（デモファミリーに属する個人レコードのみを厳格に対象とし、他家族のレコードを巻き込まない）
-    const guestAccountIds = new Set(guestUsers.map((g) => g._id));
-    const guestRecords = [];
-    for (const guestAccountId of guestAccountIds) {
+    // 4-2. デモファミリー所属メンバー（管理者含む）が作成した個人レコードを取得
+    // （デモファミリーに属する個人レコードのみを厳格に対象とし、他家族のレコードを巻き込まない）
+    const memberAccountIds = new Set(familyMembers.map((m) => m._id));
+    const personalRecords = [];
+    for (const memberAccountId of memberAccountIds) {
       const records = await ctx.db
         .query("serviceRecords")
-        .withIndex("by_accountId", (q) => q.eq("accountId", guestAccountId))
+        .withIndex("by_accountId", (q) => q.eq("accountId", memberAccountId))
         .collect();
       const demoPersonalRecords = records.filter(
         (r) =>
           r.familyId === demoFamilyId &&
           (r.ownerType === "user" || !r.ownerType),
       );
-      guestRecords.push(...demoPersonalRecords);
+      personalRecords.push(...demoPersonalRecords);
     }
 
     // レコードの重複排除
@@ -177,13 +178,14 @@ export const resetDemoFamilyInternal = internalMutation({
     for (const r of familyRecords) {
       recordMap.set(r._id, r);
     }
-    for (const r of guestRecords) {
+    for (const r of personalRecords) {
       recordMap.set(r._id, r);
     }
     const allRecordsToDelete = Array.from(recordMap.values());
 
     // レコードおよび関連データの完全削除
     let deletedRecordsCount = 0;
+    let deletedViewLogsCount = 0;
     for (const record of allRecordsToDelete) {
       await deleteCredentialsForRecord(ctx, record._id);
 
@@ -196,25 +198,25 @@ export const resetDemoFamilyInternal = internalMutation({
         await ctx.db.delete(s._id);
       }
 
-      // 閲覧ログ削除
+      // レコード単位の閲覧ログ削除
       const viewLogs = await ctx.db
         .query("viewLogs")
         .withIndex("by_recordId_createdAt", (q) => q.eq("recordId", record._id))
         .collect();
       for (const vl of viewLogs) {
         await ctx.db.delete(vl._id);
+        deletedViewLogsCount++;
       }
 
       await ctx.db.delete(record._id);
       deletedRecordsCount++;
     }
 
-    // 4.5 デモファミリーの viewLogs をファミリー単位で一括パージ（コホート間漏洩防止）
+    // 4.5 デモファミリーの viewLogs をファミリー単位で一括パージ（コホート間漏洩防止・無条件全削除）
     const remainingViewLogs = await ctx.db
       .query("viewLogs")
       .withIndex("by_family_createdAt", (q) => q.eq("familyId", demoFamilyId))
       .collect();
-    let deletedViewLogsCount = 0;
     for (const vl of remainingViewLogs) {
       await ctx.db.delete(vl._id);
       deletedViewLogsCount++;
@@ -276,14 +278,51 @@ export const resetDemoFamilyInternal = internalMutation({
       }
     }
 
-    // 6.5 デモファミリーの監査ログを全パージ（コホート間漏洩防止）
+    // 6.5 デモファミリーの監査ログを無条件で全パージ（管理者操作・ゲスト操作・家族操作を網羅）
     // ※ クールダウンガード判定は本ステップ到達前（ステップ 2）で完了済みのため影響なし
-    const auditLogs = await ctx.db
+    const auditLogsToDeleteMap = new Map<Id<"auditLogs">, Doc<"auditLogs">>();
+
+    // A. familyId === demoFamilyId の全監査ログ
+    const familyAuditLogs = await ctx.db
       .query("auditLogs")
       .withIndex("by_family_createdAt", (q) => q.eq("familyId", demoFamilyId))
       .collect();
+    for (const audit of familyAuditLogs) {
+      auditLogsToDeleteMap.set(audit._id, audit);
+    }
+
+    // B. 削除対象となった全レコードに紐づく監査ログ
+    for (const record of allRecordsToDelete) {
+      const recordAuditLogs = await ctx.db
+        .query("auditLogs")
+        .withIndex("by_recordId_createdAt", (q) => q.eq("recordId", record._id))
+        .collect();
+      for (const audit of recordAuditLogs) {
+        auditLogsToDeleteMap.set(audit._id, audit);
+      }
+    }
+
+    // C. デモ専用管理者（adminMembers）自身が行ったデモ内操作ログ
+    // ※ 一般ゲストユーザーの個人ログや、第三者ユーザーが実行した監査ログ（targetAccountId 経由等）は、他ファミリーの監査証跡・完全性を保護するため一切削除しない
+    for (const admin of adminMembers) {
+      const adminAuditLogs = await ctx.db
+        .query("auditLogs")
+        .withIndex("by_userId_createdAt", (q) => q.eq("userId", admin.userId))
+        .collect();
+      for (const audit of adminAuditLogs) {
+        // 他ファミリーのIDを持たない、デモ管理者の操作ログのみを削除
+        const belongsToOtherFamily =
+          (audit.familyId != null && audit.familyId !== demoFamilyId) ||
+          (audit.ownerFamilyId != null && audit.ownerFamilyId !== demoFamilyId);
+
+        if (!belongsToOtherFamily) {
+          auditLogsToDeleteMap.set(audit._id, audit);
+        }
+      }
+    }
+
     let deletedAuditLogsCount = 0;
-    for (const audit of auditLogs) {
+    for (const audit of auditLogsToDeleteMap.values()) {
       await ctx.db.delete(audit._id);
       deletedAuditLogsCount++;
     }
