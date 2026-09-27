@@ -222,17 +222,38 @@ export const getRecords = authenticatedQuery({
     let filtered = recordsWithCredentials;
 
     if (args.q) {
-      const q = args.q.toLowerCase();
-      filtered = filtered.filter(
-        (r) =>
-          r.title.toLowerCase().includes(q) ||
-          r.memo?.toLowerCase().includes(q) ||
-          r.credentials.some(
-            (c) =>
-              c.label?.toLowerCase().includes(q) ||
-              c.loginId?.toLowerCase().includes(q),
-          ),
-      );
+      const rawQ = args.q.trim();
+      if (rawQ) {
+        // NFKC 正規化により全角スペース（\u3000）も半角スペース（\u0020）に変換される
+        const searchWords = rawQ
+          .normalize("NFKC")
+          .toLowerCase()
+          .split(/\s+/)
+          .filter(Boolean);
+
+        if (searchWords.length > 0) {
+          filtered = filtered.filter((r) => {
+            const searchableTexts: string[] = [
+              r.title,
+              r.titleReading,
+              r.url,
+              r.memo,
+              ...(r.tags ?? []),
+              ...r.credentials.flatMap((c) => [c.label, c.loginId]),
+            ]
+              .filter(
+                (text): text is string =>
+                  typeof text === "string" && text.length > 0,
+              )
+              .map((text) => text.normalize("NFKC").toLowerCase());
+
+            // AND 検索: 指定されたすべての単語がいずれかの検索対象フィールドに含まれること
+            return searchWords.every((word) =>
+              searchableTexts.some((text) => text.includes(word)),
+            );
+          });
+        }
+      }
     }
 
     if (args.q) {

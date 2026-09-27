@@ -176,6 +176,27 @@ PoohMa のブランドカラー本体（`#f97316` / orange-500：ロゴや変更
 - Focus outline: `2px solid var(--ds-focus-color)` — consistent blue focus ring
 - Border: via shadow technique, not traditional border
 
+**Full-width Search Bar (Dashboard)**
+
+- Container: `relative flex-1`
+- Search Icon: `absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none`
+- Input: `w-full rounded-md bg-card pl-10 pr-10 py-2.5 h-10 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-shadow`
+- Clear Button: `absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground cursor-pointer`
+- Characteristics: 手動検索ボタンを撤去し、フルワイド100%幅で250msデバウンス自動検索を提供。
+
+**Integrated Scope & Tag Filter Bar (Dashboard)**
+
+- Container: `flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 min-w-0`
+- Scope Chip (shadcn/ui DropdownMenu):
+  - Height: `h-[30px]` / `h-8`（ピル型 `rounded-full`、幅 約 85px〜105px）
+  - Status Style:
+    - すべて (`all`): `bg-card text-foreground border-border/60 hover:bg-accent`
+    - 自分のみ (`personal`): `bg-emerald-100/70 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border-emerald-500/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/60`（個人・プライベートを明確に示すエメラルドカラー）
+    - 共有中 (`shared`): `bg-blue-100/60 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border-blue-500/30`
+- Separator: `h-4 w-[1px] bg-border/60 shrink-0`
+- Ownership Badges: ダッシュボード（リスト/カード）およびレコード詳細画面の所有権バッジも同一テーマに統一（共有中: Blue / 自分のみ: Emerald）。
+- Tag Cloud: 残り全幅をスムーズに横スクロール。モバイル（375px幅）でも縦方向をわずか36px（1行）に抑え、タグ領域に約268pxの広いスワイプ領域を確保。
+
 **Visual Accent Bar (Form Modification Indicator)**
 
 - Container: `relative pl-3.5`（編集画面では常に左余白 14px を確保し、レイアウトシフト＝ガタつきを完全防止）

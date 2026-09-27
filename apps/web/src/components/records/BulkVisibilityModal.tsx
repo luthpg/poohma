@@ -155,7 +155,7 @@ export function BulkVisibilityModal({
             <div className="space-y-4 py-2">
               {/* 変更方向ビジュアル */}
               <div className="flex items-center justify-center gap-3 p-3.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm">
-                <div className="flex items-center gap-1.5 font-medium text-muted-foreground">
+                <div className="flex items-center gap-1.5 font-medium text-emerald-700 dark:text-emerald-400">
                   <Lock className="size-4" />
                   <span>自分のみ（個人用）</span>
                 </div>
@@ -243,7 +243,7 @@ export function BulkVisibilityModal({
                   <span>家族共有</span>
                 </div>
                 <ArrowRight className="size-4 text-orange-500 shrink-0" />
-                <div className="flex items-center gap-1.5 font-semibold text-foreground">
+                <div className="flex items-center gap-1.5 font-semibold text-emerald-700 dark:text-emerald-400">
                   <Lock className="size-4" />
                   <span>自分のみ（個人用）</span>
                 </div>

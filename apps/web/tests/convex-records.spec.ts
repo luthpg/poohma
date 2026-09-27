@@ -2403,3 +2403,162 @@ describe("2.2.14 CSV差分インポート・安定ID（stableId）検証", () =>
     expect(createdWithStranger?.admins).toEqual([userAccountId]);
   });
 });
+
+describe("2.4 getRecords 検索・フィルタリング機能 (Convex版)", () => {
+  it("読み仮名・URL・タグ・全角英数表記揺れ・ログインID、および半角/全角スペース AND 検索が正しく機能すること", async () => {
+    const t = convexTest(schema, modules);
+
+    let familyId!: Id<"families">;
+    let userAccountId!: Id<"users">;
+
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        name: "Search Test Family",
+        updatedAt: Date.now(),
+      });
+
+      userAccountId = await ctx.db.insert("users", {
+        familyRole: "admin",
+        userId: "search_user",
+        email: "search@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+
+      // 1. Google
+      const googleId = await ctx.db.insert("serviceRecords", {
+        stableId: crypto.randomUUID(),
+        userId: "search_user",
+        accountId: userAccountId,
+        familyId,
+        ownerFamilyId: familyId,
+        title: "Google",
+        titleReading: "グーグル",
+        url: "https://google.com",
+        sortKey: computeSortKey("Google"),
+        ownerType: "family",
+        admins: [userAccountId],
+        tags: ["検索", "便利"],
+        updatedAt: Date.now(),
+      });
+      await ctx.db.insert("credentials", {
+        recordId: googleId,
+        stableId: crypto.randomUUID(),
+        label: "メイン",
+        loginId: "testuser@gmail.com",
+        order: 0,
+        updatedAt: Date.now(),
+      });
+
+      // 2. Amazon
+      const amazonId = await ctx.db.insert("serviceRecords", {
+        stableId: crypto.randomUUID(),
+        userId: "search_user",
+        accountId: userAccountId,
+        familyId,
+        ownerFamilyId: familyId,
+        title: "Amazon",
+        titleReading: "アマゾン",
+        url: "https://amazon.co.jp",
+        sortKey: computeSortKey("Amazon"),
+        ownerType: "family",
+        admins: [userAccountId],
+        tags: ["ショッピング", "通販"],
+        updatedAt: Date.now(),
+      });
+      await ctx.db.insert("credentials", {
+        recordId: amazonId,
+        stableId: crypto.randomUUID(),
+        label: "個人用",
+        loginId: "shopper",
+        order: 0,
+        updatedAt: Date.now(),
+      });
+
+      // 3. GitHub
+      const githubId = await ctx.db.insert("serviceRecords", {
+        stableId: crypto.randomUUID(),
+        userId: "search_user",
+        accountId: userAccountId,
+        familyId,
+        ownerFamilyId: familyId,
+        title: "GitHub",
+        titleReading: "ギットハブ",
+        url: "https://github.com",
+        sortKey: computeSortKey("GitHub"),
+        ownerType: "family",
+        admins: [userAccountId],
+        tags: ["開発", "仕事"],
+        updatedAt: Date.now(),
+      });
+      await ctx.db.insert("credentials", {
+        recordId: githubId,
+        stableId: crypto.randomUUID(),
+        label: "Work",
+        loginId: "developer",
+        order: 0,
+        updatedAt: Date.now(),
+      });
+    });
+
+    const user = t.withIdentity({
+      subject: "search_user",
+      email: "search@example.com",
+    });
+
+    // 1. 読み仮名（カタカナ）による検索
+    const resReading = await user.query(api.records.getRecords, {
+      q: "グーグル",
+    });
+    expect(resReading).toHaveLength(1);
+    expect(resReading[0]?.title).toBe("Google");
+
+    // 2. URL（ドメイン）による検索
+    const resUrl = await user.query(api.records.getRecords, {
+      q: "github.com",
+    });
+    expect(resUrl).toHaveLength(1);
+    expect(resUrl[0]?.title).toBe("GitHub");
+
+    // 3. タグ名による検索
+    const resTag = await user.query(api.records.getRecords, { q: "仕事" });
+    expect(resTag).toHaveLength(1);
+    expect(resTag[0]?.title).toBe("GitHub");
+
+    // 4. 全角英数（Ａｍａｚｏｎ）による表記揺れ検索
+    const resFullWidth = await user.query(api.records.getRecords, {
+      q: "Ａｍａｚｏｎ",
+    });
+    expect(resFullWidth).toHaveLength(1);
+    expect(resFullWidth[0]?.title).toBe("Amazon");
+
+    // 5. ログインIDによる検索
+    const resLoginId = await user.query(api.records.getRecords, { q: "gmail" });
+    expect(resLoginId).toHaveLength(1);
+    expect(resLoginId[0]?.title).toBe("Google");
+
+    // 6. 半角スペース区切りの AND 検索（タイトル × タグ）
+    const resAndHalf = await user.query(api.records.getRecords, {
+      q: "GitHub 仕事",
+    });
+    expect(resAndHalf).toHaveLength(1);
+    expect(resAndHalf[0]?.title).toBe("GitHub");
+
+    const resAndHalfMismatch = await user.query(api.records.getRecords, {
+      q: "GitHub ショッピング",
+    });
+    expect(resAndHalfMismatch).toHaveLength(0);
+
+    // 7. 全角スペース区切りの AND 検索（読み仮名　×　ログインID）
+    const resAndFull = await user.query(api.records.getRecords, {
+      q: "グーグル　gmail",
+    });
+    expect(resAndFull).toHaveLength(1);
+    expect(resAndFull[0]?.title).toBe("Google");
+
+    const resAndFullMismatch = await user.query(api.records.getRecords, {
+      q: "グーグル　developer",
+    });
+    expect(resAndFullMismatch).toHaveLength(0);
+  });
+});

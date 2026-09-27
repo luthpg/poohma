@@ -12,6 +12,7 @@ import {
   List,
   Lock,
   Plus,
+  Search,
   ShieldCheck,
   Tag,
   Trash2,
@@ -36,6 +37,10 @@ import {
   DashboardTagCloud,
   TagCloudSkeleton,
 } from "@/components/dashboard/DashboardTagCloud";
+import {
+  ScopeFilterChip,
+  type ScopeFilterType,
+} from "@/components/dashboard/ScopeFilterChip";
 import { IndexScrollBar } from "@/components/IndexScrollBar";
 import { OnboardingBanner } from "@/components/onboarding/OnboardingBanner";
 import { OnboardingModal } from "@/components/onboarding/OnboardingModal";
@@ -60,6 +65,7 @@ import { groupRecordsByIndex } from "@/utils/index-group";
 const searchSchema = z.object({
   q: z.string().optional(),
   tag: z.string().optional(),
+  filter: z.enum(["all", "personal", "shared"]).optional(),
   sort: z
     .enum([
       "name-asc",
@@ -82,12 +88,18 @@ export const Route = createFileRoute("/(app)/dashboard")({
     const prefs = await getDashboardPrefs();
     return { prefs };
   },
-  loaderDeps: ({ search: { q, tag, sort, view } }) => ({ q, tag, sort, view }),
-  loader: async ({ context, deps: { q, tag, sort, view } }) => {
+  loaderDeps: ({ search: { q, tag, filter, sort, view } }) => ({
+    q,
+    tag,
+    filter,
+    sort,
+    view,
+  }),
+  loader: async ({ context, deps: { q, tag, filter, sort, view } }) => {
     return {
       user: context.user ?? null,
       prefs: context.prefs,
-      searchParams: { q, tag, sort, view },
+      searchParams: { q, tag, filter, sort, view },
     };
   },
   component: RouteComponent,
@@ -149,10 +161,55 @@ function RouteComponent() {
   const sortParam =
     (searchParams.sort as SortParam) || (prefs.sort as SortParam) || "name-asc";
 
+  const currentFilter = (searchParams.filter as ScopeFilterType) || "all";
+
   const [searchInput, setSearchInput] = useState(searchParams.q || "");
+  const [isComposing, setIsComposing] = useState(false);
+
   useEffect(() => {
     setSearchInput(searchParams.q || "");
   }, [searchParams.q]);
+
+  // デバウンス自動検索（250ms）
+  useEffect(() => {
+    if (isComposing) return;
+
+    const timer = setTimeout(() => {
+      const trimmed = searchInput.trim();
+      const currentQ = searchParams.q || "";
+      if (trimmed !== currentQ) {
+        navigate({
+          replace: true,
+          search: (prev) => ({
+            ...prev,
+            q: trimmed || undefined,
+          }),
+        });
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [searchInput, searchParams.q, navigate, isComposing]);
+
+  const handleClearSearch = () => {
+    setSearchInput("");
+    navigate({
+      replace: true,
+      search: (prev) => ({
+        ...prev,
+        q: undefined,
+      }),
+    });
+  };
+
+  const handleFilterChange = (newFilter: ScopeFilterType) => {
+    navigate({
+      search: (prev) => ({
+        ...prev,
+        filter: newFilter === "all" ? undefined : newFilter,
+      }),
+    });
+  };
 
   // --- オンボーディング ---
   const {
@@ -164,6 +221,8 @@ function RouteComponent() {
     NonNullable<typeof api.records.getRecords._returnType>
   >(api.records.getRecords, {
     accountId: activeAccountId || undefined,
+    q: searchParams.q,
+    tag: searchParams.tag,
   });
   const family = useQuery(api.families.getFamilyMembers, {
     accountId: activeAccountId || undefined,
@@ -171,6 +230,15 @@ function RouteComponent() {
   const onboarding = useOnboarding();
   const onboardingInitRef = useRef(false);
   const onboardingSearch = useSearch({ from: "/(app)/dashboard" });
+
+  // フィルター種別ごとの件数集計
+  const filterCounts = useMemo(() => {
+    if (!records) return undefined;
+    const total = records.length;
+    const personal = records.filter((r) => r.ownerType !== "family").length;
+    const shared = records.filter((r) => r.ownerType === "family").length;
+    return { all: total, personal, shared };
+  }, [records]);
 
   // 通常データ（非サンプル）が存在するか
   const hasRealRecords = useMemo(
@@ -264,10 +332,12 @@ function RouteComponent() {
 
   const handleSearch = (e: SubmitEvent) => {
     e.preventDefault();
+    const trimmed = searchInput.trim();
     navigate({
+      replace: true,
       search: (prev) => ({
         ...prev,
-        q: searchInput || undefined,
+        q: trimmed || undefined,
       }),
     });
   };
@@ -284,6 +354,10 @@ function RouteComponent() {
   // 一括操作用状態
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Clear selection when the URL filter changes, without reading its value.
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [searchParams.filter]);
   const [activeModal, setActiveModal] = useState<
     "tag" | "visibility" | "admin" | "delete" | null
   >(null);
@@ -474,50 +548,58 @@ function RouteComponent() {
       />
 
       {/* 検索・フィルターエリア */}
-      <div className="mb-6">
-        <form onSubmit={handleSearch} className="flex items-center gap-2">
+      <div className="mb-6 space-y-3">
+        <form onSubmit={handleSearch} className="flex items-center">
           <div className="relative flex-1">
+            <Search
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none"
+              aria-hidden="true"
+            />
             <input
               type="text"
               data-tour="search-input"
               value={searchInput}
+              onCompositionStart={() => setIsComposing(true)}
+              onCompositionEnd={(e) => {
+                setIsComposing(false);
+                setSearchInput(e.currentTarget.value);
+              }}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="タグやサービス名で検索..."
-              className="w-full rounded-md bg-card pl-4 pr-10 py-2.5 h-10 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-shadow"
+              placeholder="サービス名、URL、読み仮名、タグで検索..."
+              className="w-full rounded-md bg-card pl-10 pr-10 py-2.5 h-10 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-shadow"
             />
             {searchInput && (
               <button
                 type="button"
-                onClick={() => {
-                  setSearchInput("");
-                  navigate({
-                    search: (prev) => ({
-                      ...prev,
-                      q: undefined,
-                    }),
-                  });
-                }}
+                onClick={handleClearSearch}
+                aria-label="検索キーワードをクリア"
                 className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
             )}
           </div>
-          <button
-            type="submit"
-            className="rounded-md bg-foreground px-4 py-2.5 h-10 w-20 text-[14px] font-medium text-background shadow-border hover:bg-foreground/90 transition cursor-pointer"
-          >
-            検索
-          </button>
         </form>
-        {/* タグクラウド (フィルター) - Suspense化 */}
-        <div data-tour="tag-cloud">
-          <Suspense fallback={<TagCloudSkeleton />}>
-            <DashboardTagCloud
-              activeTag={searchParams.tag}
-              onTagClick={handleTagClick}
-            />
-          </Suspense>
+
+        {/* 1行フィルターバー: 左固定 ScopeFilterChip ｜ 右 DashboardTagCloud */}
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 min-w-0">
+          <ScopeFilterChip
+            currentFilter={currentFilter}
+            onFilterChange={handleFilterChange}
+            counts={filterCounts}
+          />
+          <div
+            className="h-4 w-[1px] bg-border/60 shrink-0"
+            aria-hidden="true"
+          />
+          <div className="min-w-0 flex-1" data-tour="tag-cloud">
+            <Suspense fallback={<TagCloudSkeleton />}>
+              <DashboardTagCloud
+                activeTag={searchParams.tag}
+                onTagClick={handleTagClick}
+              />
+            </Suspense>
+          </div>
         </div>
       </div>
 
@@ -807,30 +889,47 @@ function RecordListSection({
     sort: sortParam,
   });
 
+  const currentFilter = (searchParams.filter as ScopeFilterType) || "all";
+
+  const filteredRecords = useMemo(() => {
+    if (!records) return records;
+    if (currentFilter === "personal") {
+      return records.filter((r) => r.ownerType !== "family");
+    }
+    if (currentFilter === "shared") {
+      return records.filter((r) => r.ownerType === "family");
+    }
+    return records;
+  }, [records, currentFilter]);
+
   const firstSampleRecordId = useMemo(
     () =>
-      records?.find((r) => (r as RecordType & { isSample?: boolean }).isSample)
-        ?._id,
-    [records],
+      filteredRecords?.find(
+        (r) => (r as RecordType & { isSample?: boolean }).isSample,
+      )?._id,
+    [filteredRecords],
   );
 
   const groupedRecords = useMemo(() => {
-    return groupRecordsByIndex(records || []);
-  }, [records]);
+    return groupRecordsByIndex(filteredRecords || []);
+  }, [filteredRecords]);
 
   const availableGroups = useMemo(() => {
     return groupedRecords.map((g) => g.groupKey);
   }, [groupedRecords]);
 
-  if (records === undefined) {
+  if (records === undefined || filteredRecords === undefined) {
     return <RecordListSkeleton />;
   }
 
-  const isNormalList = !searchParams.q?.trim() && !searchParams.tag;
+  const isNormalList =
+    !searchParams.q?.trim() &&
+    !searchParams.tag &&
+    (!searchParams.filter || searchParams.filter === "all");
 
   return (
     <>
-      {records.length > 0 && (
+      {filteredRecords.length > 0 && (
         <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             {isSelectMode ? (
@@ -838,11 +937,12 @@ function RecordListSection({
                 <input
                   type="checkbox"
                   checked={
-                    records.length > 0 && selectedIds.length === records.length
+                    filteredRecords.length > 0 &&
+                    selectedIds.length === filteredRecords.length
                   }
                   onChange={(e) => {
                     if (e.target.checked) {
-                      onSelectAll(records.map((r) => r._id));
+                      onSelectAll(filteredRecords.map((r) => r._id));
                     } else {
                       onSelectAll([]);
                     }
@@ -858,7 +958,7 @@ function RecordListSection({
                 className="text-[14px] text-muted-foreground font-medium tracking-geist-ui"
                 data-testid="record-count"
               >
-                {records.length} 件のレコード
+                {filteredRecords.length} 件のレコード
               </div>
             )}
           </div>
@@ -916,7 +1016,7 @@ function RecordListSection({
         </div>
       )}
 
-      {records.length === 0 ? (
+      {filteredRecords.length === 0 ? (
         <DashboardEmptyState />
       ) : sortParam === "name-asc" ? (
         <>
@@ -1006,7 +1106,7 @@ function RecordListSection({
           {isNormalList &&
             !isSelectMode &&
             (viewMode === "card" ? <AddRecordCard /> : <AddRecordListItem />)}
-          {records.map((record) =>
+          {filteredRecords.map((record) =>
             viewMode === "card" ? (
               <ServiceCard
                 key={record._id}
@@ -1116,10 +1216,10 @@ function ServiceListItem({
               {record.title}
             </span>
             <span
-              className={`inline-flex items-center gap-1 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+              className={`inline-flex items-center gap-1 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium border ${
                 isShared
-                  ? "bg-blue-100/50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
-                  : "bg-secondary text-muted-foreground"
+                  ? "bg-blue-100/60 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-blue-500/20"
+                  : "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-500/20"
               }`}
             >
               {isShared ? (
@@ -1266,10 +1366,10 @@ function ServiceCard({
           </span>
           {/* 所有設定バッジ */}
           <span
-            className={`inline-flex items-center gap-1 shrink-0 rounded-full px-2 py-0.5 text-[10px] md:text-xs font-medium ${
+            className={`inline-flex items-center gap-1 shrink-0 rounded-full px-2 py-0.5 text-[10px] md:text-xs font-medium border ${
               record.ownerType === "family"
-                ? "bg-blue-100/50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
-                : "bg-secondary text-muted-foreground"
+                ? "bg-blue-100/60 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-blue-500/20"
+                : "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-500/20"
             }`}
           >
             {record.ownerType === "family" ? (
