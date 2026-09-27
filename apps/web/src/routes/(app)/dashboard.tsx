@@ -354,6 +354,10 @@ function RouteComponent() {
   // 一括操作用状態
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Clear selection when the URL filter changes, without reading its value.
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [searchParams.filter]);
   const [activeModal, setActiveModal] = useState<
     "tag" | "visibility" | "admin" | "delete" | null
   >(null);

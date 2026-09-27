@@ -133,6 +133,5 @@ UI 実装、外部 API 連携、環境変数、モノレポ設定における落
 ### 日本語 IME 変換中のデバウンス検索誤発火
 
 - **問題**: 検索入力欄に `onChange` + `setTimeout` によるデバウンス検索を導入した際、日本語 IME 入力中の変換途中の未確定文字列（ひらがな等）でデバウンスタイマーが発火し、URL遷移や検索クエリが先行実行されて変換候補が確定・キャンセルされてしまう UX 破綻が起きる。
-- **回避法**: `onCompositionStart` で `isComposing.current = true`、`onCompositionEnd` で `isComposing.current = false` を追跡し、変換中はタイマーをクリアして保留する。また、変換確定（`compositionend`）時に入力値の検索トリガーを適切に再開する。
-
+- **回避法**: `onCompositionStart` で `setIsComposing(true)`、`onCompositionEnd` で `setIsComposing(false)` を呼び、変換中はタイマーをクリアして保留する。デバウンス用 `useEffect` の依存配列に `isComposing` を含め、変換確定後に検索を再開する。
 
