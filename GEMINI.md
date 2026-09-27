@@ -2,6 +2,9 @@
 
 ## 0. Core Guardrails & Production Protection (最重要不変原則)
 
+- **`main` ブランチへの直接コミット・直接プッシュの完全禁止**:
+  - `main` ブランチで直接コミット（`git commit`）したり、直接プッシュ（`git push origin main`）することは固く禁ずる。
+  - すべての作業（機能開発・バグ修正・リファクタリング・ドキュメント更新など）は、必ず `origin/main` から切った専用のトピックブランチ（例: `feat/issue-151-...`、`fix/issue-...`）で作業を進め、GitHub Pull Request（PR）を作成してレビュー・CI通過を経てマージすること。
 - **テスト・CI失敗時のプロダクションコード改変禁止**:
   - CI やテスト（E2E、ユニットテスト等）が失敗した際、**テストを通すためだけにプロダクションコード（`apps/web/src/` や `apps/web/convex/` 等）のタグ、DOM構造、挙動を独断で改変することは固く禁ずる**。
   - テストが失敗した場合は、まずテスト自体のセレクタ、待機処理、前提データ（家族所属状態、認証状態など）の不備を疑い、テストコード側の改善で解決を試みること。
@@ -79,6 +82,7 @@
 
 ## 4. Git Commit & GitHub CLI Guidelines
 
+- **Branching**: `main` ブランチへの直接コミット・直接プッシュは固く禁止。必ず作業前に `origin/main` からトピックブランチ（例: `feat/issue-151-quick-scope-filter`）をチェックアウトして作業し、`gh pr create` で PR を作成すること。
 - **Format**: Conventional Commits 形式に従う（`feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`）。
 - **Body**: 必ず日本語で「なぜこの変更を行ったか」「どのような影響があるか」を明記。
 - **PowerShell 実行手順（シングルクォートヒアドキュメント必須）**:

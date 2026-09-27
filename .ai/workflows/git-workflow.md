@@ -2,6 +2,12 @@
 
 PowerShell 7 (pwsh / Windows) 環境において、日本語文字化けやエスケープ破壊を防ぎながら安全に Git コミットおよび GitHub CLI（`gh`）を実行するためのワークフローです。
 
+## 0. Branching Strategy & Direct Commit Prohibition
+
+- **`main` ブランチへの直接コミット・直接プッシュは完全禁止**:
+  - 作業着手時は、必ず `origin/main` から最新を取得した上で専用のトピックブランチ（例: `feat/issue-151-quick-scope-filter`, `fix/issue-312-timing-attack`）を作成・チェックアウトして作業すること。
+  - すべての変更は GitHub Pull Request（PR）を作成し、CI パス・レビューを経てマージする運用を徹底する。
+
 ---
 
 ## 1. Git Commit Message Guidelines
