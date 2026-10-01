@@ -541,9 +541,11 @@ describe("監査ログ (Audit Log) & 閲覧履歴 (View Log) の統合テスト"
   });
 
   // 5. クリーンアップ Cron テスト
-  it("ライフサイクル: 180日以上前の古い監査ログ・閲覧ログが定期削除されること", async () => {
+  it("ライフサイクル: 180日以上前の古い閲覧ログ、および3年以上前の古い監査ログが定期削除されること", async () => {
     const t = convexTest(schema, modules);
     const now = Date.now();
+    const threeYearsAndOneDayAgo = now - (3 * 365 + 1) * 24 * 60 * 60 * 1000;
+    const oneYearAgo = now - 365 * 24 * 60 * 60 * 1000;
     const oneHundredEightyOneDaysAgo = now - 181 * 24 * 60 * 60 * 1000;
     const tenDaysAgo = now - 10 * 24 * 60 * 60 * 1000;
 
@@ -553,20 +555,20 @@ describe("監査ログ (Audit Log) & 閲覧履歴 (View Log) の統合テスト"
     let recentViewLogId!: Id<"viewLogs">;
 
     await t.run(async (ctx) => {
-      // 監査ログ
+      // 監査ログ（3年超のものが削除対象、1年前などの3年未満は保持）
       oldAuditLogId = await ctx.db.insert("auditLogs", {
         userId: "test_user",
         actorDisplayName: "テストアクター",
         ownerType: "family",
         action: "RECORD_UPDATE",
-        createdAt: oneHundredEightyOneDaysAgo,
+        createdAt: threeYearsAndOneDayAgo,
       });
       recentAuditLogId = await ctx.db.insert("auditLogs", {
         userId: "test_user",
         actorDisplayName: "テストアクター",
         ownerType: "family",
         action: "RECORD_UPDATE",
-        createdAt: tenDaysAgo,
+        createdAt: oneYearAgo,
       });
 
       const dummyAccountId = await ctx.db.insert("users", {
@@ -781,5 +783,127 @@ describe("監査ログ (Audit Log) & 閲覧履歴 (View Log) の統合テスト"
     await expect(
       viewerClient.query(api.records.getFamilyAuditAndViewsForExport, {}),
     ).rejects.toThrow("Access denied: Admin role required");
+  });
+
+  describe("exportFamilyAuditLogs のテスト", () => {
+    it("年指定フィルタおよび全期間取得が正しく機能し、他家族のログは漏洩しないこと（IDOR防止）", async () => {
+      const t = convexTest(schema, modules);
+      let familyAId!: Id<"families">;
+      let familyBId!: Id<"families">;
+
+      await t.run(async (ctx) => {
+        familyAId = await ctx.db.insert("families", {
+          name: "Family A",
+          updatedAt: Date.now(),
+        });
+        familyBId = await ctx.db.insert("families", {
+          name: "Family B",
+          updatedAt: Date.now(),
+        });
+
+        await ctx.db.insert("users", {
+          familyRole: "viewer",
+          userId: "user_a",
+          email: "user_a@example.com",
+          displayName: "ユーザーA",
+          familyId: familyAId,
+          updatedAt: Date.now(),
+        });
+
+        // 2025年のログ (JST 2025-06-01)
+        await ctx.db.insert("auditLogs", {
+          familyId: familyAId,
+          userId: "user_a",
+          actorDisplayName: "ユーザーA",
+          ownerType: "family",
+          action: "RECORD_CREATE",
+          metadata: { targetTitle: "2025年レコード" },
+          createdAt: new Date("2025-06-01T00:00:00Z").getTime(),
+        });
+
+        // 2026年のログ (JST 2026-06-01)
+        await ctx.db.insert("auditLogs", {
+          familyId: familyAId,
+          userId: "user_a",
+          actorDisplayName: "ユーザーA",
+          ownerType: "family",
+          action: "RECORD_UPDATE",
+          metadata: { targetTitle: "2026年レコード" },
+          createdAt: new Date("2026-06-01T00:00:00Z").getTime(),
+        });
+
+        // 別家族 (Family B) の2026年のログ
+        await ctx.db.insert("auditLogs", {
+          familyId: familyBId,
+          userId: "user_b",
+          actorDisplayName: "ユーザーB",
+          ownerType: "family",
+          action: "RECORD_CREATE",
+          metadata: { targetTitle: "Family B レコード" },
+          createdAt: new Date("2026-06-01T00:00:00Z").getTime(),
+        });
+      });
+
+      const clientA = t.withIdentity({
+        subject: "user_a",
+        email: "user_a@example.com",
+      });
+
+      // 1. 2026年指定で取得
+      const logs2026 = await clientA.query(
+        api.auditLogs.exportFamilyAuditLogs,
+        {
+          year: 2026,
+        },
+      );
+      expect(logs2026).toHaveLength(1);
+      expect(logs2026[0]?.targetTitle).toBe("2026年レコード");
+      expect(logs2026[0]?.action).toBe("RECORD_UPDATE");
+
+      // 2. 2025年指定で取得
+      const logs2025 = await clientA.query(
+        api.auditLogs.exportFamilyAuditLogs,
+        {
+          year: 2025,
+        },
+      );
+      expect(logs2025).toHaveLength(1);
+      expect(logs2025[0]?.targetTitle).toBe("2025年レコード");
+      expect(logs2025[0]?.action).toBe("RECORD_CREATE");
+
+      // 3. 全期間指定（year: undefined）で取得
+      const allLogs = await clientA.query(
+        api.auditLogs.exportFamilyAuditLogs,
+        {},
+      );
+      expect(allLogs).toHaveLength(2);
+      // Family B のデータは含まれないこと（IDOR防止）
+      expect(allLogs.some((l) => l.targetTitle === "Family B レコード")).toBe(
+        false,
+      );
+    });
+
+    it("家族未所属ユーザーが呼び出した場合、エラーになること", async () => {
+      const t = convexTest(schema, modules);
+
+      await t.run(async (ctx) => {
+        await ctx.db.insert("users", {
+          familyRole: "viewer",
+          userId: "user_unattached",
+          email: "unattached@example.com",
+          displayName: "未所属ユーザー",
+          updatedAt: Date.now(),
+        });
+      });
+
+      const client = t.withIdentity({
+        subject: "user_unattached",
+        email: "unattached@example.com",
+      });
+
+      await expect(
+        client.query(api.auditLogs.exportFamilyAuditLogs, {}),
+      ).rejects.toThrow("User does not belong to a family");
+    });
   });
 });

@@ -8,9 +8,10 @@ test.describe("未認証公開ルートの検証", () => {
     await expect(page).toHaveURL("/");
 
     // メイン見出し（h1）が表示されること
-    const heading = page.locator("h1");
+    const heading = page
+      .getByRole("heading", { level: 1 })
+      .filter({ hasText: "パスワード" });
     await expect(heading).toBeVisible({ timeout: 15000 });
-    await expect(heading).toContainText("パスワード");
 
     // ログインへの導線ボタンが存在すること
     const loginButton = page

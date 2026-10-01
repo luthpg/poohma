@@ -223,6 +223,7 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 | familyId | Id<families>(optional) | 所属家族グループ（アカウントごとに独立） |
 | familyRole | ("admin" \| "viewer") | 家族内ロール（"admin": ファミリー管理者, "viewer": メンバー） |
 | onboardingVersion | number(optional) | オンボーディング進捗バージョン（未開始: 0または未設定、完了: 1以上） |
+| emailNotificationSettings | object(optional) | メール配信設定（notifyRecordChanges, notifyFamilyActivity, notifyDataExport, notifySecuritySettings） |
 | createdAt | number(optional) | 作成日時 |
 | updatedAt | number | 更新日時 |
 
@@ -345,7 +346,7 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 
 #### auditLogs（監査ログ）
 
-レコードやクレデンシャルの作成・更新・削除、家族設定変更、メンバーシップ操作、リカバリ操作など、セキュリティ上重要な変更・権限変更・状態変更を記録する監査テーブル。閲覧系操作（ヒント閲覧等）はここに含まれず `viewLogs` に分離される。脱退・削除後のメンバー表示維持のため操作時点の表示名を `actorDisplayName` に保存する。180日経過したログは `cleanupOldAuditLogsInternal` により自動削除される。
+レコードやクレデンシャルの作成・更新・削除、家族設定変更、メンバーシップ操作、リカバリ操作など、セキュリティ上重要な変更・権限変更・状態変更を記録する監査テーブル。閲覧系操作（ヒント閲覧等）はここに含まれず `viewLogs` に分離される。脱退・削除後のメンバー表示維持のため操作時点の表示名を `actorDisplayName` に保存する。3年（1095日）経過したログは `cleanupOldAuditLogsInternal` により自動削除される。
 
 | フィールド | 型 | 説明 |
 | --------- | --------------------- | --------- |
@@ -637,6 +638,22 @@ ConvexReactClient / TanStack Query の Mutation実行を共通ラッパーでイ
    - **定期実行**: 毎日午前4:00 JST (19:00 UTC) に GitHub Actions cron により自動実行。
    - **手動実行**: GitHub Actions の「Reset Demo Family」ワークフローから `workflow_dispatch` で理由（`reason`）および必要に応じて強制フラグ（`force`）を指定して即時実行可能（10分間のクールダウンガード付き）。
    - **結果確認**: GitHub Actions の Step Summary および Discord Webhook（設定時）に、実行ステータス・招待コード・キック人数・削除/投入件数が出力される。
+
+### 5.8 監査ログCSVエクスポートとメール通知設定（convex/auditLogs.ts, convex/users.ts）
+
+#### 監査ログCSVエクスポート（exportFamilyAuditLogs）
+- **クエリ**: `exportFamilyAuditLogs = familyBoundQuery`
+- **引数**: `year: v.optional(v.number())`（JST基準の1年間、未指定時は全期間）
+- **セキュリティ・IDOR防止**: `familyBoundQuery` により、呼び出し元アカウントが所属する `familyId` のデータのみに厳格制限。
+- **インデックス活用**: `by_family_createdAt` を用い、指定期間のログを効率的かつ漏れなく抽出（最大10,000件）。
+- **クライアント処理**: `sanitizeCsvValue` で数式文字エスケープを施し、UTF-8 BOM を付与して CSV 生成。
+
+#### メール通知オプトアウト設定（updateEmailNotificationSettings）
+- **ミューテーション**: `updateEmailNotificationSettings = authenticatedMutation`
+- **引数**: `settings: { notifyRecordChanges?: boolean, notifyFamilyActivity?: boolean, notifyDataExport?: boolean, notifySecuritySettings?: boolean }`
+- **設計方針（KISS原則）**:
+  - `users.emailNotificationSettings` に保存し、未設定時は `?? true`（デフォルト配信）。
+  - 重要セキュリティ通知（OTP、新端末ログイン、パスコード変更等）はオプトアウト不可（強制送信）。
 
 ## 6. 暗号化設計（E2EE）
 
@@ -954,7 +971,7 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 | getRecordAuditLogs | Query | authenticated | 単一レコードの変更履歴タイムラインを取得（最大50件、`by_recordId_createdAt` インデックス使用） |
 | getFamilyAuditAndViewsForExport | Query | familyAdmin | CSVエクスポート用：家族の変更系監査ログと閲覧ログを統合し降順で取得（ファミリー管理者限定） |
 | getStaleRecords | Query | authenticated | 指定日数（デフォルト180日）以上更新されていないレコードを取得（サンプルレコード除外） |
-| cleanupOldAuditLogsInternal | InternalMutation | internal（Cron） | 180日以上経過した監査ログを削除（24時間間隔cronから実行、1回100件バッチ、件数上限到達時は再帰実行） |
+| cleanupOldAuditLogsInternal | InternalMutation | internal（Cron） | 3年（1095日）以上経過した監査ログを削除（24時間間隔cronから実行、1回100件バッチ、件数上限到達時は再帰実行） |
 | cleanupOldViewLogsInternal | InternalMutation | internal（Cron） | 180日以上経過した閲覧ログを削除（24時間間隔cronから実行、1回100件バッチ、件数上限到達時は再帰実行） |
 
 ### 7.4 convex/actions.ts（Node runtime, "use node"）
@@ -1247,7 +1264,7 @@ convex/crons.ts に登録されている定期ジョブ一覧:
 
 5. cleanup old audit logs（24時間間隔）
    → internal.records.cleanupOldAuditLogsInternal
-   - 180日以上経過した auditLogs を削除（1回100件バッチ、上限到達時は再帰実行）
+   - 3年（1095日）以上経過した auditLogs を削除（1回100件バッチ、上限到達時は再帰実行）
 
 6. cleanup old view logs（24時間間隔）
    → internal.records.cleanupOldViewLogsInternal

@@ -21,6 +21,13 @@ export interface Account {
   id: Id<"users">;
   userId: string;
   familyId?: Id<"families">;
+  familyRole?: "admin" | "viewer";
+  emailNotificationSettings?: {
+    notifyRecordChanges?: boolean;
+    notifyFamilyActivity?: boolean;
+    notifyDataExport?: boolean;
+    notifySecuritySettings?: boolean;
+  };
   displayName?: string;
   name?: string;
   email: string;

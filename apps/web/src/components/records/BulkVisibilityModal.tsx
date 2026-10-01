@@ -1,5 +1,5 @@
 import { AlertTriangle, ArrowRight, Lock, Users } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -72,11 +72,20 @@ export function BulkVisibilityModal({
     }
   };
 
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isOpen && step !== undefined) {
+      contentRef.current?.scrollTo?.({ top: 0, behavior: "instant" });
+    }
+  }, [isOpen, step]);
+
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent
+        ref={contentRef}
         data-testid="bulk-visibility-modal"
-        className="sm:max-w-md"
+        className="sm:max-w-md max-h-[85vh] overflow-y-auto"
         showCloseButton={!isSubmitting}
       >
         {step === "select" && (

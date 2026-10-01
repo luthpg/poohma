@@ -31,6 +31,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Install pnpm
         uses: pnpm/action-setup@v3
@@ -72,6 +74,19 @@ jobs:
 
       - name: Lint & Format Check (Biome)
         run: pnpm run check:ci
+
+      - name: Check knowledge references
+        run: pnpm check:knowledge
+
+      - name: Check documentation sync
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ -n "$GITHUB_BASE_REF" ]; then
+            pnpm check:doc-sync -- --base "origin/$GITHUB_BASE_REF" --ci
+          else
+            pnpm check:doc-sync -- --base "HEAD~1" --ci
+          fi
 
       - name: Type Check
         run: pnpm run typecheck

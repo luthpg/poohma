@@ -23,7 +23,7 @@ flowchart TD
     Family -->|"1:N scope"| RecFamily
     Family -->|"1:N"| Invites["familyInvites"]
     Family -->|"1:N"| JoinReqs["joinRequests"]
-    Family -->|"1:N"| AuditLog["auditLogs (by_family_createdAt, TTL 180d)"]
+    Family -->|"1:N"| AuditLog["auditLogs (by_family_createdAt, TTL 3y)"]
     PoohMaAccount -.->|"actor"| AuditLog
     RecUser -.->|"optional ref"| AuditLog
     RecFamily -.->|"optional ref"| AuditLog
@@ -268,14 +268,15 @@ flowchart TD
 
 ### データ保持・クリーンアップ
 
-- **保持期間**: 180日（`RETENTION_MS = 180 * 24 * 60 * 60 * 1000`）
+- **保持期間**: 3年（1095日、`RETENTION_MS = 3 * 365 * 24 * 60 * 60 * 1000`。閲覧ログ `viewLogs` は 180日保持）
 - **定期削除**: 24時間間隔cron（`cleanupOldAuditLogsInternal`）が `by_createdAt` インデックスで期限切れログを100件ずつバッチ削除。件数上限到達時は `ctx.scheduler.runAfter(0, ...)` で再帰実行。
 - **actorDisplayNameの保存**: 脱退・アカウント削除後もログ一覧で権限者を識別できるよう、操作時点の表示名を参照切れに顧慮して保存する。取得時（`getFamilyAuditLogs` / `getRecordAuditLogs`）には DB から最新の `displayName` を上書きして返す。
 
-### UI連携
+### UI連携とCSVエクスポート
 
 - **レコード詳細画面** (`routes/(app)/records/$id.tsx`): `RecordAuditHistoryAccordion` コンポーネントが `getRecordAuditLogs`（最大30件）を購読し、アクセス・変更履歴をアコーディオンUIで表示。
 - **家族画面** (`routes/(app)/family.tsx`): `FamilyAuditLogSection` コンポーネントが `getFamilyAuditLogs`（ページネーション）を購読し、家族のアクティビティログをアコーディオンUIで表示。
+- **CSVエクスポート** (`exportFamilyAuditLogs`): 家族画面から「全期間」または「年単位（JST基準）」で監査ログを一括ダウンロード可能。CSVインジェクション対策（`sanitizeCsvValue`）とUTF-8 BOMを付与してクライアントで生成。
 - **ヒント閲覧ログ記録**: `CredentialCard` コンポーネントの暗号復号成功時に `logRecordHintView` Mutationを非同期呼び出し（失敗してもUIに影響しない）。
 
 ---
@@ -285,12 +286,14 @@ flowchart TD
 PoohMa では、CSVエクスポート・インポートを単なるバックアップにとどまらず、手元での一括編集・差分更新ワークフローとして機能させるため、`stableId` を導入している。
 
 ### 9.1 `stableId` の役割と不変条件
+
 - **環境非依存の安定識別子**: Convex の内部不透明ID（`_id`）と異なり、UUID v4 による永続的な識別子を `serviceRecords.stableId` および `credentials.stableId` に付与。
 - **自動生成**: `createRecord`, `importRecords` による新規作成時に必ず `crypto.randomUUID()` で自動生成。
 - **ワンショット・バックフィル**: 既存レコード・クレデンシャルには `migrations:backfillStableIds` によって一括付与（アプリ実行時の遅延パッチは行わない）。
 - **インデックス**: `by_family_stableId`, `by_stableId`, `by_recordId_stableId` により高速な突合を実現。
 
 ### 9.2 CSV 差分インポートの判定ルール
+
 - **CREATE**: `RecordId` が空または列なし。新規レコードとして登録（OGP・ふりがな自動補完、ヒント暗号化）。
 - **UPDATE**: `RecordId` が一致し、DB上の値と差分がある場合。非空セルのみを更新。
 - **SKIP**: 全項目一致、またはCSV側の全セルが空の場合。既存値を維持（空セルによる意図しないデータ削除を完全防止）。
@@ -304,12 +307,14 @@ PoohMa では、CSVエクスポート・インポートを単なるバックア�
 ポートフォリオ閲覧者や試用ユーザー向けに、代表的なサービスレコード群があらかじめ投入された公開デモ環境を提供する。
 
 ### 10.1 デモファミリーの不変条件
+
 - **コホート間データ隔離**: リセット境界を跨いだゲストコホート間で、互いの痕跡（レコード、操作履歴、閲覧ログ、参加申請、招待コード等）を一切閲覧できないこと。リセット処理は「環境を初期化する」のではなく「**コホート間の情報障壁を構築する**」と捉える。
 - **手動承認制の維持**: 既存の招待・承認フロー（`createJoinRequest` → 管理者手動承認）をそのまま使用。プロダクションコードにデモ専用の条件分岐を持ち込まず、管理者の承認制による安全性を実演。
 - **無期限招待コード**: `familyInvites` の `code === DEMO_INVITE_CODE` を 2099年（`FAR_FUTURE_MS`）まで有効に維持。
 - **完全リポジトリレス実行**: GitHub Actions から `POST /resetDemoFamily`（`x-internal-secret` 定数時間比較認証）を `curl` で直接呼び出し。チェックアウトや Node/pnpm インストール不要で 1〜2 秒で完了。
 
 ### 10.2 リセット処理の整合性と順序
+
 1. **対象特定**: `DEMO_FAMILY_ID` と `DEMO_ADMIN_USER_IDS` を環境変数照合。指定管理者以外のメンバーを「ゲスト」として特定。
 2. **完全消去（ゲスト個人レコード＋共有レコード）**:
    - デモファミリーの共有レコード（`familyId === DEMO_FAMILY_ID`）を完全消去。
@@ -327,3 +332,32 @@ PoohMa では、CSVエクスポート・インポートを単なるバックア�
 8. **招待コードのクリーンアップと維持**: デモ固定コード以外の追加招待を全削除し、デモ固定コードの有効期限を 2099 年に延長。
 9. **実効的防御策**: 直近 10 分以内の連続実行はクールダウンガードによりスキップ。
 
+---
+
+## 11. メール通知設定 (`emailNotificationSettings`) と加入申請インジケーター
+
+### 11.1 メール通知設定の用途別分離
+
+ユーザーのノイズ低減とセキュリティ担保を両立するため、通知を「必須（MUST）」と「オプトアウト可能」に厳格分類。
+
+- **オプトアウト不可（強制送信）**:
+  - `recoveryOtp`（リカバリー認証コード）
+  - `newDeviceLogin`（新端末ログイン検知）
+  - `passcodeRotated`（マスターパスコード変更）
+  - `recoveryKitIssued`（リカバリーキット発行）
+  - `familyMigrationCompleted`（家族移行完了）
+  - `memberKicked`（家族からのキック通告）
+  - `accountDeleted`（アカウント完全削除）
+- **オプトアウト可能（デフォルト: true）**:
+  - `notifyRecordChanges`: レコードの家族共有設定変更・管理者追加/解除
+  - `notifyFamilyActivity`: 家族への新規メンバー加入・参加申請受信
+  - `notifyDataExport`: CSV一括エクスポート実行通知
+  - `notifySecuritySettings`: 生体認証登録/解除通知
+- **設定保存**: `users.emailNotificationSettings`（マイグレーション不要、未設定時は自然に true フォールバック）。
+
+### 11.2 未処理加入申請インジケーター（点灯ライト & バッジ）
+
+- **対象**: ファミリー管理者（`isFamilyAdmin`）かつ `joinRequests` のステータスが `pending` の場合。
+- **UI表示**:
+  - `AppHeader.tsx`: ユーザーアバターの右上にオレンジ色のアニメーション点灯ランプ（`animate-ping` ＋ 固定ドット）を表示。
+  - `UserMenu.tsx`: モバイルシートおよびデスクトップメニュー内の「家族管理」項目横に未処理件数バッジ（例: `1件の申請` / `1`）を表示。

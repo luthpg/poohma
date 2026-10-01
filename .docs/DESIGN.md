@@ -24,7 +24,7 @@ What distinguishes Vercel from other monochrome design systems is its shadow-as-
 ### Brand Identity (PoohMa Signature)
 
 - **PoohMa Orange** (`#f97316` / Tailwind `orange-500`): アプリケーション全体のシグネチャーブランドカラー。ハチミツを想起させる温かみと安心感を象徴する核となるカラー。
-  - 用途: ブランドロゴ、アプリアイコン、フォーム変更インジケーター（アクセントバー）、重要ハイライト、ブランドシンボル。
+  - 用途: ブランドロゴ、アプリアイコン、フォーム変更インジケーター（アクセントバー）、未承認申請インジケーター（ヘッダーアバター右上の点灯ランプ＋パルスアニメーション）、重要ハイライト、ブランドシンボル。
   - 特性: モノクロ・ミニマルな Geist デザインシステムの中で、PoohMa 独自のアイデンティティと親しみやすさを際立たせる。
 
 ### Primary
@@ -85,7 +85,7 @@ What distinguishes Vercel from other monochrome design systems is its shadow-as-
 ### Hierarchy
 
 | Role | Font | Size | Weight | Line Height | Letter Spacing | Notes |
-|------|------|------|--------|-------------|----------------|-------|
+| ------ | ------ | ------ | -------- | ------------- | ---------------- | ------- |
 | Display Hero | Geist | 48px (3.00rem) | 600 | 1.00–1.17 (tight) | -2.4px to -2.88px | Maximum compression, billboard impact |
 | Section Heading | Geist | 40px (2.50rem) | 600 | 1.20 (tight) | -2.4px | Feature section titles |
 | Sub-heading Large | Geist | 32px (2.00rem) | 600 | 1.25 (tight) | -1.28px | Card headings, sub-sections |
@@ -138,6 +138,7 @@ What distinguishes Vercel from other monochrome design systems is its shadow-as-
 **Primary Action Button (Orange CTA - Button Specific)**
 
 PoohMa のブランドカラー本体（`#f97316` / orange-500：ロゴや変更インジケーター等のシグネチャー）と調和を保ちつつ、ボタン内の白文字の視認性（WCAGコントラスト比）およびモバイル操作性を担保するための**ボタン限定の専用スタイル**：
+
 - Background: `#ea580c` (orange-600), Hover: `#c2410c` (orange-700)
 - Text: `#ffffff`
 - Font: `font-semibold text-xs sm:text-[14px]` (コントラスト比 3.56:1、太字UI要素/ラージテキスト基準 3:1 クリア)
@@ -209,6 +210,7 @@ PoohMa のブランドカラー本体（`#f97316` / orange-500：ロゴや変更
 ### Fixed Action Footer (Service Records)
 
 レコード詳細閲覧、レコード編集、新規登録の3画面において、下部アクションバーの体験・配置を統一：
+
 - Container: `fixed bottom-0 left-0 right-0 z-20 border-t border-border/80 bg-background/95 backdrop-blur-md px-4 py-2.5 sm:px-6 sm:py-3.5 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] dark:shadow-[0_-4px_12px_rgba(0,0,0,0.3)] pb-[max(0.625rem,env(safe-area-inset-bottom))] sm:pb-[max(0.875rem,env(safe-area-inset-bottom))]`
 - Content Width: `max-w-4xl mx-auto flex items-center justify-between`
 - Button Alignment & Tap Targets:
@@ -220,12 +222,17 @@ PoohMa のブランドカラー本体（`#f97316` / orange-500：ロゴや変更
 ### Navigation
 
 - Clean horizontal nav on white, sticky
-- Vercel logotype left-aligned, 262x52px
+- PoohMa logotype left-aligned, responsive sizing
 - Links: Geist 14px weight 500, `#171717` text
 - Active: weight 600 or underline
-- CTA: dark pill buttons ("Start Deploying", "Contact Sales")
-- Mobile: hamburger menu collapse
-- Product dropdowns with multi-level menus
+- User Menu & Notification Indicator:
+  - アバター右上に未処理参加申請（pending requests）の点灯ランプ（`bg-orange-500` + `animate-ping` によるパルスハイライト）を表示。
+  - メニュー内の「家族管理」項目に未処理件数バッジ（`bg-orange-50 text-orange-700`）を付与。
+- Smart SubHeader (`SubHeader.tsx`):
+  - レコード詳細画面、アカウント設定画面、一括データ管理画面等で画面上部に吸着するセカンダリヘッダー。
+  - 下スクロール時に親ヘッダー裏へスムーズに退避（`-translate-y-full`）、上スクロールまたは親ヘッダータップで即座に再出現（`translate-y-0`、`transition-transform duration-200`）。
+  - 安全な戻るボタン（`window.history.state?.idx > 0` 判定による適切なフォールバック）を標準装備。
+- Mobile: hamburger / user menu dropdown
 
 ### Image Treatment
 
@@ -293,7 +300,7 @@ PoohMa のブランドカラー本体（`#f97316` / orange-500：ロゴや変更
 ## 6. Depth & Elevation
 
 | Level | Treatment | Use |
-|-------|-----------|-----|
+| ------- | ----------- | ----- |
 | Flat (Level 0) | No shadow | Page background, text blocks |
 | Ring (Level 1) | `rgba(0,0,0,0.08) 0px 0px 0px 1px` | Shadow-as-border for most elements |
 | Light Ring (Level 1b) | `rgb(235,235,235) 0px 0px 0px 1px` | Lighter ring for tabs, images |
@@ -339,7 +346,7 @@ PoohMa のブランドカラー本体（`#f97316` / orange-500：ロゴや変更
 ### Breakpoints
 
 | Name | Width | Key Changes |
-|------|-------|-------------|
+| ------ | ------- | ------------- |
 | Mobile Small | <400px | Tight single column, minimal padding |
 | Mobile | 400–600px | Standard mobile, stacked layout |
 | Tablet Small | 600–768px | 2-column grids begin |

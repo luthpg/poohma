@@ -37,7 +37,9 @@ function MockFormContainer({
     memo: "",
     ownerType: "user",
     tags: [],
-    credentials: [{ label: "", loginId: "", passwordHint: "" }],
+    credentials: [
+      { id: "mock-cred-1", label: "", loginId: "", passwordHint: "" },
+    ],
     ...initialValues,
   });
 

@@ -10,10 +10,19 @@ import {
   reauthenticateWithPopup,
   signOut,
 } from "firebase/auth";
-import { AlertTriangle, ChevronRight, Database, Download } from "lucide-react";
+import {
+  AlertTriangle,
+  Ban,
+  Check,
+  ChevronRight,
+  Database,
+  Download,
+  Mail,
+} from "lucide-react";
 import { type SubmitEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
+import { SubHeader } from "@/components/common/SubHeader";
 import { usePasscode } from "@/components/PasscodeProvider";
 import {
   AlertDialog,
@@ -32,6 +41,7 @@ import { LOGOUT_FLAG_KEY } from "@/hooks/useConvexFirebaseAuth";
 import { useExportCsv } from "@/hooks/useExportCsv";
 import { clearQueryCache } from "@/hooks/usePersistentQuery";
 import { isBiometricEnabledForUser } from "@/lib/biometric";
+import { cn } from "@/lib/utils";
 import { logout } from "@/services/auth.functions";
 import { auth } from "@/utils/firebase";
 
@@ -101,6 +111,95 @@ function SettingsComponent() {
 
   const updateProfile = useMutation(api.users.updateProfile);
   const deleteAllAccountsConvex = useMutation(api.users.deleteAllAccounts);
+  const updateEmailSettingsMutation = useMutation(
+    api.users.updateEmailNotificationSettings,
+  );
+
+  const [emailSettings, setEmailSettings] = useState({
+    notifyRecordChanges:
+      currentAccount?.emailNotificationSettings?.notifyRecordChanges ?? true,
+    notifyFamilyActivity:
+      currentAccount?.emailNotificationSettings?.notifyFamilyActivity ?? true,
+    notifyDataExport:
+      currentAccount?.emailNotificationSettings?.notifyDataExport ?? true,
+    notifySecuritySettings:
+      currentAccount?.emailNotificationSettings?.notifySecuritySettings ?? true,
+  });
+
+  useEffect(() => {
+    if (currentAccount?.emailNotificationSettings) {
+      setEmailSettings({
+        notifyRecordChanges:
+          currentAccount.emailNotificationSettings.notifyRecordChanges ?? true,
+        notifyFamilyActivity:
+          currentAccount.emailNotificationSettings.notifyFamilyActivity ?? true,
+        notifyDataExport:
+          currentAccount.emailNotificationSettings.notifyDataExport ?? true,
+        notifySecuritySettings:
+          currentAccount.emailNotificationSettings.notifySecuritySettings ??
+          true,
+      });
+    }
+  }, [currentAccount?.emailNotificationSettings]);
+
+  const handleToggleEmailSetting = async (
+    key:
+      | "notifyRecordChanges"
+      | "notifyFamilyActivity"
+      | "notifyDataExport"
+      | "notifySecuritySettings",
+    newValue: boolean,
+  ) => {
+    const updated = { ...emailSettings, [key]: newValue };
+    setEmailSettings(updated);
+    try {
+      await updateEmailSettingsMutation({
+        accountId: activeAccountId || undefined,
+        settings: { [key]: newValue },
+      });
+      toast.success("メール通知設定を更新しました");
+    } catch (_error) {
+      setEmailSettings(emailSettings);
+      toast.error("メール通知設定の更新に失敗しました");
+    }
+  };
+
+  const handleBatchToggleEmailSettings = async (enabled: boolean) => {
+    const previous = { ...emailSettings };
+    const updated = {
+      notifyRecordChanges: enabled,
+      notifyFamilyActivity: enabled,
+      notifyDataExport: enabled,
+      notifySecuritySettings: enabled,
+    };
+    setEmailSettings(updated);
+    try {
+      await updateEmailSettingsMutation({
+        accountId: activeAccountId || undefined,
+        settings: updated,
+      });
+      toast.success(
+        enabled
+          ? "すべてのメール通知をオンにしました"
+          : "すべてのメール通知をオフにしました",
+      );
+    } catch (_error) {
+      setEmailSettings(previous);
+      toast.error("メール通知設定の一括更新に失敗しました");
+    }
+  };
+
+  const isAllEmailEnabled =
+    emailSettings.notifyRecordChanges &&
+    emailSettings.notifyFamilyActivity &&
+    emailSettings.notifyDataExport &&
+    emailSettings.notifySecuritySettings;
+
+  const isAllEmailDisabled =
+    !emailSettings.notifyRecordChanges &&
+    !emailSettings.notifyFamilyActivity &&
+    !emailSettings.notifyDataExport &&
+    !emailSettings.notifySecuritySettings;
 
   if (!currentAccount) {
     return (
@@ -237,22 +336,8 @@ function SettingsComponent() {
 
   return (
     <div className="mx-auto max-w-2xl p-4 sm:p-6">
-      {/* 戻るボタン */}
-      <div className="sticky top-0 z-20 -mx-4 -mt-4 mb-6 bg-background/95 px-4 pb-4 pt-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:-mx-6 sm:-mt-6 sm:px-6 sm:pt-6">
-        <button
-          type="button"
-          onClick={() => {
-            if (window.history.length > 2) {
-              window.history.back();
-            } else {
-              router.navigate({ to: "/dashboard" });
-            }
-          }}
-          className="text-[14px] font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
-        >
-          <span className="text-[16px] leading-none mb-0.5">←</span> 戻る
-        </button>
-      </div>
+      {/* 共通スマート子ヘッダー */}
+      <SubHeader backLabel="ダッシュボードに戻る" fallbackTo="/dashboard" />
 
       <div className="mb-8">
         <h1 className="text-[28px] font-semibold tracking-geist-h1 text-foreground mb-2">
@@ -389,6 +474,209 @@ function SettingsComponent() {
               </button>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* メール通知設定セクション */}
+      <div className="rounded-lg bg-card p-6 shadow-card border border-border/50 mt-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2 border-b border-border pb-4">
+          <div className="flex items-center gap-2">
+            <Mail className="h-5 w-5 text-orange-500" />
+            <h2 className="text-[18px] font-semibold text-foreground tracking-geist-ui">
+              メール通知設定
+            </h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[12px] text-muted-foreground hidden sm:inline">
+              一括操作:
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => handleBatchToggleEmailSettings(true)}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-3 py-1 text-[12px] font-medium transition-all shadow-xs cursor-pointer border",
+                  isAllEmailEnabled
+                    ? "bg-orange-500 text-white border-orange-500 font-semibold shadow-orange-500/20"
+                    : "bg-background text-foreground border-border hover:bg-accent hover:border-foreground/20",
+                )}
+              >
+                <Check className="h-3.5 w-3.5" />
+                <span>すべてオン</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBatchToggleEmailSettings(false)}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-3 py-1 text-[12px] font-medium transition-all shadow-xs cursor-pointer border",
+                  isAllEmailDisabled
+                    ? "bg-stone-800 text-white dark:bg-stone-200 dark:text-stone-900 border-stone-800 dark:border-stone-200 font-semibold"
+                    : "bg-background text-foreground border-border hover:bg-accent hover:border-foreground/20",
+                )}
+              >
+                <Ban className="h-3.5 w-3.5" />
+                <span>すべてオフ</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <p className="text-[12px] text-muted-foreground mb-6">
+          各種イベント発生時にお送りする通知メールの受信設定を管理できます。
+        </p>
+
+        <div className="space-y-5">
+          {/* レコード共有・権限変更通知 */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <p className="text-[14px] font-medium text-foreground">
+                レコードの共有・管理者変更通知
+              </p>
+              <p className="text-[12px] text-muted-foreground">
+                アカウント情報の家族共有への追加・解除や、管理者権限の変更時に通知します。
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={emailSettings.notifyRecordChanges}
+              onClick={() =>
+                handleToggleEmailSetting(
+                  "notifyRecordChanges",
+                  !emailSettings.notifyRecordChanges,
+                )
+              }
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
+                emailSettings.notifyRecordChanges
+                  ? "bg-orange-500"
+                  : "bg-muted-foreground/30"
+              }`}
+            >
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  emailSettings.notifyRecordChanges
+                    ? "translate-x-5"
+                    : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* 家族アクティビティ通知 */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-border/40">
+            <div className="space-y-0.5">
+              <p className="text-[14px] font-medium text-foreground">
+                家族のアクティビティ通知
+              </p>
+              <p className="text-[12px] text-muted-foreground">
+                家族への参加申請の受信や、新しいメンバーの加入・脱退時に通知します。
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={emailSettings.notifyFamilyActivity}
+              onClick={() =>
+                handleToggleEmailSetting(
+                  "notifyFamilyActivity",
+                  !emailSettings.notifyFamilyActivity,
+                )
+              }
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
+                emailSettings.notifyFamilyActivity
+                  ? "bg-orange-500"
+                  : "bg-muted-foreground/30"
+              }`}
+            >
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  emailSettings.notifyFamilyActivity
+                    ? "translate-x-5"
+                    : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* CSVデータエクスポート通知 */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-border/40">
+            <div className="space-y-0.5">
+              <p className="text-[14px] font-medium text-foreground">
+                CSVデータエクスポート通知
+              </p>
+              <p className="text-[12px] text-muted-foreground">
+                保管データのCSV一括エクスポートが実行された際に通知します。
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={emailSettings.notifyDataExport}
+              onClick={() =>
+                handleToggleEmailSetting(
+                  "notifyDataExport",
+                  !emailSettings.notifyDataExport,
+                )
+              }
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
+                emailSettings.notifyDataExport
+                  ? "bg-orange-500"
+                  : "bg-muted-foreground/30"
+              }`}
+            >
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  emailSettings.notifyDataExport
+                    ? "translate-x-5"
+                    : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* セキュリティ設定変更通知 */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-border/40">
+            <div className="space-y-0.5">
+              <p className="text-[14px] font-medium text-foreground">
+                端末セキュリティ設定通知
+              </p>
+              <p className="text-[12px] text-muted-foreground">
+                生体認証（Touch ID/Face
+                ID）の登録や解除が行われた際に通知します。
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={emailSettings.notifySecuritySettings}
+              onClick={() =>
+                handleToggleEmailSetting(
+                  "notifySecuritySettings",
+                  !emailSettings.notifySecuritySettings,
+                )
+              }
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
+                emailSettings.notifySecuritySettings
+                  ? "bg-orange-500"
+                  : "bg-muted-foreground/30"
+              }`}
+            >
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  emailSettings.notifySecuritySettings
+                    ? "translate-x-5"
+                    : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-6 rounded-md bg-muted/40 p-3 text-[11px] text-muted-foreground">
+          ※ワンタイムパスワード（OTP）や新端末ログイン検知、マスターパスコード変更、リカバリーキット発行、アカウント削除などの重要セキュリティ通知は、アカウント保護のため配信停止できません。
         </div>
       </div>
 

@@ -1090,24 +1090,26 @@ export const shareRecord = familyBoundMutation({
     const family = await ctx.db.get(ctx.familyId);
     const familyName = family?.name ?? "家族";
 
-    await ctx.scheduler.runAfter(
-      0,
-      internal.actions.sendTemplatedEmailInternal,
-      {
-        email: ctx.user.email,
-        payload: {
-          template: "shareSettingChanged",
-          props: {
-            displayName: ctx.user.displayName || "メンバー",
-            familyName,
-            changedByDisplayName: ctx.user.displayName || "メンバー",
-            changedAt: Date.now(),
-            changeSummary: `「${record.title}」が家族共有に設定されました`,
-            ctaUrl: "/records",
+    if (ctx.user.emailNotificationSettings?.notifyRecordChanges !== false) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.actions.sendTemplatedEmailInternal,
+        {
+          email: ctx.user.email,
+          payload: {
+            template: "shareSettingChanged",
+            props: {
+              displayName: ctx.user.displayName || "メンバー",
+              familyName,
+              changedByDisplayName: ctx.user.displayName || "メンバー",
+              changedAt: Date.now(),
+              changeSummary: `「${record.title}」が家族共有に設定されました`,
+              ctaUrl: "/records",
+            },
           },
         },
-      },
-    );
+      );
+    }
   },
 });
 
@@ -1147,24 +1149,26 @@ export const unshareRecord = familyBoundMutation({
     const family = await ctx.db.get(ctx.familyId);
     const familyName = family?.name ?? "家族";
 
-    await ctx.scheduler.runAfter(
-      0,
-      internal.actions.sendTemplatedEmailInternal,
-      {
-        email: ctx.user.email,
-        payload: {
-          template: "shareSettingChanged",
-          props: {
-            displayName: ctx.user.displayName || "メンバー",
-            familyName,
-            changedByDisplayName: ctx.user.displayName || "メンバー",
-            changedAt: Date.now(),
-            changeSummary: `「${record.title}」の共有が解除され、個人所有に変更されました`,
-            ctaUrl: "/records",
+    if (ctx.user.emailNotificationSettings?.notifyRecordChanges !== false) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.actions.sendTemplatedEmailInternal,
+        {
+          email: ctx.user.email,
+          payload: {
+            template: "shareSettingChanged",
+            props: {
+              displayName: ctx.user.displayName || "メンバー",
+              familyName,
+              changedByDisplayName: ctx.user.displayName || "メンバー",
+              changedAt: Date.now(),
+              changeSummary: `「${record.title}」の共有が解除され、個人所有に変更されました`,
+              ctaUrl: "/records",
+            },
           },
         },
-      },
-    );
+      );
+    }
   },
 });
 
@@ -1213,10 +1217,12 @@ export const addRecordAdmin = recordAdminMutation({
       const familyName = family?.name ?? "家族";
       const now = Date.now();
 
-      // 新管理者一覧の全メンバーに通知
       for (const adminId of newAdmins) {
         const adminDoc = await ctx.db.get(adminId);
-        if (adminDoc) {
+        if (
+          adminDoc &&
+          adminDoc.emailNotificationSettings?.notifyRecordChanges !== false
+        ) {
           await ctx.scheduler.runAfter(
             0,
             internal.actions.sendTemplatedEmailInternal,
@@ -1313,7 +1319,10 @@ export const removeRecordAdmin = recordAdminMutation({
     );
     for (const userId of notifyUserIds) {
       const userDoc = await ctx.db.get(userId);
-      if (userDoc) {
+      if (
+        userDoc &&
+        userDoc.emailNotificationSettings?.notifyRecordChanges !== false
+      ) {
         await ctx.scheduler.runAfter(
           0,
           internal.actions.sendTemplatedEmailInternal,
@@ -1363,7 +1372,10 @@ export const bulkShareRecords = familyBoundMutation({
       }
     }
 
-    if (count > 0) {
+    if (
+      count > 0 &&
+      ctx.user.emailNotificationSettings?.notifyRecordChanges !== false
+    ) {
       const family = await ctx.db.get(ctx.familyId);
       const familyName = family?.name ?? "家族";
 
@@ -1417,7 +1429,10 @@ export const bulkUnshareRecords = familyBoundMutation({
       }
     }
 
-    if (count > 0) {
+    if (
+      count > 0 &&
+      ctx.user.emailNotificationSettings?.notifyRecordChanges !== false
+    ) {
       const family = await ctx.db.get(ctx.familyId);
       const familyName = family?.name ?? "家族";
 
@@ -1517,28 +1532,30 @@ export const fetchRecordsForExport = authenticatedMutation({
       : [user];
     const emailById = new Map(members.map((m) => [m._id, m.email]));
 
-    // エクスポート実行通知メールをスケジュール（サーバー側確実発火）
-    await ctx.scheduler.runAfter(
-      0,
-      internal.actions.sendTemplatedEmailInternal,
-      {
-        email: user.email,
-        payload: {
-          template: "csvExported",
-          props: {
-            displayName: user.displayName || "メンバー",
-            exportedAt: Date.now(),
-            recordCount: records.length,
-            deviceName: args.deviceName,
-            browser: args.browser,
-            os: args.os,
-            ipAddress: args.ipAddress,
-            location: args.location,
-            ctaUrl: "/settings",
+    // エクスポート実行通知メールをスケジュール（オプトアウト判定）
+    if (user.emailNotificationSettings?.notifyDataExport !== false) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.actions.sendTemplatedEmailInternal,
+        {
+          email: user.email,
+          payload: {
+            template: "csvExported",
+            props: {
+              displayName: user.displayName || "メンバー",
+              exportedAt: Date.now(),
+              recordCount: records.length,
+              deviceName: args.deviceName,
+              browser: args.browser,
+              os: args.os,
+              ipAddress: args.ipAddress,
+              location: args.location,
+              ctaUrl: "/settings",
+            },
           },
         },
-      },
-    );
+      );
+    }
 
     return Promise.all(
       records.map(async (r) => {
@@ -2015,11 +2032,11 @@ export const getStaleRecords = authenticatedQuery({
   },
 });
 
-/** 保持期間を超えた監査ログをバッチ単位で削除する。 */
+/** 保持期間を超えた監査ログをバッチ単位で削除する（3年/1095日保持）。 */
 export const cleanupOldAuditLogsInternal = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const RETENTION_MS = 180 * 24 * 60 * 60 * 1000;
+    const RETENTION_MS = 3 * 365 * 24 * 60 * 60 * 1000;
     const cutoff = Date.now() - RETENTION_MS;
     const oldLogs = await ctx.db
       .query("auditLogs")

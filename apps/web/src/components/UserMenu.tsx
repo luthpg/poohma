@@ -1,5 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import { useQuery } from "convex/react";
 import { signOut } from "firebase/auth";
 import {
   ArrowLeft,
@@ -23,6 +24,7 @@ import {
   Users,
 } from "lucide-react";
 import { useState } from "react";
+import { api } from "@/../convex/_generated/api";
 import { useTheme } from "@/components/theme-provider";
 import { UserAvatar } from "@/components/UserAvatar";
 import {
@@ -108,11 +110,27 @@ export function UserMenu({
     }
   };
 
+  const isFamilyAdmin =
+    activeAccount?.familyRole === "admin" && !!activeAccount?.familyId;
+
+  const pendingRequests = useQuery(
+    api.families.getPendingRequests,
+    isFamilyAdmin ? { accountId: activeAccount?._id } : "skip",
+  );
+
+  const pendingCount = pendingRequests?.length ?? 0;
+  const hasPendingJoinRequests = isFamilyAdmin && pendingCount > 0;
+
   const avatarButton = (
     <button
       type="button"
       data-testid="user-menu-trigger"
-      className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary shadow-border outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50 transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+      className="relative flex h-9 w-9 items-center justify-center rounded-full bg-secondary shadow-border outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50 transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+      aria-label={
+        hasPendingJoinRequests
+          ? `ユーザーメニュー（未処理の加入申請が${pendingCount}件あります）`
+          : "ユーザーメニュー"
+      }
     >
       <UserAvatar
         displayName={displayName}
@@ -120,6 +138,16 @@ export function UserMenu({
         photoURL={photoURL}
         className="h-8 w-8"
       />
+      {hasPendingJoinRequests && (
+        <span
+          data-testid="pending-join-indicator"
+          className="absolute -top-0.5 -right-0.5 flex h-3 w-3 pointer-events-none"
+          title={`未処理の加入申請が${pendingCount}件あります`}
+        >
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-500 border-2 border-background" />
+        </span>
+      )}
     </button>
   );
 
@@ -214,6 +242,11 @@ export function UserMenu({
                   >
                     <Users className="h-5 w-5 text-orange-500" />
                     <span>家族管理</span>
+                    {hasPendingJoinRequests && (
+                      <span className="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30">
+                        {pendingCount}件の申請
+                      </span>
+                    )}
                   </Link>
                 </div>
 
@@ -589,6 +622,11 @@ export function UserMenu({
                 <Link to="/family" className="cursor-pointer">
                   <Users className="mr-2 h-4 w-4" />
                   <span>家族管理</span>
+                  {hasPendingJoinRequests && (
+                    <span className="ml-auto inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30">
+                      {pendingCount}
+                    </span>
+                  )}
                 </Link>
               </DropdownMenuItem>
             </DropdownMenuGroup>

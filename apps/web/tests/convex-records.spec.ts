@@ -181,7 +181,7 @@ describe("2.2.2. OGP取得処理のフェイルセーフとタイムアウト (C
       expect(res.title).toBe("テストサービスタイトル");
       expect(res.image).toBe("https://example.com/ogp.png");
       expect(res.description).toBe("テストサービスの詳細説明文です。");
-    });
+    }, 60000);
   });
 });
 

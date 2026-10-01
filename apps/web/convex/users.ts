@@ -189,6 +189,8 @@ export const getAccounts = identityVerifiedQuery({
           displayName: acc.displayName,
           photoURL: acc.photoURL,
           familyId: acc.familyId,
+          familyRole: acc.familyRole,
+          emailNotificationSettings: acc.emailNotificationSettings,
           family,
           onboardingVersion: acc.onboardingVersion,
           createdAt: acc.createdAt,
@@ -812,50 +814,86 @@ export const notifyBiometricEvent = authenticatedMutation({
   handler: async (ctx, args) => {
     const { user } = ctx;
     const now = Date.now();
-    if (args.event === "registered") {
-      await ctx.scheduler.runAfter(
-        0,
-        internal.actions.sendTemplatedEmailInternal,
-        {
-          email: user.email,
-          payload: {
-            template: "biometricRegistered",
-            props: {
-              displayName: user.displayName || "ユーザー",
-              registeredAt: now,
-              deviceName: args.deviceName,
-              browser: args.browser,
-              os: args.os,
-              ipAddress: args.ipAddress,
-              location: args.location,
-              ctaUrl: "/settings",
+    const shouldNotify =
+      user.emailNotificationSettings?.notifySecuritySettings !== false;
+
+    if (shouldNotify) {
+      if (args.event === "registered") {
+        await ctx.scheduler.runAfter(
+          0,
+          internal.actions.sendTemplatedEmailInternal,
+          {
+            email: user.email,
+            payload: {
+              template: "biometricRegistered",
+              props: {
+                displayName: user.displayName || "ユーザー",
+                registeredAt: now,
+                deviceName: args.deviceName,
+                browser: args.browser,
+                os: args.os,
+                ipAddress: args.ipAddress,
+                location: args.location,
+                ctaUrl: "/settings",
+              },
             },
           },
-        },
-      );
-    } else {
-      await ctx.scheduler.runAfter(
-        0,
-        internal.actions.sendTemplatedEmailInternal,
-        {
-          email: user.email,
-          payload: {
-            template: "biometricRemoved",
-            props: {
-              displayName: user.displayName || "ユーザー",
-              removedAt: now,
-              deviceName: args.deviceName,
-              browser: args.browser,
-              os: args.os,
-              ipAddress: args.ipAddress,
-              location: args.location,
-              ctaUrl: "/settings",
+        );
+      } else {
+        await ctx.scheduler.runAfter(
+          0,
+          internal.actions.sendTemplatedEmailInternal,
+          {
+            email: user.email,
+            payload: {
+              template: "biometricRemoved",
+              props: {
+                displayName: user.displayName || "ユーザー",
+                removedAt: now,
+                deviceName: args.deviceName,
+                browser: args.browser,
+                os: args.os,
+                ipAddress: args.ipAddress,
+                location: args.location,
+                ctaUrl: "/settings",
+              },
             },
           },
-        },
-      );
+        );
+      }
     }
 
     return { success: true };
+  },
+});
+
+/**
+ * ユーザーのメール通知設定を更新するミューテーション。
+ * デフォルトはすべて true とし、明示的に false に設定された項目のみ配信停止とする。
+ */
+export const updateEmailNotificationSettings = authenticatedMutation({
+  args: {
+    accountId: v.optional(v.id("users")),
+    settings: v.object({
+      notifyRecordChanges: v.optional(v.boolean()),
+      notifyFamilyActivity: v.optional(v.boolean()),
+      notifyDataExport: v.optional(v.boolean()),
+      notifySecuritySettings: v.optional(v.boolean()),
+    }),
+  },
+  handler: async (ctx, args) => {
+    const { user } = ctx;
+    const currentSettings = user.emailNotificationSettings ?? {};
+    const newSettings = {
+      ...currentSettings,
+      ...args.settings,
+    };
+
+    await ctx.db.patch(user._id, {
+      emailNotificationSettings: newSettings,
+      updatedAt: Date.now(),
+    });
+
+    return { success: true, settings: newSettings };
   },
 });

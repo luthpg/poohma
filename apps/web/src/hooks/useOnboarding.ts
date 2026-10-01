@@ -329,6 +329,7 @@ export function useOnboarding() {
     (queryParam?: string): boolean => {
       if (queryParam === "guide") {
         setPhase("manual-tour");
+        clearOnboardingQuery();
         return true;
       }
       // オンボーディング完了済みの場合は、part1/part2/detail/modal の自動復元を行わずクエリ削除を促す
@@ -353,7 +354,7 @@ export function useOnboarding() {
       }
       return false;
     },
-    [needsOnboarding],
+    [needsOnboarding, clearOnboardingQuery],
   );
 
   return {

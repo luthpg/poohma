@@ -1185,7 +1185,7 @@ function ServiceListItem({
           onToggleSelect();
         }
       }}
-      className={`group flex flex-col sm:flex-row sm:items-center justify-between gap-3 overflow-hidden rounded-lg bg-card p-4 shadow-card transition-shadow hover:shadow-card-hover border block ${
+      className={`group flex flex-col sm:flex-row sm:items-center justify-between gap-0 overflow-hidden rounded-lg bg-card p-4 shadow-card transition-shadow hover:shadow-card-hover border block ${
         isSelected
           ? "border-orange-500 ring-2 ring-orange-500/20"
           : "border-border/50"

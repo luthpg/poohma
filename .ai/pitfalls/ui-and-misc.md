@@ -135,3 +135,26 @@ UI 実装、外部 API 連携、環境変数、モノレポ設定における落
 - **問題**: 検索入力欄に `onChange` + `setTimeout` によるデバウンス検索を導入した際、日本語 IME 入力中の変換途中の未確定文字列（ひらがな等）でデバウンスタイマーが発火し、URL遷移や検索クエリが先行実行されて変換候補が確定・キャンセルされてしまう UX 破綻が起きる。
 - **回避法**: `onCompositionStart` で `setIsComposing(true)`、`onCompositionEnd` で `setIsComposing(false)` を呼び、変換中はタイマーをクリアして保留する。デバウンス用 `useEffect` の依存配列に `isComposing` を含め、変換確定後に検索を再開する。
 
+---
+
+### jsdom 環境における `HTMLElement.prototype.scrollTo` の未定義とモーダル初期化
+
+- **問題**:
+  - ダイアログや長大モーダルのオープン時・ステップ切り替え時に、前回のスクロール位置をリセットするために `contentRef.current.scrollTo({ top: 0, behavior: "instant" })` を直接実行すると、ブラウザ上では正常に動作するが、jsdom / Vitest を用いた単体テスト環境で `TypeError: contentRef.current.scrollTo is not a function` 例外が発生してテストがクラッシュする。
+  - jsdom は `window.scrollTo` はモック可能だが、汎用 `HTMLElement` のプロトタイプには `scrollTo` を実装していない場合がある。
+- **回避法**:
+  - 要素のスクロールリセットを行う際は、必ずオプショナルチェーンを用いて安全に呼び出す：
+    ```ts
+    contentRef.current?.scrollTo?.({ top: 0, behavior: "instant" });
+    ```
+  - これにより、ブラウザ上では瞬時に先頭スクロール復元が実行され、jsdom / 単体テスト環境でもフォールバックしてクラッシュを完全に回避できる。
+
+---
+
+### オンボーディングガイドのURLクエリ即時消費による二重起動ループ防止
+
+- **問題**:
+  - 使い方ページ等から `?onboarding=guide` クエリ付きでダッシュボードへ遷移し、ツアーを起動する設計において、クエリ検知後に即座に URL からクエリを削除（消費）しないと、ツアー終了・ステップ進行時の再レンダリングや依存配列発火で再び `onboarding=guide` が検知され、ツアーが無限に再起動・ループする。
+- **回避法**:
+  - `useOnboarding` の `resumeFromQuery("guide")` 内で、クエリを検知してツアー起動を判定した直後に `clearOnboardingQuery()` を呼び、URLクエリを即時クリア（消費済み化）する。
+
