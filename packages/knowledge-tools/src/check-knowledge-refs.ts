@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { findRepoRoot } from "./repo-root.js";
@@ -11,6 +12,32 @@ interface ReferenceError {
 
 const ROOT_DIR = findRepoRoot();
 const AI_DIR = path.join(ROOT_DIR, ".ai");
+
+const gitIgnoreCache = new Map<string, boolean>();
+
+/**
+ * 指定されたパスが .gitignore 対象であるかを判定する。
+ * CI環境等でチェックアウト直後に存在しない動的生成ファイル（例: e2e/.env.e2e-preview）の参照誤検知を防ぐ。
+ */
+function isPathGitIgnored(relativePath: string): boolean {
+  const normalized = relativePath.replace(/\\/g, "/");
+  const cached = gitIgnoreCache.get(normalized);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  try {
+    execSync(`git check-ignore --quiet "${normalized}"`, {
+      cwd: ROOT_DIR,
+      stdio: "ignore",
+    });
+    gitIgnoreCache.set(normalized, true);
+    return true;
+  } catch {
+    gitIgnoreCache.set(normalized, false);
+    return false;
+  }
+}
 
 // Markdownファイルを再帰的に走査
 function getMarkdownFiles(dir: string): string[] {
@@ -129,11 +156,18 @@ function checkReferences(): void {
               }
 
               if (!fs.existsSync(resolvedPath)) {
+                const relPath = path.relative(ROOT_DIR, resolvedPath);
+                // .gitignore 対象ファイル（動的生成されるenvファイル等）が存在しない場合は除外
+                if (isPathGitIgnored(relPath)) {
+                  match = pattern.exec(line);
+                  continue;
+                }
+
                 errors.push({
                   filePath: path.relative(ROOT_DIR, file),
                   lineNumber,
                   rawRef,
-                  normalizedPath: path.relative(ROOT_DIR, resolvedPath),
+                  normalizedPath: relPath,
                 });
               }
             }
