@@ -873,7 +873,6 @@ export const notifyBiometricEvent = authenticatedMutation({
  */
 export const updateEmailNotificationSettings = authenticatedMutation({
   args: {
-    accountId: v.optional(v.id("users")),
     settings: v.object({
       notifyRecordChanges: v.optional(v.boolean()),
       notifyFamilyActivity: v.optional(v.boolean()),

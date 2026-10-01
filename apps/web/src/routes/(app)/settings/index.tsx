@@ -127,19 +127,17 @@ function SettingsComponent() {
   });
 
   useEffect(() => {
-    if (currentAccount?.emailNotificationSettings) {
-      setEmailSettings({
-        notifyRecordChanges:
-          currentAccount.emailNotificationSettings.notifyRecordChanges ?? true,
-        notifyFamilyActivity:
-          currentAccount.emailNotificationSettings.notifyFamilyActivity ?? true,
-        notifyDataExport:
-          currentAccount.emailNotificationSettings.notifyDataExport ?? true,
-        notifySecuritySettings:
-          currentAccount.emailNotificationSettings.notifySecuritySettings ??
-          true,
-      });
-    }
+    setEmailSettings({
+      notifyRecordChanges:
+        currentAccount?.emailNotificationSettings?.notifyRecordChanges ?? true,
+      notifyFamilyActivity:
+        currentAccount?.emailNotificationSettings?.notifyFamilyActivity ?? true,
+      notifyDataExport:
+        currentAccount?.emailNotificationSettings?.notifyDataExport ?? true,
+      notifySecuritySettings:
+        currentAccount?.emailNotificationSettings?.notifySecuritySettings ??
+        true,
+    });
   }, [currentAccount?.emailNotificationSettings]);
 
   const handleToggleEmailSetting = async (
@@ -538,6 +536,7 @@ function SettingsComponent() {
             <button
               type="button"
               role="switch"
+              aria-label="レコードの共有・管理者変更通知"
               aria-checked={emailSettings.notifyRecordChanges}
               onClick={() =>
                 handleToggleEmailSetting(
@@ -575,6 +574,7 @@ function SettingsComponent() {
             <button
               type="button"
               role="switch"
+              aria-label="家族のアクティビティ通知"
               aria-checked={emailSettings.notifyFamilyActivity}
               onClick={() =>
                 handleToggleEmailSetting(
@@ -612,6 +612,7 @@ function SettingsComponent() {
             <button
               type="button"
               role="switch"
+              aria-label="CSVデータエクスポート通知"
               aria-checked={emailSettings.notifyDataExport}
               onClick={() =>
                 handleToggleEmailSetting(
@@ -650,6 +651,7 @@ function SettingsComponent() {
             <button
               type="button"
               role="switch"
+              aria-label="端末セキュリティ設定通知"
               aria-checked={emailSettings.notifySecuritySettings}
               onClick={() =>
                 handleToggleEmailSetting(

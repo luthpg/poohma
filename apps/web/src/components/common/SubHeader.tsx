@@ -1,4 +1,4 @@
-import { useRouter } from "@tanstack/react-router";
+import { useCanGoBack, useRouter } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
@@ -93,6 +93,7 @@ export function SubHeader({
   children,
 }: SubHeaderProps) {
   const router = useRouter();
+  const canGoBack = useCanGoBack();
   const [isNavigating, setIsNavigating] = useState(false);
   const isVisible = useScrollHeader(forceVisible);
 
@@ -105,15 +106,16 @@ export function SubHeader({
       return;
     }
 
-    if (typeof window !== "undefined" && window.history.length > 2) {
-      window.history.back();
+    if (canGoBack) {
+      router.history.back();
     } else {
-      router.navigate({ to: fallbackTo });
+      void router.navigate({ to: fallbackTo });
     }
   };
 
   return (
     <div
+      inert={!isVisible}
       className={cn(
         "sticky top-16 z-10 -mx-3.5 -mt-4 mb-4 px-3.5 pb-3 pt-4 sm:-mx-6 sm:-mt-6 sm:mb-6 sm:px-6 sm:pb-4 sm:pt-6 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between gap-4 border-b border-border/40 transition-all duration-300 ease-in-out",
         isVisible

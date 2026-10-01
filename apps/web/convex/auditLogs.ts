@@ -68,7 +68,7 @@ export async function logAuditEvent(
 /**
  * 家族アクティビティログを CSV エクスポート用に一括取得するクエリ。
  * year が指定された場合、その年（JST: 1月1日 00:00:00 〜 12月31日 23:59:59.999）の範囲に絞り込む。
- * 未指定の場合は全期間を降順で取得する（最大 10,000 件）。
+ * 未指定の場合は全期間を降順で取得する。
  */
 export const exportFamilyAuditLogs = familyBoundQuery({
   args: {
@@ -96,7 +96,7 @@ export const exportFamilyAuditLogs = familyBoundQuery({
         return q.eq("familyId", familyId);
       });
 
-    const logs = await query.order("desc").take(10000);
+    const logs = await query.order("desc").collect();
 
     return logs.map((log) => ({
       id: log._id,

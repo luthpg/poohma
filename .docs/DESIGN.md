@@ -231,7 +231,7 @@ PoohMa のブランドカラー本体（`#f97316` / orange-500：ロゴや変更
 - Smart SubHeader (`SubHeader.tsx`):
   - レコード詳細画面、アカウント設定画面、一括データ管理画面等で画面上部に吸着するセカンダリヘッダー。
   - 下スクロール時に親ヘッダー裏へスムーズに退避（`-translate-y-full`）、上スクロールまたは親ヘッダータップで即座に再出現（`translate-y-0`、`transition-transform duration-200`）。
-  - 安全な戻るボタン（`window.history.state?.idx > 0` 判定による適切なフォールバック）を標準装備。
+  - 安全な戻るボタン（TanStack Router の `useCanGoBack()` 判定による適切なフォールバック）を標準装備。非表示時は `inert` 属性によりフォーカス対象外となる。
 - Mobile: hamburger / user menu dropdown
 
 ### Image Treatment

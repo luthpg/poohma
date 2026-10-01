@@ -37,7 +37,8 @@ export function FamilyAuditLogSection({
   const currentYear = new Date().getFullYear();
   const availableYears = useMemo(() => {
     const years: number[] = [];
-    for (let y = currentYear; y >= currentYear - 2; y--) {
+    // 監査ログ保持期間（1095日≒3年）に含まれる年（当年〜3年前までの計4年分）を選択肢に含める
+    for (let y = currentYear; y >= currentYear - 3; y--) {
       years.push(y);
     }
     return years;

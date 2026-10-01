@@ -645,7 +645,7 @@ ConvexReactClient / TanStack Query の Mutation実行を共通ラッパーでイ
 - **クエリ**: `exportFamilyAuditLogs = familyBoundQuery`
 - **引数**: `year: v.optional(v.number())`（JST基準の1年間、未指定時は全期間）
 - **セキュリティ・IDOR防止**: `familyBoundQuery` により、呼び出し元アカウントが所属する `familyId` のデータのみに厳格制限。
-- **インデックス活用**: `by_family_createdAt` を用い、指定期間のログを効率的かつ漏れなく抽出（最大10,000件）。
+- **インデックス活用**: `by_family_createdAt` を用い、指定期間のログを効率的かつ漏れなく全件抽出（降順）。
 - **クライアント処理**: `sanitizeCsvValue` で数式文字エスケープを施し、UTF-8 BOM を付与して CSV 生成。
 
 #### メール通知オプトアウト設定（updateEmailNotificationSettings）

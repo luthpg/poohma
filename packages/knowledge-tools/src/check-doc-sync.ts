@@ -111,6 +111,13 @@ async function getChangedFiles(
           files.add(file.file.replace(/\\/g, "/"));
         }
       } catch (diffErr) {
+        if (isCiMode) {
+          console.error(
+            `❌ Doc-Sync CI 検査失敗: ベース ${targetBaseRef} との差分取得に失敗しました。`,
+            diffErr,
+          );
+          process.exit(1);
+        }
         console.warn(
           `⚠️ Warning: Failed to diff against base ${targetBaseRef}, falling back to status only:`,
           diffErr,
