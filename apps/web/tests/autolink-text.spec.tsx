@@ -37,16 +37,77 @@ describe("AutolinkText Component", () => {
     expect(link2.getAttribute("href")).toBe("http://test.org");
   });
 
-  it("日本語の句読点や括弧が URL に巻き込まれないこと", () => {
+  it("日本語の句読点や全角括弧が URL に巻き込まれず切り離されること", () => {
     render(
-      <AutolinkText text="（https://example.com/path）を確認してください。" />,
+      <AutolinkText text="「https://example.com/path」を確認してください。" />,
     );
 
     const link = screen.getByRole("link", { name: "https://example.com/path" });
     expect(link).toBeTruthy();
     expect(link.getAttribute("href")).toBe("https://example.com/path");
-    expect(screen.getByText(/（/)).toBeTruthy();
-    expect(screen.getByText(/）を確認してください。/)).toBeTruthy();
+    expect(screen.getByText(/「/)).toBeTruthy();
+    expect(screen.getByText(/」を確認してください。/)).toBeTruthy();
+  });
+
+  it("半角括弧で囲まれた URL は末尾の括弧が除外されること (linkify-it カッコバランス)", () => {
+    render(
+      <AutolinkText text="公式ドキュメントはこちら(https://example.com/docs)です" />,
+    );
+
+    const link = screen.getByRole("link", { name: "https://example.com/docs" });
+    expect(link).toBeTruthy();
+    expect(link.getAttribute("href")).toBe("https://example.com/docs");
+    expect(screen.getByText(/\)です/)).toBeTruthy();
+  });
+
+  it("URL 自体に含まれる括弧（Wikipedia等）は正しく URL に保持されること", () => {
+    render(
+      <AutolinkText text="https://ja.wikipedia.org/wiki/Pooh_(character) を参照" />,
+    );
+
+    const link = screen.getByRole("link", {
+      name: "https://ja.wikipedia.org/wiki/Pooh_(character)",
+    });
+    expect(link).toBeTruthy();
+    expect(link.getAttribute("href")).toBe(
+      "https://ja.wikipedia.org/wiki/Pooh_(character)",
+    );
+  });
+
+  it("日本語クエリパラメータ（実用パス/クエリ）が壊れずそのままリンク化されること", () => {
+    render(
+      <AutolinkText text="検索結果: https://example.com/search?q=本。こちらからどうぞ" />,
+    );
+
+    const link = screen.getByRole("link", {
+      name: "https://example.com/search?q=本",
+    });
+    expect(link).toBeTruthy();
+    expect(link.getAttribute("href")).toBe("https://example.com/search?q=本");
+    expect(screen.getByText(/。こちらからどうぞ/)).toBeTruthy();
+  });
+
+  it("URL 直前にスペースなしで日本語が直結していても正しく検出されること", () => {
+    render(
+      <AutolinkText text="ログイン先はこちらhttps://example.com/login です" />,
+    );
+
+    const link = screen.getByRole("link", {
+      name: "https://example.com/login",
+    });
+    expect(link).toBeTruthy();
+    expect(link.getAttribute("href")).toBe("https://example.com/login");
+    expect(screen.getByText(/ログイン先はこちら/)).toBeTruthy();
+  });
+
+  it("日本語ドメインも正しくリンク化されること", () => {
+    render(<AutolinkText text="総務省のサイト: http://総務省.jp/test です" />);
+
+    const link = screen.getByRole("link", {
+      name: "http://総務省.jp/test",
+    });
+    expect(link).toBeTruthy();
+    expect(link.getAttribute("href")).toBe("http://総務省.jp/test");
   });
 
   it("javascript: などの危険なスキームはリンク化されないこと（CWE-79対策）", () => {

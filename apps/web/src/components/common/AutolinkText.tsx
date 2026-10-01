@@ -1,15 +1,46 @@
+import * as linkifyItModule from "linkify-it";
+import type React from "react";
+
 export interface AutolinkTextProps {
   text?: string | null;
   className?: string;
   linkClassName?: string;
 }
 
+// CJS / ESM / Vite / Vitest 環境差異を安全に吸収するインスタンス化
+// biome-ignore lint/suspicious/noExplicitAny: library CJS/ESM interop
+const mod = linkifyItModule as any;
+const LinkifyItConstructor =
+  mod.LinkifyIt || mod.default?.LinkifyIt || mod.default || mod;
+
+const linkify = new LinkifyItConstructor({
+  fuzzyLink: false,
+  fuzzyIP: false,
+  fuzzyEmail: false,
+});
+
+// URL 末尾に含まれるべきではない全角記号・約物・括弧・句読点・空白
+const TRAILING_PUNCTUATION_REGEX =
+  /[。、！？・…「」『』（）［］【】〔〕〈〉《》\u3000\s]+$/;
+
 /**
- * URL の正規表現: http:// または https:// で始まる文字列
- * 末尾の日本語句読点（。、）や括弧（「」、（）、()）を URL に巻き込まないよう配慮
+ * linkify-it が検出した URL に対して、末尾の全角約物・句読点・全角括弧をトリミングし、
+ * クリーンな URL と切り離されたテキスト（suffix）を返す。
+ * （パスやクエリパラメータ内の日本語は実用性を優先してそのまま保持）
  */
-const URL_REGEX =
-  /(https?:\/\/[^\s\u3000\u3001\u3002\uff08\uff09()「」『』]+)/g;
+function cleanJapaneseUrl(raw: string): { url: string; suffix: string } {
+  let url = raw;
+  let suffix = "";
+
+  const punctMatch = url.match(TRAILING_PUNCTUATION_REGEX);
+  if (punctMatch) {
+    const len = punctMatch[0].length;
+    suffix = url.slice(-len);
+    url = url.slice(0, -len);
+  }
+
+  return { url, suffix };
+}
 
 /**
  * URL が http: または https: で始まる安全なものか検証（CWE-79 XSS 防止）
@@ -23,6 +54,53 @@ function isSafeHttpUrl(urlString: string): boolean {
   }
 }
 
+interface ExtractedLink {
+  index: number;
+  lastIndex: number;
+  url: string;
+  suffix: string;
+}
+
+/**
+ * 日本語テキスト混在環境において、linkify-it の高度なカッコバランス解析と
+ * 実用的な日本語境界制御（前方直結対応・末尾句読点除外・日本語パス/クエリ許容）を組み合わせた安全なリンク検出。
+ */
+function findLinks(text: string): ExtractedLink[] {
+  const results: ExtractedLink[] = [];
+  const schemaRegex = /https?:\/\//gi;
+  let schemaMatch: RegExpExecArray | null = schemaRegex.exec(text);
+
+  while (schemaMatch !== null) {
+    const startIndex = schemaMatch.index;
+    const subText = text.slice(startIndex);
+
+    // subText の先頭から始まる URL を linkify-it で検出
+    const matches = linkify.match(subText);
+    if (matches && matches.length > 0) {
+      const firstMatch = matches[0];
+      if (firstMatch && firstMatch.index === 0) {
+        const { url, suffix } = cleanJapaneseUrl(firstMatch.raw);
+        if (
+          (url.startsWith("http://") || url.startsWith("https://")) &&
+          isSafeHttpUrl(url)
+        ) {
+          const matchEnd = startIndex + firstMatch.raw.length;
+          results.push({
+            index: startIndex,
+            lastIndex: matchEnd,
+            url,
+            suffix,
+          });
+          schemaRegex.lastIndex = matchEnd;
+        }
+      }
+    }
+    schemaMatch = schemaRegex.exec(text);
+  }
+
+  return results;
+}
+
 /**
  * テキスト内の URL を自動検出し、安全な外部リンクとして描画するコンポーネント。
  */
@@ -33,32 +111,46 @@ export function AutolinkText({
 }: AutolinkTextProps) {
   if (!text) return null;
 
-  // URL を境界としてテキストを分割
-  const parts = text.split(URL_REGEX);
+  const links = findLinks(text);
+  if (links.length === 0) {
+    return <span className={className}>{text}</span>;
+  }
 
-  return (
-    <span className={className}>
-      {parts.map((part, index) => {
-        if (
-          (part.startsWith("http://") || part.startsWith("https://")) &&
-          isSafeHttpUrl(part)
-        ) {
-          return (
-            <a
-              // biome-ignore lint/suspicious/noArrayIndexKey: parts array from static string split has no stable unique ID
-              key={index}
-              href={part}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className={linkClassName}
-            >
-              {part}
-            </a>
-          );
-        }
-        return part;
-      })}
-    </span>
-  );
+  const elements: React.ReactNode[] = [];
+  let lastIndex = 0;
+
+  for (const item of links) {
+    // 前方のプレーンテキスト
+    if (item.index > lastIndex) {
+      elements.push(text.slice(lastIndex, item.index));
+    }
+
+    // リンク
+    elements.push(
+      <a
+        key={`link-${item.index}`}
+        href={item.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className={linkClassName}
+      >
+        {item.url}
+      </a>,
+    );
+
+    // 日本語トリミングサフィックス（全角句読点や全角括弧など）
+    if (item.suffix) {
+      elements.push(item.suffix);
+    }
+
+    lastIndex = item.lastIndex;
+  }
+
+  // 残りの末尾プレーンテキスト
+  if (lastIndex < text.length) {
+    elements.push(text.slice(lastIndex));
+  }
+
+  return <span className={className}>{elements}</span>;
 }
