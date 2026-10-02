@@ -80,10 +80,7 @@ function findLinks(text: string): ExtractedLink[] {
       const firstMatch = matches[0];
       if (firstMatch && firstMatch.index === 0) {
         const { url, suffix } = cleanJapaneseUrl(firstMatch.raw);
-        if (
-          (url.startsWith("http://") || url.startsWith("https://")) &&
-          isSafeHttpUrl(url)
-        ) {
+        if (/^https?:\/\//i.test(url) && isSafeHttpUrl(url)) {
           const matchEnd = startIndex + firstMatch.raw.length;
           results.push({
             index: startIndex,

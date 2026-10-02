@@ -110,7 +110,7 @@ Docker Desktop が未起動の場合は起動してから実行すること。
 
 ### 事象
 
-CI ワークフローで `pnpm check:doc-sync -- --base origin/${{ github.base_ref }}` を実行する際、`actions/checkout` のデフォルト設定（`fetch-depth: 1`）では最新の 1 コミットしか取得されないため、`origin/main...HEAD` や `HEAD~1` の比較対象コミットが存在せず、`git diffSummary` が `fatal: ambiguous argument` で失敗する。
+CI ワークフローで `pnpm check:doc-sync -- --base "origin/$GITHUB_BASE_REF"` を実行する際、`actions/checkout` のデフォルト設定（`fetch-depth: 1`）では最新の 1 コミットしか取得されないため、`origin/main...HEAD` や `HEAD~1` の比較対象コミットが存在せず、`git diffSummary` が `fatal: ambiguous argument` で失敗する。
 
 ### 対策
 

@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { findRepoRoot } from "./repo-root.js";
@@ -27,7 +27,7 @@ function isPathGitIgnored(relativePath: string): boolean {
   }
 
   try {
-    execSync(`git check-ignore --quiet "${normalized}"`, {
+    execFileSync("git", ["check-ignore", "--quiet", "--", normalized], {
       cwd: ROOT_DIR,
       stdio: "ignore",
     });

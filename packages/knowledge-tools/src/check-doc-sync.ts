@@ -106,7 +106,11 @@ async function getChangedFiles(
 
     if (targetBaseRef) {
       try {
-        const diffSummary = await git.diffSummary([`${targetBaseRef}...HEAD`]);
+        const diffSummary = await git.diffSummary([
+          `${targetBaseRef}...HEAD`,
+          "--name-only",
+          "--no-renames",
+        ]);
         for (const file of diffSummary.files) {
           files.add(file.file.replace(/\\/g, "/"));
         }

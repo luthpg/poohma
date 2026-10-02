@@ -125,6 +125,7 @@ function SettingsComponent() {
     notifySecuritySettings:
       currentAccount?.emailNotificationSettings?.notifySecuritySettings ?? true,
   });
+  const [isUpdatingEmailSettings, setIsUpdatingEmailSettings] = useState(false);
 
   useEffect(() => {
     setEmailSettings({
@@ -148,6 +149,8 @@ function SettingsComponent() {
       | "notifySecuritySettings",
     newValue: boolean,
   ) => {
+    if (isUpdatingEmailSettings) return;
+    setIsUpdatingEmailSettings(true);
     const updated = { ...emailSettings, [key]: newValue };
     setEmailSettings(updated);
     try {
@@ -159,10 +162,14 @@ function SettingsComponent() {
     } catch (_error) {
       setEmailSettings(emailSettings);
       toast.error("メール通知設定の更新に失敗しました");
+    } finally {
+      setIsUpdatingEmailSettings(false);
     }
   };
 
   const handleBatchToggleEmailSettings = async (enabled: boolean) => {
+    if (isUpdatingEmailSettings) return;
+    setIsUpdatingEmailSettings(true);
     const previous = { ...emailSettings };
     const updated = {
       notifyRecordChanges: enabled,
@@ -184,6 +191,8 @@ function SettingsComponent() {
     } catch (_error) {
       setEmailSettings(previous);
       toast.error("メール通知設定の一括更新に失敗しました");
+    } finally {
+      setIsUpdatingEmailSettings(false);
     }
   };
 
@@ -491,12 +500,14 @@ function SettingsComponent() {
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
+                disabled={isUpdatingEmailSettings}
                 onClick={() => handleBatchToggleEmailSettings(true)}
                 className={cn(
                   "inline-flex items-center gap-1 rounded-full px-3 py-1 text-[12px] font-medium transition-all shadow-xs cursor-pointer border",
                   isAllEmailEnabled
                     ? "bg-orange-500 text-white border-orange-500 font-semibold shadow-orange-500/20"
                     : "bg-background text-foreground border-border hover:bg-accent hover:border-foreground/20",
+                  isUpdatingEmailSettings && "opacity-50 cursor-not-allowed",
                 )}
               >
                 <Check className="h-3.5 w-3.5" />
@@ -504,12 +515,14 @@ function SettingsComponent() {
               </button>
               <button
                 type="button"
+                disabled={isUpdatingEmailSettings}
                 onClick={() => handleBatchToggleEmailSettings(false)}
                 className={cn(
                   "inline-flex items-center gap-1 rounded-full px-3 py-1 text-[12px] font-medium transition-all shadow-xs cursor-pointer border",
                   isAllEmailDisabled
                     ? "bg-stone-800 text-white dark:bg-stone-200 dark:text-stone-900 border-stone-800 dark:border-stone-200 font-semibold"
                     : "bg-background text-foreground border-border hover:bg-accent hover:border-foreground/20",
+                  isUpdatingEmailSettings && "opacity-50 cursor-not-allowed",
                 )}
               >
                 <Ban className="h-3.5 w-3.5" />
@@ -536,6 +549,7 @@ function SettingsComponent() {
             <button
               type="button"
               role="switch"
+              disabled={isUpdatingEmailSettings}
               aria-label="レコードの共有・管理者変更通知"
               aria-checked={emailSettings.notifyRecordChanges}
               onClick={() =>
@@ -548,7 +562,7 @@ function SettingsComponent() {
                 emailSettings.notifyRecordChanges
                   ? "bg-orange-500"
                   : "bg-muted-foreground/30"
-              }`}
+              } ${isUpdatingEmailSettings ? "opacity-50 cursor-not-allowed" : ""}`}
             >
               <span
                 aria-hidden="true"
@@ -574,6 +588,7 @@ function SettingsComponent() {
             <button
               type="button"
               role="switch"
+              disabled={isUpdatingEmailSettings}
               aria-label="家族のアクティビティ通知"
               aria-checked={emailSettings.notifyFamilyActivity}
               onClick={() =>
@@ -586,7 +601,7 @@ function SettingsComponent() {
                 emailSettings.notifyFamilyActivity
                   ? "bg-orange-500"
                   : "bg-muted-foreground/30"
-              }`}
+              } ${isUpdatingEmailSettings ? "opacity-50 cursor-not-allowed" : ""}`}
             >
               <span
                 aria-hidden="true"
@@ -612,6 +627,7 @@ function SettingsComponent() {
             <button
               type="button"
               role="switch"
+              disabled={isUpdatingEmailSettings}
               aria-label="CSVデータエクスポート通知"
               aria-checked={emailSettings.notifyDataExport}
               onClick={() =>
@@ -624,7 +640,7 @@ function SettingsComponent() {
                 emailSettings.notifyDataExport
                   ? "bg-orange-500"
                   : "bg-muted-foreground/30"
-              }`}
+              } ${isUpdatingEmailSettings ? "opacity-50 cursor-not-allowed" : ""}`}
             >
               <span
                 aria-hidden="true"
@@ -651,6 +667,7 @@ function SettingsComponent() {
             <button
               type="button"
               role="switch"
+              disabled={isUpdatingEmailSettings}
               aria-label="端末セキュリティ設定通知"
               aria-checked={emailSettings.notifySecuritySettings}
               onClick={() =>
@@ -663,7 +680,7 @@ function SettingsComponent() {
                 emailSettings.notifySecuritySettings
                   ? "bg-orange-500"
                   : "bg-muted-foreground/30"
-              }`}
+              } ${isUpdatingEmailSettings ? "opacity-50 cursor-not-allowed" : ""}`}
             >
               <span
                 aria-hidden="true"

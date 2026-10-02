@@ -61,6 +61,7 @@ function BulkSettingsPage() {
     <div className="container mx-auto max-w-6xl px-4 py-6 sm:py-8 space-y-6">
       {/* 共通スマート子ヘッダー */}
       <SubHeader
+        className="sm:-mx-4 sm:px-4"
         backLabel="設定へ戻る"
         fallbackTo="/settings"
         rightElement={

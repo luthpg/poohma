@@ -119,6 +119,16 @@ describe("AutolinkText Component", () => {
     ).toBeTruthy();
   });
 
+  it("大文字スキーム（HTTPS:// 等）も正しくリンク化されること", () => {
+    render(<AutolinkText text="大文字URL: HTTPS://example.com/test です" />);
+
+    const link = screen.getByRole("link", {
+      name: "HTTPS://example.com/test",
+    });
+    expect(link).toBeTruthy();
+    expect(link.getAttribute("href")).toBe("HTTPS://example.com/test");
+  });
+
   it("リンククリック時に親へのイベント伝播（stopPropagation）が呼ばれること", () => {
     render(<AutolinkText text="https://example.com" />);
 
