@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
+import { AutolinkText } from "@/components/common/AutolinkText";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { usePasscode } from "@/components/PasscodeProvider";
 import { RecordAuditHistoryAccordion } from "@/components/records/RecordAuditHistoryAccordion";
@@ -263,6 +264,13 @@ function RecordDetailComponent({
   }, []);
 
   const [isEditing, setIsEditing] = useState(false);
+
+  // 閲覧モード ↔ 編集モード切り替え時に先頭スクロール
+  useEffect(() => {
+    if (isEditing !== undefined) {
+      window.scrollTo({ top: 0, behavior: "instant" });
+    }
+  }, [isEditing]);
   const [isNavigating, setIsNavigating] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -1255,7 +1263,7 @@ function RecordDetailComponent({
                 メモ
               </h2>
               <div className="rounded-md bg-muted/50 p-4 text-[14px] text-muted-foreground whitespace-pre-wrap shadow-border-light">
-                {record.memo}
+                <AutolinkText text={record.memo} />
               </div>
             </div>
           )}

@@ -1,6 +1,6 @@
 import { useMutation } from "convex/react";
 import { ShieldCheck, UserMinus, UserPlus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
@@ -87,14 +87,20 @@ export function BulkAdminModal({
       );
       await onSuccess();
       onClose();
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "一括管理者設定に失敗しました",
-      );
+    } catch (_error) {
+      toast.error("一括管理者設定に失敗しました");
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      contentRef.current?.scrollTo?.({ top: 0, behavior: "instant" });
+    }
+  }, [isOpen]);
 
   return (
     <Dialog
@@ -102,8 +108,9 @@ export function BulkAdminModal({
       onOpenChange={(open) => !open && !isSubmitting && onClose()}
     >
       <DialogContent
+        ref={contentRef}
         data-testid="bulk-admin-modal"
-        className="sm:max-w-md"
+        className="sm:max-w-md max-h-[85vh] overflow-y-auto"
         showCloseButton={!isSubmitting}
       >
         <DialogHeader>

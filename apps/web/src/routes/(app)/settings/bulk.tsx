@@ -1,15 +1,10 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import {
-  ArrowLeft,
-  CheckCircle2,
-  Database,
-  HelpCircle,
-  RotateCcw,
-} from "lucide-react";
-import { useState } from "react";
+import { CheckCircle2, Database, HelpCircle, RotateCcw } from "lucide-react";
+import { useEffect, useState } from "react";
 import { CsvExportSection } from "@/components/bulk/CsvExportSection";
 import { CsvImportDropZone } from "@/components/bulk/CsvImportDropZone";
 import { CsvImportPreviewTable } from "@/components/bulk/CsvImportPreviewTable";
+import { SubHeader } from "@/components/common/SubHeader";
 import { CsvHelpDialog } from "@/components/csvHelpDialog";
 import { JpText } from "@/components/JpText";
 import { Button } from "@/components/ui/button";
@@ -28,6 +23,11 @@ function BulkSettingsPage() {
     created: number;
     updated: number;
   } | null>(null);
+
+  // ページ遷移時に先頭スクロール
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   const {
     isAnalyzing,
@@ -48,6 +48,7 @@ function BulkSettingsPage() {
         created: result.createdCount,
         updated: result.updatedCount,
       });
+      window.scrollTo({ top: 0, behavior: "instant" });
     }
   };
 
@@ -58,29 +59,27 @@ function BulkSettingsPage() {
 
   return (
     <div className="container mx-auto max-w-6xl px-4 py-6 sm:py-8 space-y-6">
-      {/* ナビゲーションバー & パンくず */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-          <Link
-            to="/settings"
-            className="flex items-center gap-1 hover:text-foreground transition-colors"
+      {/* 共通スマート子ヘッダー */}
+      <SubHeader
+        className="sm:-mx-4 sm:px-4"
+        backLabel="設定へ戻る"
+        fallbackTo="/settings"
+        rightElement={
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs font-medium cursor-pointer"
           >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            設定へ戻る
-          </Link>
-          <span>/</span>
-          <span className="text-foreground font-medium">データ管理</span>
-        </div>
-
-        <Button
-          asChild
-          variant="outline"
-          size="sm"
-          className="h-8 text-xs font-medium"
-        >
-          <Link to="/dashboard">ダッシュボードへ</Link>
-        </Button>
-      </div>
+            <Link to="/dashboard">ダッシュボードへ</Link>
+          </Button>
+        }
+      >
+        <span className="text-muted-foreground text-xs sm:text-sm">/</span>
+        <span className="text-foreground font-medium text-xs sm:text-sm">
+          データ管理
+        </span>
+      </SubHeader>
 
       {/* ページタイトル & ヘッダー */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-5">

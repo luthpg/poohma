@@ -11,7 +11,7 @@ import {
   Share2,
   ShieldCheck,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import { JpText } from "@/components/JpText";
@@ -392,9 +392,20 @@ export function RecoveryKitDialog({
   const hasSavedAtLeastOne =
     hasSavedLocally || hasPrinted || hasSavedDrive || hasShared;
 
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isOpen && step !== undefined) {
+      contentRef.current?.scrollTo?.({ top: 0, behavior: "instant" });
+    }
+  }, [isOpen, step]);
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="sm:max-w-[560px]">
+      <DialogContent
+        ref={contentRef}
+        className="sm:max-w-[560px] max-h-[85vh] overflow-y-auto"
+      >
         <DialogHeader>
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-full bg-primary/10 text-primary">

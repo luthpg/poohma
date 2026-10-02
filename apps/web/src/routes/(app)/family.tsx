@@ -23,7 +23,7 @@ import {
   UserMinus,
   X,
 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
@@ -168,6 +168,11 @@ function FamilyComponent() {
   const router = useRouter();
   const navigate = useNavigate();
   const [showFamilyCreatedTour, setShowFamilyCreatedTour] = useState(false);
+
+  // ページ遷移時に先頭スクロール
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   const { queryClient } = Route.useRouteContext();
   const convex = useConvex();
@@ -1673,7 +1678,10 @@ function FamilyComponent() {
           <div className="mt-8 border-t border-border pt-6 text-center">
             <button
               type="button"
-              onClick={() => setIsChangingFamily(true)}
+              onClick={() => {
+                setIsChangingFamily(true);
+                window.scrollTo({ top: 0, behavior: "instant" });
+              }}
               className="text-[14px] font-medium text-red-500 hover:text-red-600 transition underline underline-offset-4"
             >
               家族グループを変更・脱退する
@@ -1687,7 +1695,10 @@ function FamilyComponent() {
         <FamilySetupView
           family={family}
           isChangingFamily={isChangingFamily}
-          onCancelChangeFamily={() => setIsChangingFamily(false)}
+          onCancelChangeFamily={() => {
+            setIsChangingFamily(false);
+            window.scrollTo({ top: 0, behavior: "instant" });
+          }}
           activeAccountId={activeAccountId}
           activeAccount={activeAccount}
           searchInviteCode={search.inviteCode}

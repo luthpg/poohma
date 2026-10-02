@@ -1152,23 +1152,25 @@ export const createJoinRequest = authenticatedMutation({
     );
 
     for (const admin of familyAdmins) {
-      await ctx.scheduler.runAfter(
-        0,
-        internal.actions.sendTemplatedEmailInternal,
-        {
-          email: admin.email,
-          payload: {
-            template: "joinRequestReceived",
-            props: {
-              displayName: admin.displayName || "管理者",
-              familyName: family.name,
-              applicantDisplayName: user.displayName || "名無し",
-              applicantEmail: user.email,
-              ctaUrl: "/family",
+      if (admin.emailNotificationSettings?.notifyFamilyActivity !== false) {
+        await ctx.scheduler.runAfter(
+          0,
+          internal.actions.sendTemplatedEmailInternal,
+          {
+            email: admin.email,
+            payload: {
+              template: "joinRequestReceived",
+              props: {
+                displayName: admin.displayName || "管理者",
+                familyName: family.name,
+                applicantDisplayName: user.displayName || "名無し",
+                applicantEmail: user.email,
+                ctaUrl: "/family",
+              },
             },
           },
-        },
-      );
+        );
+      }
     }
 
     return requestId;

@@ -1287,4 +1287,95 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
       ).rejects.toThrow("Access denied");
     });
   });
+
+  describe("updateEmailNotificationSettings の検証", () => {
+    it("未認証での実行は拒否されること", async () => {
+      const t = convexTest(schema, modules);
+      await expect(
+        t.mutation(api.users.updateEmailNotificationSettings, {
+          settings: { notifyRecordChanges: false },
+        }),
+      ).rejects.toThrow("Unauthenticated");
+    });
+
+    it("認証済みユーザーが通知設定を更新でき、部分更新が正しく保存されること", async () => {
+      const t = convexTest(schema, modules);
+      let userAccountId!: Id<"users">;
+
+      await t.run(async (ctx) => {
+        userAccountId = await ctx.db.insert("users", {
+          familyRole: "viewer",
+          userId: "notif_user",
+          email: "notif@example.com",
+          displayName: "通知設定テスト",
+          updatedAt: Date.now(),
+        });
+      });
+
+      const client = t.withIdentity({
+        subject: "notif_user",
+        email: "notif@example.com",
+      });
+
+      // 1. 一部の設定を false に更新
+      const res1 = await client.mutation(
+        api.users.updateEmailNotificationSettings,
+        {
+          settings: { notifyRecordChanges: false },
+        },
+      );
+      expect(res1.success).toBe(true);
+      expect(res1.settings.notifyRecordChanges).toBe(false);
+
+      // DB の中身を確認
+      await t.run(async (ctx) => {
+        const u = await ctx.db.get(userAccountId);
+        expect(u?.emailNotificationSettings?.notifyRecordChanges).toBe(false);
+      });
+
+      // 2. 別の設定を更新した際、既存の設定が保持されること
+      const res2 = await client.mutation(
+        api.users.updateEmailNotificationSettings,
+        {
+          settings: { notifyFamilyActivity: false },
+        },
+      );
+      expect(res2.settings.notifyRecordChanges).toBe(false);
+      expect(res2.settings.notifyFamilyActivity).toBe(false);
+
+      // 3. 一括ですべてオンに更新できること
+      const resBatchOn = await client.mutation(
+        api.users.updateEmailNotificationSettings,
+        {
+          settings: {
+            notifyRecordChanges: true,
+            notifyFamilyActivity: true,
+            notifyDataExport: true,
+            notifySecuritySettings: true,
+          },
+        },
+      );
+      expect(resBatchOn.settings.notifyRecordChanges).toBe(true);
+      expect(resBatchOn.settings.notifyFamilyActivity).toBe(true);
+      expect(resBatchOn.settings.notifyDataExport).toBe(true);
+      expect(resBatchOn.settings.notifySecuritySettings).toBe(true);
+
+      // 4. 一括ですべてオフに更新できること
+      const resBatchOff = await client.mutation(
+        api.users.updateEmailNotificationSettings,
+        {
+          settings: {
+            notifyRecordChanges: false,
+            notifyFamilyActivity: false,
+            notifyDataExport: false,
+            notifySecuritySettings: false,
+          },
+        },
+      );
+      expect(resBatchOff.settings.notifyRecordChanges).toBe(false);
+      expect(resBatchOff.settings.notifyFamilyActivity).toBe(false);
+      expect(resBatchOff.settings.notifyDataExport).toBe(false);
+      expect(resBatchOff.settings.notifySecuritySettings).toBe(false);
+    });
+  });
 });

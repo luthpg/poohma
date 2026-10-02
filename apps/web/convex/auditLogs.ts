@@ -1,5 +1,7 @@
+import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
+import { familyBoundQuery } from "./customBuilders";
 
 export interface LogAuditParams {
   actor: Doc<"users">;
@@ -62,3 +64,48 @@ export async function logAuditEvent(
     createdAt: now,
   });
 }
+
+/**
+ * 家族アクティビティログを CSV エクスポート用に一括取得するクエリ。
+ * year が指定された場合、その年（JST: 1月1日 00:00:00 〜 12月31日 23:59:59.999）の範囲に絞り込む。
+ * 未指定の場合は全期間を降順で取得する。
+ */
+export const exportFamilyAuditLogs = familyBoundQuery({
+  args: {
+    year: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const { familyId } = ctx;
+
+    const query = ctx.db
+      .query("auditLogs")
+      .withIndex("by_family_createdAt", (q) => {
+        if (args.year != null) {
+          const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
+          const startOfYear =
+            new Date(Date.UTC(args.year, 0, 1, 0, 0, 0, 0)).getTime() -
+            JST_OFFSET_MS;
+          const endOfYear =
+            new Date(Date.UTC(args.year, 11, 31, 23, 59, 59, 999)).getTime() -
+            JST_OFFSET_MS;
+          return q
+            .eq("familyId", familyId)
+            .gte("createdAt", startOfYear)
+            .lte("createdAt", endOfYear);
+        }
+        return q.eq("familyId", familyId);
+      });
+
+    const logs = await query.order("desc").collect();
+
+    return logs.map((log) => ({
+      id: log._id,
+      action: log.action,
+      actorDisplayName: log.actorDisplayName,
+      targetTitle: log.metadata?.targetTitle ?? "",
+      changedFields: log.metadata?.changedFields?.join("; ") ?? "",
+      detail: log.metadata?.detail ?? "",
+      createdAt: log.createdAt,
+    }));
+  },
+});

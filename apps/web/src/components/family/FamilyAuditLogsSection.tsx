@@ -1,5 +1,7 @@
-import { usePaginatedQuery } from "convex/react";
-import { History } from "lucide-react";
+import { useConvex, usePaginatedQuery } from "convex/react";
+import { Download, History } from "lucide-react";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
 import {
@@ -15,17 +17,32 @@ import {
   DEFAULT_ACTION_CONFIG,
   formatFieldName,
 } from "@/utils/audit-log-formatter";
+import { sanitizeCsvValue } from "@/utils/csv-sanitize";
 
 export function FamilyAuditLogSection({
   activeAccountId,
 }: {
   activeAccountId?: Id<"users"> | null;
 }) {
+  const convex = useConvex();
+  const [selectedYear, setSelectedYear] = useState<string>("all");
+  const [isExporting, setIsExporting] = useState(false);
+
   const { results, status, loadMore, isLoading } = usePaginatedQuery(
     api.records.getFamilyAuditLogs,
     { accountId: activeAccountId || undefined },
     { initialNumItems: 15 },
   );
+
+  const currentYear = new Date().getFullYear();
+  const availableYears = useMemo(() => {
+    const years: number[] = [];
+    // 監査ログ保持期間（1095日≒3年）に含まれる年（当年〜3年前までの計4年分）を選択肢に含める
+    for (let y = currentYear; y >= currentYear - 3; y--) {
+      years.push(y);
+    }
+    return years;
+  }, [currentYear]);
 
   /** 監査イベントの日時を日本語ロケールで表示できる形式にする。 */
   const formatDate = (timestamp: number) => {
@@ -36,6 +53,57 @@ export function FamilyAuditLogSection({
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const yearParam =
+        selectedYear === "all" ? undefined : Number.parseInt(selectedYear, 10);
+      const logs = await convex.query(api.auditLogs.exportFamilyAuditLogs, {
+        year: yearParam,
+        accountId: activeAccountId || undefined,
+      });
+
+      if (!logs || logs.length === 0) {
+        toast.info("エクスポート対象のログがありません");
+        return;
+      }
+
+      const formattedRows = logs.map((log) => ({
+        日時: sanitizeCsvValue(new Date(log.createdAt).toLocaleString("ja-JP")),
+        操作者: sanitizeCsvValue(log.actorDisplayName),
+        操作種別: sanitizeCsvValue(
+          AUDIT_ACTION_CONFIG[log.action]?.label ?? log.action,
+        ),
+        対象レコード: sanitizeCsvValue(log.targetTitle),
+        変更項目: sanitizeCsvValue(log.changedFields),
+        詳細: sanitizeCsvValue(log.detail),
+      }));
+
+      const Papa = (await import("papaparse")).default;
+      const csv = Papa.unparse(formattedRows);
+      const bom = new Uint8Array([0xef, 0xbb, 0xbf]);
+      const blob = new Blob([bom, csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      const dateStr = new Date().toISOString().split("T")[0];
+      link.setAttribute(
+        "download",
+        `poohma_audit_logs_${selectedYear}_${dateStr}.csv`,
+      );
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success("監査ログをエクスポートしました");
+    } catch (_error) {
+      toast.error("監査ログのエクスポートに失敗しました");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -65,6 +133,50 @@ export function FamilyAuditLogSection({
           家族共有レコードに対する登録・更新・共有設定変更・削除などの変更履歴を確認できます。
         </p>
         <AccordionContent className="pb-0">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2.5 rounded-lg bg-muted/40 p-3 border border-border/40">
+            <div className="flex items-center gap-2">
+              <label
+                htmlFor="audit-export-year"
+                className="text-xs font-medium text-muted-foreground whitespace-nowrap"
+              >
+                対象期間:
+              </label>
+              <select
+                id="audit-export-year"
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                disabled={isExporting}
+                className="h-8 rounded-md border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-orange-500"
+              >
+                <option value="all">全期間</option>
+                {availableYears.map((year) => (
+                  <option key={year} value={year.toString()}>
+                    {year}年
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExport}
+              disabled={isExporting}
+              className="h-9 sm:h-8 text-xs font-medium min-h-[44px] sm:min-h-[32px] px-3 gap-1.5 border-border hover:bg-muted"
+            >
+              {isExporting ? (
+                <>
+                  <Spinner className="h-3.5 w-3.5 mr-1" />
+                  エクスポート中...
+                </>
+              ) : (
+                <>
+                  <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                  CSVエクスポート
+                </>
+              )}
+            </Button>
+          </div>
+
           {status === "LoadingFirstPage" ? (
             <div className="flex flex-col items-center justify-center py-10 gap-2 text-muted-foreground text-xs">
               <Spinner className="h-5 w-5" />

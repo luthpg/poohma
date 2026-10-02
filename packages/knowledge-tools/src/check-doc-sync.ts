@@ -84,11 +84,52 @@ const RULES: Rule[] = [
   },
 ];
 
-async function getChangedFiles(): Promise<string[]> {
+const cliArgs = process.argv.slice(2);
+let baseRef: string | null = null;
+let isCiMode = false;
+
+for (let i = 0; i < cliArgs.length; i++) {
+  if (cliArgs[i] === "--base" && cliArgs[i + 1]) {
+    baseRef = cliArgs[i + 1] ?? null;
+    i++;
+  } else if (cliArgs[i] === "--ci") {
+    isCiMode = true;
+  }
+}
+
+async function getChangedFiles(
+  targetBaseRef: string | null,
+): Promise<string[]> {
   try {
     const git = simpleGit(ROOT_DIR);
-    const status: StatusResult = await git.status();
     const files = new Set<string>();
+
+    if (targetBaseRef) {
+      try {
+        const diffSummary = await git.diffSummary([
+          `${targetBaseRef}...HEAD`,
+          "--name-only",
+          "--no-renames",
+        ]);
+        for (const file of diffSummary.files) {
+          files.add(file.file.replace(/\\/g, "/"));
+        }
+      } catch (diffErr) {
+        if (isCiMode) {
+          console.error(
+            `❌ Doc-Sync CI 検査失敗: ベース ${targetBaseRef} との差分取得に失敗しました。`,
+            diffErr,
+          );
+          process.exit(1);
+        }
+        console.warn(
+          `⚠️ Warning: Failed to diff against base ${targetBaseRef}, falling back to status only:`,
+          diffErr,
+        );
+      }
+    }
+
+    const status: StatusResult = await git.status();
 
     for (const file of status.files) {
       if (file.path) {
@@ -111,15 +152,15 @@ async function getChangedFiles(): Promise<string[]> {
 async function runDocSyncCheck(): Promise<void> {
   console.log("📋 Checking Doc-Sync requirements for current git changes...\n");
 
-  const changedFiles = await getChangedFiles();
+  const changedFiles = await getChangedFiles(baseRef);
 
   if (changedFiles.length === 0) {
-    console.log("✨ No working tree changes detected.");
+    console.log("✨ No working tree or branch changes detected.");
     return;
   }
 
   console.log(
-    `Found ${changedFiles.length} modified/untracked file(s) in working tree.\n`,
+    `Found ${changedFiles.length} modified/untracked file(s) (base: ${baseRef || "working tree"}).\n`,
   );
 
   const requiredDocs = new Map<string, { level: string; reasons: string[] }>();
@@ -189,6 +230,12 @@ async function runDocSyncCheck(): Promise<void> {
     console.log(
       "仕様変更や不変条件への影響がないか確認し、必要に応じてドキュメントを同期してください。",
     );
+    if (isCiMode) {
+      console.error(
+        "\n❌ Doc-Sync CI 検査失敗: REQUIRED レベルのドキュメント未更新が検出されました。",
+      );
+      process.exit(1);
+    }
   } else {
     console.log(
       "\n✨ すべての必須ドキュメントが更新されているか、または軽微な変更のみです。",

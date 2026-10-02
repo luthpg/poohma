@@ -11,6 +11,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { LogoText } from "./common/LogoText";
 
 interface PublicLayoutProps {
   children: React.ReactNode;
@@ -57,7 +58,7 @@ export function PublicLayout({ children, user }: PublicLayoutProps) {
                   alt="PoohMa"
                   className="h-7 w-7 object-contain"
                 />
-                <span className="font-sans">PoohMa</span>
+                <LogoText />
               </Link>
             </div>
 

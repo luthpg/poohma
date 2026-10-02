@@ -65,6 +65,14 @@ export default defineSchema({
     familyId: v.optional(v.id("families")),
     familyRole: v.union(v.literal("admin"), v.literal("viewer")),
     onboardingVersion: v.optional(v.number()),
+    emailNotificationSettings: v.optional(
+      v.object({
+        notifyRecordChanges: v.optional(v.boolean()),
+        notifyFamilyActivity: v.optional(v.boolean()),
+        notifyDataExport: v.optional(v.boolean()),
+        notifySecuritySettings: v.optional(v.boolean()),
+      }),
+    ),
     createdAt: v.optional(v.number()),
     updatedAt: v.number(),
   })

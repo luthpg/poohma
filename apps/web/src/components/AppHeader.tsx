@@ -2,6 +2,7 @@ import { Link, useMatches } from "@tanstack/react-router";
 import { Lightbulb, Plus } from "lucide-react";
 import { ResponsiveNews } from "@/components/ResponsiveNews";
 import { UserMenu } from "@/components/UserMenu";
+import { LogoText } from "./common/LogoText";
 
 interface AppHeaderProps {
   user: {
@@ -36,9 +37,7 @@ export function AppHeader({ user }: AppHeaderProps) {
             alt="PoohMa"
             className="h-9 w-9 object-contain"
           />
-          <span className="hidden sm:inline">
-            Pooh<span className="text-orange-500">Ma</span>
-          </span>
+          <LogoText className="hidden sm:inline" />
         </Link>
         <div className="flex items-center gap-2 sm:gap-3">
           <ResponsiveNews variant="bell" />

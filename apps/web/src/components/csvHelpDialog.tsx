@@ -1,5 +1,6 @@
 import { Download, FileText, Info, ShieldCheck } from "lucide-react";
 import type React from "react";
+import { useEffect, useRef } from "react";
 import { JpText } from "@/components/JpText";
 import { Button } from "@/components/ui/button";
 import {
@@ -153,10 +154,21 @@ export function CsvHelpDialog({
     URL.revokeObjectURL(url);
   };
 
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      contentRef.current?.scrollTo?.({ top: 0, behavior: "instant" });
+    }
+  }, [open]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-      <DialogContent className="w-[95vw] sm:max-w-3xl md:max-w-4xl max-h-[85vh] overflow-y-auto p-4 sm:p-6">
+      <DialogContent
+        ref={contentRef}
+        className="w-[95vw] sm:max-w-3xl md:max-w-4xl max-h-[85vh] overflow-y-auto p-4 sm:p-6"
+      >
         <DialogHeader className="space-y-1 text-left">
           <div className="flex items-center gap-2">
             <Info className="h-5 w-5 text-orange-500 shrink-0" />

@@ -5,6 +5,7 @@ import {
   signInWithRedirect,
 } from "firebase/auth";
 import { useEffect, useState } from "react";
+import { LogoText } from "@/components/common/LogoText";
 import { Spinner } from "@/components/ui/spinner";
 import { syncUser } from "@/services/auth.functions";
 import { auth, googleProvider } from "@/utils/firebase";
@@ -159,9 +160,7 @@ function LoginPage() {
       <div className="w-full max-w-md space-y-8 rounded-xl bg-card p-8 shadow-lg">
         {/* ロゴエリア */}
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-foreground">
-            Pooh<span className="text-orange-500">Ma</span>
-          </h1>
+          <LogoText className="text-3xl" />
           <p className="mt-2 text-muted-foreground">
             家族のパスワード、
             <br />

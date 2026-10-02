@@ -149,9 +149,11 @@
 ## 7. CI/CD・GitHub Actions ワークフローの不変条件
 
 ### コミット前ローカル静的検証の義務付け
+
 - ワークフローファイル（`.github/workflows/*.yml`）を変更・新規作成した際は、**必ずコミット前にローカルで `pnpm lint:workflows`（Docker 経由の actionlint + shellcheck）を実行し、エラー 0 件であることを確認**しなければならない。静的検証を未実施のままコミット・プッシュしてはならない。
 
 ### シェルスクリプト引数・変数の完全防護
+
 - **`jq` 内でのシェル変数直接参照の禁止**:
   - `jq '.key // $VAR'` のようにシングルクォート内でシェル環境変数を直接参照してはならない（未定義 jq 変数エラーとなり bash `-e` で即死する）。
   - 必ず `jq --arg var "$VAR" '.key // $var'` のように `--arg` または `--argjson` を経由すること。
@@ -159,6 +161,7 @@
   - `$GITHUB_OUTPUT` や `$GITHUB_STEP_SUMMARY` へのリダイレクト、およびシェル変数展開時は必ずダブルクォートで保護する（例: `>> "$GITHUB_OUTPUT"`, `>> "$GITHUB_STEP_SUMMARY"`）。
 
 ### 可用性とサプライチェーン保護
+
 - **外部 HTTP 通信のタイムアウト必須化**:
   - ワークフロー内で `curl` を用いて外部エンドポイント（Convex, Discord Webhook 等）へ通信する際は、必ず有限のタイムアウト（`--connect-timeout`, `--max-time`）を設定し、ネットワーク障害時の最長6時間ハングを防止する。
 - **生 URL パイプ実行（`curl | bash`）の禁止**:
@@ -166,4 +169,9 @@
 - **内部シークレット送信時の HTTPS 検証**:
   - `CONVEX_INTERNAL_SECRET` などの高権限シークレットを送信する際は、送信先 URL が `https://` で始まっていることを事前に検証し、誤設定による平文送信（CWE-319）を防止すること。
 
+### CI での Knowledge・ドキュメント同期（Doc-Sync Gate）の強制
 
+- **完全履歴チェックアウト（`fetch-depth: 0`）**:
+  - PR 時の差分検知や base ブランチとのドキュメント同期判定のため、CI の `actions/checkout` には必ず `fetch-depth: 0` を指定する。
+- **Knowledge 参照検証と Doc-Sync Gate**:
+  - `check-and-test` ジョブ内で `pnpm check:knowledge` および `pnpm check:doc-sync -- --base "origin/$GITHUB_BASE_REF" --ci` を実行し、参照切れや REQUIRED レベルのドキュメント未更新が残存する状態でのマージを CI 側で厳格にブロックする。
