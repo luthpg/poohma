@@ -73,16 +73,13 @@ export function useExportCsv() {
         data.map(async (row) => {
           const newRow = { ...row };
 
-          // サニタイズを適用
-          for (const key of Object.keys(row)) {
-            newRow[key] = sanitizeCsvValue(row[key]);
-          }
+          let hasDecryptionError = false;
 
           for (let i = 1; i <= MAX_CREDENTIALS_PER_RECORD; i++) {
-            const hint = newRow[`PasswordHint${i}`];
-            const iv = newRow[`PasswordHintIv${i}`];
-            const dekEncrypted = newRow[`PasswordHintDekEncrypted${i}`];
-            const dekIv = newRow[`PasswordHintDekIv${i}`];
+            const hint = row[`PasswordHint${i}`];
+            const iv = row[`PasswordHintIv${i}`];
+            const dekEncrypted = row[`PasswordHintDekEncrypted${i}`];
+            const dekIv = row[`PasswordHintDekIv${i}`];
             if (hint && iv) {
               try {
                 const plainHint = await decryptHint(
@@ -91,17 +88,32 @@ export function useExportCsv() {
                   dekEncrypted || undefined,
                   dekIv || undefined,
                 );
-                // サニタイズを適用
+                // 復号後の平文ヒントにCSVサニタイズを適用
                 newRow[`PasswordHint${i}`] = sanitizeCsvValue(plainHint);
               } catch (_e) {
                 newRow[`PasswordHint${i}`] = "";
+                hasDecryptionError = true;
               }
+            } else {
+              newRow[`PasswordHint${i}`] = "";
             }
             // Remove IV and DEK fields from export
             delete newRow[`PasswordHintIv${i}`];
             delete newRow[`PasswordHintDekEncrypted${i}`];
             delete newRow[`PasswordHintDekIv${i}`];
           }
+
+          // 非暗号化フィールドにサニタイズを適用
+          for (const key of Object.keys(newRow)) {
+            if (!key.startsWith("PasswordHint")) {
+              newRow[key] = sanitizeCsvValue(newRow[key]);
+            }
+          }
+
+          if (hasDecryptionError) {
+            toast.error("一部のアカウント情報の復号に失敗しました");
+          }
+
           return newRow;
         }),
       );

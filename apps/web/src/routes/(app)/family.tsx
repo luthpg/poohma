@@ -592,7 +592,10 @@ function FamilyComponent() {
       // 3. 所有するレコードの暗号化対象を取得し再ラップ
       const migrationData = await convex.query(
         api.families.getMigrationForEncryption,
-        { migrationId },
+        {
+          migrationId,
+          accountId: activeAccountId || undefined,
+        },
       );
       let reEncryptedCredentials: Awaited<
         ReturnType<typeof reEncryptCredentials>

@@ -169,13 +169,32 @@ async function runBackup(env: Env): Promise<{ fileName: string }> {
     );
   }
 
-  console.log(`[Backup] 4. Saving zip to Cloudflare R2...`);
+  console.log(`[Backup] 4. Validating and saving zip to Cloudflare R2...`);
+
+  const buffer = await downloadRes.arrayBuffer();
+  if (buffer.byteLength < 4) {
+    throw new Error(
+      `[Backup] Downloaded zip is corrupted or empty (size: ${buffer.byteLength} bytes)`,
+    );
+  }
+
+  const bytes = new Uint8Array(buffer, 0, 4);
+  const isZip =
+    bytes[0] === 0x50 &&
+    bytes[1] === 0x4b &&
+    bytes[2] === 0x03 &&
+    bytes[3] === 0x04;
+  if (!isZip) {
+    throw new Error(
+      `[Backup] Downloaded file lacks valid ZIP magic number (header: ${bytes.join(",")})`,
+    );
+  }
 
   // 4. Cloudflare R2 への保存
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const fileName = `convex_backup_${timestamp}.zip`;
 
-  await env.BACKUP_BUCKET.put(fileName, downloadRes.body, {
+  await env.BACKUP_BUCKET.put(fileName, buffer, {
     httpMetadata: {
       contentType: "application/zip",
     },
@@ -184,6 +203,7 @@ async function runBackup(env: Env): Promise<{ fileName: string }> {
       trigger: "scheduled",
       deployment: deploymentIdentifier,
       snapshotTs: snapshotExportTs,
+      sizeBytes: String(buffer.byteLength),
     },
   });
 

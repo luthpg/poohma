@@ -2916,12 +2916,18 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       // 同一アカウントのキック拒否
       await expect(
-        userA.mutation(api.families.kickMember, { targetAccountId: userAId }),
+        userA.mutation(api.families.kickMember, {
+          accountId: userAId,
+          targetAccountId: userAId,
+        }),
       ).rejects.toThrow("Cannot kick yourself");
 
       // 同一UID別アカウントのキック拒否
       await expect(
-        userA.mutation(api.families.kickMember, { targetAccountId: userA2Id }),
+        userA.mutation(api.families.kickMember, {
+          accountId: userAId,
+          targetAccountId: userA2Id,
+        }),
       ).rejects.toThrow("Cannot kick yourself");
     });
 

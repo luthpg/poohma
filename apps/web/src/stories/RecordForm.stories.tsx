@@ -94,6 +94,8 @@ function MockFormContainer({
     setEditingMetadata: () => {},
     isDirty: false,
     targetRecordId,
+    draftSaveStatus: "idle",
+    flushDraftSave: async () => {},
   };
 
   return (
