@@ -169,16 +169,21 @@ async function runBackup(env: Env): Promise<{ fileName: string }> {
     );
   }
 
-  console.log(`[Backup] 4. Validating and saving zip to Cloudflare R2...`);
+  console.log(`[Backup] 4. Validating and streaming zip to Cloudflare R2...`);
 
-  const buffer = await downloadRes.arrayBuffer();
-  if (buffer.byteLength < 4) {
+  if (!downloadRes.body) {
+    throw new Error("[Backup] Response body is empty");
+  }
+
+  const reader = downloadRes.body.getReader();
+  const firstChunk = await reader.read();
+  if (firstChunk.done || !firstChunk.value || firstChunk.value.length < 4) {
     throw new Error(
-      `[Backup] Downloaded zip is corrupted or empty (size: ${buffer.byteLength} bytes)`,
+      `[Backup] Downloaded zip is corrupted or empty (size < 4 bytes)`,
     );
   }
 
-  const bytes = new Uint8Array(buffer, 0, 4);
+  const bytes = firstChunk.value.subarray(0, 4);
   const isZip =
     bytes[0] === 0x50 &&
     bytes[1] === 0x4b &&
@@ -186,15 +191,33 @@ async function runBackup(env: Env): Promise<{ fileName: string }> {
     bytes[3] === 0x04;
   if (!isZip) {
     throw new Error(
-      `[Backup] Downloaded file lacks valid ZIP magic number (header: ${bytes.join(",")})`,
+      `[Backup] Downloaded file lacks valid ZIP magic number (header: ${Array.from(bytes).join(",")})`,
     );
   }
+
+  // 先頭チャンクと残りのストリームを結合して R2 へストリーミング転送
+  const combinedStream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(firstChunk.value);
+    },
+    async pull(controller) {
+      const { done, value } = await reader.read();
+      if (done) {
+        controller.close();
+      } else {
+        controller.enqueue(value);
+      }
+    },
+    cancel(reason) {
+      return reader.cancel(reason);
+    },
+  });
 
   // 4. Cloudflare R2 への保存
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const fileName = `convex_backup_${timestamp}.zip`;
 
-  await env.BACKUP_BUCKET.put(fileName, buffer, {
+  await env.BACKUP_BUCKET.put(fileName, combinedStream, {
     httpMetadata: {
       contentType: "application/zip",
     },
@@ -203,7 +226,6 @@ async function runBackup(env: Env): Promise<{ fileName: string }> {
       trigger: "scheduled",
       deployment: deploymentIdentifier,
       snapshotTs: snapshotExportTs,
-      sizeBytes: String(buffer.byteLength),
     },
   });
 

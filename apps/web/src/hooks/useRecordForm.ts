@@ -126,6 +126,8 @@ export function useRecordForm(
   const [baselineValues, setBaselineValuesState] = useState<
     Partial<RecordFormValues> | undefined
   >(initialValues);
+  const baselineValuesRef = useRef(baselineValues);
+  baselineValuesRef.current = baselineValues;
 
   const [isFetchingOgp, setIsFetchingOgp] = useState(false);
   const [isFetchingFurigana, setIsFetchingFurigana] = useState(false);
@@ -193,11 +195,12 @@ export function useRecordForm(
     saveGenerationRef.current += 1;
     clearRecordDraft({ targetRecordId, draftId });
     setDraftSaveStatus("idle");
-    if (baselineValues) {
+    const currentBaseline = baselineValuesRef.current;
+    if (currentBaseline) {
       const restoredValues: RecordFormValues = {
         ...DEFAULT_VALUES,
-        ...baselineValues,
-        credentials: ensureCredentialIds(baselineValues.credentials),
+        ...currentBaseline,
+        credentials: ensureCredentialIds(currentBaseline.credentials),
       };
       setValues(restoredValues);
       initialValuesJsonRef.current = JSON.stringify(restoredValues);
@@ -209,7 +212,7 @@ export function useRecordForm(
       setValues(fallbackValues);
       initialValuesJsonRef.current = JSON.stringify(fallbackValues);
     }
-  }, [targetRecordId, draftId, baselineValues]);
+  }, [targetRecordId, draftId]);
 
   // masterKey 解除時にドラフトが存在すれば自動復元（サイレントリフレッシュ / 再ログイン復帰時）
   useEffect(() => {
@@ -217,6 +220,7 @@ export function useRecordForm(
     if (isRestoredRef.current) return;
 
     (async () => {
+      const currentGen = saveGenerationRef.current;
       try {
         const hadDraft = hasRecordDraft({ targetRecordId, draftId });
         const draft = await loadRecordDraft({
@@ -225,6 +229,7 @@ export function useRecordForm(
           masterKey,
           currentAccountId: activeAccountId,
         });
+        if (currentGen !== saveGenerationRef.current) return;
         if (draft) {
           isRestoredRef.current = true;
           setValues({
@@ -622,6 +627,9 @@ export function useRecordForm(
           furiganaPromiseRef.current,
           timeoutPromise,
         ]);
+        if (!resolvedReading) {
+          invalidateFuriganaRequest();
+        }
         currentTitleReading = resolvedReading ?? values.title;
       }
 
@@ -710,13 +718,20 @@ export function useRecordForm(
         tags: values.tags,
         credentials: encryptedCredentials,
       };
-    }, [values, masterKey, requireUnlock, encryptHint]);
+    }, [
+      values,
+      masterKey,
+      requireUnlock,
+      encryptHint,
+      invalidateFuriganaRequest,
+    ]);
 
   const submit = useCallback(
     async (
       action: (payload: RecordSubmitPayload) => Promise<void>,
     ): Promise<boolean> => {
       setIsSubmitting(true);
+      invalidateFuriganaRequest();
       try {
         const payload = await buildEncryptedPayload();
 
@@ -785,7 +800,7 @@ export function useRecordForm(
         setIsSubmitting(false);
       }
     },
-    [buildEncryptedPayload, targetRecordId, draftId],
+    [buildEncryptedPayload, targetRecordId, draftId, invalidateFuriganaRequest],
   );
 
   const retryPendingSubmit = useCallback(async (): Promise<boolean> => {

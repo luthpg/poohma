@@ -84,6 +84,9 @@ describe("validateUrlSafety", () => {
     expect(isPrivateIp("::ffff:10.0.0.1")).toBe(true);
     expect(isPrivateIp("::ffff:8.8.8.8")).toBe(false);
     expect(isPrivateIp("::ffff:7f00:0001")).toBe(true);
+    // 完全展開表記（非省略）
+    expect(isPrivateIp("0:0:0:0:0:ffff:127.0.0.1")).toBe(true);
+    expect(isPrivateIp("0:0:0:0:0:ffff:8.8.8.8")).toBe(false);
   });
 
   it("should detect 6to4 addresses correctly", () => {

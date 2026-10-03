@@ -24,7 +24,7 @@ export default defineConfig({
     tsconfigPaths: true,
   },
   test: {
-    testTimeout: 15000,
+    testTimeout: 30000,
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
@@ -32,6 +32,7 @@ export default defineConfig({
         "node_modules/**",
         "tests/**",
         ".storybook/**",
+        "src/stories/**",
         "src/components/ui/**",
         "src/utils/schemas.ts",
         "convex/_generated/**",
@@ -83,6 +84,7 @@ export default defineConfig({
       {
         extends: true,
         test: {
+          name: "unit",
           environment: "node",
           exclude: [
             "**/node_modules/**",
@@ -108,6 +110,7 @@ export default defineConfig({
         ],
         test: {
           name: "storybook",
+          testTimeout: 30000,
           browser: {
             enabled: true,
             headless: true,

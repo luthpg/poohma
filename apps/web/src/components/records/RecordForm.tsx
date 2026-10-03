@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, Lock, Users } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Lock, Users } from "lucide-react";
 import { useState } from "react";
 import { SessionExpiredDialog } from "@/components/auth/SessionExpiredDialog";
 import { Spinner } from "@/components/ui/spinner";
@@ -49,6 +49,25 @@ export function RecordForm({
           <h2 className="text-[16px] md:text-[18px] font-semibold text-foreground tracking-geist-ui">
             基本情報
           </h2>
+          <div
+            className="flex items-center gap-1.5 text-xs text-muted-foreground transition-opacity"
+            data-testid="draft-save-status-indicator"
+          >
+            {form.draftSaveStatus === "saving" && (
+              <>
+                <Spinner className="h-3 w-3 animate-spin text-orange-500" />
+                <span>下書き保存中...</span>
+              </>
+            )}
+            {form.draftSaveStatus === "saved" && (
+              <>
+                <Check className="h-3.5 w-3.5 text-green-500" />
+                <span className="text-green-600 dark:text-green-400">
+                  下書き保存済み
+                </span>
+              </>
+            )}
+          </div>
         </div>
         <div className="space-y-4">
           <div className={getModifiedClass("url")}>

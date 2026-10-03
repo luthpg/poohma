@@ -19,7 +19,7 @@ import {
   familyAdminQuery,
 } from "./customBuilders";
 import { deleteCredentialsForRecord, getCredentialsForRecord } from "./records";
-import { getEffectiveFamilyRole } from "./rls";
+import { getEffectiveFamilyRole, getEffectiveOwnerType } from "./rls";
 
 /**
  * メンバーが家族を離脱または削除された際、共有レコードの管理者リストを調停
@@ -145,7 +145,7 @@ async function getPersonalRecordsForUser(
     .query("serviceRecords")
     .withIndex("by_accountId", (q) => q.eq("accountId", accountId))
     .collect();
-  return records.filter((r) => r.ownerType === "user");
+  return records.filter((r) => getEffectiveOwnerType(r) === "user");
 }
 
 export const getFamilyMembersByFamilyId = async (
@@ -1429,8 +1429,15 @@ export const approveJoinRequest = familyAdminMutation({
           .first();
     if (!applicant) throw new Error("Applicant not found");
 
-    if (!applicant.familyId) {
-      // migrate serviceRecords to family before changing familyId
+    const pendingVault = await ctx.db
+      .query("pendingExportVaults")
+      .withIndex("by_accountId", (q) => q.eq("accountId", applicant._id))
+      .first();
+
+    const isMigration = Boolean(applicant.familyId || pendingVault);
+
+    if (!isMigration) {
+      // 家族未所属かつ引き継ぎ用Vaultもない新規ユーザーのみ即時所属
       const applicantRecords = await ctx.db
         .query("serviceRecords")
         .withIndex("by_accountId", (q) => q.eq("accountId", applicant._id))
@@ -1442,52 +1449,30 @@ export const approveJoinRequest = familyAdminMutation({
       }
 
       await ctx.db.patch(applicant._id, { familyId, familyRole: "viewer" });
-      await ctx.db.patch(request._id, {
-        status: "approved",
-        updatedAt: Date.now(),
-      });
-
-      const family = await ctx.db.get(familyId);
-      await ctx.scheduler.runAfter(
-        0,
-        internal.actions.sendTemplatedEmailInternal,
-        {
-          email: applicant.email,
-          payload: {
-            template: "joinApproved",
-            props: {
-              displayName: applicant.displayName || "メンバー",
-              familyName: family?.name || "",
-              variant: "join",
-              ctaUrl: "/family",
-            },
-          },
-        },
-      );
-    } else {
-      await ctx.db.patch(request._id, {
-        status: "approved",
-        updatedAt: Date.now(),
-      });
-
-      const family = await ctx.db.get(familyId);
-      await ctx.scheduler.runAfter(
-        0,
-        internal.actions.sendTemplatedEmailInternal,
-        {
-          email: applicant.email,
-          payload: {
-            template: "joinApproved",
-            props: {
-              displayName: applicant.displayName || "メンバー",
-              familyName: family?.name || "",
-              variant: "migration",
-              ctaUrl: "/family",
-            },
-          },
-        },
-      );
     }
+
+    await ctx.db.patch(request._id, {
+      status: "approved",
+      updatedAt: Date.now(),
+    });
+
+    const family = await ctx.db.get(familyId);
+    await ctx.scheduler.runAfter(
+      0,
+      internal.actions.sendTemplatedEmailInternal,
+      {
+        email: applicant.email,
+        payload: {
+          template: "joinApproved",
+          props: {
+            displayName: applicant.displayName || "メンバー",
+            familyName: family?.name || "",
+            variant: isMigration ? "migration" : "join",
+            ctaUrl: "/family",
+          },
+        },
+      },
+    );
 
     await logAuditEvent(ctx, {
       actor: ctx.user,

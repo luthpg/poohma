@@ -40,7 +40,11 @@ function parseIpv6(ip: string): number[] | null {
     : [];
 
   if (ipv4Parts) {
-    right = right.concat(ipv4Parts);
+    if (parts.length === 2) {
+      right = right.concat(ipv4Parts);
+    } else {
+      left.push(...ipv4Parts);
+    }
   }
 
   if (left.some(Number.isNaN) || right.some(Number.isNaN)) return null;

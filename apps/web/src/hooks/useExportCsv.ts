@@ -69,11 +69,10 @@ export function useExportCsv() {
       }
 
       // Decrypt hints for export
+      let totalDecryptionErrors = 0;
       const decryptedData = await Promise.all(
         data.map(async (row) => {
           const newRow = { ...row };
-
-          let hasDecryptionError = false;
 
           for (let i = 1; i <= MAX_CREDENTIALS_PER_RECORD; i++) {
             const hint = row[`PasswordHint${i}`];
@@ -92,7 +91,7 @@ export function useExportCsv() {
                 newRow[`PasswordHint${i}`] = sanitizeCsvValue(plainHint);
               } catch (_e) {
                 newRow[`PasswordHint${i}`] = "";
-                hasDecryptionError = true;
+                totalDecryptionErrors += 1;
               }
             } else {
               newRow[`PasswordHint${i}`] = "";
@@ -108,10 +107,6 @@ export function useExportCsv() {
             if (!key.startsWith("PasswordHint")) {
               newRow[key] = sanitizeCsvValue(newRow[key]);
             }
-          }
-
-          if (hasDecryptionError) {
-            toast.error("一部のアカウント情報の復号に失敗しました");
           }
 
           return newRow;
@@ -151,7 +146,13 @@ export function useExportCsv() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast.success("データをエクスポートしました");
+      if (totalDecryptionErrors > 0) {
+        toast.warning(
+          "一部のアカウント情報の復号に失敗したため、該当のヒントは空欄で出力されました",
+        );
+      } else {
+        toast.success("データをエクスポートしました");
+      }
     } catch (_error) {
       toast.error("エクスポートに失敗しました");
     } finally {
