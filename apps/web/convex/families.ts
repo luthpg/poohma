@@ -17,10 +17,9 @@ import {
   authenticatedQuery,
   familyAdminMutation,
   familyAdminQuery,
-  familyBoundQuery,
 } from "./customBuilders";
 import { deleteCredentialsForRecord, getCredentialsForRecord } from "./records";
-import { getEffectiveFamilyRole } from "./rls";
+import { getEffectiveFamilyRole, getEffectiveOwnerType } from "./rls";
 
 /**
  * メンバーが家族を離脱または削除された際、共有レコードの管理者リストを調停
@@ -46,11 +45,19 @@ export async function reconcileAdminsOnLeave(
     .filter((u) => u._id !== leavingAccountId)
     .map((u) => u._id);
 
-  // 残存メンバーがいない場合、管理者不在・メンバー不在となった孤立共有レコードをクリーンアップ
+  // 残存メンバーがいない場合、管理者不在・メンバー不在となった孤立共有レコード、招待、参加申請をクリーンアップ
   if (remainingAccountIds.length === 0) {
     for (const record of sharedRecords) {
       await deleteCredentialsForRecord(ctx, record._id);
       await ctx.db.delete(record._id);
+    }
+    await deleteFamilyInvites(ctx, familyId);
+    const reqs = await ctx.db
+      .query("joinRequests")
+      .withIndex("by_familyId_status", (q) => q.eq("familyId", familyId))
+      .collect();
+    for (const req of reqs) {
+      await ctx.db.delete(req._id);
     }
     return;
   }
@@ -61,7 +68,20 @@ export async function reconcileAdminsOnLeave(
         u._id !== leavingAccountId && getEffectiveFamilyRole(u) === "admin",
     )
     .map((u) => u._id);
-  const remainingDefaultAdminExists = remainingDefaultAdminIds.length > 0;
+  let remainingDefaultAdminExists = remainingDefaultAdminIds.length > 0;
+
+  // 残存メンバーがいるのに管理者が0人になってしまう場合、最古の残存メンバーを自動昇格（管理者不在の防止）
+  if (!remainingDefaultAdminExists && remainingAccountIds.length > 0) {
+    const candidateToPromote = remainingFamilyMembers
+      .filter((u) => u._id !== leavingAccountId)
+      .sort((a, b) => a._creationTime - b._creationTime)[0];
+
+    if (candidateToPromote) {
+      await ctx.db.patch(candidateToPromote._id, { familyRole: "admin" });
+      remainingDefaultAdminIds.push(candidateToPromote._id);
+      remainingDefaultAdminExists = true;
+    }
+  }
 
   for (const record of sharedRecords) {
     const currentAdmins = record.admins ?? [];
@@ -125,7 +145,7 @@ async function getPersonalRecordsForUser(
     .query("serviceRecords")
     .withIndex("by_accountId", (q) => q.eq("accountId", accountId))
     .collect();
-  return records.filter((r) => r.ownerType === "user");
+  return records.filter((r) => getEffectiveOwnerType(r) === "user");
 }
 
 export const getFamilyMembersByFamilyId = async (
@@ -137,11 +157,24 @@ export const getFamilyMembersByFamilyId = async (
 
   const usersInFamily = await ctx.db
     .query("users")
-    .filter((q) => q.eq(q.field("familyId"), family._id))
+    .withIndex("by_familyId", (q) => q.eq("familyId", family._id))
     .collect();
 
+  // 復旧用暗号文およびコードハッシュはOTP検証済み専用経路でのみ返却するため、通常APIからは除外
+  // （発行日時 recoveryIssuedAt や発行者 recoveryIssuedByAccountId は家族設定画面でのステータス表示用に保持）
+  const {
+    recoveryMasterKeyEncrypted: _1,
+    recoveryMasterKeyIv: _2,
+    recoveryMasterKeySalt: _3,
+    recoveryCodeHash: _4,
+    recoveryKdfIterations: _5,
+    recoveryCryptoVersion: _6,
+    ...safeFamily
+  } = family;
+
   return {
-    ...family,
+    ...safeFamily,
+    hasRecoveryKit: family.recoveryMasterKeyEncrypted != null,
     users: usersInFamily.map((u) => ({
       id: u._id,
       userId: u.userId,
@@ -222,14 +255,19 @@ function resolveKdfParams(iterations?: number, version?: number) {
 export const createFamily = authenticatedMutation({
   args: {
     name: v.string(),
-    masterKeyEncrypted: v.optional(v.string()),
-    masterKeyIv: v.optional(v.string()),
-    masterKeySalt: v.optional(v.string()),
+    masterKeyEncrypted: v.string(),
+    masterKeyIv: v.string(),
+    masterKeySalt: v.string(),
     kdfIterations: v.optional(v.number()),
     cryptoVersion: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const { user } = ctx;
+    if (user.familyId) {
+      throw new Error(
+        "すでに家族に所属しています。家族を変更する場合は家族移行手続きを行ってください",
+      );
+    }
     const { kdfIterations, cryptoVersion } = resolveKdfParams(
       args.kdfIterations,
       args.cryptoVersion,
@@ -510,6 +548,7 @@ export const prepareFamilyMigration = authenticatedMutation({
     const migrationId = await ctx.db.insert("familyMigrations", {
       userId: user.userId,
       accountId: user._id,
+      action: args.action,
       sourceFamilyId: user.familyId,
       targetFamilyId,
       serviceRecordIds,
@@ -635,8 +674,18 @@ export const commitFamilyMigration = authenticatedMutation({
 
     const now = Date.now();
     for (const record of currentRecords) {
+      if (record.updatedAt > migration.createdAt) {
+        throw new Error(
+          "Conflict detected: Service record was modified during migration. Please retry migration.",
+        );
+      }
       const creds = await getCredentialsForRecord(ctx, record._id);
       for (const cred of creds) {
+        if (cred.updatedAt > migration.createdAt) {
+          throw new Error(
+            "Conflict detected: Credential was modified during migration. Please retry migration.",
+          );
+        }
         if (cred.passwordHint && cred.passwordHintIv) {
           const update =
             credUpdates.get(`${record._id}:${cred._id}`) ??
@@ -662,8 +711,6 @@ export const commitFamilyMigration = authenticatedMutation({
       });
     }
 
-    await ctx.db.patch(user._id, { familyId: migration.targetFamilyId });
-
     const approvedRequest = await ctx.db
       .query("joinRequests")
       .withIndex("by_familyId_accountId", (q) =>
@@ -675,6 +722,21 @@ export const commitFamilyMigration = authenticatedMutation({
     if (approvedRequest) {
       await ctx.db.delete(approvedRequest._id);
     }
+
+    // 移行確定時の権限設定: 新規家族作成なら admin、既存家族参加なら viewer
+    const targetRole =
+      migration.action === "create"
+        ? "admin"
+        : migration.action === "join"
+          ? "viewer"
+          : approvedRequest
+            ? "viewer"
+            : "admin";
+
+    await ctx.db.patch(user._id, {
+      familyId: migration.targetFamilyId,
+      familyRole: targetRole,
+    });
 
     if (
       migration.sourceFamilyId &&
@@ -889,6 +951,21 @@ export const createFamilyInvite = familyAdminMutation({
 
     const code = crypto.randomUUID();
     const now = Date.now();
+
+    const MAX_ACTIVE_INVITES_PER_FAMILY = 10;
+    const existingInvites = await ctx.db
+      .query("familyInvites")
+      .withIndex("by_familyId", (q) => q.eq("familyId", familyId))
+      .collect();
+    const activeInvitesCount = existingInvites.filter(
+      (inv) => inv.revokedAt == null && inv.expiresAt > now,
+    ).length;
+    if (activeInvitesCount >= MAX_ACTIVE_INVITES_PER_FAMILY) {
+      throw new Error(
+        `有効な招待コードが上限（${MAX_ACTIVE_INVITES_PER_FAMILY}件）に達しています。不要な招待を無効化してください`,
+      );
+    }
+
     const expiresAt = now + clampedTtl * 60 * 1000;
 
     const inviteId = await ctx.db.insert("familyInvites", {
@@ -1184,10 +1261,10 @@ export const cancelJoinRequest = authenticatedMutation({
     const request = await ctx.db.get(args.requestId);
     if (!request) throw new Error("Request not found");
 
-    if (
-      request.userId !== user.userId &&
-      (!request.accountId || request.accountId !== user._id)
-    ) {
+    const isOwner = request.accountId
+      ? request.accountId === user._id
+      : request.userId === user.userId;
+    if (!isOwner) {
       throw new Error("Unauthorized: This is not your request");
     }
 
@@ -1280,10 +1357,10 @@ export const dismissRejectedRequest = authenticatedMutation({
     const { user } = ctx;
     const request = await ctx.db.get(args.requestId);
     if (!request) throw new Error("Request not found");
-    if (
-      request.userId !== user.userId &&
-      (!request.accountId || request.accountId !== user._id)
-    ) {
+    const isOwner = request.accountId
+      ? request.accountId === user._id
+      : request.userId === user.userId;
+    if (!isOwner) {
       throw new Error("Unauthorized");
     }
     if (request.status !== "rejected") {
@@ -1295,7 +1372,7 @@ export const dismissRejectedRequest = authenticatedMutation({
   },
 });
 
-export const getPendingRequests = familyBoundQuery({
+export const getPendingRequests = familyAdminQuery({
   args: {},
   handler: async (ctx) => {
     const { familyId } = ctx;
@@ -1352,8 +1429,15 @@ export const approveJoinRequest = familyAdminMutation({
           .first();
     if (!applicant) throw new Error("Applicant not found");
 
-    if (!applicant.familyId) {
-      // migrate serviceRecords to family before changing familyId
+    const pendingVault = await ctx.db
+      .query("pendingExportVaults")
+      .withIndex("by_accountId", (q) => q.eq("accountId", applicant._id))
+      .first();
+
+    const isMigration = Boolean(applicant.familyId || pendingVault);
+
+    if (!isMigration) {
+      // 家族未所属かつ引き継ぎ用Vaultもない新規ユーザーのみ即時所属
       const applicantRecords = await ctx.db
         .query("serviceRecords")
         .withIndex("by_accountId", (q) => q.eq("accountId", applicant._id))
@@ -1365,52 +1449,30 @@ export const approveJoinRequest = familyAdminMutation({
       }
 
       await ctx.db.patch(applicant._id, { familyId, familyRole: "viewer" });
-      await ctx.db.patch(request._id, {
-        status: "approved",
-        updatedAt: Date.now(),
-      });
-
-      const family = await ctx.db.get(familyId);
-      await ctx.scheduler.runAfter(
-        0,
-        internal.actions.sendTemplatedEmailInternal,
-        {
-          email: applicant.email,
-          payload: {
-            template: "joinApproved",
-            props: {
-              displayName: applicant.displayName || "メンバー",
-              familyName: family?.name || "",
-              variant: "join",
-              ctaUrl: "/family",
-            },
-          },
-        },
-      );
-    } else {
-      await ctx.db.patch(request._id, {
-        status: "approved",
-        updatedAt: Date.now(),
-      });
-
-      const family = await ctx.db.get(familyId);
-      await ctx.scheduler.runAfter(
-        0,
-        internal.actions.sendTemplatedEmailInternal,
-        {
-          email: applicant.email,
-          payload: {
-            template: "joinApproved",
-            props: {
-              displayName: applicant.displayName || "メンバー",
-              familyName: family?.name || "",
-              variant: "migration",
-              ctaUrl: "/family",
-            },
-          },
-        },
-      );
     }
+
+    await ctx.db.patch(request._id, {
+      status: "approved",
+      updatedAt: Date.now(),
+    });
+
+    const family = await ctx.db.get(familyId);
+    await ctx.scheduler.runAfter(
+      0,
+      internal.actions.sendTemplatedEmailInternal,
+      {
+        email: applicant.email,
+        payload: {
+          template: "joinApproved",
+          props: {
+            displayName: applicant.displayName || "メンバー",
+            familyName: family?.name || "",
+            variant: isMigration ? "migration" : "join",
+            ctaUrl: "/family",
+          },
+        },
+      },
+    );
 
     await logAuditEvent(ctx, {
       actor: ctx.user,

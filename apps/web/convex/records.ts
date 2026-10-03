@@ -26,6 +26,7 @@ import {
 } from "./customBuilders";
 import {
   getEffectiveAdmins,
+  getEffectiveFamilyRole,
   getEffectiveOwnerFamilyId,
   getEffectiveOwnerType,
   isRecordAdmin,
@@ -369,15 +370,13 @@ export const getRecordDetail = authenticatedQuery({
     // 管理者ユーザー一覧の情報を取得（動的マージ）
     let adminDocs: (Doc<"users"> | null)[] = [];
     if (record.ownerType === "family" && record.ownerFamilyId) {
-      const familyAdmins = await ctx.db
+      const familyMembers = await ctx.db
         .query("users")
-        .filter((q) =>
-          q.and(
-            q.eq(q.field("familyId"), record.ownerFamilyId),
-            q.eq(q.field("familyRole"), "admin"),
-          ),
-        )
+        .withIndex("by_familyId", (q) => q.eq("familyId", record.ownerFamilyId))
         .collect();
+      const familyAdmins = familyMembers.filter(
+        (u) => getEffectiveFamilyRole(u) === "admin",
+      );
 
       const individualAdmins = await Promise.all(
         (record.admins ?? []).map((adminId) => ctx.db.get(adminId)),
@@ -2472,6 +2471,8 @@ export const applyImportDiff = familyBoundMutation({
         patchData.ownerFamilyId =
           item.ownerType === "family" ? user.familyId : undefined;
         if (item.ownerType === "user") {
+          patchData.userId = user.userId;
+          patchData.accountId = user._id;
           patchData.admins = [];
         }
       }

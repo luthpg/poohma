@@ -126,6 +126,8 @@ export function useRecordForm(
   const [baselineValues, setBaselineValuesState] = useState<
     Partial<RecordFormValues> | undefined
   >(initialValues);
+  const baselineValuesRef = useRef(baselineValues);
+  baselineValuesRef.current = baselineValues;
 
   const [isFetchingOgp, setIsFetchingOgp] = useState(false);
   const [isFetchingFurigana, setIsFetchingFurigana] = useState(false);
@@ -184,12 +186,41 @@ export function useRecordForm(
     }
   }, [masterKey, requireUnlock, targetRecordId, draftId]);
 
+  const [draftSaveStatus, setDraftSaveStatus] = useState<
+    "idle" | "saving" | "saved"
+  >("idle");
+
+  // 明示的キャンセル時のドラフト破棄（復元トーストおよびキャンセル時に利用）
+  const discardDraft = useCallback(() => {
+    saveGenerationRef.current += 1;
+    clearRecordDraft({ targetRecordId, draftId });
+    setDraftSaveStatus("idle");
+    const currentBaseline = baselineValuesRef.current;
+    if (currentBaseline) {
+      const restoredValues: RecordFormValues = {
+        ...DEFAULT_VALUES,
+        ...currentBaseline,
+        credentials: ensureCredentialIds(currentBaseline.credentials),
+      };
+      setValues(restoredValues);
+      initialValuesJsonRef.current = JSON.stringify(restoredValues);
+    } else {
+      const fallbackValues: RecordFormValues = {
+        ...DEFAULT_VALUES,
+        credentials: [createEmptyCredential()],
+      };
+      setValues(fallbackValues);
+      initialValuesJsonRef.current = JSON.stringify(fallbackValues);
+    }
+  }, [targetRecordId, draftId]);
+
   // masterKey 解除時にドラフトが存在すれば自動復元（サイレントリフレッシュ / 再ログイン復帰時）
   useEffect(() => {
     if (typeof window === "undefined" || !masterKey) return;
     if (isRestoredRef.current) return;
 
     (async () => {
+      const currentGen = saveGenerationRef.current;
       try {
         const hadDraft = hasRecordDraft({ targetRecordId, draftId });
         const draft = await loadRecordDraft({
@@ -198,6 +229,7 @@ export function useRecordForm(
           masterKey,
           currentAccountId: activeAccountId,
         });
+        if (currentGen !== saveGenerationRef.current) return;
         if (draft) {
           isRestoredRef.current = true;
           setValues({
@@ -210,7 +242,15 @@ export function useRecordForm(
             isEditing: draft.isEditing,
             accountId: draft.accountId,
           });
-          toast.success("未保存の入力内容を復元しました");
+          toast.success("未保存の入力内容を復元しました", {
+            action: {
+              label: "下書きを破棄",
+              onClick: () => {
+                discardDraft();
+                toast.info("下書きを破棄しました");
+              },
+            },
+          });
         } else if (hadDraft) {
           toast.error("未保存の下書きの復元に失敗しました");
         }
@@ -218,7 +258,7 @@ export function useRecordForm(
         toast.error("未保存の下書きの復元に失敗しました");
       }
     })();
-  }, [masterKey, targetRecordId, draftId, activeAccountId]);
+  }, [masterKey, targetRecordId, draftId, activeAccountId, discardDraft]);
 
   // Auto-Save 処理（debounce & visibilitychange/pagehide）
   const valuesRef = useRef(values);
@@ -233,6 +273,7 @@ export function useRecordForm(
       if (!masterKey || !isDirty) return;
       saveGenerationRef.current += 1;
       const currentGen = saveGenerationRef.current;
+      setDraftSaveStatus("saving");
 
       try {
         await saveRecordDraft({
@@ -249,16 +290,30 @@ export function useRecordForm(
           accountId: activeAccountId,
           isCancelled: () => currentGen !== saveGenerationRef.current,
         });
+        if (currentGen === saveGenerationRef.current) {
+          setDraftSaveStatus("saved");
+        }
       } catch {
-        // ignore
+        if (currentGen === saveGenerationRef.current) {
+          setDraftSaveStatus("idle");
+        }
       }
     },
     [masterKey, isDirty, targetRecordId, draftId, activeAccountId],
   );
 
+  const flushDraftSave = useCallback(async () => {
+    if (!masterKey || !isDirty) return;
+    await performAutoSave(valuesRef.current);
+  }, [masterKey, isDirty, performAutoSave]);
+
   // 1000ms debounce auto-save
   useEffect(() => {
-    if (!isDirty || !masterKey) return;
+    if (!isDirty || !masterKey) {
+      setDraftSaveStatus("idle");
+      return;
+    }
+    setDraftSaveStatus((prev) => (prev === "saved" ? "idle" : prev));
     const timer = setTimeout(() => {
       performAutoSave(values);
     }, 1000);
@@ -285,12 +340,6 @@ export function useRecordForm(
       window.removeEventListener("pagehide", handlePageHide);
     };
   }, [performAutoSave]);
-
-  // 明示的キャンセル時のドラフト破棄
-  const discardDraft = useCallback(() => {
-    saveGenerationRef.current += 1;
-    clearRecordDraft({ targetRecordId, draftId });
-  }, [targetRecordId, draftId]);
 
   // フィールド単位の変更判定（初期基準値と現在の値を比較）
   const isFieldModified = useCallback(
@@ -363,6 +412,7 @@ export function useRecordForm(
     setValues(nextValues);
     initialValuesJsonRef.current = JSON.stringify(nextValues);
     setBaselineValuesState(nextValues);
+    setDraftSaveStatus("idle");
   }, []);
 
   const setBaselineValues = useCallback((next: Partial<RecordFormValues>) => {
@@ -569,7 +619,18 @@ export function useRecordForm(
     useCallback(async (): Promise<RecordSubmitPayload> => {
       let currentTitleReading = values.titleReading;
       if (!currentTitleReading && furiganaPromiseRef.current) {
-        currentTitleReading = (await furiganaPromiseRef.current) ?? "";
+        // ふりがな取得が進行中の場合、最大1.5秒のみ待機し、遅延時は待たずに入力タイトルで確定
+        const timeoutPromise = new Promise<null>((resolve) =>
+          setTimeout(() => resolve(null), 1500),
+        );
+        const resolvedReading = await Promise.race([
+          furiganaPromiseRef.current,
+          timeoutPromise,
+        ]);
+        if (!resolvedReading) {
+          invalidateFuriganaRequest();
+        }
+        currentTitleReading = resolvedReading ?? values.title;
       }
 
       let ogpResult: {
@@ -657,13 +718,20 @@ export function useRecordForm(
         tags: values.tags,
         credentials: encryptedCredentials,
       };
-    }, [values, masterKey, requireUnlock, encryptHint]);
+    }, [
+      values,
+      masterKey,
+      requireUnlock,
+      encryptHint,
+      invalidateFuriganaRequest,
+    ]);
 
   const submit = useCallback(
     async (
       action: (payload: RecordSubmitPayload) => Promise<void>,
     ): Promise<boolean> => {
       setIsSubmitting(true);
+      invalidateFuriganaRequest();
       try {
         const payload = await buildEncryptedPayload();
 
@@ -674,6 +742,7 @@ export function useRecordForm(
 
           // 保存成功時は即座にドラフトを物理削除
           clearRecordDraft({ targetRecordId, draftId });
+          setDraftSaveStatus("idle");
           return true;
         } catch (actionErr) {
           // セッション切れエラー判定
@@ -686,6 +755,7 @@ export function useRecordForm(
                 pendingActionRef.current = null;
                 saveGenerationRef.current += 1;
                 clearRecordDraft({ targetRecordId, draftId });
+                setDraftSaveStatus("idle");
                 return true;
               } catch (retryErr) {
                 if (isAuthSessionError(retryErr)) {
@@ -730,7 +800,7 @@ export function useRecordForm(
         setIsSubmitting(false);
       }
     },
-    [buildEncryptedPayload, targetRecordId, draftId],
+    [buildEncryptedPayload, targetRecordId, draftId, invalidateFuriganaRequest],
   );
 
   const retryPendingSubmit = useCallback(async (): Promise<boolean> => {
@@ -768,6 +838,8 @@ export function useRecordForm(
     setEditingMetadata,
     isDirty,
     targetRecordId,
+    draftSaveStatus,
+    flushDraftSave,
   } as const;
 }
 

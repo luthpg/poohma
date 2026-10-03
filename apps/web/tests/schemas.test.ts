@@ -21,6 +21,8 @@ describe("RecordInputSchema", () => {
           loginId: "admin@example.com",
           passwordHint: "SGVsbG8gV29ybGQgYXV0aGVudGljYXRlZCBhZWFk", // Base64 encrypted hint
           passwordHintIv: "dGVzdGl2MTIzNDU2", // Base64 IV
+          passwordHintDekEncrypted: "ZGVrRW5jcnlwdGVkMTIzNDU2",
+          passwordHintDekIv: "dGVzdGl2MTIzNDU2",
         },
       ],
       tags: ["test", "service"],

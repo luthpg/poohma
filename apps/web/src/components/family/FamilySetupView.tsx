@@ -108,7 +108,7 @@ export function FamilySetupView({
 
   const handleCreate = async (e: React.SubmitEvent) => {
     e.preventDefault();
-    if (isChangingFamily && onChangeFamily) {
+    if ((isChangingFamily || pendingExportVault) && onChangeFamily) {
       if (isLoading) return;
       setIsLoading(true);
       try {

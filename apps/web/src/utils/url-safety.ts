@@ -2,6 +2,66 @@ import dns from "node:dns/promises";
 import net from "node:net";
 
 /**
+ * IPv6 アドレスを 8 個の 16 ビット整数配列に正規化・展開する
+ */
+function parseIpv6(ip: string): number[] | null {
+  const normalized = ip.toLowerCase();
+  const lastColon = normalized.lastIndexOf(":");
+  let ipv4Parts: number[] | null = null;
+  let v6Part = normalized;
+
+  // 埋め込み IPv4 (例: ::ffff:192.168.1.1 や ::127.0.0.1) の処理
+  if (lastColon !== -1 && normalized.includes(".")) {
+    const possibleIpv4 = normalized.slice(lastColon + 1);
+    if (net.isIPv4(possibleIpv4)) {
+      const octets = possibleIpv4.split(".").map(Number);
+      ipv4Parts = [
+        ((octets[0] ?? 0) << 8) | (octets[1] ?? 0),
+        ((octets[2] ?? 0) << 8) | (octets[3] ?? 0),
+      ];
+      v6Part = normalized.slice(0, lastColon);
+    }
+  }
+
+  const parts = v6Part.split("::");
+  if (parts.length > 2) return null;
+
+  const left = parts[0]
+    ? parts[0]
+        .split(":")
+        .filter(Boolean)
+        .map((h) => parseInt(h, 16))
+    : [];
+  let right = parts[1]
+    ? parts[1]
+        .split(":")
+        .filter(Boolean)
+        .map((h) => parseInt(h, 16))
+    : [];
+
+  if (ipv4Parts) {
+    if (parts.length === 2) {
+      right = right.concat(ipv4Parts);
+    } else {
+      left.push(...ipv4Parts);
+    }
+  }
+
+  if (left.some(Number.isNaN) || right.some(Number.isNaN)) return null;
+
+  const totalGroups = 8;
+  const missing = totalGroups - (left.length + right.length);
+  if (parts.length === 2 && missing >= 0) {
+    const zeros = new Array(missing).fill(0);
+    return [...left, ...zeros, ...right];
+  }
+  if (parts.length === 1 && left.length === totalGroups) {
+    return left;
+  }
+  return null;
+}
+
+/**
  * プライベートIP / 予約済みIPアドレスかどうかを判定
  */
 export function isPrivateIp(ip: string): boolean {
@@ -28,24 +88,53 @@ export function isPrivateIp(ip: string): boolean {
 
   // IPv6 チェック
   if (net.isIPv6(ip)) {
-    const normalized = ip.toLowerCase();
-    // ::1 (loopback)
-    if (normalized === "::1") return true;
-    // fc00::/7 (Unique Local Address)
-    if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true;
-    // fe80::/10 (link-local)
-    if (normalized.startsWith("fe80")) return true;
-    // :: (unspecified)
-    if (normalized === "::") return true;
+    const words = parseIpv6(ip);
+    if (!words) return true; // パースできない不正形式は安全側に倒してブロック
 
-    // ::ffff:0:0/96 (IPv4-mapped IPv6)
-    if (normalized.startsWith("::ffff:")) {
-      const ipv4Part = normalized.substring(7);
-      if (net.isIPv4(ipv4Part)) {
-        return isPrivateIp(ipv4Part);
-      }
-      // If it's another form of IPv4-mapped IPv6 (e.g. hex), block it for safety
-      return true;
+    const [w0, w1, w2, _w3, _w4, w5, w6, w7] = words as [
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+    ];
+
+    // :: (unspecified)
+    if (words.every((w) => w === 0)) return true;
+
+    // ::1 (loopback)
+    if (words.slice(0, 7).every((w) => w === 0) && w7 === 1) return true;
+
+    // fc00::/7 (Unique Local Address: fc00::/8, fd00::/8)
+    if ((w0 & 0xfe00) === 0xfc00) return true;
+
+    // fe80::/10 (Link-Local unicast)
+    if ((w0 & 0xffc0) === 0xfe80) return true;
+
+    // IPv4-mapped (::ffff:0:0/96) & IPv4-compatible (::/96)
+    const isMappedOrCompatible =
+      words.slice(0, 5).every((w) => w === 0) &&
+      (w5 === 0xffff || w5 === 0x0000);
+    if (isMappedOrCompatible) {
+      const ipv4Str = `${(w6 >> 8) & 0xff}.${w6 & 0xff}.${(w7 >> 8) & 0xff}.${w7 & 0xff}`;
+      return isPrivateIp(ipv4Str);
+    }
+
+    // 6to4 (2002::/16) - 埋め込みIPv4を検証
+    if (w0 === 0x2002) {
+      const ipv4Str = `${(w1 >> 8) & 0xff}.${w1 & 0xff}.${(w2 >> 8) & 0xff}.${w2 & 0xff}`;
+      return isPrivateIp(ipv4Str);
+    }
+
+    // Teredo (2001:0000::/32) - XOR反転されたIPv4を検証
+    if (w0 === 0x2001 && w1 === 0x0000) {
+      const invWord6 = w6 ^ 0xffff;
+      const invWord7 = w7 ^ 0xffff;
+      const ipv4Str = `${(invWord6 >> 8) & 0xff}.${invWord6 & 0xff}.${(invWord7 >> 8) & 0xff}.${invWord7 & 0xff}`;
+      return isPrivateIp(ipv4Str);
     }
 
     return false;

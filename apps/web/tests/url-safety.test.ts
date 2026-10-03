@@ -84,5 +84,28 @@ describe("validateUrlSafety", () => {
     expect(isPrivateIp("::ffff:10.0.0.1")).toBe(true);
     expect(isPrivateIp("::ffff:8.8.8.8")).toBe(false);
     expect(isPrivateIp("::ffff:7f00:0001")).toBe(true);
+    // 完全展開表記（非省略）
+    expect(isPrivateIp("0:0:0:0:0:ffff:127.0.0.1")).toBe(true);
+    expect(isPrivateIp("0:0:0:0:0:ffff:8.8.8.8")).toBe(false);
+  });
+
+  it("should detect 6to4 addresses correctly", () => {
+    // 2002:7f00:0001:: -> 127.0.0.1 (private)
+    expect(isPrivateIp("2002:7f00:0001::")).toBe(true);
+    // 2002:0808:0808:: -> 8.8.8.8 (public)
+    expect(isPrivateIp("2002:0808:0808::")).toBe(false);
+  });
+
+  it("should detect Teredo addresses correctly", () => {
+    // 2001:0000:... with XOR inverted IPv4
+    // 127.0.0.1 -> 0x7f00, 0x0001 -> inverted: 0x80ff, 0xfffe
+    expect(isPrivateIp("2001:0000:4136:e378:8000:63bf:80ff:fffe")).toBe(true);
+    // 8.8.8.8 -> 0x0808, 0x0808 -> inverted: 0xf7f7, 0xf7f7
+    expect(isPrivateIp("2001:0000:4136:e378:8000:63bf:f7f7:f7f7")).toBe(false);
+  });
+
+  it("should treat public IPv6 as non-private", () => {
+    expect(isPrivateIp("2001:4860:4860::8888")).toBe(false);
+    expect(isPrivateIp("2606:4700:4700::1111")).toBe(false);
   });
 });
