@@ -799,4 +799,51 @@ describe("useRecordForm", () => {
       "未保存の下書きの復元に失敗しました",
     );
   });
+
+  describe("draftSaveStatus", () => {
+    it("masterKey がない場合は常に paused となること", () => {
+      mockMasterKey = null;
+      const { result } = renderHook(() => useRecordForm());
+      expect(result.current.draftSaveStatus).toBe("paused");
+    });
+
+    it("masterKey があり、saveRecordDraft が成功した場合は saved となること", async () => {
+      mockMasterKey = {} as CryptoKey;
+      const authRecovery = await import("@/lib/auth-recovery");
+      vi.spyOn(authRecovery, "saveRecordDraft").mockResolvedValue(true);
+
+      const { result } = renderHook(() => useRecordForm());
+      expect(result.current.draftSaveStatus).toBe("idle");
+
+      act(() => {
+        result.current.updateTitle("New Title");
+      });
+
+      await act(async () => {
+        const saved = await result.current.flushDraftSave();
+        expect(saved).toBe(true);
+      });
+
+      expect(result.current.draftSaveStatus).toBe("saved");
+    });
+
+    it("saveRecordDraft が false を返した場合は error となること", async () => {
+      mockMasterKey = {} as CryptoKey;
+      const authRecovery = await import("@/lib/auth-recovery");
+      vi.spyOn(authRecovery, "saveRecordDraft").mockResolvedValue(false);
+
+      const { result } = renderHook(() => useRecordForm());
+
+      act(() => {
+        result.current.updateTitle("New Title");
+      });
+
+      await act(async () => {
+        const saved = await result.current.flushDraftSave();
+        expect(saved).toBe(false);
+      });
+
+      expect(result.current.draftSaveStatus).toBe("error");
+    });
+  });
 });

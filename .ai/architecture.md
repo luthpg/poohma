@@ -84,7 +84,7 @@ poohma/
 | **Firebase ID Token** | Convex バックエンドへの通信認証 | 1時間（SDK自動更新） | Convex への WebSocket/HTTP 通信時に付与され、Convex 側 OIDC 検証で直接認証。 |
 | **session Cookie** | SSR初期表示・Server Function用キャッシュ | 14日間（自動ローリング延長） | サーバー側補助セッション。Cookie の期限切れのみでログアウト扱いにしてはならない。 |
 | **Custom Token** | Client Auth 消失時のリカバリ | 一時発行（1回限り） | ブラウザストレージの揮発時に session Cookie から Client Auth を復旧するための非常用経路。 |
-| **poohma_active_account_id Cookie** | SSR時のアクティブアカウント同期 | 14日間（アカウント切替時に更新） | SSR初期表示でクライアントと同一のアカウント/家族コンテキストを確定・整合させる補助Cookie。 |
+| **poohma_active_account_id Cookie** | SSR時のアクティブアカウント同期 | 365日間（アカウント切替時に更新） | SSR初期表示でクライアントと同一のアカウント/家族コンテキストを確定・整合させる補助Cookie。ふとした利用時でもアカウント再選択を不要にし、端末上で直前の利用アカウントを長期間保持する。 |
 
 ### 認証フロー
 

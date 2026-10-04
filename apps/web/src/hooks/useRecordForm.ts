@@ -41,6 +41,8 @@ export interface RecordFormValues {
   credentials: RecordFormCredential[];
 }
 
+export type DraftSaveStatus = "idle" | "saving" | "saved" | "paused" | "error";
+
 export interface EncryptedCredentialPayload {
   id: string;
   label?: string;
@@ -186,12 +188,11 @@ export function useRecordForm(
     }
   }, [masterKey, requireUnlock, targetRecordId, draftId]);
 
-  const [internalDraftSaveStatus, setInternalDraftSaveStatus] = useState<
-    "idle" | "saving" | "saved"
-  >("idle");
+  const [internalDraftSaveStatus, setInternalDraftSaveStatus] =
+    useState<DraftSaveStatus>("idle");
 
   // masterKey が存在しない（パスコード未入力/自動ロック中）場合は "paused" として扱う
-  const draftSaveStatus: "idle" | "saving" | "saved" | "paused" = !masterKey
+  const draftSaveStatus: DraftSaveStatus = !masterKey
     ? "paused"
     : internalDraftSaveStatus;
 
@@ -296,12 +297,19 @@ export function useRecordForm(
           isCancelled: () => currentGen !== saveGenerationRef.current,
         });
         if (currentGen === saveGenerationRef.current) {
-          setInternalDraftSaveStatus(saved ? "saved" : "idle");
+          if (saved) {
+            // 保存完了時の値が現在の最新入力と一致する場合のみ saved、新しい入力があれば次回デバウンス保存待ち（idle）
+            setInternalDraftSaveStatus(
+              valuesRef.current === currentValues ? "saved" : "idle",
+            );
+          } else {
+            setInternalDraftSaveStatus("error");
+          }
         }
         return saved;
       } catch {
         if (currentGen === saveGenerationRef.current) {
-          setInternalDraftSaveStatus("idle");
+          setInternalDraftSaveStatus("error");
         }
         return false;
       }
@@ -320,7 +328,9 @@ export function useRecordForm(
       setInternalDraftSaveStatus("idle");
       return;
     }
-    setInternalDraftSaveStatus((prev) => (prev === "saved" ? "idle" : prev));
+    setInternalDraftSaveStatus((prev) =>
+      prev === "saved" || prev === "error" ? "idle" : prev,
+    );
     const timer = setTimeout(() => {
       performAutoSave(values);
     }, 1000);
@@ -738,9 +748,9 @@ export function useRecordForm(
       action: (payload: RecordSubmitPayload) => Promise<void>,
     ): Promise<boolean> => {
       setIsSubmitting(true);
-      invalidateFuriganaRequest();
       try {
         const payload = await buildEncryptedPayload();
+        invalidateFuriganaRequest();
 
         try {
           await action(payload);

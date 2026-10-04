@@ -1,4 +1,11 @@
-import { Check, ChevronDown, ChevronUp, Lock, Users } from "lucide-react";
+import {
+  AlertCircle,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Lock,
+  Users,
+} from "lucide-react";
 import { useState } from "react";
 import { SessionExpiredDialog } from "@/components/auth/SessionExpiredDialog";
 import { Spinner } from "@/components/ui/spinner";
@@ -77,6 +84,12 @@ export function RecordForm({
               >
                 ロック解除
               </button>
+            </span>
+          )}
+          {form.draftSaveStatus === "error" && (
+            <span className="inline-flex items-center gap-1.5 text-rose-600 dark:text-rose-400 font-medium">
+              <AlertCircle className="h-3.5 w-3.5" />
+              下書きの保存に失敗しました
             </span>
           )}
           {form.draftSaveStatus === "idle" && (
