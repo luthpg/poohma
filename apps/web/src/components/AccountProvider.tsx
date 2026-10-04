@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { useMutation, useQuery } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import type React from "react";
 import {
   createContext,
@@ -94,6 +94,7 @@ export function AccountProvider({
   const router = useRouter();
   const queryClient = useQueryClient();
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { isAuthenticated: isConvexAuthenticated } = useConvexAuth();
   const currentUid =
     auth?.currentUser?.uid || initialUser?.accounts?.[0]?.userId;
 
@@ -103,7 +104,7 @@ export function AccountProvider({
 
   const fetchedAccounts = useQuery(
     api.users.getAccounts,
-    isAuthenticated ? {} : "skip",
+    isConvexAuthenticated ? {} : "skip",
   );
 
   const createAccountMutation = useMutation(api.users.createAccount);
