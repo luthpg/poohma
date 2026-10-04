@@ -111,14 +111,6 @@ export const CredentialInputSchema = z
       });
     }
 
-    if (hasDek !== hasDekIv) {
-      ctx.addIssue({
-        code: "custom",
-        message:
-          "DEK暗号データとIVは両方指定するか、両方省略する必要があります",
-        path: ["passwordHintDekEncrypted"],
-      });
-    }
     if (hasDek && hasDekIv) {
       const result = AeadDataSchema.safeParse({
         iv: data.passwordHintDekIv,

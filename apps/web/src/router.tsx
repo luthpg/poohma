@@ -3,6 +3,7 @@ import { createRouter } from "@tanstack/react-router";
 import { getGlobalStartContext } from "@tanstack/react-start";
 import { setNonce } from "get-nonce";
 
+import { isAuthSessionError } from "@/lib/auth-recovery";
 // Import the generated route tree
 import { routeTree } from "@/routeTree.gen";
 
@@ -12,7 +13,11 @@ export const getRouter = () => {
     defaultOptions: {
       queries: {
         staleTime: 1000 * 60 * 5, // 5 minutes
-        retry: 3,
+        retry: (failureCount, error) => {
+          if (failureCount >= 3) return false;
+          if (isAuthSessionError(error)) return false;
+          return true;
+        },
         retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
       },
     },
