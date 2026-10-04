@@ -41,7 +41,11 @@ import {
   type RecordSubmitPayload,
   useRecordForm,
 } from "@/hooks/useRecordForm";
-import { attemptSilentReauth, isAuthSessionError } from "@/lib/auth-recovery";
+import {
+  attemptSilentReauth,
+  hasRecordDraft,
+  isAuthSessionError,
+} from "@/lib/auth-recovery";
 import {
   recordDetailIntroSteps,
   recordDetailReturnSteps,
@@ -348,7 +352,11 @@ function RecordDetailComponent({
   }, [record]);
 
   const { decryptHint, requireUnlock } = usePasscode();
+  const [hasDraft, setHasDraft] = useState(() =>
+    hasRecordDraft({ targetRecordId: record._id }),
+  );
   const form = useRecordForm(initialFormValues, record._id, undefined, {
+    autoUnlock: isEditing,
     onUnlockCancelled: () => {
       setIsEditing(false);
     },
@@ -547,6 +555,30 @@ function RecordDetailComponent({
   ]);
 
   const handleEditStart = async () => {
+    // 1. 未保存ドラフトが存在する場合: アンロック後に編集モードを有効化し、useRecordForm の復元処理に委ねる
+    if (hasDraft) {
+      const unlocked = await requireUnlock();
+      if (!unlocked) {
+        setIsEditing(false);
+        return;
+      }
+      const currentRev = record.revision ?? 0;
+      setInitialRevision(currentRev);
+      form.setEditingMetadata({ initialRevision: currentRev, isEditing: true });
+      setIsEditing(true);
+
+      try {
+        await startEditingSession({
+          recordId: record._id,
+          accountId: activeAccountId || undefined,
+        });
+      } catch {
+        // 編集セッション開始失敗はサイレントに処理
+      }
+      return;
+    }
+
+    // 2. 通常時: パスワードヒントを復号して初期化
     const hasEncryptedHints = record.credentials.some(
       (c) => c.passwordHint && c.passwordHintIv,
     );
@@ -609,6 +641,7 @@ function RecordDetailComponent({
 
   const handleEditCancel = useCallback(async () => {
     form.discardDraft();
+    setHasDraft(false);
     form.setEditingMetadata(null);
     toast.dismiss("record-stale-toast");
     toast.dismiss("editing-presence-toast");
@@ -654,6 +687,7 @@ function RecordDetailComponent({
       setInitialRevision(null);
       setPendingPayload(null);
       form.setEditingMetadata(null);
+      setHasDraft(false);
       await router.invalidate();
       setIsEditing(false);
     } else if (conflictDetected) {
@@ -669,6 +703,7 @@ function RecordDetailComponent({
     setPendingPayload(null);
     setInitialRevision(null);
     form.discardDraft();
+    setHasDraft(false);
     form.setEditingMetadata(null);
     setIsEditing(false);
     await router.invalidate();
@@ -693,6 +728,7 @@ function RecordDetailComponent({
       setPendingPayload(null);
       setInitialRevision(null);
       form.discardDraft();
+      setHasDraft(false);
       form.setEditingMetadata(null);
       await router.invalidate();
       setIsEditing(false);
@@ -1312,13 +1348,26 @@ function RecordDetailComponent({
                     </AlertDialog>
                   )}
                 </div>
-                <div className="flex items-center gap-3 sm:gap-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  {hasDraft && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        form.discardDraft();
+                        setHasDraft(false);
+                        toast.info("下書きを破棄しました");
+                      }}
+                      className="flex h-9 sm:h-10 min-h-11 items-center justify-center rounded-md border border-border bg-background px-3 text-xs sm:text-[14px] font-medium text-muted-foreground hover:bg-muted transition cursor-pointer"
+                    >
+                      下書きを破棄
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={handleEditStart}
                     className="flex h-9 sm:h-10 min-h-11 min-w-20 sm:min-w-25 items-center justify-center rounded-md bg-orange-600 px-4 sm:px-6 text-xs sm:text-[14px] font-semibold text-white shadow-sm hover:bg-orange-700 transition cursor-pointer"
                   >
-                    編集する
+                    {hasDraft ? "下書きを編集" : "編集する"}
                   </button>
                 </div>
               </div>

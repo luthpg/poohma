@@ -846,4 +846,30 @@ describe("useRecordForm", () => {
       expect(result.current.draftSaveStatus).toBe("error");
     });
   });
+
+  describe("autoUnlock option", () => {
+    it("autoUnlock: false が指定された場合、ドラフトが存在しても requireUnlock を呼び出さないこと", async () => {
+      mockMasterKey = null;
+      const authRecovery = await import("@/lib/auth-recovery");
+      vi.spyOn(authRecovery, "hasRecordDraft").mockReturnValue(true);
+
+      renderHook(() =>
+        useRecordForm(undefined, "rec-123", undefined, {
+          autoUnlock: false,
+        }),
+      );
+
+      expect(mockRequireUnlock).not.toHaveBeenCalled();
+    });
+
+    it("autoUnlock: true（デフォルト）の場合、ドラフトが存在すれば requireUnlock を呼び出すこと", async () => {
+      mockMasterKey = null;
+      const authRecovery = await import("@/lib/auth-recovery");
+      vi.spyOn(authRecovery, "hasRecordDraft").mockReturnValue(true);
+
+      renderHook(() => useRecordForm(undefined, "rec-456"));
+
+      expect(mockRequireUnlock).toHaveBeenCalled();
+    });
+  });
 });

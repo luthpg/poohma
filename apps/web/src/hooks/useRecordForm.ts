@@ -107,6 +107,12 @@ const DEFAULT_VALUES: Omit<RecordFormValues, "credentials"> = {
 
 export interface UseRecordFormOptions {
   onUnlockCancelled?: () => void;
+  /**
+   * フォームの初期マウント時の自動アンロック（requireUnlock）およびドラフト自動復元を有効にするか。
+   * 既存レコードの閲覧画面等では false（または isEditing）を指定することで、閲覧時の不要なアンロックダイアログを防止できる。
+   * デフォルトは true。
+   */
+  autoUnlock?: boolean;
 }
 
 export function useRecordForm(
@@ -155,15 +161,20 @@ export function useRecordForm(
 
   const isDirty = JSON.stringify(values) !== initialValuesJsonRef.current;
 
+  const autoUnlock = options?.autoUnlock ?? true;
+
   // 開始時アンロック連携（レコード別の初回マウント時のみ試行）:
   // 新規登録画面（!targetRecordId）または未保存ドラフトが存在する場合に requireUnlock を試行
   // ※ 同一レコード編集中にオートロックがかかった後に不必要にアンロックダイアログを再オープンしない。
   // ※ 別のレコード（または新規登録）に切り替わった際は、それぞれのレコード単位で初回アンロック判定を行う。
+  // ※ autoUnlock が false の場合（閲覧画面表示時など）は自動アンロックをスキップする。
   const onUnlockCancelledRef = useRef(options?.onUnlockCancelled);
   onUnlockCancelledRef.current = options?.onUnlockCancelled;
   const lastAttemptedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (!autoUnlock) return;
+
     const currentKey = `${targetRecordId ?? "new"}_${draftId ?? ""}`;
     if (lastAttemptedKeyRef.current === currentKey) return;
 
@@ -186,7 +197,7 @@ export function useRecordForm(
       // 既に masterKey がアンロック済みの状態で開かれた場合は初回試行済みとする
       lastAttemptedKeyRef.current = currentKey;
     }
-  }, [masterKey, requireUnlock, targetRecordId, draftId]);
+  }, [autoUnlock, masterKey, requireUnlock, targetRecordId, draftId]);
 
   const [internalDraftSaveStatus, setInternalDraftSaveStatus] =
     useState<DraftSaveStatus>("idle");
@@ -221,8 +232,10 @@ export function useRecordForm(
   }, [targetRecordId, draftId]);
 
   // masterKey 解除時にドラフトが存在すれば自動復元（サイレントリフレッシュ / 再ログイン復帰時）
+  // ※ autoUnlock が false の場合（閲覧画面表示時など）は自動復元・トーストをスキップする。
   useEffect(() => {
     if (typeof window === "undefined" || !masterKey) return;
+    if (!autoUnlock) return;
     if (isRestoredRef.current) return;
 
     (async () => {
@@ -264,7 +277,14 @@ export function useRecordForm(
         toast.error("未保存の下書きの復元に失敗しました");
       }
     })();
-  }, [masterKey, targetRecordId, draftId, activeAccountId, discardDraft]);
+  }, [
+    autoUnlock,
+    masterKey,
+    targetRecordId,
+    draftId,
+    activeAccountId,
+    discardDraft,
+  ]);
 
   // Auto-Save 処理（debounce & visibilitychange/pagehide）
   const valuesRef = useRef(values);
@@ -276,7 +296,7 @@ export function useRecordForm(
 
   const performAutoSave = useCallback(
     async (currentValues: RecordFormValues): Promise<boolean> => {
-      if (!masterKey || !isDirty) return false;
+      if (!autoUnlock || !masterKey || !isDirty) return false;
       saveGenerationRef.current += 1;
       const currentGen = saveGenerationRef.current;
       setInternalDraftSaveStatus("saving");
@@ -314,7 +334,7 @@ export function useRecordForm(
         return false;
       }
     },
-    [masterKey, isDirty, targetRecordId, draftId, activeAccountId],
+    [masterKey, isDirty, targetRecordId, draftId, activeAccountId, autoUnlock],
   );
 
   const flushDraftSave = useCallback(async (): Promise<boolean> => {
