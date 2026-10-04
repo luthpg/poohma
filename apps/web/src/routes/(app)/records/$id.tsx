@@ -592,12 +592,10 @@ function RecordDetailComponent({
                   decryptHint,
                 );
               } catch {
-                baselineCredentials = record.credentials.map((c) => ({
-                  id: c.id,
-                  label: c.label || "",
-                  loginId: c.loginId || "",
-                  passwordHint: "",
-                }));
+                toast.error(
+                  "パスワードヒントの復号に失敗したため、編集を開始できませんでした",
+                );
+                return;
               }
             } else {
               baselineCredentials = record.credentials.map((c) => ({

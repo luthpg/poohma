@@ -95,6 +95,9 @@ export function useExportCsv() {
               }
             } else {
               newRow[`PasswordHint${i}`] = "";
+              if (hint && !iv) {
+                totalDecryptionErrors += 1;
+              }
             }
             // Remove IV and DEK fields from export
             delete newRow[`PasswordHintIv${i}`];
