@@ -159,7 +159,7 @@ export async function saveRecordDraft(params: {
   isEditing?: boolean;
   accountId?: string | null;
   isCancelled?: () => boolean;
-}): Promise<void> {
+}): Promise<boolean> {
   const {
     targetRecordId,
     draftId,
@@ -173,7 +173,7 @@ export async function saveRecordDraft(params: {
 
   // アカウント ID が確定していない状態でのドラフト保存は抑止（マルチアカウント漏洩防止）
   if (!accountId) {
-    return;
+    return false;
   }
 
   const now = Date.now();
@@ -211,7 +211,7 @@ export async function saveRecordDraft(params: {
 
   // 非同期暗号化中にキャンセルまたは世代交代が発生した場合は書き込みを中断
   if (isCancelled?.()) {
-    return;
+    return false;
   }
 
   const container: StoredRecordDraftContainer = {
@@ -236,11 +236,13 @@ export async function saveRecordDraft(params: {
   };
 
   const local = getLocalStorage();
+  if (!local) return false;
   const storageKey = getDraftStorageKey(targetRecordId, draftId);
   try {
-    local?.setItem(storageKey, JSON.stringify(container));
+    local.setItem(storageKey, JSON.stringify(container));
+    return true;
   } catch {
-    // ignore
+    return false;
   }
 }
 

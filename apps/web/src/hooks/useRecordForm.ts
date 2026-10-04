@@ -186,15 +186,20 @@ export function useRecordForm(
     }
   }, [masterKey, requireUnlock, targetRecordId, draftId]);
 
-  const [draftSaveStatus, setDraftSaveStatus] = useState<
+  const [internalDraftSaveStatus, setInternalDraftSaveStatus] = useState<
     "idle" | "saving" | "saved"
   >("idle");
+
+  // masterKey が存在しない（パスコード未入力/自動ロック中）場合は "paused" として扱う
+  const draftSaveStatus: "idle" | "saving" | "saved" | "paused" = !masterKey
+    ? "paused"
+    : internalDraftSaveStatus;
 
   // 明示的キャンセル時のドラフト破棄（復元トーストおよびキャンセル時に利用）
   const discardDraft = useCallback(() => {
     saveGenerationRef.current += 1;
     clearRecordDraft({ targetRecordId, draftId });
-    setDraftSaveStatus("idle");
+    setInternalDraftSaveStatus("idle");
     const currentBaseline = baselineValuesRef.current;
     if (currentBaseline) {
       const restoredValues: RecordFormValues = {
@@ -269,14 +274,14 @@ export function useRecordForm(
   editingMetadataRef.current = editingMetadata;
 
   const performAutoSave = useCallback(
-    async (currentValues: RecordFormValues) => {
-      if (!masterKey || !isDirty) return;
+    async (currentValues: RecordFormValues): Promise<boolean> => {
+      if (!masterKey || !isDirty) return false;
       saveGenerationRef.current += 1;
       const currentGen = saveGenerationRef.current;
-      setDraftSaveStatus("saving");
+      setInternalDraftSaveStatus("saving");
 
       try {
-        await saveRecordDraft({
+        const saved = await saveRecordDraft({
           targetRecordId,
           draftId,
           values: currentValues,
@@ -291,29 +296,31 @@ export function useRecordForm(
           isCancelled: () => currentGen !== saveGenerationRef.current,
         });
         if (currentGen === saveGenerationRef.current) {
-          setDraftSaveStatus("saved");
+          setInternalDraftSaveStatus(saved ? "saved" : "idle");
         }
+        return saved;
       } catch {
         if (currentGen === saveGenerationRef.current) {
-          setDraftSaveStatus("idle");
+          setInternalDraftSaveStatus("idle");
         }
+        return false;
       }
     },
     [masterKey, isDirty, targetRecordId, draftId, activeAccountId],
   );
 
-  const flushDraftSave = useCallback(async () => {
-    if (!masterKey || !isDirty) return;
-    await performAutoSave(valuesRef.current);
+  const flushDraftSave = useCallback(async (): Promise<boolean> => {
+    if (!masterKey || !isDirty) return false;
+    return performAutoSave(valuesRef.current);
   }, [masterKey, isDirty, performAutoSave]);
 
   // 1000ms debounce auto-save
   useEffect(() => {
     if (!isDirty || !masterKey) {
-      setDraftSaveStatus("idle");
+      setInternalDraftSaveStatus("idle");
       return;
     }
-    setDraftSaveStatus((prev) => (prev === "saved" ? "idle" : prev));
+    setInternalDraftSaveStatus((prev) => (prev === "saved" ? "idle" : prev));
     const timer = setTimeout(() => {
       performAutoSave(values);
     }, 1000);
@@ -412,7 +419,7 @@ export function useRecordForm(
     setValues(nextValues);
     initialValuesJsonRef.current = JSON.stringify(nextValues);
     setBaselineValuesState(nextValues);
-    setDraftSaveStatus("idle");
+    setInternalDraftSaveStatus("idle");
   }, []);
 
   const setBaselineValues = useCallback((next: Partial<RecordFormValues>) => {
@@ -742,7 +749,7 @@ export function useRecordForm(
 
           // 保存成功時は即座にドラフトを物理削除
           clearRecordDraft({ targetRecordId, draftId });
-          setDraftSaveStatus("idle");
+          setInternalDraftSaveStatus("idle");
           return true;
         } catch (actionErr) {
           // セッション切れエラー判定
@@ -755,7 +762,7 @@ export function useRecordForm(
                 pendingActionRef.current = null;
                 saveGenerationRef.current += 1;
                 clearRecordDraft({ targetRecordId, draftId });
-                setDraftSaveStatus("idle");
+                setInternalDraftSaveStatus("idle");
                 return true;
               } catch (retryErr) {
                 if (isAuthSessionError(retryErr)) {
@@ -840,6 +847,7 @@ export function useRecordForm(
     targetRecordId,
     draftSaveStatus,
     flushDraftSave,
+    requireUnlock,
   } as const;
 }
 

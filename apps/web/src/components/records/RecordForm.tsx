@@ -43,31 +43,54 @@ export function RecordForm({
 
   return (
     <form onSubmit={onSubmit} className="space-y-8">
+      {/* フォーム全体の下書き自動保存ステータスバー */}
+      <div
+        className="flex items-center justify-between px-3.5 py-2 -mt-2 rounded-lg bg-card/60 border border-border/40 text-xs text-muted-foreground shadow-sm transition-all"
+        data-testid="draft-save-status-indicator"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        <span className="font-medium text-muted-foreground/80">
+          下書き自動保存
+        </span>
+        <div className="flex items-center gap-2">
+          {form.draftSaveStatus === "saving" && (
+            <span className="inline-flex items-center gap-1.5 text-orange-600 dark:text-orange-400 font-medium">
+              <Spinner className="h-3 w-3 animate-spin" />
+              保存中...
+            </span>
+          )}
+          {form.draftSaveStatus === "saved" && (
+            <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
+              <Check className="h-3.5 w-3.5" />
+              保存済み
+            </span>
+          )}
+          {form.draftSaveStatus === "paused" && (
+            <span className="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-medium">
+              <Lock className="h-3.5 w-3.5" />
+              一時停止中（パスコード未入力）
+              <button
+                type="button"
+                onClick={() => form.requireUnlock()}
+                className="underline hover:text-foreground font-semibold ml-1 cursor-pointer"
+              >
+                ロック解除
+              </button>
+            </span>
+          )}
+          {form.draftSaveStatus === "idle" && (
+            <span className="text-muted-foreground/70">有効</span>
+          )}
+        </div>
+      </div>
+
       {/* 基本情報セクション */}
       <section className="rounded-lg bg-card p-6 shadow-card transition-shadow">
         <div className="sticky top-16 z-10 -mx-6 -mt-6 mb-6 flex items-center justify-between rounded-t-lg border-b border-border/60 bg-card/95 px-6 py-3.5 backdrop-blur supports-[backdrop-filter]:bg-card/80">
           <h2 className="text-[16px] md:text-[18px] font-semibold text-foreground tracking-geist-ui">
             基本情報
           </h2>
-          <div
-            className="flex items-center gap-1.5 text-xs text-muted-foreground transition-opacity"
-            data-testid="draft-save-status-indicator"
-          >
-            {form.draftSaveStatus === "saving" && (
-              <>
-                <Spinner className="h-3 w-3 animate-spin text-orange-500" />
-                <span>下書き保存中...</span>
-              </>
-            )}
-            {form.draftSaveStatus === "saved" && (
-              <>
-                <Check className="h-3.5 w-3.5 text-green-500" />
-                <span className="text-green-600 dark:text-green-400">
-                  下書き保存済み
-                </span>
-              </>
-            )}
-          </div>
         </div>
         <div className="space-y-4">
           <div className={getModifiedClass("url")}>

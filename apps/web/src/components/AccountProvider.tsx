@@ -60,13 +60,13 @@ export const AccountContext = createContext<AccountContextValue | null>(null);
 
 function setActiveAccountCookie(accountId: string | null) {
   if (typeof document === "undefined") return;
-  const isSecure = window.location.protocol === "https:";
   if (accountId) {
     // biome-ignore lint/suspicious/noDocumentCookie: SSR同期用のアクティブアカウントIDCookie設定のため
-    document.cookie = `poohma_active_account_id=${encodeURIComponent(accountId)}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax${isSecure ? "; Secure" : ""}`;
+    document.cookie = `poohma_active_account_id=${encodeURIComponent(accountId)}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax; Secure`;
   } else {
     // biome-ignore lint/suspicious/noDocumentCookie: SSR同期用のアクティブアカウントIDCookie削除のため
-    document.cookie = `poohma_active_account_id=; path=/; max-age=0; SameSite=Lax${isSecure ? "; Secure" : ""}`;
+    document.cookie =
+      "poohma_active_account_id=; path=/; max-age=0; SameSite=Lax; Secure";
   }
 }
 

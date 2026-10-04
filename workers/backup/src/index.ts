@@ -176,29 +176,51 @@ async function runBackup(env: Env): Promise<{ fileName: string }> {
   }
 
   const reader = downloadRes.body.getReader();
-  const firstChunk = await reader.read();
-  if (firstChunk.done || !firstChunk.value || firstChunk.value.length < 4) {
+  const initialChunks: Uint8Array[] = [];
+  let accumulatedLength = 0;
+
+  while (accumulatedLength < 4) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value && value.length > 0) {
+      initialChunks.push(value);
+      accumulatedLength += value.length;
+    }
+  }
+
+  if (accumulatedLength < 4) {
     throw new Error(
-      `[Backup] Downloaded zip is corrupted or empty (size < 4 bytes)`,
+      `[Backup] Downloaded zip is corrupted or empty (size < 4 bytes, actual: ${accumulatedLength} bytes)`,
     );
   }
 
-  const bytes = firstChunk.value.subarray(0, 4);
+  // 先頭4バイトを抽出して検証
+  const header = new Uint8Array(4);
+  let offset = 0;
+  for (const chunk of initialChunks) {
+    const copyLength = Math.min(chunk.length, 4 - offset);
+    header.set(chunk.subarray(0, copyLength), offset);
+    offset += copyLength;
+    if (offset >= 4) break;
+  }
+
   const isZip =
-    bytes[0] === 0x50 &&
-    bytes[1] === 0x4b &&
-    bytes[2] === 0x03 &&
-    bytes[3] === 0x04;
+    header[0] === 0x50 &&
+    header[1] === 0x4b &&
+    header[2] === 0x03 &&
+    header[3] === 0x04;
   if (!isZip) {
     throw new Error(
-      `[Backup] Downloaded file lacks valid ZIP magic number (header: ${Array.from(bytes).join(",")})`,
+      `[Backup] Downloaded file lacks valid ZIP magic number (header: ${Array.from(header).join(",")})`,
     );
   }
 
-  // 先頭チャンクと残りのストリームを結合して R2 へストリーミング転送
+  // 読み取った全初期チャンクと残りのストリームを結合して R2 へストリーミング転送
   const combinedStream = new ReadableStream({
     start(controller) {
-      controller.enqueue(firstChunk.value);
+      for (const chunk of initialChunks) {
+        controller.enqueue(chunk);
+      }
     },
     async pull(controller) {
       const { done, value } = await reader.read();

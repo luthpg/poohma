@@ -95,7 +95,8 @@ function MockFormContainer({
     isDirty: false,
     targetRecordId,
     draftSaveStatus: "idle",
-    flushDraftSave: async () => {},
+    flushDraftSave: async () => true,
+    requireUnlock: async () => true,
   };
 
   return (
