@@ -311,6 +311,11 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 | accountId | Id<users> | 作成者の PoohMa Account ID（所有権・個人レコード境界） |
 | familyId | Id<families>(optional) | 暗号化スコープ・所属家族ID |
 | tags | string\[] | タグ |
+| isPinned | boolean | ピン留め状態（デフォルトfalse、FR-REC-18） |
+| isArchived | boolean | アーカイブ（非表示）状態（デフォルトfalse、FR-REC-23） |
+| needsUpdate | boolean | 「要更新」フラグ（デフォルトfalse、FR-REC-17） |
+| updateRequestedBy | string(optional) | 更新リクエストを送ったユーザーID |
+| updateRequestedAt | number(optional) | 更新リクエスト日時 |
 | lastViewedAt | number(optional) | 最終ヒント閲覧日時（epoch ms）。`logRecordHintView` 実行時に更新 |
 | lastViewedByAccountId | Id<users>(optional) | 最終ヒント閲覧者のPoohMa Account ID |
 | updatedByAccountId | Id<users>(optional) | 最終更新を行ったPoohMa Account ID（`createRecord` / `updateRecord` 時に記録） |
@@ -931,8 +936,9 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 
 | 関数 | 種別 | 認可 | 概要 |
 | ----------------------------------------------------------------- | ------------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| getRecords | Query | authenticated | 一覧取得。家族所属時は by\_family\_sortKey インデックスで同一家族レコードを取得し、非所属時は by\_ownerType\_accountId で個人レコードを取得。フルテーブルスキャンを完全排除（Issue #137）。検索・タグ・所有者フィルタ・並び替え・取得上限（limit）に対応。credentials読み取りは有界並行（32件バッチ）で実行 |
+| getRecords | Query | authenticated | 一覧取得。家族所属時は by\_family\_sortKey インデックスで同一家族レコードを取得し、非所属時は by\_ownerType\_accountId で個人レコードを取得。フルテーブルスキャンを完全排除（Issue #137）。検索・タグ・所有者フィルタ・並び替え・取得上限（limit）に対応。credentials読み取りは有界並行（32件バッチ）で実行。既定でisArchived=falseのみ返す |
 | getRecordsPaginated | Query | authenticated | ページネーション対応の一覧取得（Convex usePaginatedQuery準拠）。ページ内レコードに対してのみcredentialsを有界並行バッチで結合し、同時I/O上限を回避 |
+| getArchivedRecords | Query | authenticated | アーカイブ済みレコードの一覧取得（FR-REC-23） |
 | getRecordDetail | Query | authenticated | 詳細取得（rls.tsによるrequireContentAccess制御）。adminUsersをファミリー管理者＋admins配列から動的マージして返却。取得時にrecordAccessLogへVIEWEDを記録し、lastViewedAt/Byを更新 |
 | getAvailableTags | Query | authenticated | 閲覧可能レコードから使用中タグ一覧を抽出（by\_family\_sortKey経由） |
 | getOwnedRecords | Query | authenticated | 自分が管理可能な全レコード取得（個人レコード＋自分が管理者の共有レコード、CSVエクスポート用） |
@@ -950,6 +956,11 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 | createCredential / updateCredential / deleteCredential | Mutation | familyBound | 個別クレデンシャルの追加・更新・削除（requireAdminAccess認可、監査ログ記録） |
 | importRecords | Mutation | familyBound | CSVインポート（全件新規作成、最大500件、家族内メールアドレスの厳格突合、行ごとのバリデーション結果を返却、stableId自動生成、revision: 0初期化） |
 | bulkUpdateRecords | Mutation | familyBound | 一括タグ付与／所有設定変更（所有設定変更は確認モーダルを経由） |
+| togglePin | Mutation | familyBound | isPinnedの切り替え（FR-REC-18） |
+| archiveRecord / unarchiveRecord | Mutation | familyBound | isArchivedの切り替え（FR-REC-23） |
+| requestUpdate | Mutation | familyBound | needsUpdate等を設定し、オーナーへ通知メールを送信（FR-REC-17） |
+| resolveUpdateRequest | Mutation | familyBound | レコード編集保存時にneedsUpdateを自動解除 |
+| mergeTags | Mutation | familyBound | 指定タグ名を持つ自分の閲覧可能レコード群のtags配列を一括置換（FR-REC-22） |
 | getRecordAccessLog | Query | authenticated | 対象レコードのrecordAccessLogをタイムラインとして取得（rls.tsチェック、FR-REC-16） |
 | startEditingSession / heartbeatEditingSession / endEditingSession | Mutation | familyBound | recordEditingSessionsの作成・更新・削除（FR-REC-15、TTL 5分、ハートビート30秒） |
 | getActiveEditors | Query | authenticated | 対象レコードを編集中のユーザー一覧を取得（Convexのリアクティブクエリでクライアントが購読、TTL 5分超過分は自動除外） |

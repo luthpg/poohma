@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import dns from "node:dns/promises";
+import { describe, expect, it, vi } from "vitest";
 import { isPrivateIp, validateUrlSafety } from "@/utils/url-safety";
 
 describe("isPrivateIp", () => {
@@ -107,5 +108,57 @@ describe("validateUrlSafety", () => {
   it("should treat public IPv6 as non-private", () => {
     expect(isPrivateIp("2001:4860:4860::8888")).toBe(false);
     expect(isPrivateIp("2606:4700:4700::1111")).toBe(false);
+  });
+
+  it("should handle embedded IPv4 directly following :: (compression)", () => {
+    // IPv4-compatible (::x.x.x.x)
+    expect(isPrivateIp("::8.8.8.8")).toBe(false);
+    expect(isPrivateIp("::127.0.0.1")).toBe(true);
+    expect(isPrivateIp("::10.0.0.1")).toBe(true);
+
+    // Well-Known prefix / NAT64 (64:ff9b::x.x.x.x)
+    expect(isPrivateIp("64:ff9b::8.8.8.8")).toBe(false);
+    expect(isPrivateIp("64:ff9b::127.0.0.1")).toBe(true);
+  });
+
+  it("should validate hostname via DNS resolution", async () => {
+    const resolve4Spy = vi.spyOn(dns, "resolve4");
+    const resolve6Spy = vi.spyOn(dns, "resolve6");
+
+    // 正常なパブリックIPv4
+    resolve4Spy.mockResolvedValueOnce(["93.184.216.34"]);
+    resolve6Spy.mockResolvedValueOnce([]);
+    const ip = await validateUrlSafety("https://example.com");
+    expect(ip).toBe("93.184.216.34");
+
+    // 正常なパブリックIPv6 (IPv4解決なし)
+    resolve4Spy.mockResolvedValueOnce([]);
+    resolve6Spy.mockResolvedValueOnce(["2606:4700:4700::1111"]);
+    const ip6 = await validateUrlSafety("https://ipv6.example.com");
+    expect(ip6).toBe("2606:4700:4700::1111");
+
+    // プライベートIPv4が返る場合は拒否
+    resolve4Spy.mockResolvedValueOnce(["10.0.0.1"]);
+    resolve6Spy.mockResolvedValueOnce([]);
+    await expect(validateUrlSafety("https://internal.service")).rejects.toThrow(
+      "Access to private IP addresses is not allowed",
+    );
+
+    // プライベートIPv6が返る場合は拒否
+    resolve4Spy.mockResolvedValueOnce([]);
+    resolve6Spy.mockResolvedValueOnce(["::1"]);
+    await expect(
+      validateUrlSafety("https://localhost.internal"),
+    ).rejects.toThrow("Access to private IP addresses is not allowed");
+
+    // DNS解決失敗 (resolve4/resolve6 が空またはエラー)
+    resolve4Spy.mockRejectedValueOnce(new Error("ENOTFOUND"));
+    resolve6Spy.mockRejectedValueOnce(new Error("ENOTFOUND"));
+    await expect(validateUrlSafety("https://notfound.example")).rejects.toThrow(
+      "Could not resolve host",
+    );
+
+    resolve4Spy.mockRestore();
+    resolve6Spy.mockRestore();
   });
 });

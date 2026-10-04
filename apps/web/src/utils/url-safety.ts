@@ -20,6 +20,10 @@ function parseIpv6(ip: string): number[] | null {
         ((octets[2] ?? 0) << 8) | (octets[3] ?? 0),
       ];
       v6Part = normalized.slice(0, lastColon);
+      // "::" 直後の IPv4 では末尾が ":" 1文字になるため "::" に戻す
+      if (v6Part.endsWith(":")) {
+        v6Part += ":";
+      }
     }
   }
 
@@ -119,6 +123,16 @@ export function isPrivateIp(ip: string): boolean {
       words.slice(0, 5).every((w) => w === 0) &&
       (w5 === 0xffff || w5 === 0x0000);
     if (isMappedOrCompatible) {
+      const ipv4Str = `${(w6 >> 8) & 0xff}.${w6 & 0xff}.${(w7 >> 8) & 0xff}.${w7 & 0xff}`;
+      return isPrivateIp(ipv4Str);
+    }
+
+    // NAT64 Well-Known Prefix (64:ff9b::/96) - 埋め込みIPv4を検証 (RFC 6052)
+    if (
+      w0 === 0x0064 &&
+      w1 === 0xff9b &&
+      words.slice(2, 6).every((w) => w === 0)
+    ) {
       const ipv4Str = `${(w6 >> 8) & 0xff}.${w6 & 0xff}.${(w7 >> 8) & 0xff}.${w7 & 0xff}`;
       return isPrivateIp(ipv4Str);
     }
