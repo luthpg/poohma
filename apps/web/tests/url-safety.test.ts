@@ -1,5 +1,5 @@
 import dns from "node:dns/promises";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { isPrivateIp, validateUrlSafety } from "@/utils/url-safety";
 
 describe("isPrivateIp", () => {
@@ -28,7 +28,7 @@ describe("isPrivateIp", () => {
     ["172.32.0.0", false],
     ["192.167.0.1", false],
     ["169.253.0.1", false],
-    ["203.0.113.1", false],
+    ["93.184.216.34", false],
   ])("should detect %s as public (expected: %s)", (ip, expected) => {
     expect(isPrivateIp(ip)).toBe(expected);
   });
@@ -121,6 +121,10 @@ describe("validateUrlSafety", () => {
     expect(isPrivateIp("64:ff9b::127.0.0.1")).toBe(true);
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("should validate hostname via DNS resolution", async () => {
     const resolve4Spy = vi.spyOn(dns, "resolve4");
     const resolve6Spy = vi.spyOn(dns, "resolve6");
@@ -157,8 +161,5 @@ describe("validateUrlSafety", () => {
     await expect(validateUrlSafety("https://notfound.example")).rejects.toThrow(
       "Could not resolve host",
     );
-
-    resolve4Spy.mockRestore();
-    resolve6Spy.mockRestore();
   });
 });

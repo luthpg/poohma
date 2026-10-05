@@ -268,6 +268,15 @@ export const createFamily = authenticatedMutation({
         "すでに家族に所属しています。家族を変更する場合は家族移行手続きを行ってください",
       );
     }
+    const pendingVault = await ctx.db
+      .query("pendingExportVaults")
+      .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
+      .first();
+    if (pendingVault) {
+      throw new Error(
+        "退避されたアカウント情報が存在します。新規家族を作成する前に引き継ぎ手続きを完了してください",
+      );
+    }
     const { kdfIterations, cryptoVersion } = resolveKdfParams(
       args.kdfIterations,
       args.cryptoVersion,
@@ -742,26 +751,23 @@ export const commitFamilyMigration = authenticatedMutation({
       migration.sourceFamilyId &&
       migration.sourceFamilyId !== migration.targetFamilyId
     ) {
-      await reconcileAdminsOnLeave(ctx, migration.sourceFamilyId, user._id);
+      const sourceFamilyId = migration.sourceFamilyId;
+      await reconcileAdminsOnLeave(ctx, sourceFamilyId, user._id);
 
       const remainingUsers = await ctx.db
         .query("users")
-        .withIndex("by_familyId", (q) =>
-          q.eq("familyId", migration.sourceFamilyId),
-        )
+        .withIndex("by_familyId", (q) => q.eq("familyId", sourceFamilyId))
         .collect();
 
       // serviceRecords が旧 Family に残っていないことも確認
       const remainingRecord = await ctx.db
         .query("serviceRecords")
-        .withIndex("by_family_sortKey", (q) =>
-          q.eq("familyId", migration.sourceFamilyId),
-        )
+        .withIndex("by_family_sortKey", (q) => q.eq("familyId", sourceFamilyId))
         .first();
 
       if (remainingUsers.length === 0 && !remainingRecord) {
-        await deleteFamilyInvites(ctx, migration.sourceFamilyId);
-        await ctx.db.delete(migration.sourceFamilyId);
+        await deleteFamilyInvites(ctx, sourceFamilyId);
+        await ctx.db.delete(sourceFamilyId);
       }
     }
 
@@ -1438,16 +1444,6 @@ export const approveJoinRequest = familyAdminMutation({
 
     if (!isMigration) {
       // 家族未所属かつ引き継ぎ用Vaultもない新規ユーザーのみ即時所属
-      const applicantRecords = await ctx.db
-        .query("serviceRecords")
-        .withIndex("by_accountId", (q) => q.eq("accountId", applicant._id))
-        .collect();
-      for (const record of applicantRecords) {
-        if (!record.familyId) {
-          await ctx.db.patch(record._id, { familyId });
-        }
-      }
-
       await ctx.db.patch(applicant._id, { familyId, familyRole: "viewer" });
     }
 

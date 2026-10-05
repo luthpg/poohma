@@ -376,3 +376,24 @@ PoohMa では、CSVエクスポート・インポートを単なるバックア�
   - 本番・検証環境ともにすべてのレコードに対して `ownerType`（`"user"` または `"family"`）がマイグレーションおよび初期設定済みであり、未設定（`undefined`）レコードは存在しない。
   - アプリケーションコード側で `getEffectiveOwnerType` などの未設定フォールバックを過剰に追加・維持することは、コードの認知的複雑性を増やし KISS 原則に反するため行わない。バックエンドおよびクライアントの所有権判定は `record.ownerType === "user"` の直接比較で一貫させる。
 
+---
+
+## 13. スキーマ必須化と整合性保証（バックフィル完了と後方互換性排除）
+
+PoohMa では、過去の機能拡張に伴い暫定的に `v.optional()` とされていたフィールドについて、ワンショットマイグレーション（[`.ai/workflows/one-shot-migration.md`](./workflows/one-shot-migration.md)）による全件バックフィル完了後に完全必須化（Non-nullable化）を実施している。
+
+### 13.1 必須化されたフィールド一覧
+
+| テーブル | 必須化されたフィールド | 整合性保証と初期値ルール |
+| :--- | :--- | :--- |
+| `families` | `masterKeyEncrypted`, `masterKeyIv`, `masterKeySalt`, `kdfIterations`, `cryptoVersion` | 家族作成時に暗号資材・KDFメタデータをアトミックに初期化。レガシー家族はバックフィル完了済み。 |
+| `users` | `createdAt` | アカウント作成（`createAccount` / `syncUser`）時に `Date.now()` で初期化。 |
+| `serviceRecords` | `familyId`, `sortKey`, `ownerType`, `admins`, `revision`, `updatedByAccountId` | レコード作成・インポート時に必須。共有設定変更・資格情報変更等の全 mutation で `updatedAt`, `revision`, `updatedByAccountId` がアトミックに同期更新される。 |
+| `pendingExportVaults` | `kdfIterations`, `cryptoVersion` | 被キック時の Vault 生成時に旧家族の KDF メタデータを完全退避。 |
+| `credentials` | `stableId` | レコード内クレデンシャルの安定識別子として作成時に UUID v4 を自動採番。 |
+
+### 13.2 整合性保証の原則
+1. **アプリ側フォールバックの排除**: スキーマで必須化されたフィールドに対して、ビジネスロジック内で `field ?? fallback` や `if (!field)` のような不要な防御コードを記述しない（KISS 原則）。
+2. **監査ログ・更新者追跡の同期**: `serviceRecords` を変更する全 mutation（`shareRecord`, `unshareRecord`, `addRecordAdmin`, `removeRecordAdmin`, `createCredential`, `updateCredential`, `deleteCredential`, `reorderCredentials` 等）において、`updatedAt` のみならず `revision: record.revision + 1` および `updatedByAccountId: ctx.user._id` を漏れなく同期更新する。
+
+

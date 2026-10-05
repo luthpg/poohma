@@ -370,7 +370,7 @@ export const deleteAllAccounts = identityVerifiedMutation({
           .withIndex("by_accountId", (q) => q.eq("accountId", account._id))
           .collect();
         for (const record of records) {
-          if (!record.familyId || record.ownerType === "user") {
+          if (record.ownerType === "user") {
             await deleteCredentialsForRecord(ctx, record._id);
             await ctx.db.delete(record._id);
           }
@@ -513,7 +513,7 @@ export const deleteAccount = authenticatedMutation({
         .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
         .collect();
       for (const record of records) {
-        if (!record.familyId || record.ownerType === "user") {
+        if (record.ownerType === "user") {
           await deleteCredentialsForRecord(ctx, record._id);
           await ctx.db.delete(record._id);
         }
@@ -556,12 +556,15 @@ export const deleteAccount = authenticatedMutation({
 export const getUserByFirebaseUid = internalQuery({
   args: {
     userId: v.string(),
-    accountId: v.optional(v.id("users")),
+    accountId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     let user = null;
-    if (args.accountId) {
-      user = await ctx.db.get(args.accountId);
+    const normalizedAccountId = args.accountId
+      ? ctx.db.normalizeId("users", args.accountId)
+      : null;
+    if (normalizedAccountId) {
+      user = await ctx.db.get(normalizedAccountId);
       if (user && user.userId !== args.userId) {
         user = null;
       }

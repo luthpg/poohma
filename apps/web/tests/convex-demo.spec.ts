@@ -3,6 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { internal } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import schema from "../convex/schema";
+import {
+  createTestFamilyData,
+  createTestRecordData,
+  createTestUserData,
+} from "./test-helpers";
 
 const modules = import.meta.glob("../convex/**/*.ts");
 
@@ -35,10 +40,10 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
     const t = convexTest(schema, modules);
     let dummyFamilyId!: Id<"families">;
     await t.run(async (ctx) => {
-      dummyFamilyId = await ctx.db.insert("families", {
-        name: "Temporary",
-        updatedAt: Date.now(),
-      });
+      dummyFamilyId = await ctx.db.insert(
+        "families",
+        createTestFamilyData("Temporary"),
+      );
       await ctx.db.delete(dummyFamilyId);
     });
 
@@ -54,17 +59,18 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
     const t = convexTest(schema, modules);
     let demoFamilyId!: Id<"families">;
     await t.run(async (ctx) => {
-      demoFamilyId = await ctx.db.insert("families", {
-        name: "Demo Family",
-        updatedAt: Date.now(),
-      });
-      await ctx.db.insert("users", {
-        userId: "other_user",
-        email: "other@example.com",
-        familyId: demoFamilyId,
-        familyRole: "admin",
-        updatedAt: Date.now(),
-      });
+      demoFamilyId = await ctx.db.insert(
+        "families",
+        createTestFamilyData("Demo Family"),
+      );
+      await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "other_user",
+          email: "other@example.com",
+          familyId: demoFamilyId,
+        }),
+      );
     });
 
     process.env.DEMO_FAMILY_ID = demoFamilyId;
@@ -81,17 +87,19 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
     const t = convexTest(schema, modules);
     let demoFamilyId!: Id<"families">;
     await t.run(async (ctx) => {
-      demoFamilyId = await ctx.db.insert("families", {
-        name: "Demo Family",
-        updatedAt: Date.now(),
-      });
-      await ctx.db.insert("users", {
-        userId: "matched_viewer_user",
-        email: "viewer@example.com",
-        familyId: demoFamilyId,
-        familyRole: "viewer", // admin ではない
-        updatedAt: Date.now(),
-      });
+      demoFamilyId = await ctx.db.insert(
+        "families",
+        createTestFamilyData("Demo Family"),
+      );
+      await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "matched_viewer_user",
+          email: "viewer@example.com",
+          familyId: demoFamilyId,
+          familyRole: "viewer", // admin ではない
+        }),
+      );
     });
 
     process.env.DEMO_FAMILY_ID = demoFamilyId;
@@ -108,24 +116,27 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
     const t = convexTest(schema, modules);
     let demoFamilyId!: Id<"families">;
     await t.run(async (ctx) => {
-      demoFamilyId = await ctx.db.insert("families", {
-        name: "Demo Family",
-        updatedAt: Date.now(),
-      });
-      await ctx.db.insert("users", {
-        userId: "valid_admin",
-        email: "admin@example.com",
-        familyId: demoFamilyId,
-        familyRole: "admin",
-        updatedAt: Date.now(),
-      });
-      await ctx.db.insert("users", {
-        userId: "invalid_viewer",
-        email: "viewer@example.com",
-        familyId: demoFamilyId,
-        familyRole: "viewer",
-        updatedAt: Date.now(),
-      });
+      demoFamilyId = await ctx.db.insert(
+        "families",
+        createTestFamilyData("Demo Family"),
+      );
+      await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "valid_admin",
+          email: "admin@example.com",
+          familyId: demoFamilyId,
+        }),
+      );
+      await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "invalid_viewer",
+          email: "viewer@example.com",
+          familyId: demoFamilyId,
+          familyRole: "viewer",
+        }),
+      );
     });
 
     process.env.DEMO_FAMILY_ID = demoFamilyId;
@@ -145,25 +156,27 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
     let rogueAdminId!: Id<"users">;
 
     await t.run(async (ctx) => {
-      demoFamilyId = await ctx.db.insert("families", {
-        name: "Demo Family",
-        updatedAt: Date.now(),
-      });
-      legitimateAdminId = await ctx.db.insert("users", {
-        userId: "legit_admin_uid",
-        email: "legit@example.com",
-        familyId: demoFamilyId,
-        familyRole: "admin",
-        updatedAt: Date.now(),
-      });
+      demoFamilyId = await ctx.db.insert(
+        "families",
+        createTestFamilyData("Demo Family"),
+      );
+      legitimateAdminId = await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "legit_admin_uid",
+          email: "legit@example.com",
+          familyId: demoFamilyId,
+        }),
+      );
       // 手違い等で familyRole が admin になっている非管理者
-      rogueAdminId = await ctx.db.insert("users", {
-        userId: "rogue_admin_uid",
-        email: "rogue@example.com",
-        familyId: demoFamilyId,
-        familyRole: "admin",
-        updatedAt: Date.now(),
-      });
+      rogueAdminId = await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "rogue_admin_uid",
+          email: "rogue@example.com",
+          familyId: demoFamilyId,
+        }),
+      );
     });
 
     process.env.DEMO_FAMILY_ID = demoFamilyId;
@@ -195,62 +208,69 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
 
     await t.run(async (ctx) => {
       // 1. デモファミリー作成
-      demoFamilyId = await ctx.db.insert("families", {
-        name: "デモファミリー（毎日リセット）",
-        updatedAt: Date.now(),
-      });
+      demoFamilyId = await ctx.db.insert(
+        "families",
+        createTestFamilyData("デモファミリー（毎日リセット）"),
+      );
 
       // 2. 管理者ユーザー2名作成 (DEMO_ADMIN_USER_IDS に指定)
-      admin1Id = await ctx.db.insert("users", {
-        userId: "admin_uid_1",
-        email: "admin1@example.com",
-        displayName: "デモ管理者1",
-        familyId: demoFamilyId,
-        familyRole: "admin",
-        updatedAt: Date.now(),
-      });
+      admin1Id = await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "admin_uid_1",
+          email: "admin1@example.com",
+          displayName: "デモ管理者1",
+          familyId: demoFamilyId,
+        }),
+      );
 
-      admin2Id = await ctx.db.insert("users", {
-        userId: "admin_uid_2",
-        email: "admin2@example.com",
-        displayName: "デモ管理者2",
-        familyId: demoFamilyId,
-        familyRole: "admin",
-        updatedAt: Date.now(),
-      });
+      admin2Id = await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "admin_uid_2",
+          email: "admin2@example.com",
+          displayName: "デモ管理者2",
+          familyId: demoFamilyId,
+        }),
+      );
 
       // 3. ゲストユーザー2名作成 (デモファミリー所属)
-      guest1Id = await ctx.db.insert("users", {
-        userId: "guest_uid_1",
-        email: "guest1@example.com",
-        displayName: "ゲスト閲覧者1",
-        familyId: demoFamilyId,
-        familyRole: "viewer",
-        updatedAt: Date.now(),
-      });
+      guest1Id = await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "guest_uid_1",
+          email: "guest1@example.com",
+          displayName: "ゲスト閲覧者1",
+          familyId: demoFamilyId,
+          familyRole: "viewer",
+        }),
+      );
 
-      guest2Id = await ctx.db.insert("users", {
-        userId: "guest_uid_2",
-        email: "guest2@example.com",
-        displayName: "ゲスト閲覧者2",
-        familyId: demoFamilyId,
-        familyRole: "viewer",
-        updatedAt: Date.now(),
-      });
+      guest2Id = await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "guest_uid_2",
+          email: "guest2@example.com",
+          displayName: "ゲスト閲覧者2",
+          familyId: demoFamilyId,
+          familyRole: "viewer",
+        }),
+      );
 
       // 4. デモファミリーの共有レコードを作成
-      const sharedRecordId = await ctx.db.insert("serviceRecords", {
-        title: "過去の共有レコード",
-        userId: "guest_uid_1",
-        accountId: guest1Id,
-        familyId: demoFamilyId,
-        ownerType: "family",
-        ownerFamilyId: demoFamilyId,
-        admins: [admin1Id],
-        tags: ["テスト"],
-        stableId: crypto.randomUUID(),
-        updatedAt: Date.now(),
-      });
+      const sharedRecordId = await ctx.db.insert(
+        "serviceRecords",
+        createTestRecordData({
+          title: "過去の共有レコード",
+          userId: "guest_uid_1",
+          accountId: guest1Id,
+          familyId: demoFamilyId,
+          ownerType: "family",
+          ownerFamilyId: demoFamilyId,
+          admins: [admin1Id],
+          tags: ["テスト"],
+        }),
+      );
       await ctx.db.insert("credentials", {
         recordId: sharedRecordId,
         stableId: crypto.randomUUID(),
@@ -260,17 +280,17 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
       });
 
       // 5. ゲスト1が作成した個人所有レコードを作成 (ownerType: "user")
-      const guestPrivateRecordId = await ctx.db.insert("serviceRecords", {
-        title: "ゲストの個人レコード",
-        userId: "guest_uid_1",
-        accountId: guest1Id,
-        familyId: demoFamilyId,
-        ownerType: "user",
-        admins: [],
-        tags: ["プライベート"],
-        stableId: crypto.randomUUID(),
-        updatedAt: Date.now(),
-      });
+      const guestPrivateRecordId = await ctx.db.insert(
+        "serviceRecords",
+        createTestRecordData({
+          title: "ゲストの個人レコード",
+          userId: "guest_uid_1",
+          accountId: guest1Id,
+          familyId: demoFamilyId,
+          ownerType: "user",
+          tags: ["プライベート"],
+        }),
+      );
       await ctx.db.insert("credentials", {
         recordId: guestPrivateRecordId,
         stableId: crypto.randomUUID(),
@@ -280,17 +300,17 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
       });
 
       // 5.5 管理者が作成した個人レコード (ownerType: "user")
-      const adminPrivateRecordId = await ctx.db.insert("serviceRecords", {
-        title: "管理者の個人レコード",
-        userId: "admin_uid_1",
-        accountId: admin1Id,
-        familyId: demoFamilyId,
-        ownerType: "user",
-        admins: [],
-        tags: ["プライベート"],
-        stableId: crypto.randomUUID(),
-        updatedAt: Date.now(),
-      });
+      const adminPrivateRecordId = await ctx.db.insert(
+        "serviceRecords",
+        createTestRecordData({
+          title: "管理者の個人レコード",
+          userId: "admin_uid_1",
+          accountId: admin1Id,
+          familyId: demoFamilyId,
+          ownerType: "user",
+          tags: ["プライベート"],
+        }),
+      );
       await ctx.db.insert("credentials", {
         recordId: adminPrivateRecordId,
         stableId: crypto.randomUUID(),
@@ -351,6 +371,8 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
         masterKeyEncrypted: "vault_encrypted",
         masterKeyIv: "vault_iv",
         masterKeySalt: "vault_salt",
+        kdfIterations: 300_000,
+        cryptoVersion: 1,
         createdAt: now,
         expiresAt: now + 30 * 24 * 60 * 60 * 1000,
       });
@@ -584,18 +606,19 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
 
     let demoFamilyId!: Id<"families">;
     await t.run(async (ctx) => {
-      demoFamilyId = await ctx.db.insert("families", {
-        name: "デモファミリー",
-        updatedAt: Date.now(),
-      });
+      demoFamilyId = await ctx.db.insert(
+        "families",
+        createTestFamilyData("デモファミリー"),
+      );
 
-      const adminId = await ctx.db.insert("users", {
-        userId: "admin_uid_cool",
-        email: "admin_cool@example.com",
-        familyId: demoFamilyId,
-        familyRole: "admin",
-        updatedAt: Date.now(),
-      });
+      const adminId = await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "admin_uid_cool",
+          email: "admin_cool@example.com",
+          familyId: demoFamilyId,
+        }),
+      );
 
       // 5分前に実行された監査ログをあらかじめ挿入
       await ctx.db.insert("auditLogs", {
@@ -651,36 +674,38 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
 
     let familyId!: Id<"families">;
     await t.run(async (ctx) => {
-      familyId = await ctx.db.insert("families", {
-        name: "エクスポート対象ファミリー",
-        updatedAt: Date.now(),
-      });
+      familyId = await ctx.db.insert(
+        "families",
+        createTestFamilyData("エクスポート対象ファミリー"),
+      );
 
-      const user1 = await ctx.db.insert("users", {
-        userId: "uid_export",
-        email: "export@example.com",
-        familyId,
-        familyRole: "admin",
-        updatedAt: Date.now(),
-      });
+      const user1 = await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "uid_export",
+          email: "export@example.com",
+          familyId,
+        }),
+      );
 
       // 共有レコード (抽出対象)
-      const record1 = await ctx.db.insert("serviceRecords", {
-        title: "共有サービスA",
-        titleReading: "きょうゆうさーびすえー",
-        url: "https://example.com/a",
-        ogpImage: "https://example.com/ogp-a.png",
-        ogpDescription: "サービスAの説明",
-        memo: "メモA",
-        tags: ["タグ1", "タグ2"],
-        ownerType: "family",
-        ownerFamilyId: familyId,
-        familyId,
-        userId: "uid_export",
-        accountId: user1,
-        stableId: crypto.randomUUID(),
-        updatedAt: Date.now(),
-      });
+      const record1 = await ctx.db.insert(
+        "serviceRecords",
+        createTestRecordData({
+          title: "共有サービスA",
+          titleReading: "きょうゆうさーびすえー",
+          url: "https://example.com/a",
+          ogpImage: "https://example.com/ogp-a.png",
+          ogpDescription: "サービスAの説明",
+          memo: "メモA",
+          tags: ["タグ1", "タグ2"],
+          ownerType: "family",
+          ownerFamilyId: familyId,
+          familyId,
+          userId: "uid_export",
+          accountId: user1,
+        }),
+      );
 
       await ctx.db.insert("credentials", {
         recordId: record1,
@@ -696,16 +721,16 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
       });
 
       // 個人レコード (抽出対象外)
-      await ctx.db.insert("serviceRecords", {
-        title: "個人サービスB",
-        ownerType: "user",
-        familyId,
-        userId: "uid_export",
-        accountId: user1,
-        stableId: crypto.randomUUID(),
-        updatedAt: Date.now(),
-        tags: [],
-      });
+      await ctx.db.insert(
+        "serviceRecords",
+        createTestRecordData({
+          title: "個人サービスB",
+          ownerType: "user",
+          familyId,
+          userId: "uid_export",
+          accountId: user1,
+        }),
+      );
     });
 
     const exported = await t.query(internal.demo.exportDemoRecordsInternal, {
@@ -730,22 +755,23 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
     let otherFamilyId!: Id<"families">;
 
     await t.run(async (ctx) => {
-      demoFamilyId = await ctx.db.insert("families", {
-        name: "Demo Family",
-        updatedAt: Date.now(),
-      });
-      otherFamilyId = await ctx.db.insert("families", {
-        name: "Other Family",
-        updatedAt: Date.now(),
-      });
+      demoFamilyId = await ctx.db.insert(
+        "families",
+        createTestFamilyData("Demo Family"),
+      );
+      otherFamilyId = await ctx.db.insert(
+        "families",
+        createTestFamilyData("Other Family"),
+      );
 
-      await ctx.db.insert("users", {
-        userId: "demo_admin",
-        email: "admin@example.com",
-        familyId: demoFamilyId,
-        familyRole: "admin",
-        updatedAt: Date.now(),
-      });
+      await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "demo_admin",
+          email: "admin@example.com",
+          familyId: demoFamilyId,
+        }),
+      );
 
       // 別ファミリーが同じ招待コードを所有
       await ctx.db.insert("familyInvites", {
@@ -785,62 +811,66 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
     let otherViewLogId!: Id<"viewLogs">;
 
     await t.run(async (ctx) => {
-      demoFamilyId = await ctx.db.insert("families", {
-        name: "Demo Family",
-        updatedAt: Date.now(),
-      });
-      otherFamilyId = await ctx.db.insert("families", {
-        name: "Other Family",
-        updatedAt: Date.now(),
-      });
+      demoFamilyId = await ctx.db.insert(
+        "families",
+        createTestFamilyData("Demo Family"),
+      );
+      otherFamilyId = await ctx.db.insert(
+        "families",
+        createTestFamilyData("Other Family"),
+      );
 
-      await ctx.db.insert("users", {
-        userId: "demo_admin",
-        email: "admin@example.com",
-        familyId: demoFamilyId,
-        familyRole: "admin",
-        updatedAt: Date.now(),
-      });
+      await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "demo_admin",
+          email: "admin@example.com",
+          familyId: demoFamilyId,
+        }),
+      );
 
-      otherAdminId = await ctx.db.insert("users", {
-        userId: "other_admin_uid",
-        email: "other_admin@example.com",
-        familyId: otherFamilyId,
-        familyRole: "admin",
-        updatedAt: Date.now(),
-      });
+      otherAdminId = await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "other_admin_uid",
+          email: "other_admin@example.com",
+          familyId: otherFamilyId,
+        }),
+      );
 
-      guestId = await ctx.db.insert("users", {
-        userId: "guest_user",
-        email: "guest@example.com",
-        familyId: demoFamilyId,
-        familyRole: "viewer",
-        updatedAt: Date.now(),
-      });
+      guestId = await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "guest_user",
+          email: "guest@example.com",
+          familyId: demoFamilyId,
+          familyRole: "viewer",
+        }),
+      );
 
       // デモファミリー内でゲストが作成した個人レコード
-      demoRecordId = await ctx.db.insert("serviceRecords", {
-        title: "デモファミリー内の個人レコード",
-        accountId: guestId,
-        familyId: demoFamilyId,
-        userId: "guest_user",
-        ownerType: "user",
-        tags: [],
-        stableId: crypto.randomUUID(),
-        updatedAt: Date.now(),
-      });
+      demoRecordId = await ctx.db.insert(
+        "serviceRecords",
+        createTestRecordData({
+          title: "デモファミリー内の個人レコード",
+          accountId: guestId,
+          familyId: demoFamilyId,
+          userId: "guest_user",
+          ownerType: "user",
+        }),
+      );
 
       // 他ファミリーに属する個人レコード（過去データや別所属）
-      otherRecordId = await ctx.db.insert("serviceRecords", {
-        title: "他ファミリーの個人レコード",
-        accountId: guestId,
-        familyId: otherFamilyId,
-        userId: "guest_user",
-        ownerType: "user",
-        tags: [],
-        stableId: crypto.randomUUID(),
-        updatedAt: Date.now(),
-      });
+      otherRecordId = await ctx.db.insert(
+        "serviceRecords",
+        createTestRecordData({
+          title: "他ファミリーの個人レコード",
+          accountId: guestId,
+          familyId: otherFamilyId,
+          userId: "guest_user",
+          ownerType: "user",
+        }),
+      );
 
       // 他ファミリーの閲覧ログ
       otherViewLogId = await ctx.db.insert("viewLogs", {
@@ -900,6 +930,8 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
         masterKeyEncrypted: "enc",
         masterKeyIv: "iv",
         masterKeySalt: "salt",
+        kdfIterations: 300_000,
+        cryptoVersion: 1,
         createdAt: Date.now(),
         expiresAt: Date.now() + 100000,
       });
@@ -913,6 +945,8 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
         masterKeyEncrypted: "enc2",
         masterKeyIv: "iv2",
         masterKeySalt: "salt2",
+        kdfIterations: 300_000,
+        cryptoVersion: 1,
         createdAt: Date.now(),
         expiresAt: Date.now() + 100000,
       });
