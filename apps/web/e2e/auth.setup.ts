@@ -13,6 +13,8 @@ const STORAGE_STATE = path.join(dirname, ".auth/e2e-user.json");
 const BRIDGE_PATH = path.join(dirname, ".gen/firebase-bridge.iife.js");
 
 setup("authenticate as e2e test user", async ({ page, context, baseURL }) => {
+  setup.setTimeout(60_000);
+
   // 自社ドメイン限定で保護バイパスヘッダーを設定（Google等の外部APIには付与しない）
   await setupProtectionBypass(context, baseURL);
 

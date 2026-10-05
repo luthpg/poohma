@@ -4,6 +4,11 @@ import { api, internal } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import schema from "../convex/schema";
 import { computeSortKey } from "../src/utils/index-group";
+import {
+  createTestFamilyData,
+  createTestRecordData,
+  createTestUserData,
+} from "./test-helpers";
 
 const modules = import.meta.glob("../convex/**/*.ts");
 
@@ -14,18 +19,19 @@ describe("監査ログ (Audit Log) & 閲覧履歴 (View Log) の統合テスト"
     let familyId!: Id<"families">;
 
     await t.run(async (ctx) => {
-      familyId = await ctx.db.insert("families", {
-        name: "Security Family",
-        updatedAt: Date.now(),
-      });
-      await ctx.db.insert("users", {
-        familyRole: "admin",
-        userId: "user_audit_actor",
-        email: "actor@example.com",
-        displayName: "監査アクター",
-        familyId,
-        updatedAt: Date.now(),
-      });
+      familyId = await ctx.db.insert(
+        "families",
+        createTestFamilyData("Security Family"),
+      );
+      await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "user_audit_actor",
+          email: "actor@example.com",
+          displayName: "監査アクター",
+          familyId,
+        }),
+      );
     });
 
     const actorClient = t.withIdentity({
@@ -121,67 +127,69 @@ describe("監査ログ (Audit Log) & 閲覧履歴 (View Log) の統合テスト"
     let sharedRecordId!: Id<"serviceRecords">;
 
     await t.run(async (ctx) => {
-      familyId = await ctx.db.insert("families", {
-        name: "Shared Family",
-        updatedAt: Date.now(),
-      });
-      otherFamilyId = await ctx.db.insert("families", {
-        name: "Attacker Family",
-        updatedAt: Date.now(),
-      });
-      userAId = await ctx.db.insert("users", {
-        familyRole: "admin",
-        userId: "user_a",
-        email: "a@example.com",
-        displayName: "ユーザーA",
-        familyId,
-        updatedAt: Date.now(),
-      });
-      await ctx.db.insert("users", {
-        familyRole: "admin",
-        userId: "user_b",
-        email: "b@example.com",
-        displayName: "ユーザーB",
-        familyId,
-        updatedAt: Date.now(),
-      });
-      await ctx.db.insert("users", {
-        familyRole: "admin",
-        userId: "user_c_attacker",
-        email: "c@example.com",
-        displayName: "他家族C",
-        familyId: otherFamilyId,
-        updatedAt: Date.now(),
-      });
+      familyId = await ctx.db.insert(
+        "families",
+        createTestFamilyData("Shared Family"),
+      );
+      otherFamilyId = await ctx.db.insert(
+        "families",
+        createTestFamilyData("Attacker Family"),
+      );
+      userAId = await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "user_a",
+          email: "a@example.com",
+          displayName: "ユーザーA",
+          familyId,
+        }),
+      );
+      await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "user_b",
+          email: "b@example.com",
+          displayName: "ユーザーB",
+          familyId,
+        }),
+      );
+      await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "user_c_attacker",
+          email: "c@example.com",
+          displayName: "他家族C",
+          familyId: otherFamilyId,
+        }),
+      );
 
       // 個人レコード作成
-      personalRecordId = await ctx.db.insert("serviceRecords", {
-        stableId: crypto.randomUUID(),
-        title: "A's Private Bank",
-        sortKey: computeSortKey("A's Private Bank"),
-        userId: "user_a",
-        accountId: userAId,
-        familyId,
-        ownerType: "user",
-        admins: [],
-        tags: [],
-        updatedAt: Date.now(),
-      });
+      personalRecordId = await ctx.db.insert(
+        "serviceRecords",
+        createTestRecordData({
+          title: "A's Private Bank",
+          sortKey: computeSortKey("A's Private Bank"),
+          userId: "user_a",
+          accountId: userAId,
+          familyId,
+          ownerType: "user",
+        }),
+      );
 
       // 家族共有レコード作成
-      sharedRecordId = await ctx.db.insert("serviceRecords", {
-        stableId: crypto.randomUUID(),
-        title: "Family Wi-Fi",
-        sortKey: computeSortKey("Family Wi-Fi"),
-        userId: "user_a",
-        accountId: userAId,
-        familyId,
-        ownerType: "family",
-        ownerFamilyId: familyId,
-        admins: [userAId],
-        tags: [],
-        updatedAt: Date.now(),
-      });
+      sharedRecordId = await ctx.db.insert(
+        "serviceRecords",
+        createTestRecordData({
+          title: "Family Wi-Fi",
+          sortKey: computeSortKey("Family Wi-Fi"),
+          userId: "user_a",
+          accountId: userAId,
+          familyId,
+          ownerType: "family",
+          ownerFamilyId: familyId,
+          admins: [userAId],
+        }),
+      );
     });
 
     const clientA = t.withIdentity({
@@ -272,40 +280,42 @@ describe("監査ログ (Audit Log) & 閲覧履歴 (View Log) の統合テスト"
     let sharedRecordId!: Id<"serviceRecords">;
 
     await t.run(async (ctx) => {
-      familyId = await ctx.db.insert("families", {
-        name: "Fallback Test Family",
-        updatedAt: Date.now(),
-      });
-      deletedUserAccountId = await ctx.db.insert("users", {
-        familyRole: "admin",
-        userId: "user_to_be_deleted",
-        email: "deleted@example.com",
-        displayName: "退会予定パパ",
-        familyId,
-        updatedAt: Date.now(),
-      });
-      remainingUserAccountId = await ctx.db.insert("users", {
-        familyRole: "admin",
-        userId: "user_remaining",
-        email: "remaining@example.com",
-        displayName: "残存ママ",
-        familyId,
-        updatedAt: Date.now(),
-      });
+      familyId = await ctx.db.insert(
+        "families",
+        createTestFamilyData("Fallback Test Family"),
+      );
+      deletedUserAccountId = await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "user_to_be_deleted",
+          email: "deleted@example.com",
+          displayName: "退会予定パパ",
+          familyId,
+        }),
+      );
+      remainingUserAccountId = await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "user_remaining",
+          email: "remaining@example.com",
+          displayName: "残存ママ",
+          familyId,
+        }),
+      );
 
-      sharedRecordId = await ctx.db.insert("serviceRecords", {
-        stableId: crypto.randomUUID(),
-        title: "Shared Account",
-        sortKey: computeSortKey("Shared Account"),
-        userId: "user_to_be_deleted",
-        accountId: deletedUserAccountId,
-        familyId,
-        ownerType: "family",
-        ownerFamilyId: familyId,
-        admins: [deletedUserAccountId, remainingUserAccountId],
-        tags: [],
-        updatedAt: Date.now(),
-      });
+      sharedRecordId = await ctx.db.insert(
+        "serviceRecords",
+        createTestRecordData({
+          title: "Shared Account",
+          sortKey: computeSortKey("Shared Account"),
+          userId: "user_to_be_deleted",
+          accountId: deletedUserAccountId,
+          familyId,
+          ownerType: "family",
+          ownerFamilyId: familyId,
+          admins: [deletedUserAccountId, remainingUserAccountId],
+        }),
+      );
     });
 
     const deletedClient = t.withIdentity({
@@ -383,22 +393,22 @@ describe("監査ログ (Audit Log) & 閲覧履歴 (View Log) の統合テスト"
   // 3b. 退会ユーザーの問い合わせ対応テスト: 家族解散を伴う最後の1人の退会および単独ユーザー退会でも ACCOUNT_DELETE が記録され追跡可能なこと
   it("退会ユーザーの問い合わせ対応: 家族消滅・単独退会でも ACCOUNT_DELETE が記録され by_userId_createdAt で追跡できること", async () => {
     const t = convexTest(schema, modules);
-    const now = Date.now();
 
     // パターンA: 家族最後の1人（家族も同時解散）
     await t.run(async (ctx) => {
-      const familyId = await ctx.db.insert("families", {
-        name: "Solo Family",
-        updatedAt: now,
-      });
-      await ctx.db.insert("users", {
-        familyRole: "admin",
-        userId: "user_solo_family",
-        email: "solo_family@example.com",
-        displayName: "最後の一人",
-        familyId,
-        updatedAt: now,
-      });
+      const familyId = await ctx.db.insert(
+        "families",
+        createTestFamilyData("Solo Family"),
+      );
+      await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "user_solo_family",
+          email: "solo_family@example.com",
+          displayName: "最後の一人",
+          familyId,
+        }),
+      );
     });
 
     const soloFamilyClient = t.withIdentity({
@@ -429,13 +439,15 @@ describe("監査ログ (Audit Log) & 閲覧履歴 (View Log) の統合テスト"
 
     // パターンB: 家族未所属の単独ユーザー
     await t.run(async (ctx) => {
-      await ctx.db.insert("users", {
-        familyRole: "viewer",
-        userId: "user_no_family",
-        email: "no_family@example.com",
-        displayName: "単独利用ユーザー",
-        updatedAt: now,
-      });
+      await ctx.db.insert(
+        "users",
+        createTestUserData({
+          familyRole: "viewer",
+          userId: "user_no_family",
+          email: "no_family@example.com",
+          displayName: "単独利用ユーザー",
+        }),
+      );
     });
 
     const noFamilyClient = t.withIdentity({
@@ -470,60 +482,61 @@ describe("監査ログ (Audit Log) & 閲覧履歴 (View Log) の統合テスト"
     let userAccountId!: Id<"users">;
 
     await t.run(async (ctx) => {
-      const familyId = await ctx.db.insert("families", {
-        name: "Stale Test Family",
-        updatedAt: now,
-      });
-      userAccountId = await ctx.db.insert("users", {
-        familyRole: "admin",
-        userId: "user_stale",
-        email: "stale@example.com",
-        familyId,
-        updatedAt: now,
-      });
+      const familyId = await ctx.db.insert(
+        "families",
+        createTestFamilyData("Stale Test Family"),
+      );
+      userAccountId = await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "user_stale",
+          email: "stale@example.com",
+          familyId,
+        }),
+      );
 
       // 181日前の古いレコード
-      await ctx.db.insert("serviceRecords", {
-        stableId: crypto.randomUUID(),
-        title: "Old Untouched Record",
-        sortKey: computeSortKey("Old Untouched Record"),
-        userId: "user_stale",
-        accountId: userAccountId,
-        familyId,
-        ownerType: "user",
-        admins: [],
-        tags: [],
-        updatedAt: oneHundredEightyOneDaysAgo,
-      });
+      await ctx.db.insert(
+        "serviceRecords",
+        createTestRecordData({
+          title: "Old Untouched Record",
+          sortKey: computeSortKey("Old Untouched Record"),
+          userId: "user_stale",
+          accountId: userAccountId,
+          familyId,
+          ownerType: "user",
+          updatedAt: oneHundredEightyOneDaysAgo,
+        }),
+      );
 
       // 10日前の新しいレコード
-      await ctx.db.insert("serviceRecords", {
-        stableId: crypto.randomUUID(),
-        title: "Fresh Record",
-        sortKey: computeSortKey("Fresh Record"),
-        userId: "user_stale",
-        accountId: userAccountId,
-        familyId,
-        ownerType: "user",
-        admins: [],
-        tags: [],
-        updatedAt: tenDaysAgo,
-      });
+      await ctx.db.insert(
+        "serviceRecords",
+        createTestRecordData({
+          title: "Fresh Record",
+          sortKey: computeSortKey("Fresh Record"),
+          userId: "user_stale",
+          accountId: userAccountId,
+          familyId,
+          ownerType: "user",
+          updatedAt: tenDaysAgo,
+        }),
+      );
 
       // サンプルレコード（抽出対象外）
-      await ctx.db.insert("serviceRecords", {
-        stableId: crypto.randomUUID(),
-        title: "Sample Old Record",
-        sortKey: computeSortKey("Sample Old Record"),
-        userId: "user_stale",
-        accountId: userAccountId,
-        familyId,
-        ownerType: "user",
-        admins: [],
-        tags: [],
-        isSample: true,
-        updatedAt: oneHundredEightyOneDaysAgo,
-      });
+      await ctx.db.insert(
+        "serviceRecords",
+        createTestRecordData({
+          title: "Sample Old Record",
+          sortKey: computeSortKey("Sample Old Record"),
+          userId: "user_stale",
+          accountId: userAccountId,
+          familyId,
+          ownerType: "user",
+          isSample: true,
+          updatedAt: oneHundredEightyOneDaysAgo,
+        }),
+      );
     });
 
     const client = t.withIdentity({
@@ -571,25 +584,32 @@ describe("監査ログ (Audit Log) & 閲覧履歴 (View Log) の統合テスト"
         createdAt: oneYearAgo,
       });
 
-      const dummyAccountId = await ctx.db.insert("users", {
-        userId: "test_user",
-        email: "test@example.com",
-        familyRole: "admin",
-        updatedAt: now,
-      });
+      const testFamilyId = await ctx.db.insert(
+        "families",
+        createTestFamilyData("Cleanup Test Family"),
+      );
+
+      const dummyAccountId = await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "test_user",
+          email: "test@example.com",
+          familyId: testFamilyId,
+        }),
+      );
 
       // 閲覧ログ用レコード
-      const recordId = await ctx.db.insert("serviceRecords", {
-        stableId: crypto.randomUUID(),
-        title: "Test Record",
-        sortKey: computeSortKey("Test Record"),
-        userId: "test_user",
-        accountId: dummyAccountId,
-        ownerType: "user",
-        admins: [],
-        tags: [],
-        updatedAt: now,
-      });
+      const recordId = await ctx.db.insert(
+        "serviceRecords",
+        createTestRecordData({
+          title: "Test Record",
+          sortKey: computeSortKey("Test Record"),
+          userId: "test_user",
+          accountId: dummyAccountId,
+          familyId: testFamilyId,
+          ownerType: "user",
+        }),
+      );
 
       // 閲覧ログ
       oldViewLogId = await ctx.db.insert("viewLogs", {
@@ -630,32 +650,32 @@ describe("監査ログ (Audit Log) & 閲覧履歴 (View Log) の統合テスト"
     let recordId!: Id<"serviceRecords">;
 
     await t.run(async (ctx) => {
-      const familyId = await ctx.db.insert("families", {
-        name: "Viewer Family",
-        updatedAt: Date.now(),
-      });
+      const familyId = await ctx.db.insert(
+        "families",
+        createTestFamilyData("Viewer Family"),
+      );
 
-      userAccountId = await ctx.db.insert("users", {
-        familyRole: "admin",
-        userId: "viewer_user",
-        email: "viewer@example.com",
-        displayName: "閲覧者太郎",
-        familyId,
-        updatedAt: Date.now(),
-      });
+      userAccountId = await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "viewer_user",
+          email: "viewer@example.com",
+          displayName: "閲覧者太郎",
+          familyId,
+        }),
+      );
 
-      recordId = await ctx.db.insert("serviceRecords", {
-        stableId: crypto.randomUUID(),
-        title: "Viewer Target",
-        sortKey: computeSortKey("Viewer Target"),
-        userId: "viewer_user",
-        accountId: userAccountId,
-        familyId,
-        ownerType: "user",
-        admins: [],
-        tags: [],
-        updatedAt: Date.now(),
-      });
+      recordId = await ctx.db.insert(
+        "serviceRecords",
+        createTestRecordData({
+          title: "Viewer Target",
+          sortKey: computeSortKey("Viewer Target"),
+          userId: "viewer_user",
+          accountId: userAccountId,
+          familyId,
+          ownerType: "user",
+        }),
+      );
     });
 
     const client = t.withIdentity({
@@ -685,32 +705,33 @@ describe("監査ログ (Audit Log) & 閲覧履歴 (View Log) の統合テスト"
     let recordId!: Id<"serviceRecords">;
 
     await t.run(async (ctx) => {
-      familyId = await ctx.db.insert("families", {
-        name: "Export Test Family",
-        updatedAt: Date.now(),
-      });
-      const userId = await ctx.db.insert("users", {
-        familyRole: "admin",
-        userId: "export_user",
-        email: "export@example.com",
-        displayName: "エクスポート担当",
-        familyId,
-        updatedAt: Date.now(),
-      });
+      familyId = await ctx.db.insert(
+        "families",
+        createTestFamilyData("Export Test Family"),
+      );
+      const userId = await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "export_user",
+          email: "export@example.com",
+          displayName: "エクスポート担当",
+          familyId,
+        }),
+      );
 
-      recordId = await ctx.db.insert("serviceRecords", {
-        stableId: crypto.randomUUID(),
-        title: "Shared Bank",
-        sortKey: computeSortKey("Shared Bank"),
-        userId: "export_user",
-        accountId: userId,
-        familyId,
-        ownerType: "family",
-        ownerFamilyId: familyId,
-        admins: [userId],
-        tags: [],
-        updatedAt: Date.now(),
-      });
+      recordId = await ctx.db.insert(
+        "serviceRecords",
+        createTestRecordData({
+          title: "Shared Bank",
+          sortKey: computeSortKey("Shared Bank"),
+          userId: "export_user",
+          accountId: userId,
+          familyId,
+          ownerType: "family",
+          ownerFamilyId: familyId,
+          admins: [userId],
+        }),
+      );
     });
 
     const client = t.withIdentity({
@@ -760,19 +781,21 @@ describe("監査ログ (Audit Log) & 閲覧履歴 (View Log) の統合テスト"
     const t = convexTest(schema, modules);
 
     await t.run(async (ctx) => {
-      const familyId = await ctx.db.insert("families", {
-        name: "Viewer Audit Family",
-        updatedAt: Date.now(),
-      });
+      const familyId = await ctx.db.insert(
+        "families",
+        createTestFamilyData("Viewer Audit Family"),
+      );
 
-      await ctx.db.insert("users", {
-        familyRole: "viewer",
-        userId: "viewer_user",
-        email: "viewer@example.com",
-        displayName: "一般メンバー",
-        familyId,
-        updatedAt: Date.now(),
-      });
+      await ctx.db.insert(
+        "users",
+        createTestUserData({
+          familyRole: "viewer",
+          userId: "viewer_user",
+          email: "viewer@example.com",
+          displayName: "一般メンバー",
+          familyId,
+        }),
+      );
     });
 
     const viewerClient = t.withIdentity({
@@ -792,23 +815,25 @@ describe("監査ログ (Audit Log) & 閲覧履歴 (View Log) の統合テスト"
       let familyBId!: Id<"families">;
 
       await t.run(async (ctx) => {
-        familyAId = await ctx.db.insert("families", {
-          name: "Family A",
-          updatedAt: Date.now(),
-        });
-        familyBId = await ctx.db.insert("families", {
-          name: "Family B",
-          updatedAt: Date.now(),
-        });
+        familyAId = await ctx.db.insert(
+          "families",
+          createTestFamilyData("Family A"),
+        );
+        familyBId = await ctx.db.insert(
+          "families",
+          createTestFamilyData("Family B"),
+        );
 
-        await ctx.db.insert("users", {
-          familyRole: "viewer",
-          userId: "user_a",
-          email: "user_a@example.com",
-          displayName: "ユーザーA",
-          familyId: familyAId,
-          updatedAt: Date.now(),
-        });
+        await ctx.db.insert(
+          "users",
+          createTestUserData({
+            familyRole: "viewer",
+            userId: "user_a",
+            email: "user_a@example.com",
+            displayName: "ユーザーA",
+            familyId: familyAId,
+          }),
+        );
 
         // 2025年のログ (JST 2025-06-01)
         await ctx.db.insert("auditLogs", {
@@ -887,13 +912,15 @@ describe("監査ログ (Audit Log) & 閲覧履歴 (View Log) の統合テスト"
       const t = convexTest(schema, modules);
 
       await t.run(async (ctx) => {
-        await ctx.db.insert("users", {
-          familyRole: "viewer",
-          userId: "user_unattached",
-          email: "unattached@example.com",
-          displayName: "未所属ユーザー",
-          updatedAt: Date.now(),
-        });
+        await ctx.db.insert(
+          "users",
+          createTestUserData({
+            familyRole: "viewer",
+            userId: "user_unattached",
+            email: "unattached@example.com",
+            displayName: "未所属ユーザー",
+          }),
+        );
       });
 
       const client = t.withIdentity({

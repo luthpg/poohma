@@ -215,7 +215,7 @@ export function useImportCsvDiff(options?: UseImportCsvDiffOptions) {
         // 家族メンバー一覧を取得（共有レコードの管理者メール照合用）
         const familyInfo = await convex.query(
           api.families.getFamilyMembers,
-          {},
+          accountId ? { accountId } : {},
         );
         const familyMemberEmails = new Set(
           (familyInfo?.users || [])

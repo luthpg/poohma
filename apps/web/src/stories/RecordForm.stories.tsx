@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { useState } from "react";
 import { RecordForm } from "../components/records/RecordForm";
 import type {
+  DraftSaveStatus,
   RecordFormValues,
   UseRecordFormReturn,
 } from "../hooks/useRecordForm";
@@ -21,12 +22,14 @@ function MockFormContainer({
   submitIdleLabel = "登録する",
   isBusy = false,
   targetRecordId,
+  draftSaveStatus = "idle",
 }: {
   initialValues?: Partial<RecordFormValues>;
   isAdmin?: boolean;
   submitIdleLabel?: string;
   isBusy?: boolean;
   targetRecordId?: string;
+  draftSaveStatus?: DraftSaveStatus;
 }) {
   const [values, setValues] = useState<RecordFormValues>({
     title: "",
@@ -94,6 +97,9 @@ function MockFormContainer({
     setEditingMetadata: () => {},
     isDirty: false,
     targetRecordId,
+    draftSaveStatus,
+    flushDraftSave: async () => true,
+    requireUnlock: async () => true,
   };
 
   return (
@@ -182,6 +188,32 @@ export const SubmittingState: Story = {
       isBusy={true}
       initialValues={{
         title: "Netflix",
+        ownerType: "user",
+      }}
+    />
+  ),
+};
+
+export const DraftSavePausedState: Story = {
+  render: () => (
+    <MockFormContainer
+      submitIdleLabel="保存する"
+      draftSaveStatus="paused"
+      initialValues={{
+        title: "Amazon",
+        ownerType: "user",
+      }}
+    />
+  ),
+};
+
+export const DraftSaveErrorState: Story = {
+  render: () => (
+    <MockFormContainer
+      submitIdleLabel="保存する"
+      draftSaveStatus="error"
+      initialValues={{
+        title: "Google",
         ownerType: "user",
       }}
     />

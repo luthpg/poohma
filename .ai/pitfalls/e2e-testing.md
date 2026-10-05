@@ -61,4 +61,21 @@ Playwright E2E テストおよびフロントエンド遷移における落と�
   2. ワークフロー（`upload-artifact`）のパスに `!apps/web/test-results/**/*.zip` を指定し、万が一のアーカイブ生成時もアップロードから完全除外する。
   3. 失敗時のデバッグには `screenshot: "only-on-failure"` の画像および HTML レポート、ターミナル出力を使用する。
 
+---
+
+### 未認証ガード検証時の `page.goto` とクライアント即時リダイレクトによる `net::ERR_ABORTED`
+
+- **問題**: ログアウト完了や未認証状態を確認するため、テストコードから保護ルート（`/family` など）へ直接 `page.goto` する際、アプリ側の未認証ガード（`apps/web/src/routes/(app)/route.tsx`）が即座に `/login` へのクライアントサイド遷移を実行すると、HTML ロード完了前にナビゲーションが中断され、Playwright で `page.goto: net::ERR_ABORTED` 例外が発生してテストがタイムアウト・失敗する。
+- **回避法**: 未認証ガードでリダイレクトされることが期待されるルートへの直接アクセス検証（`apps/web/e2e/logout.spec.ts` 等）では、`Promise.all` を用いて `/login` への遷移完了待機と `page.goto` の中断例外（`ERR_ABORTED`）の許容を同時に行う。
+  ```typescript
+  await Promise.all([
+    page.waitForURL((url) => url.pathname === "/login", { timeout: 20000 }),
+    page.goto("/family").catch((err: Error) => {
+      if (!err.message.includes("ERR_ABORTED")) throw err;
+    }),
+  ]);
+  await expect(page).toHaveURL(/.*\/login/);
+  ```
+
+
 

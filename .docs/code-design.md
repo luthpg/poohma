@@ -84,7 +84,7 @@ Service Worker (Workbox等):
 | 認証             | Firebase Authentication（Google OAuth）＋ firebase-admin（サーバー側検証）＋ httpOnlyセッションCookie                                          |
 | CMS            | microCMS（microcms-js-sdk）                                                                                                    |
 | メール送信・テンプレート | Resend, React Email（`@react-email/components`）                                                                                |
-| 外部API          | Yahoo!テキスト解析API（ふりがな）、任意サイトのOGPスクレイピング（cheerio）、Abstract IP Geolocation API（位置情報取得）                                 |
+| 外部API          | Yahoo!テキスト解析API（ふりがな）、任意サイトのOGPスクレイピング（cheerio）、Abstract IP Geolocation API（位置情報取得）、ipaddr.js（IPアドレス検証・SSRF/プライベートIP除外） |
 | CSV処理          | papaparse                                                                                                                    |
 | QRコード          | qrcode.react                                                                                                                 |
 | PWA            | Web App Manifest、iOS standalone判定ロジック（自前実装）、Service Worker（Workbox等）＋IndexedDB（オフラインキャッシュ、FR-PWA-03）                         |
@@ -182,11 +182,11 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 | フィールド | 型 | 説明 |
 | -------------------------- | ---------------- | --------------------------------------------------------------------------------- |
 | name | string | 家族グループ名 |
-| masterKeyEncrypted | string(optional) | パスコード由来鍵でラップされたマスターキー（Base64） |
-| masterKeyIv | string(optional) | 上記ラップ処理のIV（Base64） |
-| masterKeySalt | string(optional) | パスコードからの鍵導出（PBKDF2）に使うソルト（Base64） |
-| kdfIterations | number(optional) | パスコード鍵導出（PBKDF2）の反復回数。作成・パスコード変更時点の値を記録し、復号時はこの値を動的に適用する（NFR-SEC-14）。未設定時はレガシー値300,000 |
-| cryptoVersion | number(optional) | KDF・暗号化スキームのバージョン番号。未設定時はレガシー値1 |
+| masterKeyEncrypted | string | パスコード由来鍵でラップされたマスターキー（Base64） |
+| masterKeyIv | string | 上記ラップ処理のIV（Base64） |
+| masterKeySalt | string | パスコードからの鍵導出（PBKDF2）に使うソルト（Base64） |
+| kdfIterations | number | パスコード鍵導出（PBKDF2）の反復回数。作成・パスコード変更時点の値を記録し、復号時はこの値を動的に適用する（NFR-SEC-14） |
+| cryptoVersion | number | KDF・暗号化スキームのバージョン番号 |
 | recoveryMasterKeyEncrypted | string(optional) | リカバリーキー由来鍵でラップされたマスターキー（Base64、FR-CRYPT-06） |
 | recoveryMasterKeyIv | string(optional) | 上記リカバリーラップ処理のIV（Base64） |
 | recoveryMasterKeySalt | string(optional) | リカバリーキー鍵導出（PBKDF2）に使うソルト（Base64） |
@@ -224,7 +224,7 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 | familyRole | ("admin" \| "viewer") | 家族内ロール（"admin": ファミリー管理者, "viewer": メンバー） |
 | onboardingVersion | number(optional) | オンボーディング進捗バージョン（未開始: 0または未設定、完了: 1以上） |
 | emailNotificationSettings | object(optional) | メール配信設定（notifyRecordChanges, notifyFamilyActivity, notifyDataExport, notifySecuritySettings） |
-| createdAt | number(optional) | 作成日時 |
+| createdAt | number | 作成日時 |
 | updatedAt | number | 更新日時 |
 
 インデックス: by\_userId, by\_email, by\_familyId
@@ -258,8 +258,8 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 | masterKeyEncrypted | string | 旧家族パスコード由来鍵でラップされたマスターキー（Base64） |
 | masterKeyIv | string | 上記ラップ処理のIV（Base64） |
 | masterKeySalt | string | 旧パスコード鍵導出（PBKDF2）のソルト（Base64） |
-| kdfIterations | number(optional) | 旧パスコード鍵導出（PBKDF2）の反復回数 |
-| cryptoVersion | number(optional) | 旧暗号化スキームのバージョン番号 |
+| kdfIterations | number | 旧パスコード鍵導出（PBKDF2）の反復回数 |
+| cryptoVersion | number | 旧暗号化スキームのバージョン番号 |
 | createdAt | number | 作成日時（epoch ms） |
 | expiresAt | number | 有効期限日時（作成から30日後） |
 
@@ -296,20 +296,20 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 
 | フィールド | 型 | 説明 |
 | --------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| stableId | string(optional) | CSVエクスポート・差分インポート突合用の安定識別子（UUID v4）。全件バックフィル完了後は実質必須 |
+| stableId | string | CSVエクスポート・差分インポート突合用の安定識別子（UUID v4） |
 | title | string | サービス名 |
 | titleReading | string(optional) | 読み仮名（五十音インデックス用） |
-| sortKey | string(optional) | 五十音順・アルファベット順ソートキー（グループ順位 2 桁ゼロ埋めプレフィックス + NFKC/ひらがな正規化文字列）。backfill 完了までは optional |
+| sortKey | string | 五十音順・アルファベット順ソートキー（グループ順位 2 桁ゼロ埋めプレフィックス + NFKC/ひらがな正規化文字列） |
 | url | string(optional) | サービスURL |
 | ogpImage / ogpDescription | string(optional) | OGP自動取得結果 |
 | customIcon | string(optional) | ファビコン取得失敗時のフォールバック表示（絵文字＋カラーコード等、FR-REC-19） |
 | memo | string(optional) | メモ（最大10,000文字） |
-| ownerType | ("user" \| "family")(optional) | 所有者種別（"user": 個人所有, "family": 家族共有）。backfill 完了までは optional |
+| ownerType | ("user" \| "family") | 所有者種別（"user": 個人所有, "family": 家族共有） |
 | ownerFamilyId | Id<families>(optional) | 共有レコードが属する家族ID（ownerType === "family" の場合） |
-| admins | Id<users>[](optional) | レコードの追加管理者（PoohMa accountId）配列。ファミリー管理者（familyRole === "admin"）は動的に管理者権限を持つため本配列には含めず、個別管理者として任命された一般メンバー（または個人レコード作成者）のみを格納する。backfill 完了までは optional |
+| admins | Id<users>[] | レコードの追加管理者（PoohMa accountId）配列。ファミリー管理者（familyRole === "admin"）は動的に管理者権限を持つため本配列には含めず、個別管理者として任命された一般メンバー（または個人レコード作成者）のみを格納する |
 | userId | string | 作成者の Firebase UID |
 | accountId | Id<users> | 作成者の PoohMa Account ID（所有権・個人レコード境界） |
-| familyId | Id<families>(optional) | 暗号化スコープ・所属家族ID |
+| familyId | Id<families> | 暗号化スコープ・所属家族ID |
 | tags | string\[] | タグ |
 | isPinned | boolean | ピン留め状態（デフォルトfalse、FR-REC-18） |
 | isArchived | boolean | アーカイブ（非表示）状態（デフォルトfalse、FR-REC-23） |
@@ -318,8 +318,8 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 | updateRequestedAt | number(optional) | 更新リクエスト日時 |
 | lastViewedAt | number(optional) | 最終ヒント閲覧日時（epoch ms）。`logRecordHintView` 実行時に更新 |
 | lastViewedByAccountId | Id<users>(optional) | 最終ヒント閲覧者のPoohMa Account ID |
-| updatedByAccountId | Id<users>(optional) | 最終更新を行ったPoohMa Account ID（`createRecord` / `updateRecord` 時に記録） |
-| revision | number(optional) | 楽観的ロック用リビジョン番号（0から開始、保存成功ごとに+1インクリメント） |
+| updatedByAccountId | Id<users> | 最終更新を行ったPoohMa Account ID（`createRecord` / `updateRecord` 時に記録） |
+| revision | number | 楽観的ロック用リビジョン番号（0から開始、保存成功ごとに+1インクリメント） |
 | isSample | boolean(optional) | サンプルデータフラグ（オンボーディング用のサンプルレコードはtrue） |
 | updatedAt | number | 更新日時 |
 
@@ -332,7 +332,7 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 | フィールド | 型 | 説明 |
 | ------------------------ | ---------------------- | ----------------------------------------- |
 | recordId | Id<serviceRecords> | 対象サービスレコード。`serviceRecords._id` を参照する |
-| stableId | string(optional) | CSVエクスポート・差分インポート突合用の安定識別子（UUID v4）。全件バックフィル完了後は実質必須 |
+| stableId | string | CSVエクスポート・差分インポート突合用の安定識別子（UUID v4） |
 | label | string(optional) | 認証情報ラベル（平文） |
 | loginId | string(optional) | ログインID（平文でサーバーに保存される） |
 | passwordHint | string(optional) | 暗号化済みパスワードヒント（Base64、E2EE暗号化対象） |
@@ -938,7 +938,6 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 | ----------------------------------------------------------------- | ------------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | getRecords | Query | authenticated | 一覧取得。家族所属時は by\_family\_sortKey インデックスで同一家族レコードを取得し、非所属時は by\_ownerType\_accountId で個人レコードを取得。フルテーブルスキャンを完全排除（Issue #137）。検索・タグ・所有者フィルタ・並び替え・取得上限（limit）に対応。credentials読み取りは有界並行（32件バッチ）で実行。既定でisArchived=falseのみ返す |
 | getRecordsPaginated | Query | authenticated | ページネーション対応の一覧取得（Convex usePaginatedQuery準拠）。ページ内レコードに対してのみcredentialsを有界並行バッチで結合し、同時I/O上限を回避 |
-
 | getArchivedRecords | Query | authenticated | アーカイブ済みレコードの一覧取得（FR-REC-23） |
 | getRecordDetail | Query | authenticated | 詳細取得（rls.tsによるrequireContentAccess制御）。adminUsersをファミリー管理者＋admins配列から動的マージして返却。取得時にrecordAccessLogへVIEWEDを記録し、lastViewedAt/Byを更新 |
 | getAvailableTags | Query | authenticated | 閲覧可能レコードから使用中タグ一覧を抽出（by\_family\_sortKey経由） |
@@ -954,6 +953,7 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 | createRecord | Mutation | familyBound | レコード新規作成（zodによるサーバー再検証、sortKey自動算出、ownerType: "user" \| "family"、credentials最大10件チェック、stableId自動生成、revision: 0初期化） |
 | updateRecord | Mutation | familyBound | レコード更新（requireAdminAccessチェックにより閲覧専用メンバーによる更新を防止、sortKey再算出、共有解除時は管理者権限を要求、revisionによる楽観的ロック競合検証、forceフラグによる強制上書き、完了時セッション自動削除） |
 | deleteRecord / deleteRecords | Mutation | familyBound | 単体／一括削除（requireAdminAccessチェック、非管理者の共有レコード削除を防止） |
+| createCredential / updateCredential / deleteCredential | Mutation | familyBound | 個別クレデンシャルの追加・更新・削除（requireAdminAccess認可、監査ログ記録） |
 | importRecords | Mutation | familyBound | CSVインポート（全件新規作成、最大500件、家族内メールアドレスの厳格突合、行ごとのバリデーション結果を返却、stableId自動生成、revision: 0初期化） |
 | bulkUpdateRecords | Mutation | familyBound | 一括タグ付与／所有設定変更（所有設定変更は確認モーダルを経由） |
 | togglePin | Mutation | familyBound | isPinnedの切り替え（FR-REC-18） |

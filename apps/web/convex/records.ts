@@ -26,6 +26,7 @@ import {
 } from "./customBuilders";
 import {
   getEffectiveAdmins,
+  getEffectiveFamilyRole,
   getEffectiveOwnerFamilyId,
   getEffectiveOwnerType,
   isRecordAdmin,
@@ -89,10 +90,11 @@ async function collectVisibleRecords(
   user: Doc<"users">,
   ownedOnly = false,
 ): Promise<Doc<"serviceRecords">[]> {
-  if (user.familyId) {
+  const familyId = user.familyId;
+  if (familyId) {
     const familyRecords = await ctx.db
       .query("serviceRecords")
-      .withIndex("by_family_sortKey", (i) => i.eq("familyId", user.familyId))
+      .withIndex("by_family_sortKey", (i) => i.eq("familyId", familyId))
       .collect();
 
     if (ownedOnly) {
@@ -168,7 +170,7 @@ function sortRecords<T extends Doc<"serviceRecords">>(
       return a.updatedAt - b.updatedAt;
     if (sort === "date-desc" || sort === "updatedAt-desc")
       return b.updatedAt - a.updatedAt;
-    return (a.sortKey || a.title).localeCompare(b.sortKey || b.title);
+    return a.sortKey.localeCompare(b.sortKey);
   });
 }
 
@@ -212,7 +214,6 @@ export const getRecords = authenticatedQuery({
         }));
         return {
           ...record,
-          revision: record.revision ?? 0,
           credentials: mappedCreds,
         };
       },
@@ -281,12 +282,11 @@ export const getRecordsPaginated = authenticatedQuery({
   handler: async (ctx, args) => {
     const { user } = ctx;
 
-    const baseQuery = user.familyId
+    const familyId = user.familyId;
+    const baseQuery = familyId
       ? ctx.db
           .query("serviceRecords")
-          .withIndex("by_family_sortKey", (i) =>
-            i.eq("familyId", user.familyId),
-          )
+          .withIndex("by_family_sortKey", (i) => i.eq("familyId", familyId))
       : ctx.db
           .query("serviceRecords")
           .withIndex("by_accountId", (i) => i.eq("accountId", user._id));
@@ -324,7 +324,6 @@ export const getRecordsPaginated = authenticatedQuery({
         }));
         return {
           ...record,
-          revision: record.revision ?? 0,
           credentials: mappedCreds,
         };
       },
@@ -369,15 +368,13 @@ export const getRecordDetail = authenticatedQuery({
     // 管理者ユーザー一覧の情報を取得（動的マージ）
     let adminDocs: (Doc<"users"> | null)[] = [];
     if (record.ownerType === "family" && record.ownerFamilyId) {
-      const familyAdmins = await ctx.db
+      const familyMembers = await ctx.db
         .query("users")
-        .filter((q) =>
-          q.and(
-            q.eq(q.field("familyId"), record.ownerFamilyId),
-            q.eq(q.field("familyRole"), "admin"),
-          ),
-        )
+        .withIndex("by_familyId", (q) => q.eq("familyId", record.ownerFamilyId))
         .collect();
+      const familyAdmins = familyMembers.filter(
+        (u) => getEffectiveFamilyRole(u) === "admin",
+      );
 
       const individualAdmins = await Promise.all(
         (record.admins ?? []).map((adminId) => ctx.db.get(adminId)),
@@ -417,13 +414,10 @@ export const getRecordDetail = authenticatedQuery({
       passwordHintDekIv: c.passwordHintDekIv,
     }));
 
-    const lastUpdateUser = record.updatedByAccountId
-      ? await ctx.db.get("users", record.updatedByAccountId)
-      : null;
+    const lastUpdateUser = await ctx.db.get("users", record.updatedByAccountId);
 
     return {
       ...record,
-      revision: record.revision ?? 0,
       credentials: mappedCredentials,
       user: recordOwner
         ? {
@@ -542,10 +536,10 @@ export const createRecord = familyBoundMutation({
       memo: args.memo,
       userId: user.userId,
       accountId: user._id,
-      familyId: user.familyId,
+      familyId: ctx.familyId,
       sortKey,
       ownerType: isFamily ? "family" : "user",
-      ownerFamilyId: isFamily ? user.familyId : undefined,
+      ownerFamilyId: isFamily ? ctx.familyId : undefined,
       admins: isFamily && user.familyRole === "viewer" ? [user._id] : [],
       tags: args.tags,
       stableId: crypto.randomUUID(),
@@ -636,7 +630,7 @@ export const updateRecord = familyBoundMutation({
           "REVISION_INVALID: revision must be a non-negative integer",
         );
       }
-      if ((record.revision ?? 0) !== args.revision) {
+      if (record.revision !== args.revision) {
         throw new Error(
           "CONFLICT: レコードが他のユーザーによって更新されました",
         );
@@ -655,7 +649,7 @@ export const updateRecord = familyBoundMutation({
       ogpDescription: args.data.ogpDescription,
       memo: args.data.memo,
       tags: args.data.tags,
-      revision: (record.revision ?? 0) + 1,
+      revision: record.revision + 1,
       updatedAt: now,
       updatedByAccountId: ctx.user._id,
     };
@@ -874,9 +868,13 @@ export const createCredential = familyBoundMutation({
       updatedAt: now,
     });
 
-    await ctx.db.patch(args.recordId, { updatedAt: now });
+    await ctx.db.patch(args.recordId, {
+      revision: record.revision + 1,
+      updatedByAccountId: ctx.user._id,
+      updatedAt: now,
+    });
 
-    const ownerType = getEffectiveOwnerType(record);
+    const ownerType = record.ownerType;
     await logAuditEvent(ctx, {
       actor: ctx.user,
       recordId: record._id,
@@ -930,9 +928,13 @@ export const updateCredential = familyBoundMutation({
       updatedAt: now,
     });
 
-    await ctx.db.patch(record._id, { updatedAt: now });
+    await ctx.db.patch(record._id, {
+      revision: record.revision + 1,
+      updatedByAccountId: ctx.user._id,
+      updatedAt: now,
+    });
 
-    const ownerType = getEffectiveOwnerType(record);
+    const ownerType = record.ownerType;
     await logAuditEvent(ctx, {
       actor: ctx.user,
       recordId: record._id,
@@ -964,9 +966,13 @@ export const deleteCredential = familyBoundMutation({
     requireAdminAccess(ctx.user, record);
 
     await ctx.db.delete(args.id);
-    await ctx.db.patch(record._id, { updatedAt: Date.now() });
+    await ctx.db.patch(record._id, {
+      revision: record.revision + 1,
+      updatedByAccountId: ctx.user._id,
+      updatedAt: Date.now(),
+    });
 
-    const ownerType = getEffectiveOwnerType(record);
+    const ownerType = record.ownerType;
     await logAuditEvent(ctx, {
       actor: ctx.user,
       recordId: record._id,
@@ -1071,6 +1077,8 @@ export const shareRecord = familyBoundMutation({
       ownerType: "family",
       ownerFamilyId: ctx.user.familyId,
       admins: ctx.user.familyRole === "viewer" ? [ctx.user._id] : [],
+      revision: record.revision + 1,
+      updatedByAccountId: ctx.user._id,
       updatedAt: Date.now(),
     });
 
@@ -1130,6 +1138,8 @@ export const unshareRecord = familyBoundMutation({
       accountId: ctx.user._id,
       ownerFamilyId: undefined,
       admins: [],
+      revision: record.revision + 1,
+      updatedByAccountId: ctx.user._id,
       updatedAt: Date.now(),
     });
 
@@ -1196,6 +1206,8 @@ export const addRecordAdmin = recordAdminMutation({
       const newAdmins = [...admins, args.targetAccountId];
       await ctx.db.patch(record._id, {
         admins: newAdmins,
+        revision: record.revision + 1,
+        updatedByAccountId: ctx.user._id,
         updatedAt: Date.now(),
       });
 
@@ -1292,6 +1304,8 @@ export const removeRecordAdmin = recordAdminMutation({
     const newAdmins = admins.filter((id) => id !== args.targetAccountId);
     await ctx.db.patch(record._id, {
       admins: newAdmins,
+      revision: record.revision + 1,
+      updatedByAccountId: ctx.user._id,
       updatedAt: Date.now(),
     });
 
@@ -1366,6 +1380,8 @@ export const bulkShareRecords = familyBoundMutation({
           ownerType: "family",
           ownerFamilyId: ctx.user.familyId,
           admins: ctx.user.familyRole === "viewer" ? [ctx.user._id] : [],
+          revision: record.revision + 1,
+          updatedByAccountId: ctx.user._id,
           updatedAt: Date.now(),
         });
         count++;
@@ -1423,6 +1439,8 @@ export const bulkUnshareRecords = familyBoundMutation({
           accountId: ctx.user._id,
           ownerFamilyId: undefined,
           admins: [],
+          revision: record.revision + 1,
+          updatedByAccountId: ctx.user._id,
           updatedAt: Date.now(),
         });
         count++;
@@ -1493,12 +1511,16 @@ export const bulkSetRecordAdmin = familyBoundMutation({
       if (args.makeAdmin && !hasAdmin) {
         await ctx.db.patch(id, {
           admins: [...admins, args.targetAccountId],
+          revision: record.revision + 1,
+          updatedByAccountId: ctx.user._id,
           updatedAt: Date.now(),
         });
         count++;
       } else if (!args.makeAdmin && hasAdmin) {
         await ctx.db.patch(id, {
           admins: admins.filter((adminId) => adminId !== args.targetAccountId),
+          revision: record.revision + 1,
+          updatedByAccountId: ctx.user._id,
           updatedAt: Date.now(),
         });
         count++;
@@ -1691,15 +1713,16 @@ export const importRecords = familyBoundMutation({
           memo: record.memo,
           userId: user.userId,
           accountId: user._id,
-          familyId: user.familyId,
+          familyId: ctx.familyId,
           sortKey,
           ownerType: isFamily ? "family" : "user",
-          ownerFamilyId: isFamily ? user.familyId : undefined,
+          ownerFamilyId: isFamily ? ctx.familyId : undefined,
           admins: resolvedAdmins,
           tags: record.tags,
           stableId: crypto.randomUUID(),
           revision: 0,
           updatedAt: now,
+          updatedByAccountId: user._id,
         });
 
         for (const [j, cred] of record.credentials.entries()) {
@@ -2378,15 +2401,16 @@ export const applyImportDiff = familyBoundMutation({
         memo: item.memo,
         userId: user.userId,
         accountId: user._id,
-        familyId: user.familyId,
+        familyId: ctx.familyId,
         sortKey,
         ownerType: isFamily ? "family" : "user",
-        ownerFamilyId: isFamily ? user.familyId : undefined,
+        ownerFamilyId: isFamily ? ctx.familyId : undefined,
         admins: resolvedAdmins,
         tags: item.tags,
         stableId: crypto.randomUUID(),
         revision: 0,
         updatedAt: now,
+        updatedByAccountId: user._id,
       });
 
       for (const [j, cred] of item.credentials.entries()) {
@@ -2412,7 +2436,7 @@ export const applyImportDiff = familyBoundMutation({
       const record = await ctx.db
         .query("serviceRecords")
         .withIndex("by_family_stableId", (q) =>
-          q.eq("familyId", user.familyId).eq("stableId", item.stableId),
+          q.eq("familyId", ctx.familyId).eq("stableId", item.stableId),
         )
         .first();
 
@@ -2440,7 +2464,7 @@ export const applyImportDiff = familyBoundMutation({
       }
 
       const patchData: Partial<Doc<"serviceRecords">> = {
-        revision: (record.revision ?? 0) + 1,
+        revision: record.revision + 1,
         updatedAt: now,
         updatedByAccountId: user._id,
       };
@@ -2472,6 +2496,8 @@ export const applyImportDiff = familyBoundMutation({
         patchData.ownerFamilyId =
           item.ownerType === "family" ? user.familyId : undefined;
         if (item.ownerType === "user") {
+          patchData.userId = user.userId;
+          patchData.accountId = user._id;
           patchData.admins = [];
         }
       }

@@ -4,6 +4,7 @@ import { api, internal } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import { resolveAccount } from "../convex/customBuilders";
 import schema from "../convex/schema";
+import { mockCryptoMaterials } from "./test-helpers";
 
 const modules = import.meta.glob("../convex/**/*.ts");
 
@@ -119,6 +120,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           userId: "existing_user_uid",
           email: "old@example.com",
           photoURL: "https://old.com/photo.png",
+          createdAt: 1000,
           updatedAt: 1000,
         });
         acc2Id = await ctx.db.insert("users", {
@@ -127,6 +129,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           email: "old@example.com",
           displayName: "設定済み名",
           photoURL: "https://old.com/photo2.png",
+          createdAt: 1000,
           updatedAt: 1000,
         });
       });
@@ -167,6 +170,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "移行テスト家族",
           updatedAt: Date.now(),
         });
@@ -175,6 +179,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           userId: "old_firebase_uid",
           email: "recreated@example.com",
           familyId,
+          createdAt: 1000,
           updatedAt: 1000,
         });
         oldAccId2 = await ctx.db.insert("users", {
@@ -183,13 +188,20 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           email: "recreated@example.com",
           displayName: "保持される名前",
           familyId,
+          createdAt: 1000,
           updatedAt: 1000,
         });
         recordId = await ctx.db.insert("serviceRecords", {
           stableId: crypto.randomUUID(),
           userId: "old_firebase_uid",
           accountId: oldAccId1,
+          familyId,
+          ownerType: "user",
+          admins: [],
           title: "旧レコード",
+          sortKey: "kyu",
+          revision: 0,
+          updatedByAccountId: oldAccId1,
           tags: [],
           updatedAt: 1000,
         });
@@ -375,6 +387,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           familyRole: "admin",
           userId: "other_user_owner",
           email: "other@example.com",
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
       });
@@ -401,6 +414,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           familyRole: "admin",
           userId: "temp",
           email: "temp@example.com",
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
         await ctx.db.delete(dummy);
@@ -441,6 +455,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 
       await t.run(async (ctx) => {
         const dummyFamily = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "削除予定家族",
           updatedAt: Date.now(),
         });
@@ -463,6 +478,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           userId: "get_acc_user",
           email: "getacc@example.com",
           familyId: danglingFamilyId,
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
         // 有効な familyId を持つアカウント
@@ -471,6 +487,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           userId: "get_acc_user",
           email: "getacc@example.com",
           familyId: validFamilyId,
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
         // 家族なしアカウント
@@ -478,6 +495,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           familyRole: "admin",
           userId: "get_acc_user",
           email: "getacc@example.com",
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
       });
@@ -513,6 +531,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "単独家族",
           updatedAt: Date.now(),
         });
@@ -521,6 +540,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           userId: "solo_family_user",
           email: "solo@example.com",
           familyId,
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
         familyRecId = await ctx.db.insert("serviceRecords", {
@@ -528,7 +548,12 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           userId: "solo_family_user",
           accountId: userAccId,
           familyId,
+          ownerType: "family",
+          admins: [],
           title: "家族レコード",
+          sortKey: "kazoku",
+          revision: 0,
+          updatedByAccountId: userAccId,
           tags: [],
           updatedAt: Date.now(),
         });
@@ -536,6 +561,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           familyRole: "admin",
           userId: "other_req_user",
           email: "other@example.com",
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
         joinReqId = await ctx.db.insert("joinRequests", {
@@ -575,6 +601,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "同居家族",
           updatedAt: Date.now(),
         });
@@ -583,6 +610,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           userId: "leaving_member_uid",
           email: "leaving@example.com",
           familyId,
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
         remainingAccId = await ctx.db.insert("users", {
@@ -590,6 +618,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           userId: "remaining_member_uid",
           email: "remaining@example.com",
           familyId,
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
         personalRecId = await ctx.db.insert("serviceRecords", {
@@ -598,7 +627,11 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           accountId: leavingAccId,
           familyId,
           ownerType: "user",
+          admins: [],
           title: "脱退者の個人レコード",
+          sortKey: "dattai-kojin",
+          revision: 0,
+          updatedByAccountId: leavingAccId,
           tags: [],
           updatedAt: Date.now(),
         });
@@ -608,7 +641,11 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           accountId: leavingAccId,
           familyId,
           ownerType: "family",
+          admins: [],
           title: "脱退者が作った共有レコード",
+          sortKey: "dattai-shoyu",
+          revision: 0,
+          updatedByAccountId: leavingAccId,
           tags: [],
           updatedAt: Date.now(),
         });
@@ -641,6 +678,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 
       await t.run(async (ctx) => {
         otherFamilyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "別家族",
           updatedAt: Date.now(),
         });
@@ -648,13 +686,20 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           familyRole: "admin",
           userId: "no_family_user",
           email: "nofam@example.com",
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
         personalRecId = await ctx.db.insert("serviceRecords", {
           stableId: crypto.randomUUID(),
           userId: "no_family_user",
           accountId: userAccId,
+          familyId: otherFamilyId,
+          ownerType: "user",
+          admins: [],
           title: "個人レコード",
+          sortKey: "kojin",
+          revision: 0,
+          updatedByAccountId: userAccId,
           tags: [],
           updatedAt: Date.now(),
         });
@@ -663,7 +708,12 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           userId: "no_family_user",
           accountId: userAccId,
           familyId: otherFamilyId,
+          ownerType: "family",
+          admins: [],
           title: "家族付きレコード",
+          sortKey: "kazoku",
+          revision: 0,
+          updatedByAccountId: userAccId,
           tags: [],
           updatedAt: Date.now(),
         });
@@ -697,6 +747,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 
       await t.run(async (ctx) => {
         sharedFamilyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "共有テスト家族",
           updatedAt: Date.now(),
         });
@@ -705,6 +756,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           userId: "delete_all_multi_user",
           email: "delmulti@example.com",
           familyId: sharedFamilyId,
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
         otherAcc = await ctx.db.insert("users", {
@@ -712,12 +764,14 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           userId: "other_member_uid",
           email: "other@example.com",
           familyId: sharedFamilyId,
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
         myAcc2 = await ctx.db.insert("users", {
           familyRole: "admin",
           userId: "delete_all_multi_user",
           email: "delmulti@example.com",
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
 
@@ -727,7 +781,11 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           accountId: myAcc1,
           familyId: sharedFamilyId,
           ownerType: "user",
+          admins: [],
           title: "個人レコード",
+          sortKey: "kojin",
+          revision: 0,
+          updatedByAccountId: myAcc1,
           tags: [],
           updatedAt: Date.now(),
         });
@@ -737,7 +795,11 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           accountId: myAcc1,
           familyId: sharedFamilyId,
           ownerType: "family",
+          admins: [],
           title: "共有レコード",
+          sortKey: "shoyu",
+          revision: 0,
+          updatedByAccountId: myAcc1,
           tags: [],
           updatedAt: Date.now(),
         });
@@ -745,7 +807,13 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           stableId: crypto.randomUUID(),
           userId: "delete_all_multi_user",
           accountId: myAcc2,
+          familyId: sharedFamilyId,
+          ownerType: "user",
+          admins: [],
           title: "家族なしレコード",
+          sortKey: "nofam",
+          revision: 0,
+          updatedByAccountId: myAcc2,
           tags: [],
           updatedAt: Date.now(),
         });
@@ -809,6 +877,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           email: "internal@example.com",
           displayName: "内部1",
           familyId: famId,
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
@@ -816,12 +885,14 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           userId: "internal_user_uid",
           email: "internal@example.com",
           displayName: "内部2",
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
         otherAccId = await ctx.db.insert("users", {
           familyRole: "admin",
           userId: "other_uid",
           email: "other@example.com",
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
       });
@@ -863,6 +934,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 
       await t.run(async (ctx) => {
         famId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "ID取得家族",
           updatedAt: Date.now(),
         });
@@ -871,12 +943,14 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           userId: "uid_fam",
           email: "fam@example.com",
           familyId: famId,
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
         userWithoutFamId = await ctx.db.insert("users", {
           familyRole: "admin",
           userId: "uid_nofam",
           email: "nofam@example.com",
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
       });
@@ -898,6 +972,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           familyRole: "admin",
           userId: "temp",
           email: "t@example.com",
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
         await ctx.db.delete(temp);
@@ -933,6 +1008,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           familyRole: "admin",
           userId: "user_device_test",
           email: "device@example.com",
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
       });
@@ -973,12 +1049,14 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           familyRole: "admin",
           userId: "login_fb_user",
           email: "loginfb@example.com",
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
         otherAccId = await ctx.db.insert("users", {
           familyRole: "admin",
           userId: "other_login_user",
           email: "other@example.com",
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
       });
@@ -1019,6 +1097,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           familyRole: "admin",
           userId: "cleanup_user_small",
           email: "clean_small@example.com",
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
 
@@ -1066,6 +1145,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           familyRole: "admin",
           userId: "cleanup_user_100",
           email: "clean100@example.com",
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
 
@@ -1097,6 +1177,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           userId: "user_bio_test",
           email: "bio@example.com",
           displayName: "生体太郎",
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
       });
@@ -1180,6 +1261,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           familyRole: "admin",
           userId: "dummy_target",
           email: "dummy@example.com",
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
       });
@@ -1206,6 +1288,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "Test Family",
           updatedAt: Date.now(),
         });
@@ -1214,6 +1297,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           userId: "viewer_user",
           email: "viewer@example.com",
           familyId,
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
       });
@@ -1241,6 +1325,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "Auth Test Family",
           updatedAt: Date.now(),
         });
@@ -1249,6 +1334,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           userId: "admin_user",
           email: "admin@example.com",
           familyId,
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
         viewerId = await ctx.db.insert("users", {
@@ -1256,6 +1342,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           userId: "viewer_user",
           email: "viewer@example.com",
           familyId,
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
         sharedRecId = await ctx.db.insert("serviceRecords", {
@@ -1269,6 +1356,8 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           ownerType: "family",
           admins: [],
           tags: [],
+          revision: 0,
+          updatedByAccountId: adminId,
           updatedAt: Date.now(),
         });
       });
@@ -1308,6 +1397,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           userId: "notif_user",
           email: "notif@example.com",
           displayName: "通知設定テスト",
+          createdAt: Date.now(),
           updatedAt: Date.now(),
         });
       });

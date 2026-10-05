@@ -71,6 +71,9 @@ flowchart TD
   - `COMPLETED`: 再暗号化データの保存と `familyId` の付け替えが正常完了。
   - `EXPIRED`: 30 分以内に完了せず失効（Crons による定期クリーンアップ対象）。
   - `ABORTED`: ユーザーによる手動中断。
+- **アクション種別 (`action`)**:
+  - `create`: 新規家族グループの作成に伴う移行。コミット時に操作者を管理者（`admin`）として設定。
+  - `join`: 既存家族グループへの参加に伴う移行。コミット時に操作者を一般メンバー（`viewer`）として設定。未指定時は既存家族の有無やメンバー数から自動判別。
 
 ---
 
@@ -361,3 +364,36 @@ PoohMa では、CSVエクスポート・インポートを単なるバックア�
 - **UI表示**:
   - `AppHeader.tsx`: ユーザーアバターの右上にオレンジ色のアニメーション点灯ランプ（`animate-ping` ＋ 固定ドット）を表示。
   - `UserMenu.tsx`: モバイルシートおよびデスクトップメニュー内の「家族管理」項目横に未処理件数バッジ（例: `1件の申請` / `1`）を表示。
+
+---
+
+## 12. レコード所有権モデル (`ownerType`) と後方互換性方針
+
+- **所有権の厳格な二分法**:
+  - `ownerType === "user"`: 個人所有レコード。作成者のアカウントにのみ紐づき、家族所属後も非公開。
+  - `ownerType === "family"`: 家族共有レコード。家族内の全員が閲覧可能であり、個別管理者（admins）またはファミリー管理者が管理。
+- **全レコード設定済み前提（後方互換フォールバックの排除）**:
+  - 本番・検証環境ともにすべてのレコードに対して `ownerType`（`"user"` または `"family"`）がマイグレーションおよび初期設定済みであり、未設定（`undefined`）レコードは存在しない。
+  - アプリケーションコード側で `getEffectiveOwnerType` などの未設定フォールバックを過剰に追加・維持することは、コードの認知的複雑性を増やし KISS 原則に反するため行わない。バックエンドおよびクライアントの所有権判定は `record.ownerType === "user"` の直接比較で一貫させる。
+
+---
+
+## 13. スキーマ必須化と整合性保証（バックフィル完了と後方互換性排除）
+
+PoohMa では、過去の機能拡張に伴い暫定的に `v.optional()` とされていたフィールドについて、ワンショットマイグレーション（[`.ai/workflows/one-shot-migration.md`](./workflows/one-shot-migration.md)）による全件バックフィル完了後に完全必須化（Non-nullable化）を実施している。
+
+### 13.1 必須化されたフィールド一覧
+
+| テーブル | 必須化されたフィールド | 整合性保証と初期値ルール |
+| :--- | :--- | :--- |
+| `families` | `masterKeyEncrypted`, `masterKeyIv`, `masterKeySalt`, `kdfIterations`, `cryptoVersion` | 家族作成時に暗号資材・KDFメタデータをアトミックに初期化。レガシー家族はバックフィル完了済み。 |
+| `users` | `createdAt` | アカウント作成（`createAccount` / `syncUser`）時に `Date.now()` で初期化。 |
+| `serviceRecords` | `familyId`, `sortKey`, `ownerType`, `admins`, `revision`, `updatedByAccountId` | レコード作成・インポート時に必須。共有設定変更・資格情報変更等の全 mutation で `updatedAt`, `revision`, `updatedByAccountId` がアトミックに同期更新される。 |
+| `pendingExportVaults` | `kdfIterations`, `cryptoVersion` | 被キック時の Vault 生成時に旧家族の KDF メタデータを完全退避。 |
+| `credentials` | `stableId` | レコード内クレデンシャルの安定識別子として作成時に UUID v4 を自動採番。 |
+
+### 13.2 整合性保証の原則
+1. **アプリ側フォールバックの排除**: スキーマで必須化されたフィールドに対して、ビジネスロジック内で `field ?? fallback` や `if (!field)` のような不要な防御コードを記述しない（KISS 原則）。
+2. **監査ログ・更新者追跡の同期**: `serviceRecords` を変更する全 mutation（`shareRecord`, `unshareRecord`, `addRecordAdmin`, `removeRecordAdmin`, `createCredential`, `updateCredential`, `deleteCredential`, `reorderCredentials` 等）において、`updatedAt` のみならず `revision: record.revision + 1` および `updatedByAccountId: ctx.user._id` を漏れなく同期更新する。
+
+

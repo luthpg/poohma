@@ -66,3 +66,16 @@ Firebase Auth および Session Cookie 管理における落とし穴と回避�
   - 外部リダイレクトやブラウザリロードを跨いで引き継ぐ一時データ（リダイレクト復帰先 URL、暗号化ドラフト退避データ等）は、**`localStorage` のみに一本化**する。
   - TTL（有効期限）をメタデータとして保持させ、復元完了時または期限切れ時に確実に `removeItem` で消去する。
   - 「保険のつもりで `sessionStorage` にも書く」冗長な二重化コードは書かない。
+
+---
+
+### スリープ復帰時等の過渡期における Convex クエリ発行ガード（Firebase Auth と Convex Auth の非同期ライフサイクル乖離）
+
+- **問題**: PCのスリープ復帰やネットワーク再接続時、ブラウザ側コンソールや Convex Cloud 上で `Server Error: Unauthenticated` や `TypeError: Failed to fetch` が連鎖発生する。
+- **原因**:
+  1. クライアント側のメモリ上では Firebase Auth（`useAuth().isAuthenticated`）は即座に `true` のまま維持される。
+  2. しかし、Convex の WebSocket 接続（`convex/react`）はスリープ中に切断（Code 1006）されており、再接続・トークン再送が完了するまで一時的に未認証（`useConvexAuth().isAuthenticated === false`）となる。
+  3. `useQuery(api.users.getAccounts, isAuthenticated ? {} : "skip")` のように Firebase Auth の認証フラグで Convex クエリを発行してしまうと、WebSocket 再接続完了前にクエリが送信され、バックエンドの `identityVerifiedQuery` で `Unauthenticated` 例外がスローされて Server Error となる。
+- **回避法**:
+  - Convex の Query / Mutation 発行ガード（skip 制御）には、Firebase Auth ではなく **`useConvexAuth().isAuthenticated`** を用いる。
+  - バックエンド側で例外を握りつぶして空配列等を返す小手先対応は行わない（空配列を返すとアカウント未作成判定となり、画面が未作成へ誤リダイレクトされるため）。Single Source of Truth に基づき、Convex レベルの認証完了を待ってクエリを発行する。

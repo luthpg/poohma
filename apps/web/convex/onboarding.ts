@@ -134,6 +134,7 @@ export const insertSampleRecords = familyBoundMutation({
         isSample: true,
         revision: 0,
         updatedAt: now,
+        updatedByAccountId: user._id,
       });
 
       // credentials テーブルへ挿入

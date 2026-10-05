@@ -169,13 +169,77 @@ async function runBackup(env: Env): Promise<{ fileName: string }> {
     );
   }
 
-  console.log(`[Backup] 4. Saving zip to Cloudflare R2...`);
+  console.log(`[Backup] 4. Validating and streaming zip to Cloudflare R2...`);
+
+  if (!downloadRes.body) {
+    throw new Error("[Backup] Response body is empty");
+  }
+
+  const reader = downloadRes.body.getReader();
+  const initialChunks: Uint8Array[] = [];
+  let accumulatedLength = 0;
+
+  while (accumulatedLength < 4) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value && value.length > 0) {
+      initialChunks.push(value);
+      accumulatedLength += value.length;
+    }
+  }
+
+  if (accumulatedLength < 4) {
+    throw new Error(
+      `[Backup] Downloaded zip is corrupted or empty (size < 4 bytes, actual: ${accumulatedLength} bytes)`,
+    );
+  }
+
+  // 先頭4バイトを抽出して検証
+  const header = new Uint8Array(4);
+  let offset = 0;
+  for (const chunk of initialChunks) {
+    const copyLength = Math.min(chunk.length, 4 - offset);
+    header.set(chunk.subarray(0, copyLength), offset);
+    offset += copyLength;
+    if (offset >= 4) break;
+  }
+
+  const isZip =
+    header[0] === 0x50 &&
+    header[1] === 0x4b &&
+    header[2] === 0x03 &&
+    header[3] === 0x04;
+  if (!isZip) {
+    throw new Error(
+      `[Backup] Downloaded file lacks valid ZIP magic number (header: ${Array.from(header).join(",")})`,
+    );
+  }
+
+  // 読み取った全初期チャンクと残りのストリームを結合して R2 へストリーミング転送
+  const combinedStream = new ReadableStream({
+    start(controller) {
+      for (const chunk of initialChunks) {
+        controller.enqueue(chunk);
+      }
+    },
+    async pull(controller) {
+      const { done, value } = await reader.read();
+      if (done) {
+        controller.close();
+      } else {
+        controller.enqueue(value);
+      }
+    },
+    cancel(reason) {
+      return reader.cancel(reason);
+    },
+  });
 
   // 4. Cloudflare R2 への保存
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const fileName = `convex_backup_${timestamp}.zip`;
 
-  await env.BACKUP_BUCKET.put(fileName, downloadRes.body, {
+  await env.BACKUP_BUCKET.put(fileName, combinedStream, {
     httpMetadata: {
       contentType: "application/zip",
     },

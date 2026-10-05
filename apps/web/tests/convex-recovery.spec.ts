@@ -1,8 +1,9 @@
-import { convexTest } from "convex-test";
+﻿import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
 import { api } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import schema from "../convex/schema";
+import { mockCryptoMaterials } from "./test-helpers";
 
 const modules = import.meta.glob("../convex/**/*.ts");
 
@@ -14,6 +15,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 
     await t.run(async (ctx) => {
       familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "佐藤家",
         masterKeyEncrypted: "OriginalMasterKeyEncryptedBase64==",
         masterKeyIv: "OriginalIvBase64==",
@@ -21,6 +23,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
         updatedAt: Date.now(),
       });
       await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_sato",
         email: "sato@example.com",
@@ -95,11 +98,13 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 
     await t.run(async (ctx) => {
       const familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Viewer Recovery Family",
         updatedAt: Date.now(),
       });
 
       await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "viewer",
         userId: "user_viewer_rec",
         email: "viewer_rec@example.com",
@@ -129,6 +134,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
     let familyId!: Id<"families">;
     await t.run(async (ctx) => {
       familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "旧式キット家族",
         masterKeyEncrypted: "MasterKey==",
         masterKeyIv: "MasterIv==",
@@ -140,6 +146,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
         updatedAt: Date.now(),
       });
       await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_legacy_recovery_kit",
         email: "legacy@example.com",
@@ -175,6 +182,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 
     await t.run(async (ctx) => {
       familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "鈴木家",
         masterKeyEncrypted: "OldMasterKeyBase64==",
         masterKeyIv: "OldIvBase64==",
@@ -189,6 +197,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
         updatedAt: Date.now(),
       });
       await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_suzuki",
         email: "suzuki@example.com",
@@ -349,12 +358,14 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 
     await t.run(async (ctx) => {
       await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_nofam",
         email: "nofam@example.com",
         updatedAt: Date.now(),
       });
       familyNoKitId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "木村家",
         masterKeyEncrypted: "MasterKeyKimura==",
         masterKeyIv: "IvKimura==",
@@ -362,6 +373,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
         updatedAt: Date.now(),
       });
       await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_fam_nokit",
         email: "famnokit@example.com",
@@ -369,6 +381,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
         updatedAt: Date.now(),
       });
       familyWithKitNoOtpId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "野村家",
         masterKeyEncrypted: "MasterKeyNomura==",
         masterKeyIv: "IvNomura==",
@@ -381,6 +394,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
         updatedAt: Date.now(),
       });
       await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_fam_with_kit_no_otp",
         email: "famkitnootp@example.com",
@@ -436,6 +450,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
     let userWithKitId!: Id<"users">;
     await t.run(async (ctx) => {
       familyWithKitId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "高橋家",
         masterKeyEncrypted: "Enc==",
         masterKeyIv: "Iv==",
@@ -448,6 +463,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
         updatedAt: Date.now(),
       });
       userWithKitId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_takahashi",
         email: "takahashi@example.com",
@@ -491,6 +507,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
     await t.run(async (ctx) => {
       // 家族A（リカバリーキット発行済み）
       familyAId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "田中家本家",
         masterKeyEncrypted: "MasterKeyA==",
         masterKeyIv: "IvA==",
@@ -502,6 +519,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
         updatedAt: Date.now(),
       });
       accountAId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: sharedFirebaseUid,
         email: "multi@example.com",
@@ -512,6 +530,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
 
       // 家族B（新規作成、リカバリーキット未発行）
       familyBId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "田中家分家",
         masterKeyEncrypted: "MasterKeyB==",
         masterKeyIv: "IvB==",
@@ -519,6 +538,7 @@ describe("2.4 リカバリーキット・2段階復元のバックエンド統�
         updatedAt: Date.now(),
       });
       accountBId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: sharedFirebaseUid,
         email: "multi@example.com",

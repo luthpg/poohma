@@ -35,10 +35,14 @@ export async function resolveAccount(
       throw new Error("Unauthorized");
     }
   } else {
-    user = await ctx.db
+    const users = await ctx.db
       .query("users")
       .withIndex("by_userId", (q) => q.eq("userId", identity.subject))
-      .first();
+      .take(2);
+    if (users.length > 1) {
+      throw new Error("Account ID is required for multi-account users");
+    }
+    user = users[0] ?? null;
   }
 
   if (!user) throw new Error("User not found in DB");

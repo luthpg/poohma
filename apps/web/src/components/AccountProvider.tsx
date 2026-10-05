@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { useMutation, useQuery } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import type React from "react";
 import {
   createContext,
@@ -58,6 +58,18 @@ export interface AccountContextValue {
 
 export const AccountContext = createContext<AccountContextValue | null>(null);
 
+function setActiveAccountCookie(accountId: string | null) {
+  if (typeof document === "undefined") return;
+  if (accountId) {
+    // biome-ignore lint/suspicious/noDocumentCookie: SSR同期用のアクティブアカウントIDCookie設定のため
+    document.cookie = `poohma_active_account_id=${encodeURIComponent(accountId)}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax; Secure`;
+  } else {
+    // biome-ignore lint/suspicious/noDocumentCookie: SSR同期用のアクティブアカウントIDCookie削除のため
+    document.cookie =
+      "poohma_active_account_id=; path=/; max-age=0; SameSite=Lax; Secure";
+  }
+}
+
 export function AccountProvider({
   children,
   initialUser,
@@ -82,6 +94,7 @@ export function AccountProvider({
   const router = useRouter();
   const queryClient = useQueryClient();
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { isAuthenticated: isConvexAuthenticated } = useConvexAuth();
   const currentUid =
     auth?.currentUser?.uid || initialUser?.accounts?.[0]?.userId;
 
@@ -91,7 +104,7 @@ export function AccountProvider({
 
   const fetchedAccounts = useQuery(
     api.users.getAccounts,
-    isAuthenticated ? {} : "skip",
+    isConvexAuthenticated ? {} : "skip",
   );
 
   const createAccountMutation = useMutation(api.users.createAccount);
@@ -106,7 +119,10 @@ export function AccountProvider({
         const stored =
           localStorage.getItem(key) ||
           localStorage.getItem("poohma_active_account_id");
-        if (stored) return stored as Id<"users">;
+        if (stored) {
+          setActiveAccountCookie(stored);
+          return stored as Id<"users">;
+        }
       }
       return initialUser?.accountId || null;
     },
@@ -141,6 +157,7 @@ export function AccountProvider({
         localStorage.getItem("poohma_active_account_id");
       if (stored) {
         setActiveAccountId(stored as Id<"users">);
+        setActiveAccountCookie(stored);
       }
     }
   }, [currentUid, getStorageKey]);
@@ -165,6 +182,7 @@ export function AccountProvider({
           }
         }
         setActiveAccountId(targetId);
+        setActiveAccountCookie(targetId);
       }
     }
   }, [accounts, activeAccountId, currentUid, getStorageKey]);
@@ -186,6 +204,7 @@ export function AccountProvider({
 
       // 2. アクティブアカウントの切り替え
       setActiveAccountId(accountId);
+      setActiveAccountCookie(accountId);
       if (typeof window !== "undefined") {
         localStorage.setItem(getStorageKey(currentUid), accountId);
         // レガシーキーも更新
@@ -204,6 +223,7 @@ export function AccountProvider({
       clearQueryCache();
       await queryClient.invalidateQueries();
       setActiveAccountId(newAccountId);
+      setActiveAccountCookie(newAccountId);
       if (typeof window !== "undefined") {
         localStorage.setItem(getStorageKey(currentUid), newAccountId);
         localStorage.setItem("poohma_active_account_id", newAccountId);
@@ -228,12 +248,14 @@ export function AccountProvider({
           // biome-ignore lint/style/noNonNullAssertion: 1 account 以上は必ずある
           const nextId = remaining[0]!._id;
           setActiveAccountId(nextId);
+          setActiveAccountCookie(nextId);
           if (typeof window !== "undefined") {
             localStorage.setItem(getStorageKey(currentUid), nextId);
             localStorage.setItem("poohma_active_account_id", nextId);
           }
         } else {
           setActiveAccountId(null);
+          setActiveAccountCookie(null);
           if (typeof window !== "undefined") {
             localStorage.removeItem(getStorageKey(currentUid));
             localStorage.removeItem("poohma_active_account_id");

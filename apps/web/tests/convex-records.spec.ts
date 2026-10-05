@@ -7,6 +7,7 @@ import { api, internal } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import schema from "../convex/schema";
 import { computeSortKey } from "../src/utils/index-group";
+import { mockCryptoMaterials } from "./test-helpers";
 
 const modules = import.meta.glob("../convex/**/*.ts");
 
@@ -45,12 +46,14 @@ describe("2.2.1 閲覧権限（ownerType）の境界値テスト (Convex版)", (
     await t.run(async (ctx) => {
       // 家族1
       family1Id = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Family 1",
         updatedAt: Date.now(),
       });
 
       // ユーザーA と ユーザーB (家族1所属)
       userAId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_a",
         email: "a@example.com",
@@ -59,6 +62,7 @@ describe("2.2.1 閲覧権限（ownerType）の境界値テスト (Convex版)", (
       });
 
       await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_b",
         email: "b@example.com",
@@ -68,6 +72,7 @@ describe("2.2.1 閲覧権限（ownerType）の境界値テスト (Convex版)", (
 
       // ユーザーC (家族未所属)
       await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_c",
         email: "c@example.com",
@@ -79,6 +84,8 @@ describe("2.2.1 閲覧権限（ownerType）の境界値テスト (Convex版)", (
         stableId: crypto.randomUUID(),
         userId: "user_a",
         accountId: userAId,
+        revision: 0,
+        updatedByAccountId: userAId,
         familyId: family1Id,
         title: "Private Record A",
         sortKey: computeSortKey("Private Record A"),
@@ -93,6 +100,8 @@ describe("2.2.1 閲覧権限（ownerType）の境界値テスト (Convex版)", (
         stableId: crypto.randomUUID(),
         userId: "user_a",
         accountId: userAId,
+        revision: 0,
+        updatedByAccountId: userAId,
         familyId: family1Id,
         ownerFamilyId: family1Id,
         title: "Shared Record A",
@@ -193,11 +202,13 @@ describe("2.2.3 CSVインポートのバリデーションと境界値 (Convex�
 
     await t.run(async (ctx) => {
       familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "CSV Test Family",
         updatedAt: Date.now(),
       });
 
       await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "csv_user",
         email: "csv@example.com",
@@ -265,11 +276,13 @@ describe("2.2.3 CSVインポートのバリデーションと境界値 (Convex�
 
     await t.run(async (ctx) => {
       familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Limit Test Family",
         updatedAt: Date.now(),
       });
 
       await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "limit_user",
         email: "limit@example.com",
@@ -300,6 +313,7 @@ describe("2.2.3 CSVインポートのバリデーションと境界値 (Convex�
 
     await t.run(async (ctx) => {
       await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "no_family_user",
         email: "nofamily@example.com",
@@ -333,11 +347,13 @@ describe("2.2.3 CSVインポートのバリデーションと境界値 (Convex�
 
     await t.run(async (ctx) => {
       familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Tag Limit Test Family",
         updatedAt: Date.now(),
       });
 
       await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "tag_limit_user",
         email: "taglimit@example.com",
@@ -386,11 +402,13 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
 
     await t.run(async (ctx) => {
       family1Id = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Family 1",
         updatedAt: Date.now(),
       });
 
       userAId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_a",
         email: "a@example.com",
@@ -399,6 +417,7 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
       });
 
       userBId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_b",
         email: "b@example.com",
@@ -411,6 +430,8 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
         stableId: crypto.randomUUID(),
         userId: "user_a",
         accountId: userAId,
+        revision: 0,
+        updatedByAccountId: userAId,
         familyId: family1Id,
         title: "A's Private",
         sortKey: computeSortKey("A's Private"),
@@ -425,6 +446,8 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
         stableId: crypto.randomUUID(),
         userId: "user_b",
         accountId: userBId,
+        revision: 0,
+        updatedByAccountId: userBId,
         familyId: family1Id,
         ownerFamilyId: family1Id,
         title: "B's Shared",
@@ -457,11 +480,13 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
 
     await t.run(async (ctx) => {
       familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Test Family",
         updatedAt: Date.now(),
       });
 
       userAId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_a",
         email: "a@example.com",
@@ -470,6 +495,7 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
       });
 
       await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "viewer",
         userId: "user_b",
         email: "b@example.com",
@@ -481,6 +507,8 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
         stableId: crypto.randomUUID(),
         userId: "user_a",
         accountId: userAId,
+        revision: 0,
+        updatedByAccountId: userAId,
         familyId,
         title: "Record To Share",
         sortKey: computeSortKey("Record To Share"),
@@ -531,11 +559,13 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
 
     await t.run(async (ctx) => {
       familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Test Family",
         updatedAt: Date.now(),
       });
 
       userAId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_a",
         email: "a@example.com",
@@ -544,6 +574,7 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
       });
 
       userBId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "viewer",
         userId: "user_b",
         email: "b@example.com",
@@ -555,6 +586,8 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
         stableId: crypto.randomUUID(),
         userId: "user_a",
         accountId: userAId,
+        revision: 0,
+        updatedByAccountId: userAId,
         familyId,
         ownerFamilyId: familyId,
         title: "Shared Record",
@@ -601,11 +634,13 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
 
     await t.run(async (ctx) => {
       familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Test Family",
         updatedAt: Date.now(),
       });
 
       userAId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_a",
         email: "a@example.com",
@@ -617,6 +652,8 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
         stableId: crypto.randomUUID(),
         userId: "user_a",
         accountId: userAId,
+        revision: 0,
+        updatedByAccountId: userAId,
         familyId,
         title: "R1",
         sortKey: computeSortKey("R1"),
@@ -630,6 +667,8 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
         stableId: crypto.randomUUID(),
         userId: "user_a",
         accountId: userAId,
+        revision: 0,
+        updatedByAccountId: userAId,
         familyId,
         title: "R2",
         sortKey: computeSortKey("R2"),
@@ -686,11 +725,13 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
 
     await t.run(async (ctx) => {
       familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Test Family",
         updatedAt: Date.now(),
       });
 
       userAId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_a",
         email: "a@example.com",
@@ -702,6 +743,8 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
         stableId: crypto.randomUUID(),
         userId: "user_a",
         accountId: userAId,
+        revision: 0,
+        updatedByAccountId: userAId,
         familyId,
         title: "Amazon",
         titleReading: "あまぞん",
@@ -744,10 +787,12 @@ describe("レコード削除・一括操作の認可検証 (deleteRecord / delet
 
     await t.run(async (ctx) => {
       const familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Test Family",
         updatedAt: Date.now(),
       });
       userAId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_a",
         email: "a@example.com",
@@ -755,6 +800,7 @@ describe("レコード削除・一括操作の認可検証 (deleteRecord / delet
         updatedAt: Date.now(),
       });
       await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_b",
         email: "b@example.com",
@@ -766,6 +812,8 @@ describe("レコード削除・一括操作の認可検証 (deleteRecord / delet
         stableId: crypto.randomUUID(),
         userId: "user_a",
         accountId: userAId,
+        revision: 0,
+        updatedByAccountId: userAId,
         familyId,
         title: "User A Record",
         sortKey: computeSortKey("User A Record"),
@@ -793,10 +841,12 @@ describe("レコード削除・一括操作の認可検証 (deleteRecord / delet
     let othersPrivateId!: Id<"serviceRecords">;
     await t.run(async (ctx) => {
       family1Id = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Family 1",
         updatedAt: Date.now(),
       });
       const userAId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_bulk_a",
         email: "bulka@example.com",
@@ -804,6 +854,7 @@ describe("レコード削除・一括操作の認可検証 (deleteRecord / delet
         updatedAt: Date.now(),
       });
       const userBId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_bulk_b",
         email: "bulkb@example.com",
@@ -814,6 +865,8 @@ describe("レコード削除・一括操作の認可検証 (deleteRecord / delet
         stableId: crypto.randomUUID(),
         userId: "user_bulk_b",
         accountId: userBId,
+        revision: 0,
+        updatedByAccountId: userBId,
         familyId: family1Id,
         title: "Bの自分のレコード",
         sortKey: computeSortKey("Bの自分のレコード"),
@@ -826,6 +879,8 @@ describe("レコード削除・一括操作の認可検証 (deleteRecord / delet
         stableId: crypto.randomUUID(),
         userId: "user_bulk_a",
         accountId: userAId,
+        revision: 0,
+        updatedByAccountId: userAId,
         familyId: family1Id,
         title: "Aの個人レコード",
         sortKey: computeSortKey("Aの個人レコード"),
@@ -857,10 +912,12 @@ describe("レコード削除・一括操作の認可検証 (deleteRecord / delet
     let sharedRecordId!: Id<"serviceRecords">;
     await t.run(async (ctx) => {
       const familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Family Shared",
         updatedAt: Date.now(),
       });
       const userAId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_bulk_owner",
         email: "bulkowner@example.com",
@@ -868,6 +925,7 @@ describe("レコード削除・一括操作の認可検証 (deleteRecord / delet
         updatedAt: Date.now(),
       });
       await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "viewer",
         userId: "user_bulk_member",
         email: "bulkmember@example.com",
@@ -878,6 +936,8 @@ describe("レコード削除・一括操作の認可検証 (deleteRecord / delet
         stableId: crypto.randomUUID(),
         userId: "user_bulk_owner",
         accountId: userAId,
+        revision: 0,
+        updatedByAccountId: userAId,
         familyId,
         ownerFamilyId: familyId,
         title: "共有レコード",
@@ -917,14 +977,17 @@ describe("レコード削除・一括操作の認可検証 (deleteRecord / delet
     const t = convexTest(schema, modules);
     await t.run(async (ctx) => {
       const family1Id = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Family 1",
         updatedAt: Date.now(),
       });
       const family2Id = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Family 2",
         updatedAt: Date.now(),
       });
       const user1Id = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "u1",
         email: "u1@example.com",
@@ -932,6 +995,7 @@ describe("レコード削除・一括操作の認可検証 (deleteRecord / delet
         updatedAt: Date.now(),
       });
       const user2Id = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "u2",
         email: "u2@example.com",
@@ -946,6 +1010,8 @@ describe("レコード削除・一括操作の認可検証 (deleteRecord / delet
         stableId: crypto.randomUUID(),
         userId: "u1",
         accountId: user1Id,
+        revision: 0,
+        updatedByAccountId: user1Id,
         familyId: family1Id,
         title: "Shared Record",
         sortKey: computeSortKey("Shared Record"),
@@ -961,10 +1027,13 @@ describe("レコード削除・一括操作の認可検証 (deleteRecord / delet
         stableId: crypto.randomUUID(),
         userId: "u1",
         accountId: user1Id,
+        revision: 0,
+        updatedByAccountId: user1Id,
         familyId: family1Id,
         title: "Private Record",
         sortKey: computeSortKey("Private Record"),
         ownerType: "user",
+        admins: [],
         tags: [],
         updatedAt: Date.now(),
       });
@@ -1008,10 +1077,12 @@ describe("レコード削除・一括操作の認可検証 (deleteRecord / delet
 
     await t.run(async (ctx) => {
       const familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Order Test Family",
         updatedAt: Date.now(),
       });
       const accountId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_order",
         email: "order@example.com",
@@ -1023,6 +1094,11 @@ describe("レコード削除・一括操作の認可検証 (deleteRecord / delet
         userId: "user_order",
         accountId,
         familyId,
+        ownerType: "user",
+        admins: [],
+        sortKey: computeSortKey("Order Test Record"),
+        revision: 0,
+        updatedByAccountId: accountId,
         title: "Order Test Record",
         tags: [],
         updatedAt: Date.now(),
@@ -1080,11 +1156,13 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
 
     await t.run(async (ctx) => {
       familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Export Family",
         updatedAt: Date.now(),
       });
 
       userAId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_export_a",
         email: "export_a@example.com",
@@ -1094,6 +1172,7 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
       });
 
       userBId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_export_b",
         email: "export_b@example.com",
@@ -1106,10 +1185,14 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
       personalRecAId = await ctx.db.insert("serviceRecords", {
         stableId: crypto.randomUUID(),
         title: "A Personal Record",
+        sortKey: computeSortKey("A Personal Record"),
         userId: "user_export_a",
         accountId: userAId,
+        revision: 0,
+        updatedByAccountId: userAId,
         familyId,
         ownerType: "user",
+        admins: [],
         tags: [],
         updatedAt: Date.now(),
       });
@@ -1118,8 +1201,11 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
       await ctx.db.insert("serviceRecords", {
         stableId: crypto.randomUUID(),
         title: "Shared Admin A Record",
+        sortKey: computeSortKey("Shared Admin A Record"),
         userId: "user_export_a",
         accountId: userAId,
+        revision: 0,
+        updatedByAccountId: userAId,
         familyId,
         ownerType: "family",
         ownerFamilyId: familyId,
@@ -1132,8 +1218,11 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
       await ctx.db.insert("serviceRecords", {
         stableId: crypto.randomUUID(),
         title: "Shared Admin B Record",
+        sortKey: computeSortKey("Shared Admin B Record"),
         userId: "user_export_b",
         accountId: userBId,
+        revision: 0,
+        updatedByAccountId: userBId,
         familyId,
         ownerType: "family",
         ownerFamilyId: familyId,
@@ -1146,10 +1235,14 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
       await ctx.db.insert("serviceRecords", {
         stableId: crypto.randomUUID(),
         title: "B Personal Record",
+        sortKey: computeSortKey("B Personal Record"),
         userId: "user_export_b",
         accountId: userBId,
+        revision: 0,
+        updatedByAccountId: userBId,
         familyId,
         ownerType: "user",
+        admins: [],
         tags: [],
         updatedAt: Date.now(),
       });
@@ -1212,11 +1305,13 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
 
     await t.run(async (ctx) => {
       familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Viewer Export Family",
         updatedAt: Date.now(),
       });
 
       userAId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_admin_a",
         email: "admin_a@example.com",
@@ -1226,6 +1321,7 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
       });
 
       userCId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "viewer",
         userId: "user_viewer_c",
         email: "viewer_c@example.com",
@@ -1238,10 +1334,14 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
       await ctx.db.insert("serviceRecords", {
         stableId: crypto.randomUUID(),
         title: "A Personal Secret",
+        sortKey: computeSortKey("A Personal Secret"),
         userId: "user_admin_a",
         accountId: userAId,
+        revision: 0,
+        updatedByAccountId: userAId,
         familyId,
         ownerType: "user",
+        admins: [],
         tags: [],
         updatedAt: Date.now(),
       });
@@ -1250,10 +1350,14 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
       await ctx.db.insert("serviceRecords", {
         stableId: crypto.randomUUID(),
         title: "C Personal Record",
+        sortKey: computeSortKey("C Personal Record"),
         userId: "user_viewer_c",
         accountId: userCId,
+        revision: 0,
+        updatedByAccountId: userCId,
         familyId,
         ownerType: "user",
+        admins: [],
         tags: [],
         updatedAt: Date.now(),
       });
@@ -1262,8 +1366,11 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
       await ctx.db.insert("serviceRecords", {
         stableId: crypto.randomUUID(),
         title: "Family Shared WiFi",
+        sortKey: computeSortKey("Family Shared WiFi"),
         userId: "user_admin_a",
         accountId: userAId,
+        revision: 0,
+        updatedByAccountId: userAId,
         familyId,
         ownerType: "family",
         ownerFamilyId: familyId,
@@ -1300,6 +1407,7 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
 
     await t.run(async (ctx) => {
       await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_legit_a",
         email: "legit_a@example.com",
@@ -1307,6 +1415,7 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
       });
 
       userBId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_victim_b",
         email: "victim_b@example.com",
@@ -1339,11 +1448,13 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
 
     await t.run(async (ctx) => {
       familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Family Concurrency",
         updatedAt: Date.now(),
       });
 
       userAId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_a",
         email: "a@example.com",
@@ -1353,6 +1464,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
       });
 
       userBId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_b",
         email: "b@example.com",
@@ -1365,6 +1477,8 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
         stableId: crypto.randomUUID(),
         userId: "user_a",
         accountId: userAId,
+        revision: 0,
+        updatedByAccountId: userAId,
         familyId,
         ownerFamilyId: familyId,
         title: "Concurrent Record",
@@ -1434,11 +1548,13 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
 
     await t.run(async (ctx) => {
       familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Family TTL",
         updatedAt: Date.now(),
       });
 
       userAId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_a",
         email: "a@example.com",
@@ -1450,6 +1566,8 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
         stableId: crypto.randomUUID(),
         userId: "user_a",
         accountId: userAId,
+        revision: 0,
+        updatedByAccountId: userAId,
         familyId,
         ownerFamilyId: familyId,
         title: "TTL Record",
@@ -1491,10 +1609,12 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
 
     await t.run(async (ctx) => {
       const familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Cleanup Family",
         updatedAt: now,
       });
       const accountId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "cleanup_user",
         email: "cleanup@example.com",
@@ -1505,8 +1625,11 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
         stableId: crypto.randomUUID(),
         userId: "cleanup_user",
         accountId,
+        revision: 0,
+        updatedByAccountId: accountId,
         familyId,
         title: "Cleanup Record",
+        sortKey: computeSortKey("Cleanup Record"),
         ownerType: "user",
         admins: [],
         tags: [],
@@ -1549,11 +1672,13 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
 
     await t.run(async (ctx) => {
       familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Family Conflict",
         updatedAt: Date.now(),
       });
 
       userAId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_a",
         email: "a@example.com",
@@ -1563,6 +1688,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
       });
 
       await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_b",
         email: "b@example.com",
@@ -1575,6 +1701,8 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
         stableId: crypto.randomUUID(),
         userId: "user_a",
         accountId: userAId,
+        revision: 0,
+        updatedByAccountId: userAId,
         familyId,
         ownerFamilyId: familyId,
         title: "Original Title",
@@ -1582,7 +1710,6 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
         ownerType: "family",
         admins: [userAId],
         tags: [],
-        revision: 0,
         updatedAt: 5000,
       });
     });
@@ -1674,11 +1801,13 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
 
     await t.run(async (ctx) => {
       familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Chunk Test Family",
         updatedAt: Date.now(),
       });
 
       userAId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_chunk_a",
         email: "chunk_a@example.com",
@@ -1692,6 +1821,8 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
           stableId: crypto.randomUUID(),
           userId: "user_chunk_a",
           accountId: userAId,
+          revision: 0,
+          updatedByAccountId: userAId,
           familyId,
           title: `Service ${i.toString().padStart(3, "0")}`,
           sortKey: `01_service_${i.toString().padStart(3, "0")}`,
@@ -1758,11 +1889,13 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
 
     await t.run(async (ctx) => {
       familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Limit Test Family",
         updatedAt: Date.now(),
       });
 
       userAId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_limit_a",
         email: "limit_a@example.com",
@@ -1775,6 +1908,8 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
           stableId: crypto.randomUUID(),
           userId: "user_limit_a",
           accountId: userAId,
+          revision: 0,
+          updatedByAccountId: userAId,
           familyId,
           title: `Limit Service ${i}`,
           sortKey: `01_service_${i}`,
@@ -1823,11 +1958,13 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
 
     await t.run(async (ctx) => {
       familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Paginated Test Family",
         updatedAt: Date.now(),
       });
 
       userAId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_paginated_a",
         email: "paginated_a@example.com",
@@ -1840,6 +1977,8 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
           stableId: crypto.randomUUID(),
           userId: "user_paginated_a",
           accountId: userAId,
+          revision: 0,
+          updatedByAccountId: userAId,
           familyId,
           title: `Paginated Service ${i}`,
           sortKey: `01_service_${i}`,
@@ -1922,10 +2061,12 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
 
     await t.run(async (ctx) => {
       familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Bulk Admin Family",
         updatedAt: Date.now(),
       });
       userAId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "user_a",
         email: "a@example.com",
@@ -1933,6 +2074,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
         updatedAt: Date.now(),
       });
       viewerId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "viewer",
         userId: "viewer_b",
         email: "b@example.com",
@@ -1944,6 +2086,8 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
         stableId: crypto.randomUUID(),
         userId: "user_a",
         accountId: userAId,
+        revision: 0,
+        updatedByAccountId: userAId,
         familyId,
         ownerFamilyId: familyId,
         title: "Shared 1",
@@ -1957,6 +2101,8 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
         stableId: crypto.randomUUID(),
         userId: "user_a",
         accountId: userAId,
+        revision: 0,
+        updatedByAccountId: userAId,
         familyId,
         ownerFamilyId: familyId,
         title: "Shared 2",
@@ -2027,10 +2173,12 @@ describe("2.2.14 CSV差分インポート・安定ID（stableId）検証", () =>
 
     await t.run(async (ctx) => {
       const familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Diff Family",
         updatedAt: Date.now(),
       });
       const userId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "diff_user",
         email: "diff@example.com",
@@ -2043,7 +2191,12 @@ describe("2.2.14 CSV差分インポート・安定ID（stableId）検証", () =>
         memo: "Original Memo",
         userId: "diff_user",
         accountId: userId,
+        revision: 0,
+        updatedByAccountId: userId,
         familyId,
+        sortKey: computeSortKey("Diff Target Service"),
+        ownerType: "user",
+        admins: [],
         stableId: stableUUID,
         tags: ["work"],
         updatedAt: Date.now(),
@@ -2092,10 +2245,12 @@ describe("2.2.14 CSV差分インポート・安定ID（stableId）検証", () =>
 
     await t.run(async (ctx) => {
       const familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Diff Viewer Family",
         updatedAt: Date.now(),
       });
       const adminUserId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "diff_admin",
         email: "diff_admin@example.com",
@@ -2103,6 +2258,7 @@ describe("2.2.14 CSV差分インポート・安定ID（stableId）検証", () =>
         updatedAt: Date.now(),
       });
       await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "viewer",
         userId: "diff_viewer",
         email: "diff_viewer@example.com",
@@ -2114,7 +2270,10 @@ describe("2.2.14 CSV差分インポート・安定ID（stableId）検証", () =>
         url: "https://diff-shared.example.com",
         userId: "diff_admin",
         accountId: adminUserId,
+        revision: 0,
+        updatedByAccountId: adminUserId,
         familyId,
+        sortKey: computeSortKey("Family Shared Service"),
         ownerType: "family",
         ownerFamilyId: familyId,
         admins: [adminUserId],
@@ -2147,10 +2306,12 @@ describe("2.2.14 CSV差分インポート・安定ID（stableId）検証", () =>
 
     await t.run(async (ctx) => {
       familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "ApplyDiff Family",
         updatedAt: Date.now(),
       });
       const userId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "apply_user",
         email: "apply@example.com",
@@ -2163,7 +2324,12 @@ describe("2.2.14 CSV差分インポート・安定ID（stableId）検証", () =>
         memo: "Keep this memo",
         userId: "apply_user",
         accountId: userId,
+        revision: 0,
+        updatedByAccountId: userId,
         familyId,
+        sortKey: computeSortKey("Before Update Service"),
+        ownerType: "user",
+        admins: [],
         stableId: existingStableId,
         tags: ["old-tag"],
         updatedAt: Date.now(),
@@ -2268,10 +2434,12 @@ describe("2.2.14 CSV差分インポート・安定ID（stableId）検証", () =>
 
     await t.run(async (ctx) => {
       const familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Rollback Family",
         updatedAt: Date.now(),
       });
       await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "rollback_user",
         email: "rollback@example.com",
@@ -2307,10 +2475,12 @@ describe("2.2.14 CSV差分インポート・安定ID（stableId）検証", () =>
     let familyId!: Id<"families">;
     await t.run(async (ctx) => {
       familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Val Family",
         updatedAt: Date.now(),
       });
       userAccountId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "val_user",
         email: "val@example.com",
@@ -2330,6 +2500,7 @@ describe("2.2.14 CSV差分インポート・安定ID（stableId）検証", () =>
         tags: [],
         stableId: recStableId,
         revision: 0,
+        updatedByAccountId: userAccountId,
         updatedAt: Date.now(),
       });
     });
@@ -2413,11 +2584,13 @@ describe("2.4 getRecords 検索・フィルタリング機能 (Convex版)", () =
 
     await t.run(async (ctx) => {
       familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
         name: "Search Test Family",
         updatedAt: Date.now(),
       });
 
       userAccountId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
         familyRole: "admin",
         userId: "search_user",
         email: "search@example.com",
@@ -2430,6 +2603,8 @@ describe("2.4 getRecords 検索・フィルタリング機能 (Convex版)", () =
         stableId: crypto.randomUUID(),
         userId: "search_user",
         accountId: userAccountId,
+        revision: 0,
+        updatedByAccountId: userAccountId,
         familyId,
         ownerFamilyId: familyId,
         title: "Google",
@@ -2455,6 +2630,8 @@ describe("2.4 getRecords 検索・フィルタリング機能 (Convex版)", () =
         stableId: crypto.randomUUID(),
         userId: "search_user",
         accountId: userAccountId,
+        revision: 0,
+        updatedByAccountId: userAccountId,
         familyId,
         ownerFamilyId: familyId,
         title: "Amazon",
@@ -2480,6 +2657,8 @@ describe("2.4 getRecords 検索・フィルタリング機能 (Convex版)", () =
         stableId: crypto.randomUUID(),
         userId: "search_user",
         accountId: userAccountId,
+        revision: 0,
+        updatedByAccountId: userAccountId,
         familyId,
         ownerFamilyId: familyId,
         title: "GitHub",

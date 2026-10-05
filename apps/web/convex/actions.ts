@@ -209,9 +209,10 @@ export const getFurigana = action({
       return textToConvert;
     }
 
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      timeoutId = setTimeout(() => controller.abort(), 3000);
 
       const response = await fetch("https://jlp.yahooapis.jp/jsonrpc", {
         method: "POST",
@@ -229,8 +230,6 @@ export const getFurigana = action({
         }),
         signal: controller.signal,
       });
-
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         console.error("Yahoo Furigana API HTTP error:", response.statusText);
@@ -257,6 +256,8 @@ export const getFurigana = action({
     } catch (error) {
       console.error("Failed to fetch furigana from Yahoo API:", error);
       return textToConvert;
+    } finally {
+      clearTimeout(timeoutId);
     }
   },
 });

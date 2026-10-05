@@ -86,6 +86,22 @@ export const registerRecoveryKit = familyAdminMutation({
       updatedAt: now,
     });
 
+    // 既存の未消費リカバリーセッションおよび保留中OTPを完全無効化（旧キットによるパスコード変更を阻止）
+    const existingSessions = await ctx.db
+      .query("recoverySessions")
+      .withIndex("by_familyId_accountId", (q) => q.eq("familyId", familyId))
+      .collect();
+    for (const session of existingSessions) {
+      await ctx.db.delete(session._id);
+    }
+    const existingOtps = await ctx.db
+      .query("recoveryOtps")
+      .withIndex("by_familyId_accountId", (q) => q.eq("familyId", familyId))
+      .collect();
+    for (const otp of existingOtps) {
+      await ctx.db.delete(otp._id);
+    }
+
     // 家族メンバー全員に通知メールを非同期送信
     const members = await ctx.db
       .query("users")
@@ -320,20 +336,15 @@ export const verifyRecoveryOtpAndGetRecoveryData = authenticatedMutation({
 
     // 試行回数チェック
     if (otpRecord.attempts >= OTP_MAX_ATTEMPTS) {
-      await ctx.db.delete(otpRecord._id);
       throw new Error(
-        "認証コードの試行上限回数を超えました。最初からやり直してください。",
+        "認証コードの試行上限回数を超えました。コードを再送信してください。",
       );
     }
 
     const inputHash = await hashText(args.otpCode.trim());
     if (!timingSafeEqual(inputHash, otpRecord.codeHash)) {
       const newAttempts = otpRecord.attempts + 1;
-      if (newAttempts >= OTP_MAX_ATTEMPTS) {
-        await ctx.db.delete(otpRecord._id);
-      } else {
-        await ctx.db.patch(otpRecord._id, { attempts: newAttempts });
-      }
+      await ctx.db.patch(otpRecord._id, { attempts: newAttempts });
       const remaining = Math.max(0, OTP_MAX_ATTEMPTS - newAttempts);
       return {
         success: false as const,

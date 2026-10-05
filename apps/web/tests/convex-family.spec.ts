@@ -4,6 +4,7 @@ import { api, internal } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import schema from "../convex/schema";
 import { computeSortKey } from "../src/utils/index-group";
+import { mockCryptoMaterials } from "./test-helpers";
 
 const modules = import.meta.glob("../convex/**/*.ts");
 
@@ -38,6 +39,7 @@ const seedTwoUserFamily_ = async (t: ReturnType<typeof convexTest>) => {
 
   await t.run(async (ctx) => {
     oldFamilyId = await ctx.db.insert("families", {
+      ...mockCryptoMaterials,
       name: "F1",
       masterKeyEncrypted: "SGVsbG9Xb3JsZA==",
       masterKeyIv: "SGVsbG9Xb3JsZA==",
@@ -46,6 +48,7 @@ const seedTwoUserFamily_ = async (t: ReturnType<typeof convexTest>) => {
     });
 
     userAId = await ctx.db.insert("users", {
+      createdAt: Date.now(),
       familyRole: "admin",
       userId: "ua",
       email: "a@a.com",
@@ -54,6 +57,7 @@ const seedTwoUserFamily_ = async (t: ReturnType<typeof convexTest>) => {
     });
 
     userBId = await ctx.db.insert("users", {
+      createdAt: Date.now(),
       familyRole: "admin",
       userId: "ub",
       email: "b@b.com",
@@ -65,6 +69,8 @@ const seedTwoUserFamily_ = async (t: ReturnType<typeof convexTest>) => {
       stableId: crypto.randomUUID(),
       userId: "ua",
       accountId: userAId,
+      revision: 0,
+      updatedByAccountId: userAId,
       familyId: oldFamilyId,
       title: "RA",
       sortKey: computeSortKey("RA"),
@@ -91,6 +97,8 @@ const seedTwoUserFamily_ = async (t: ReturnType<typeof convexTest>) => {
       stableId: crypto.randomUUID(),
       userId: "ub",
       accountId: userBId,
+      revision: 0,
+      updatedByAccountId: userBId,
       familyId: oldFamilyId,
       title: "RB",
       sortKey: computeSortKey("RB"),
@@ -134,6 +142,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
       // シードデータ（ユーザー）
       await t.run(async (ctx) => {
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_a",
           email: "a@example.com",
@@ -401,6 +410,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
       await t.run(async (ctx) => {
         // 既存家族と既存メンバー
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "田中家",
           masterKeyEncrypted: "SGVsbG9Xb3JsZA==",
           masterKeyIv: "SGVsbG9Xb3JsZA==",
@@ -409,6 +419,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         });
 
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "member_a",
           email: "member_a@example.com",
@@ -418,11 +429,19 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         });
 
         // 参加申請を行う新規ユーザー
+        const applicantFamilyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
+          name: "Applicant Family",
+          updatedAt: Date.now(),
+        });
+
         applicantId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "applicant_b",
           email: "applicant_b@example.com",
           displayName: "申請者B",
+          familyId: applicantFamilyId,
           updatedAt: Date.now(),
         });
 
@@ -431,7 +450,9 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           stableId: crypto.randomUUID(),
           userId: "applicant_b",
           accountId: applicantId,
-          familyId: undefined,
+          revision: 0,
+          updatedByAccountId: applicantId,
+          familyId: applicantFamilyId,
           title: "Applicant Record",
           sortKey: computeSortKey("Applicant Record"),
           ownerType: "user",
@@ -454,6 +475,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
         // 家族未所属の一般ユーザー
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "stranger",
           email: "stranger@example.com",
@@ -636,6 +658,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "山田家",
           masterKeyEncrypted: "SGVsbG9Xb3JsZA==",
           masterKeyIv: "SGVsbG9Xb3JsZA==",
@@ -644,6 +667,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         });
 
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "member_y",
           email: "y@example.com",
@@ -652,6 +676,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         });
 
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "applicant_z",
           email: "z@example.com",
@@ -717,10 +742,12 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "佐藤家",
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_sato",
           email: "sato@example.com",
@@ -780,10 +807,12 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
       await t.run(async (ctx) => {
         const familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "TTL検証家",
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_ttl_validation",
           email: "ttl@example.com",
@@ -810,10 +839,12 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
       await t.run(async (ctx) => {
         const familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "招待権限家",
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "viewer",
           userId: "user_viewer_invite",
           email: "viewer_invite@example.com",
@@ -856,6 +887,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "期限切れ家",
           updatedAt: Date.now(),
         });
@@ -868,6 +900,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           useCount: 0,
         });
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "applicant_expired",
           email: "exp@example.com",
@@ -900,6 +933,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "失効家",
           updatedAt: Date.now(),
         });
@@ -913,6 +947,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           useCount: 0,
         });
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "applicant_revoked",
           email: "rev@example.com",
@@ -946,14 +981,17 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
       await t.run(async (ctx) => {
         familyAId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "家族A",
           updatedAt: Date.now(),
         });
         familyBId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "家族B",
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_a",
           email: "a@example.com",
@@ -961,6 +999,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_b",
           email: "b@example.com",
@@ -995,10 +1034,12 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "鈴木家",
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "member_suzuki",
           email: "suzuki@example.com",
@@ -1006,6 +1047,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "applicant_suzuki",
           email: "suzuki_app@example.com",
@@ -1050,10 +1092,12 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "孤立予定家族",
           updatedAt: Date.now(),
         });
         userId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "lone_user",
           email: "lone@example.com",
@@ -1099,6 +1143,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "クリーンアップテスト家",
           updatedAt: now,
         });
@@ -1134,6 +1179,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           useCount: 1,
         });
         const applicantAccId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "applicant",
           email: "applicant@example.com",
@@ -1200,12 +1246,14 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
       await t.run(async (ctx) => {
         oldFamilyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "旧田中家",
           updatedAt: Date.now(),
         });
 
         // ユーザーA (唯一のメンバー)
         userSoloId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_solo",
           email: "solo@example.com",
@@ -1217,6 +1265,8 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           stableId: crypto.randomUUID(),
           userId: "user_solo",
           accountId: userSoloId,
+          revision: 0,
+          updatedByAccountId: userSoloId,
           familyId: oldFamilyId,
           title: "Solo's Record",
           sortKey: computeSortKey("Solo's Record"),
@@ -1350,6 +1400,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
       await t.run(async (ctx) => {
         oldFamilyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "省略テスト家族",
           masterKeyEncrypted: "enc",
           masterKeyIv: "iv",
@@ -1357,6 +1408,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           updatedAt: Date.now(),
         });
         userOmitId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_omit",
           email: "omit@example.com",
@@ -1370,6 +1422,8 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           tags: [],
           userId: "user_omit",
           accountId: userOmitId,
+          revision: 0,
+          updatedByAccountId: userOmitId,
           familyId: oldFamilyId,
           ownerType: "user",
           admins: [],
@@ -1431,11 +1485,13 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
       await t.run(async (ctx) => {
         oldFamilyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "共有家族",
           updatedAt: Date.now(),
         });
 
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_leaving",
           email: "leaving@example.com",
@@ -1444,6 +1500,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         });
 
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_staying",
           email: "staying@example.com",
@@ -1485,6 +1542,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
       await t.run(async (ctx) => {
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_double",
           email: "double@example.com",
@@ -1530,10 +1588,18 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
       let userDupCredId!: Id<"users">;
 
       await t.run(async (ctx) => {
+        const initialFamilyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
+          name: "Initial Family",
+          updatedAt: Date.now(),
+        });
+
         userDupCredId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_dup_cred",
           email: "dup@example.com",
+          familyId: initialFamilyId,
           updatedAt: Date.now(),
         });
 
@@ -1541,12 +1607,14 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           stableId: crypto.randomUUID(),
           userId: "user_dup_cred",
           accountId: userDupCredId,
-          familyId: undefined,
+          familyId: initialFamilyId,
           title: "Service 1",
           sortKey: computeSortKey("Service 1"),
           ownerType: "user",
           admins: [],
           tags: [],
+          revision: 0,
+          updatedByAccountId: userDupCredId,
           updatedAt: Date.now(),
         });
         await ctx.db.insert("credentials", {
@@ -1562,12 +1630,14 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           stableId: crypto.randomUUID(),
           userId: "user_dup_cred",
           accountId: userDupCredId,
-          familyId: undefined,
+          familyId: initialFamilyId,
           title: "Service 2",
           sortKey: computeSortKey("Service 2"),
           ownerType: "user",
           admins: [],
           tags: [],
+          revision: 0,
+          updatedByAccountId: userDupCredId,
           updatedAt: Date.now(),
         });
         await ctx.db.insert("credentials", {
@@ -1639,6 +1709,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
       await t.run(async (ctx) => {
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_orphan",
           email: "orphan@example.com",
@@ -1697,6 +1768,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
       await t.run(async (ctx) => {
         const userAccId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_cron_test",
           email: "cron@example.com",
@@ -1704,6 +1776,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         });
 
         expiredFamilyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "期限切れ孤児ファミリー",
           updatedAt: Date.now(),
         });
@@ -1740,11 +1813,13 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
       await t.run(async (ctx) => {
         oldFamilyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "旧家族",
           updatedAt: Date.now(),
         });
 
         userMidId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_mid",
           email: "mid@example.com",
@@ -1760,6 +1835,8 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           tags: [],
           userId: "user_mid",
           accountId: userMidId,
+          revision: 0,
+          updatedByAccountId: userMidId,
           familyId: oldFamilyId,
           ownerType: "user",
           admins: [],
@@ -1802,6 +1879,8 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           tags: [],
           userId: "user_mid",
           accountId: userMidId,
+          revision: 0,
+          updatedByAccountId: userMidId,
           familyId: oldFamilyId,
           ownerType: "user",
           admins: [],
@@ -1879,6 +1958,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
 
       await t.run(async (ctx) => {
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_abort_test",
           email: "abort@example.com",
@@ -1924,10 +2004,12 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
       let userSoloId!: Id<"users">;
       await t.run(async (ctx) => {
         oldFamilyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "旧田中家",
           updatedAt: Date.now(),
         });
         userSoloId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_solo2",
           email: "solo2@example.com",
@@ -1938,6 +2020,8 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           stableId: crypto.randomUUID(),
           userId: "user_solo2",
           accountId: userSoloId,
+          revision: 0,
+          updatedByAccountId: userSoloId,
           familyId: oldFamilyId,
           title: "既存レコード",
           sortKey: computeSortKey("既存レコード"),
@@ -1977,6 +2061,8 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           stableId: crypto.randomUUID(),
           userId: "user_solo2",
           accountId: userSoloId,
+          revision: 0,
+          updatedByAccountId: userSoloId,
           familyId: oldFamilyId,
           title: "並行操作で追加されたレコード",
           sortKey: computeSortKey("並行操作で追加されたレコード"),
@@ -2032,10 +2118,12 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
       let stayingSharedRecordId!: Id<"serviceRecords">;
       await t.run(async (ctx) => {
         oldFamilyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "旧ファミリー",
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_migrating",
           email: "migrating@example.com",
@@ -2043,6 +2131,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           updatedAt: Date.now(),
         });
         const stayingId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_staying2",
           email: "staying2@example.com",
@@ -2053,6 +2142,8 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           stableId: crypto.randomUUID(),
           userId: "user_staying2",
           accountId: stayingId,
+          revision: 0,
+          updatedByAccountId: stayingId,
           familyId: oldFamilyId,
           ownerFamilyId: oldFamilyId,
           title: "旧ファミリーの共有レコード",
@@ -2221,6 +2312,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
       // 同一 Firebase UID (user_multi) で2つのアカウントを作成
       await t.run(async (ctx) => {
         account1Id = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_multi",
           email: "multi@example.com",
@@ -2228,6 +2320,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
           updatedAt: Date.now(),
         });
         account2Id = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_multi",
           email: "multi@example.com",
@@ -2324,11 +2417,13 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         familyOldId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "Old Family",
           updatedAt: Date.now(),
         });
 
         userLeaveId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_leave",
           email: "leave@example.com",
@@ -2337,6 +2432,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         userRemain1Id = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_remain1",
           email: "remain1@example.com",
@@ -2345,6 +2441,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         userRemain2Id = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_remain2",
           email: "remain2@example.com",
@@ -2356,6 +2453,8 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
           stableId: crypto.randomUUID(),
           userId: "user_leave",
           accountId: userLeaveId,
+          revision: 0,
+          updatedByAccountId: userLeaveId,
           familyId: familyOldId,
           ownerFamilyId: familyOldId,
           title: "Shared Record",
@@ -2410,10 +2509,12 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         familyOldId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "Old Solo Family",
           updatedAt: Date.now(),
         });
         userSoloId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_solo_leave",
           email: "solo_leave@example.com",
@@ -2424,6 +2525,8 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
           stableId: crypto.randomUUID(),
           userId: "user_solo_leave",
           accountId: userSoloId,
+          revision: 0,
+          updatedByAccountId: userSoloId,
           familyId: familyOldId,
           ownerFamilyId: familyOldId,
           title: "孤立する共有レコード",
@@ -2469,6 +2572,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
       const t = convexTest(schema, modules);
       await t.run(async (ctx) => {
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_kdf",
           email: "kdf@example.com",
@@ -2498,6 +2602,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
       const t = convexTest(schema, modules);
       await t.run(async (ctx) => {
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_kdf_omit",
           email: "kdfomit@example.com",
@@ -2528,6 +2633,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
       let familyId!: Id<"families">;
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "レガシー家族",
           masterKeyEncrypted: "enc",
           masterKeyIv: "iv",
@@ -2548,6 +2654,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
       let familyId!: Id<"families">;
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "新しめ家族",
           masterKeyEncrypted: "enc",
           masterKeyIv: "iv",
@@ -2574,6 +2681,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "F1",
           masterKeyEncrypted: "b2xkRW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
           masterKeyIv: "dGVzdGl2MTIzNDU2",
@@ -2584,6 +2692,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         userAId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "ua",
           email: "a@a.com",
@@ -2592,6 +2701,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         userBId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "ub",
           email: "b@b.com",
@@ -2603,6 +2713,8 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
           stableId: crypto.randomUUID(),
           userId: "ua",
           accountId: userAId,
+          revision: 0,
+          updatedByAccountId: userAId,
           familyId,
           title: "R1",
           sortKey: computeSortKey("R1"),
@@ -2680,6 +2792,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "F1",
           masterKeyEncrypted: "Y3VycmVudEVuY3J5cHRlZERhdGFBdXRoZW50aWNhdGVk",
           masterKeyIv: "dGVzdGl2MTIzNDU2",
@@ -2688,6 +2801,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "ua",
           email: "a@a.com",
@@ -2713,11 +2827,16 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         const familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
+          masterKeyEncrypted: "",
+          masterKeyIv: "",
+          masterKeySalt: "",
           name: "未初期化家族",
           updatedAt: 1000,
         });
 
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "ua",
           email: "a@a.com",
@@ -2743,6 +2862,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "no_family_user",
           email: "nofam@a.com",
@@ -2771,6 +2891,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         const familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "F_Viewer_Rotate",
           masterKeyEncrypted: "encKey",
           masterKeyIv: "iv",
@@ -2779,6 +2900,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "viewer",
           userId: "u_viewer_rotate",
           email: "v_rot@example.com",
@@ -2816,6 +2938,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "佐藤家",
           masterKeyEncrypted: "oldMasterKeyEncryptedBase64==",
           masterKeyIv: "oldMasterKeyIv==",
@@ -2826,6 +2949,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_a",
           email: "a@example.com",
@@ -2835,6 +2959,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         userBId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_b",
           email: "b@example.com",
@@ -2884,6 +3009,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "佐藤家",
           masterKeyEncrypted: "encKey",
           masterKeyIv: "iv",
@@ -2892,6 +3018,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         userAId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_a",
           email: "a@example.com",
@@ -2901,6 +3028,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
         // 同一UIDの別アカウント
         userA2Id = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_a",
           email: "a-work@example.com",
@@ -2916,12 +3044,18 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       // 同一アカウントのキック拒否
       await expect(
-        userA.mutation(api.families.kickMember, { targetAccountId: userAId }),
+        userA.mutation(api.families.kickMember, {
+          accountId: userAId,
+          targetAccountId: userAId,
+        }),
       ).rejects.toThrow("Cannot kick yourself");
 
       // 同一UID別アカウントのキック拒否
       await expect(
-        userA.mutation(api.families.kickMember, { targetAccountId: userA2Id }),
+        userA.mutation(api.families.kickMember, {
+          accountId: userAId,
+          targetAccountId: userA2Id,
+        }),
       ).rejects.toThrow("Cannot kick yourself");
     });
 
@@ -2931,11 +3065,13 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         const familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "キック権限家",
           updatedAt: Date.now(),
         });
 
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "viewer",
           userId: "viewer_kicker",
           email: "viewer_kicker@example.com",
@@ -2944,6 +3080,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         targetId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "viewer",
           userId: "victim",
           email: "victim@example.com",
@@ -2971,6 +3108,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         family1Id = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "佐藤家",
           masterKeyEncrypted: "enc1",
           masterKeyIv: "iv1",
@@ -2978,6 +3116,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
           updatedAt: Date.now(),
         });
         family2Id = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "鈴木家",
           masterKeyEncrypted: "enc2",
           masterKeyIv: "iv2",
@@ -2986,6 +3125,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_a",
           email: "a@example.com",
@@ -2994,6 +3134,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         userOtherId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_other",
           email: "other@example.com",
@@ -3023,6 +3164,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "田中家",
           masterKeyEncrypted: "encKey",
           masterKeyIv: "iv",
@@ -3031,6 +3173,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         userAId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_a",
           email: "a@example.com",
@@ -3039,6 +3182,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         userBId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_b",
           email: "b@example.com",
@@ -3053,6 +3197,8 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
           sortKey: "netflix",
           userId: "user_b",
           accountId: userBId,
+          revision: 0,
+          updatedByAccountId: userBId,
           familyId,
           ownerType: "family",
           ownerFamilyId: familyId,
@@ -3084,6 +3230,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "高橋家",
           masterKeyEncrypted: "encKey",
           masterKeyIv: "iv",
@@ -3092,6 +3239,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_a",
           email: "a@example.com",
@@ -3100,6 +3248,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         userBId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_b",
           email: "b@example.com",
@@ -3155,11 +3304,13 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         const famId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "旧家",
           updatedAt: Date.now(),
         });
 
         userBId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_b",
           email: "b@example.com",
@@ -3168,6 +3319,8 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
         // 過去の失効済みVault
         await ctx.db.insert("pendingExportVaults", {
+          cryptoVersion: 1,
+          kdfIterations: 300_000,
           accountId: userBId,
           userId: "user_b",
           oldFamilyId: famId,
@@ -3213,6 +3366,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         oldFamilyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "小林家",
           masterKeyEncrypted: "oldEncKey",
           masterKeyIv: "oldIv",
@@ -3221,6 +3375,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_a",
           email: "a@example.com",
@@ -3229,6 +3384,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
         });
 
         userBId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "user_b",
           email: "b@example.com",
@@ -3243,8 +3399,11 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
           sortKey: "personal_bank",
           userId: "user_b",
           accountId: userBId,
+          revision: 0,
+          updatedByAccountId: userBId,
           familyId: oldFamilyId,
           ownerType: "user",
+          admins: [],
           tags: [],
           updatedAt: Date.now(),
         });
@@ -3337,10 +3496,12 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "Role Test Family",
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "admin_user",
           email: "admin@example.com",
@@ -3348,6 +3509,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
           updatedAt: Date.now(),
         });
         targetAccId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "viewer",
           userId: "target_user",
           email: "target@example.com",
@@ -3391,10 +3553,12 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "Role Test Family",
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "admin_user",
           email: "admin@example.com",
@@ -3402,6 +3566,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
           updatedAt: Date.now(),
         });
         targetAccId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "viewer",
           userId: "viewer_user",
           email: "viewer@example.com",
@@ -3430,10 +3595,12 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "Role Test Family",
           updatedAt: Date.now(),
         });
         soleAdminAccId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "sole_admin_user",
           email: "soleadmin@example.com",
@@ -3441,6 +3608,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "viewer",
           userId: "viewer_user",
           email: "viewer@example.com",
@@ -3470,10 +3638,12 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "Kick Test Family",
           updatedAt: Date.now(),
         });
         adminAccId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "admin_user",
           email: "admin@example.com",
@@ -3481,6 +3651,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
           updatedAt: Date.now(),
         });
         viewerAccId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "viewer",
           userId: "viewer_user",
           email: "viewer@example.com",
@@ -3530,10 +3701,12 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "Join Approval Family",
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "admin_user",
           email: "admin@example.com",
@@ -3541,6 +3714,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
           updatedAt: Date.now(),
         });
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "viewer",
           userId: "viewer_user",
           email: "viewer@example.com",
@@ -3548,12 +3722,14 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
           updatedAt: Date.now(),
         });
         const app1AccId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           userId: "applicant_1",
           email: "app1@example.com",
           familyRole: "viewer",
           updatedAt: Date.now(),
         });
         const app2AccId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           userId: "applicant_2",
           email: "app2@example.com",
           familyRole: "viewer",
@@ -3625,10 +3801,12 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "Leave Reconcile Family",
           updatedAt: Date.now(),
         });
         leavingAdminId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "leaving_admin",
           email: "leaving@example.com",
@@ -3636,6 +3814,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
           updatedAt: Date.now(),
         });
         remainingAdminId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "admin",
           userId: "remaining_admin",
           email: "remaining@example.com",
@@ -3643,6 +3822,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
           updatedAt: Date.now(),
         });
         viewerId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
           familyRole: "viewer",
           userId: "viewer_member",
           email: "viewer_member@example.com",
@@ -3653,6 +3833,8 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
           stableId: crypto.randomUUID(),
           userId: "leaving_admin",
           accountId: leavingAdminId,
+          revision: 0,
+          updatedByAccountId: leavingAdminId,
           familyId,
           ownerFamilyId: familyId,
           title: "Shared Without Explicit Admins",
@@ -3691,11 +3873,13 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "元の家族名",
           updatedAt: Date.now(),
         });
 
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           userId: "family_admin_177",
           email: "admin177@example.com",
           displayName: "管理者",
@@ -3739,11 +3923,13 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "トリム前家族名",
           updatedAt: Date.now(),
         });
 
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           userId: "trim_admin_177",
           email: "trim@example.com",
           familyId,
@@ -3775,11 +3961,13 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "バリデーション家族",
           updatedAt: Date.now(),
         });
 
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           userId: "val_admin_177",
           email: "val@example.com",
           familyId,
@@ -3816,11 +4004,13 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
           name: "閲覧者テスト家族",
           updatedAt: Date.now(),
         });
 
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           userId: "viewer_user_177",
           email: "viewer177@example.com",
           familyId,
@@ -3852,6 +4042,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
 
       await t.run(async (ctx) => {
         await ctx.db.insert("users", {
+          createdAt: Date.now(),
           userId: "no_family_user_177",
           email: "nofamily@example.com",
           familyRole: "admin",

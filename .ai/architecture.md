@@ -59,7 +59,7 @@ poohma/
 ### Backend (`apps/web/convex`)
 
 - `schema.ts`: データベーススキーマおよびインデックス定義
-- `customBuilders.ts`: 認可レベル別 Convex クエリ/ミューテーションビルダー（`identityVerified*`, `authenticated*`, `familyBound*`, `familyAdmin*`, `recordAdmin*`, `resolveAccount`）
+- `customBuilders.ts`: 認可レベル別 Convex クエリ/ミューテーションビルダー（`identityVerified*`, `authenticated*`, `familyBound*`, `familyAdmin*`, `recordAdmin*`, `resolveAccount`。複数アカウント所持ユーザーにおいて `accountId` 未指定時はデータ越境防止のため厳格にエラー送出）
 - `rls.ts`: レコード単位のアクセス制御関数（`requireContentAccess`, `requireAdminAccess`, `getEffectiveFamilyRole`, `isRecordAdmin`, レガシー互換ヘルパー）
 - `convex.config.ts`: Convex Components 設定（`@convex-dev/rate-limiter` の登録）
 - `auditLogs.ts`: 監査ログ書き込みヘルパー（`logAuditEvent` 関数）および監査ログCSVエクスポート用クエリ（`exportFamilyAuditLogs`、年指定・全期間、JST期間計算、IDOR防止）。
@@ -84,6 +84,7 @@ poohma/
 | **Firebase ID Token** | Convex バックエンドへの通信認証 | 1時間（SDK自動更新） | Convex への WebSocket/HTTP 通信時に付与され、Convex 側 OIDC 検証で直接認証。 |
 | **session Cookie** | SSR初期表示・Server Function用キャッシュ | 14日間（自動ローリング延長） | サーバー側補助セッション。Cookie の期限切れのみでログアウト扱いにしてはならない。 |
 | **Custom Token** | Client Auth 消失時のリカバリ | 一時発行（1回限り） | ブラウザストレージの揮発時に session Cookie から Client Auth を復旧するための非常用経路。 |
+| **poohma_active_account_id Cookie** | SSR時のアクティブアカウント同期 | 365日間（アカウント切替時に更新） | SSR初期表示でクライアントと同一のアカウント/家族コンテキストを確定・整合させる補助Cookie。ふとした利用時でもアカウント再選択を不要にし、端末上で直前の利用アカウントを長期間保持する。 |
 
 ### 認証フロー
 

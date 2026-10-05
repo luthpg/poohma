@@ -36,12 +36,19 @@ import { Spinner } from "@/components/ui/spinner";
 import { useAccount } from "@/hooks/useAccount";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import {
+  ensureCredentialIds,
   type RecordFormCredential,
   type RecordFormValues,
   type RecordSubmitPayload,
   useRecordForm,
 } from "@/hooks/useRecordForm";
-import { attemptSilentReauth, isAuthSessionError } from "@/lib/auth-recovery";
+import {
+  attemptSilentReauth,
+  clearRecordDraft,
+  hasRecordDraft,
+  isAuthSessionError,
+  loadRecordDraft,
+} from "@/lib/auth-recovery";
 import {
   recordDetailIntroSteps,
   recordDetailReturnSteps,
@@ -347,8 +354,12 @@ function RecordDetailComponent({
     };
   }, [record]);
 
-  const { decryptHint, requireUnlock } = usePasscode();
+  const { decryptHint, requireUnlock, getMasterKey } = usePasscode();
+  const [hasDraft, setHasDraft] = useState(() =>
+    hasRecordDraft({ targetRecordId: record._id }),
+  );
   const form = useRecordForm(initialFormValues, record._id, undefined, {
+    autoUnlock: isEditing,
     onUnlockCancelled: () => {
       setIsEditing(false);
     },
@@ -551,15 +562,124 @@ function RecordDetailComponent({
       (c) => c.passwordHint && c.passwordHintIv,
     );
 
-    let credentials: RecordFormCredential[];
-
-    if (hasEncryptedHints) {
+    // 編集を開始するにはアンロックが必要（暗号化ヒントまたはドラフトが存在する場合）
+    if (hasDraft || hasEncryptedHints) {
       const unlocked = await requireUnlock();
       if (!unlocked) {
         setIsEditing(false);
         return;
       }
+    }
 
+    // 1. 未保存ドラフトが存在する場合: 復号して復元を試行
+    if (hasDraft) {
+      const masterKey = getMasterKey();
+      if (masterKey) {
+        try {
+          const draft = await loadRecordDraft({
+            targetRecordId: record._id,
+            masterKey,
+            currentAccountId: activeAccountId,
+          });
+
+          if (draft) {
+            // 既存レコードのヒントも復号して baselineValues に設定し、破棄時の復帰に備える
+            let baselineCredentials: RecordFormCredential[];
+            if (hasEncryptedHints) {
+              try {
+                baselineCredentials = await decryptRecordCredentials(
+                  record.credentials,
+                  decryptHint,
+                );
+              } catch {
+                toast.error(
+                  "パスワードヒントの復号に失敗したため、編集を開始できませんでした",
+                );
+                return;
+              }
+            } else {
+              baselineCredentials = record.credentials.map((c) => ({
+                id: c.id,
+                label: c.label || "",
+                loginId: c.loginId || "",
+                passwordHint: c.passwordHint || "",
+              }));
+            }
+
+            form.setBaselineValues({
+              title: record.title,
+              titleReading: record.titleReading || "",
+              url: record.url || "",
+              ogpImage: record.ogpImage || "",
+              ogpDescription: record.ogpDescription || "",
+              tags: record.tags,
+              memo: record.memo || "",
+              ownerType: record.ownerType ?? "user",
+              credentials: baselineCredentials,
+            });
+
+            form.reset({
+              ...draft.values,
+              credentials: ensureCredentialIds(draft.values.credentials),
+            });
+
+            const currentRev = draft.initialRevision ?? record.revision ?? 0;
+            setInitialRevision(currentRev);
+            form.setEditingMetadata({
+              initialRevision: currentRev,
+              isEditing: true,
+            });
+            setIsEditing(true);
+
+            toast.success("未保存の入力内容を復元しました", {
+              action: {
+                label: "下書きを破棄",
+                onClick: () => {
+                  form.discardDraft();
+                  setHasDraft(false);
+                  // 破棄時は復号済みの baselineCredentials でフォーム値を初期化
+                  form.reset({
+                    title: record.title,
+                    titleReading: record.titleReading || "",
+                    url: record.url || "",
+                    ogpImage: record.ogpImage || "",
+                    ogpDescription: record.ogpDescription || "",
+                    tags: record.tags,
+                    memo: record.memo || "",
+                    ownerType: record.ownerType ?? "user",
+                    credentials: baselineCredentials,
+                  });
+                  toast.info("下書きを破棄しました");
+                },
+              },
+            });
+
+            try {
+              await startEditingSession({
+                recordId: record._id,
+                accountId: activeAccountId || undefined,
+              });
+            } catch {
+              // 編集セッション開始失敗はサイレントに処理
+            }
+            return;
+          }
+        } catch {
+          // ドラフト復元例外
+        }
+      }
+
+      // ドラフト復元に失敗した場合は、破損または別アカウントのドラフトを安全に破棄してフォールバック
+      clearRecordDraft({ targetRecordId: record._id });
+      setHasDraft(false);
+      toast.warning(
+        "未保存の下書きの復元に失敗したため、最新の保存内容を読み込みました",
+      );
+    }
+
+    // 2. 通常時（またはドラフト復元失敗時のフォールバック）: パスワードヒントを復号して初期化
+    let credentials: RecordFormCredential[];
+    if (hasEncryptedHints) {
       try {
         credentials = await decryptRecordCredentials(
           record.credentials,
@@ -609,6 +729,7 @@ function RecordDetailComponent({
 
   const handleEditCancel = useCallback(async () => {
     form.discardDraft();
+    setHasDraft(false);
     form.setEditingMetadata(null);
     toast.dismiss("record-stale-toast");
     toast.dismiss("editing-presence-toast");
@@ -654,6 +775,7 @@ function RecordDetailComponent({
       setInitialRevision(null);
       setPendingPayload(null);
       form.setEditingMetadata(null);
+      setHasDraft(false);
       await router.invalidate();
       setIsEditing(false);
     } else if (conflictDetected) {
@@ -669,6 +791,7 @@ function RecordDetailComponent({
     setPendingPayload(null);
     setInitialRevision(null);
     form.discardDraft();
+    setHasDraft(false);
     form.setEditingMetadata(null);
     setIsEditing(false);
     await router.invalidate();
@@ -693,6 +816,7 @@ function RecordDetailComponent({
       setPendingPayload(null);
       setInitialRevision(null);
       form.discardDraft();
+      setHasDraft(false);
       form.setEditingMetadata(null);
       await router.invalidate();
       setIsEditing(false);
@@ -1312,13 +1436,26 @@ function RecordDetailComponent({
                     </AlertDialog>
                   )}
                 </div>
-                <div className="flex items-center gap-3 sm:gap-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  {hasDraft && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        form.discardDraft();
+                        setHasDraft(false);
+                        toast.info("下書きを破棄しました");
+                      }}
+                      className="flex h-9 sm:h-10 min-h-11 items-center justify-center rounded-md border border-border bg-background px-3 text-xs sm:text-[14px] font-medium text-muted-foreground hover:bg-muted transition cursor-pointer"
+                    >
+                      下書きを破棄
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={handleEditStart}
                     className="flex h-9 sm:h-10 min-h-11 min-w-20 sm:min-w-25 items-center justify-center rounded-md bg-orange-600 px-4 sm:px-6 text-xs sm:text-[14px] font-semibold text-white shadow-sm hover:bg-orange-700 transition cursor-pointer"
                   >
-                    編集する
+                    {hasDraft ? "下書きを編集" : "編集する"}
                   </button>
                 </div>
               </div>

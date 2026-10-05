@@ -194,13 +194,18 @@ export const getAuthUser = createServerFn({ method: "GET" }).handler(
       const decodedToken = await verifySessionCookie(sessionCookie);
       const { uid } = decodedToken;
 
+      const activeAccountId = getCookie("poohma_active_account_id");
+
       const res = await fetch(`${getConvexSiteUrl()}/getUserByFirebaseUid`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-internal-secret": serverEnv.CONVEX_INTERNAL_SECRET,
         },
-        body: JSON.stringify({ userId: uid }),
+        body: JSON.stringify({
+          userId: uid,
+          accountId: activeAccountId || undefined,
+        }),
         signal: AbortSignal.timeout(5000),
       });
       if (res.status === 422) return null;

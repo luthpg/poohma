@@ -4,11 +4,11 @@ import { v } from "convex/values";
 export default defineSchema({
   families: defineTable({
     name: v.string(),
-    masterKeyEncrypted: v.optional(v.string()),
-    masterKeyIv: v.optional(v.string()),
-    masterKeySalt: v.optional(v.string()),
-    kdfIterations: v.optional(v.number()),
-    cryptoVersion: v.optional(v.number()),
+    masterKeyEncrypted: v.string(),
+    masterKeyIv: v.string(),
+    masterKeySalt: v.string(),
+    kdfIterations: v.number(),
+    cryptoVersion: v.number(),
     // リカバリーキット用フィールド
     recoveryMasterKeyEncrypted: v.optional(v.string()),
     recoveryMasterKeyIv: v.optional(v.string()),
@@ -73,7 +73,7 @@ export default defineSchema({
         notifySecuritySettings: v.optional(v.boolean()),
       }),
     ),
-    createdAt: v.optional(v.number()),
+    createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_userId", ["userId"])
@@ -83,6 +83,7 @@ export default defineSchema({
   familyMigrations: defineTable({
     userId: v.string(), // Firebase UID
     accountId: v.id("users"), // 作成元 PoohMa アカウント ID
+    action: v.optional(v.union(v.literal("create"), v.literal("join"))),
     sourceFamilyId: v.optional(v.id("families")),
     targetFamilyId: v.id("families"),
     serviceRecordIds: v.array(v.id("serviceRecords")),
@@ -107,8 +108,8 @@ export default defineSchema({
     masterKeyEncrypted: v.string(), // 旧家族パスコード由来鍵でラップされた旧マスターキー
     masterKeyIv: v.string(),
     masterKeySalt: v.string(),
-    kdfIterations: v.optional(v.number()), // PBKDF2 反復回数
-    cryptoVersion: v.optional(v.number()), // 暗号化バージョン
+    kdfIterations: v.number(), // PBKDF2 反復回数
+    cryptoVersion: v.number(), // 暗号化バージョン
     createdAt: v.number(),
     expiresAt: v.number(), // 有効期限（作成から30日）
   })
@@ -156,14 +157,14 @@ export default defineSchema({
     memo: v.optional(v.string()),
     userId: v.string(), // 作成者の Firebase UID (監査・表示用)
     accountId: v.id("users"), // 作成元 / 個人オーナーの PoohMa アカウント ID (主識別子)
-    familyId: v.optional(v.id("families")), // 暗号化スコープ / 所属家族 ID
+    familyId: v.id("families"), // 暗号化スコープ / 所属家族 ID
 
-    sortKey: v.optional(v.string()), // 五十音・アルファベット順位プレフィックス付きソートキー
-    ownerType: v.optional(v.union(v.literal("user"), v.literal("family"))),
+    sortKey: v.string(), // 五十音・アルファベット順位プレフィックス付きソートキー
+    ownerType: v.union(v.literal("user"), v.literal("family")),
     ownerFamilyId: v.optional(v.id("families")), // ownerType === "family" のとき
-    admins: v.optional(v.array(v.id("users"))), // ownerType === "family" のときの管理者 PoohMa アカウント ID 配列
+    admins: v.array(v.id("users")), // ownerType === "family" のときの管理者 PoohMa アカウント ID 配列
 
-    updatedByAccountId: v.optional(v.id("users")), // 最終更新を行ったアカウントID
+    updatedByAccountId: v.id("users"), // 最終更新を行ったアカウントID
     lastViewedAt: v.optional(v.number()), // 最終ヒント閲覧日時 (epoch ms)
     lastViewedByAccountId: v.optional(v.id("users")), // 最終ヒント閲覧者アカウントID
 
@@ -171,7 +172,7 @@ export default defineSchema({
     tags: v.array(v.string()),
 
     stableId: v.string(), // CSV差分インポート・エクスポート用 UUID v4
-    revision: v.optional(v.number()), // 楽観的ロック用（既存レコードは 0 として扱う）
+    revision: v.number(), // 楽観的ロック用（0からインクリメント）
     isSample: v.optional(v.boolean()), // オンボーディング用サンプルデータ識別フラグ
     updatedAt: v.number(),
   })

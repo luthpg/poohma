@@ -1,57 +1,88 @@
 import dns from "node:dns/promises";
 import net from "node:net";
+import ipaddr from "ipaddr.js";
 
 /**
- * プライベートIP / 予約済みIPアドレスかどうかを判定
+ * プライベートIP / 予約済みIPアドレスかどうかを判定 (SSRF対策)
+ * ipaddr.js を利用して RFC 準拠の安全な判定を行う
  */
 export function isPrivateIp(ip: string): boolean {
+  if (!ipaddr.isValid(ip)) {
+    // パースできない不正形式は安全側に倒してブロック
+    return true;
+  }
+
+  const addr = ipaddr.parse(ip);
+
   // IPv4 チェック
-  if (net.isIPv4(ip)) {
-    const parts = ip.split(".").map(Number);
-    const [a, b] = parts as [number, number, number, number];
-
-    // 10.0.0.0/8
-    if (a === 10) return true;
-    // 172.16.0.0/12
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    // 192.168.0.0/16
-    if (a === 192 && b === 168) return true;
-    // 127.0.0.0/8 (loopback)
-    if (a === 127) return true;
-    // 169.254.0.0/16 (link-local)
-    if (a === 169 && b === 254) return true;
-    // 0.0.0.0/8
-    if (a === 0) return true;
-
-    return false;
+  if (addr.kind() === "ipv4") {
+    // unicast 以外（private, loopback, linkLocal, broadcast, carrierGradeNat, unspecified, reserved 等）はすべてブロック
+    return addr.range() !== "unicast";
   }
 
   // IPv6 チェック
-  if (net.isIPv6(ip)) {
-    const normalized = ip.toLowerCase();
-    // ::1 (loopback)
-    if (normalized === "::1") return true;
-    // fc00::/7 (Unique Local Address)
-    if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true;
-    // fe80::/10 (link-local)
-    if (normalized.startsWith("fe80")) return true;
-    // :: (unspecified)
-    if (normalized === "::") return true;
+  const v6 = addr as ipaddr.IPv6;
+  const range = v6.range();
 
-    // ::ffff:0:0/96 (IPv4-mapped IPv6)
-    if (normalized.startsWith("::ffff:")) {
-      const ipv4Part = normalized.substring(7);
-      if (net.isIPv4(ipv4Part)) {
-        return isPrivateIp(ipv4Part);
-      }
-      // If it's another form of IPv4-mapped IPv6 (e.g. hex), block it for safety
-      return true;
-    }
-
-    return false;
+  // 1. IPv4-mapped (::ffff:x.x.x.x)
+  if (range === "ipv4Mapped") {
+    return isPrivateIp(v6.toIPv4Address().toString());
   }
 
-  return false;
+  // 2. IPv4-compatible (::x.x.x.x) - RFC 4291 廃止済みだが埋め込みIPv4を検証
+  if (v6.parts.slice(0, 6).every((p) => p === 0)) {
+    const p6 = v6.parts[6] ?? 0;
+    const p7 = v6.parts[7] ?? 0;
+    const ipv4 = new ipaddr.IPv4([
+      (p6 >> 8) & 0xff,
+      p6 & 0xff,
+      (p7 >> 8) & 0xff,
+      p7 & 0xff,
+    ]);
+    return isPrivateIp(ipv4.toString());
+  }
+
+  // 3. 6to4 (2002::/16) - 続く32ビットが埋め込みIPv4
+  if (range === "6to4") {
+    const p1 = v6.parts[1] ?? 0;
+    const p2 = v6.parts[2] ?? 0;
+    const ipv4 = new ipaddr.IPv4([
+      (p1 >> 8) & 0xff,
+      p1 & 0xff,
+      (p2 >> 8) & 0xff,
+      p2 & 0xff,
+    ]);
+    return isPrivateIp(ipv4.toString());
+  }
+
+  // 4. Teredo (2001:0000::/32) - 末尾32ビットが XOR 0xffff されたIPv4
+  if (range === "teredo") {
+    const p6 = (v6.parts[6] ?? 0) ^ 0xffff;
+    const p7 = (v6.parts[7] ?? 0) ^ 0xffff;
+    const ipv4 = new ipaddr.IPv4([
+      (p6 >> 8) & 0xff,
+      p6 & 0xff,
+      (p7 >> 8) & 0xff,
+      p7 & 0xff,
+    ]);
+    return isPrivateIp(ipv4.toString());
+  }
+
+  // 5. NAT64 Well-Known Prefix (64:ff9b::/96) (RFC 6052)
+  if (range === "rfc6052") {
+    const p6 = v6.parts[6] ?? 0;
+    const p7 = v6.parts[7] ?? 0;
+    const ipv4 = new ipaddr.IPv4([
+      (p6 >> 8) & 0xff,
+      p6 & 0xff,
+      (p7 >> 8) & 0xff,
+      p7 & 0xff,
+    ]);
+    return isPrivateIp(ipv4.toString());
+  }
+
+  // 6. 一般的な IPv6: unicast 以外（loopback, linkLocal, uniqueLocal, unspecified, multicast, reserved 等）はすべてブロック
+  return range !== "unicast";
 }
 
 /**

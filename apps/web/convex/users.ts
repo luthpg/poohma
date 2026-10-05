@@ -364,17 +364,26 @@ export const deleteAllAccounts = identityVerifiedMutation({
           await reconcileAdminsOnLeave(ctx, familyId, account._id);
         }
       } else {
-        // 家族未所属の場合、このアカウントが作成した全レコードを削除
+        // 家族未所属の場合、このアカウントが作成・所有した個人レコードをすべて削除（キック後の旧familyId付きレコードも含む）
         const records = await ctx.db
           .query("serviceRecords")
           .withIndex("by_accountId", (q) => q.eq("accountId", account._id))
           .collect();
         for (const record of records) {
-          if (!record.familyId) {
+          if (record.ownerType === "user") {
             await deleteCredentialsForRecord(ctx, record._id);
             await ctx.db.delete(record._id);
           }
         }
+      }
+
+      // 被キック時の退避用 Vault が存在すればクリーンアップ
+      const exportVaults = await ctx.db
+        .query("pendingExportVaults")
+        .withIndex("by_accountId", (q) => q.eq("accountId", account._id))
+        .collect();
+      for (const vault of exportVaults) {
+        await ctx.db.delete(vault._id);
       }
 
       // 2. アカウント自身の削除
@@ -498,17 +507,26 @@ export const deleteAccount = authenticatedMutation({
         });
       }
     } else {
-      // 家族未所属の場合、このアカウントが作成した全レコードを削除
+      // 家族未所属の場合、このアカウントが作成・所有した個人レコードをすべて削除（キック後の旧familyId付きレコードも含む）
       const records = await ctx.db
         .query("serviceRecords")
         .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
         .collect();
       for (const record of records) {
-        if (!record.familyId) {
+        if (record.ownerType === "user") {
           await deleteCredentialsForRecord(ctx, record._id);
           await ctx.db.delete(record._id);
         }
       }
+    }
+
+    // 被キック時の退避用 Vault が存在すればクリーンアップ
+    const exportVaults = await ctx.db
+      .query("pendingExportVaults")
+      .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
+      .collect();
+    for (const vault of exportVaults) {
+      await ctx.db.delete(vault._id);
     }
 
     // 3. ユーザーアカウント自身の削除
@@ -538,12 +556,15 @@ export const deleteAccount = authenticatedMutation({
 export const getUserByFirebaseUid = internalQuery({
   args: {
     userId: v.string(),
-    accountId: v.optional(v.id("users")),
+    accountId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     let user = null;
-    if (args.accountId) {
-      user = await ctx.db.get(args.accountId);
+    const normalizedAccountId = args.accountId
+      ? ctx.db.normalizeId("users", args.accountId)
+      : null;
+    if (normalizedAccountId) {
+      user = await ctx.db.get(normalizedAccountId);
       if (user && user.userId !== args.userId) {
         user = null;
       }

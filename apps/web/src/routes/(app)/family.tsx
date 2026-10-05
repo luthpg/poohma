@@ -140,13 +140,18 @@ function FamilyComponent() {
     api.families.getFamilyMembers,
     isAuthenticated ? { accountId: activeAccountId || undefined } : "skip",
   );
+  const currentMember =
+    family?.users.find((u) => u.id === activeAccountId) ??
+    family?.users.find((u) => u.userId === activeAccount?.userId);
+  const isFamilyAdmin = currentMember?.familyRole === "admin";
+
   const myJoinRequest = useQuery(
     api.families.getMyJoinRequest,
     isAuthenticated ? { accountId: activeAccountId || undefined } : "skip",
   );
   const pendingRequests = useQuery(
     api.families.getPendingRequests,
-    isAuthenticated && family
+    isAuthenticated && family && isFamilyAdmin
       ? { accountId: activeAccountId || undefined }
       : "skip",
   );
@@ -293,11 +298,6 @@ function FamilyComponent() {
       }
     }
   };
-
-  const currentMember =
-    family?.users.find((u) => u.id === activeAccountId) ??
-    family?.users.find((u) => u.userId === activeAccount?.userId);
-  const isFamilyAdmin = currentMember?.familyRole === "admin";
 
   const familyInvites = useQuery(
     api.families.getFamilyInvites,
@@ -592,7 +592,10 @@ function FamilyComponent() {
       // 3. 所有するレコードの暗号化対象を取得し再ラップ
       const migrationData = await convex.query(
         api.families.getMigrationForEncryption,
-        { migrationId },
+        {
+          migrationId,
+          accountId: activeAccountId || undefined,
+        },
       );
       let reEncryptedCredentials: Awaited<
         ReturnType<typeof reEncryptCredentials>

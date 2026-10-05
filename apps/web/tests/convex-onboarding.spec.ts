@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { api } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import schema from "../convex/schema";
+import { createTestFamilyData, createTestUserData } from "./test-helpers";
 
 const modules = import.meta.glob("../convex/**/*.ts");
 
@@ -12,12 +13,13 @@ describe("オンボーディング Convexバックエンドテスト", () => {
 
     let userId!: Id<"users">;
     await t.run(async (ctx) => {
-      userId = await ctx.db.insert("users", {
-        familyRole: "admin",
-        userId: "user_test",
-        email: "user@example.com",
-        updatedAt: Date.now(),
-      });
+      userId = await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "user_test",
+          email: "user@example.com",
+        }),
+      );
     });
 
     const asUser = t.withIdentity({ subject: "user_test" });
@@ -58,13 +60,14 @@ describe("オンボーディング Convexバックエンドテスト", () => {
 
     let userId!: Id<"users">;
     await t.run(async (ctx) => {
-      userId = await ctx.db.insert("users", {
-        familyRole: "admin",
-        userId: "user_test_reset",
-        email: "user_reset@example.com",
-        onboardingVersion: 1,
-        updatedAt: Date.now(),
-      });
+      userId = await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "user_test_reset",
+          email: "user_reset@example.com",
+          onboardingVersion: 1,
+        }),
+      );
     });
 
     const asUser = t.withIdentity({ subject: "user_test_reset" });
@@ -85,17 +88,18 @@ describe("オンボーディング Convexバックエンドテスト", () => {
     let userId!: Id<"users">;
 
     await t.run(async (ctx) => {
-      familyId = await ctx.db.insert("families", {
-        name: "Test Family",
-        updatedAt: Date.now(),
-      });
-      userId = await ctx.db.insert("users", {
-        familyRole: "admin",
-        userId: "user_family_member",
-        email: "member@example.com",
-        familyId,
-        updatedAt: Date.now(),
-      });
+      familyId = await ctx.db.insert(
+        "families",
+        createTestFamilyData("Test Family"),
+      );
+      userId = await ctx.db.insert(
+        "users",
+        createTestUserData({
+          userId: "user_family_member",
+          email: "member@example.com",
+          familyId,
+        }),
+      );
 
       // 既存の通常レコード（非サンプル）を作成しておく
       const normalRecordId = await ctx.db.insert("serviceRecords", {
@@ -110,6 +114,7 @@ describe("オンボーディング Convexバックエンドテスト", () => {
         tags: ["通常"],
         isSample: false,
         revision: 0,
+        updatedByAccountId: userId,
         updatedAt: Date.now(),
       });
       await ctx.db.insert("credentials", {

@@ -4,7 +4,7 @@ test.describe("ログアウトフローの検証", () => {
   test("ログアウトを実行するとセッションが破棄され、未認証状態になる", async ({
     page,
   }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
 
     // 1. 認証済み画面（/dashboard または /family）へアクセス
     await page.goto("/family");
@@ -58,11 +58,15 @@ test.describe("ログアウトフローの検証", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // 4. セッションが破棄されたことを確認するため、再度 /family へ直接アクセス
-    await page.goto("/family", { waitUntil: "domcontentloaded" });
-    // 認証ガードにより /login へリダイレクトされることを確認
-    await page.waitForURL((url) => url.pathname === "/login", {
-      timeout: 20000,
-    });
+    // 認証ガードにより /login へリダイレクトされることを確認（即時リダイレクト時の ERR_ABORTED は許容）
+    await Promise.all([
+      page.waitForURL((url) => url.pathname === "/login", {
+        timeout: 30000,
+      }),
+      page.goto("/family").catch((err: Error) => {
+        if (!err.message.includes("ERR_ABORTED")) throw err;
+      }),
+    ]);
     await expect(page).toHaveURL(/.*\/login/);
   });
 });

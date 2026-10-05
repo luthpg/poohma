@@ -90,17 +90,27 @@ export const CredentialInputSchema = z
       }
     }
 
-    // DEK暗号データの検証（封筒暗号化）
+    // DEK暗号データの検証（封筒暗号化: ヒントが存在する場合はDEKも必須）
     const hasDek = !!data.passwordHintDekEncrypted;
     const hasDekIv = !!data.passwordHintDekIv;
-    if (hasDek !== hasDekIv) {
+
+    if (hasHint && (!hasDek || !hasDekIv)) {
       ctx.addIssue({
         code: "custom",
         message:
-          "DEK暗号データとIVは両方指定するか、両方省略する必要があります",
-        path: ["passwordHintDekEncrypted"],
+          "パスワードヒントを復号するためのDEK暗号データおよびIVが必要です",
+        path: !hasDek ? ["passwordHintDekEncrypted"] : ["passwordHintDekIv"],
       });
     }
+
+    if (!hasHint && (hasDek || hasDekIv)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "ヒントが存在しない場合はDEK暗号データを指定できません",
+        path: hasDek ? ["passwordHintDekEncrypted"] : ["passwordHintDekIv"],
+      });
+    }
+
     if (hasDek && hasDekIv) {
       const result = AeadDataSchema.safeParse({
         iv: data.passwordHintDekIv,
