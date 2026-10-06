@@ -18,7 +18,16 @@ PowerShell 7 (pwsh / Windows) 環境における落とし穴と回避法です�
 
 ---
 
-### 日本語コミットメッセージ・PR本文の文字化け
+### 日本語コミットメッセージ・PR本文の文字化けと UTF-8 BOM 混入
 
-- **問題**: PowerShell の標準パイプライン（`|`）や `-m` 引数はエンコーディングにより日本語が `?` に化ける。
-- **回避法**: 必ず **UTF-8 一時ファイルを経由** して `git commit -F $tmpMsgFile` や `gh pr create --body-file $tmpBodyFile` を実行する（詳細は [`.ai/workflows/git-workflow.md`](../workflows/git-workflow.md) 参照）。
+- **問題**:
+  - PowerShell の標準パイプライン（`|`）や `-m` 引数はエンコーディングにより日本語が `?` に化ける。
+  - また、.NET の `[System.Text.Encoding]::UTF8` をそのまま使って一時ファイルを作成すると、デフォルトで **UTF-8 with BOM**（バイト順マーク: `EF BB BF`）が付与される。これを `git commit -F` や `gh pr create --body-file` で渡すと、コミット件名や PR 本文の先頭に不可視の BOM 文字（`\uFEFF`）が混入し、ツールによって不要文字や文字化けの原因となる。
+- **回避法**:
+  - 必ず **BOM なし UTF-8 一時ファイルを経由** して実行する。
+  ```powershell
+  $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+  [System.IO.File]::WriteAllText($tmpFile, $text, $utf8NoBom)
+  ```
+  - 詳細は [`.ai/workflows/git-workflow.md`](../workflows/git-workflow.md) を参照。
+
