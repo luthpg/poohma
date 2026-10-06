@@ -602,7 +602,7 @@ describe("PasscodeProvider - 生体認証ロック解除とパスコード変更
     });
 
     const biometricButton = screen.getByRole("button", {
-      name: /指紋 \/ FaceID でロック解除/i,
+      name: /指紋 \/ Face ID でロック解除/i,
     });
     expect(biometricButton).toBeTruthy();
 
@@ -654,7 +654,7 @@ describe("PasscodeProvider - 生体認証ロック解除とパスコード変更
     });
 
     const biometricButton = screen.getByRole("button", {
-      name: /指紋 \/ FaceID でロック解除/i,
+      name: /指紋 \/ Face ID でロック解除/i,
     });
 
     await act(async () => {
@@ -695,12 +695,12 @@ describe("PasscodeProvider - 生体認証ロック解除とパスコード変更
 
     // 非対応端末ではチェックボックスが表示されないこと
     expect(
-      screen.queryByLabelText(/次回から指紋\/FaceIDでロック解除する/i),
+      screen.queryByLabelText(/次回から指紋 \/ Face ID でロック解除する/i),
     ).toBeNull();
     // クイック解除ボタンも表示されないこと
     expect(
       screen.queryByRole("button", {
-        name: /指紋 \/ FaceID でロック解除/i,
+        name: /指紋 \/ Face ID でロック解除/i,
       }),
     ).toBeNull();
   });

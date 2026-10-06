@@ -469,7 +469,8 @@ function SettingsComponent() {
                   生体認証の解除
                 </p>
                 <p className="text-[12px] text-muted-foreground mt-1">
-                  この端末に保存されている生体認証（FaceID/指紋）のロック解除設定を削除します。
+                  この端末に保存されている生体認証（指紋 / Face
+                  ID）のロック解除設定を削除します。
                 </p>
               </div>
               <button

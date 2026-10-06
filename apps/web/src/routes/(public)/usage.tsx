@@ -301,7 +301,7 @@ function UsagePage() {
                       SIMPLE 3 STEPS
                     </Badge>
                     <h2 className="text-xl sm:text-3xl font-bold tracking-tight text-foreground">
-                      <JpText>これだけ覚えればOK！基本の3ステップ</JpText>
+                      <JpText>これだけで使える、基本の3ステップ</JpText>
                     </h2>
                     <p className="mt-2 text-sm sm:text-base text-muted-foreground whitespace-pre-wrap">
                       <JpText>
@@ -554,7 +554,7 @@ function UsagePage() {
                                 IDを貼り付け・パスワード入力
                               </p>
                               <p className="text-muted-foreground text-[11px] leading-relaxed">
-                                コピーしたIDを貼り付け、思い出したパスワードを入力してログイン完了！
+                                コピーしたIDを貼り付け、思い出したパスワードを入力してログイン完了
                               </p>
                             </div>
                           </div>

@@ -286,45 +286,50 @@ export function CsvHelpDialog({
           {/* 重要注意事項 */}
           <div className="space-y-2">
             <h4 className="font-semibold text-foreground text-xs sm:text-sm">
-              大切なデータ保護の仕組み
+              CSV入力時の注意事項
             </h4>
             <ul className="list-disc list-outside pl-4 space-y-1 text-muted-foreground text-[11px] sm:text-xs">
               <li>
                 <strong className="text-foreground">
-                  空欄の項目はそのまま残ります:
-                </strong>{" "}
+                  空欄の項目はそのまま残ります
+                </strong>
+                <br />
                 <JpText>
                   CSVで空欄になっている項目は、今登録されている情報が消えることなくそのまま維持されます。
                 </JpText>
               </li>
               <li>
                 <strong className="text-foreground">
-                  パスワードのヒントの保護:
-                </strong>{" "}
+                  パスワードのヒントの保護
+                </strong>
+                <br />
                 <JpText>
                   CSVにヒントを入力すると、お使いの端末内で自動的に暗号化されて安全に保存されます。空欄にしておけば現在のヒントが維持されます。
                 </JpText>
               </li>
               <li>
-                <strong className="text-foreground">列の順番は自由です:</strong>{" "}
+                <strong className="text-foreground">列の順番は自由です</strong>
+                <br />
                 <JpText>
                   1行目の項目名で自動判別するため、表計算ソフト等で列の順番が入れ替わっていても問題なく読み込めます。
                 </JpText>
               </li>
               <li>
                 <strong className="text-foreground">
-                  共有データの管理者（Admins列）:
-                </strong>{" "}
+                  共有データの管理者（admins列）
+                </strong>
+                <br />
                 <JpText>
-                  ファミリー管理者はすべての共有データを管理できるため、Admins列への記入は不要（空欄でOK）です。一般メンバーに個別の編集権限を与える場合のみメールアドレスを指定してください。家族外のメールアドレスが記入されていた場合は自動で除外され、インポート実行者が管理者として登録されます。
+                  ファミリー管理者はすべての共有データを管理できるため、admins列への記入は不要（空欄でOK）です。一般メンバーに個別の編集権限を与える場合のみメールアドレスを指定してください。家族外のメールアドレスが記入されていた場合は自動で除外され、インポート実行者が管理者として登録されます。
                 </JpText>
               </li>
               <li>
                 <strong className="text-foreground">
-                  行を消しても削除はされません:
-                </strong>{" "}
+                  行を消しても削除はされません
+                </strong>
+                <br />
                 <JpText>
-                  誤って大切なデータを消してしまうのを防ぐため、CSV上から行やアカウントを消しても、アプリ内のデータは削除されません。削除はアプリ画面から個別に行ってください。
+                  誤って大切なデータを削除してしまうのを防ぐため、CSV上から行やアカウントを消しても、アプリ内のデータは削除されません。削除はアプリ画面から個別に行ってください。
                 </JpText>
               </li>
             </ul>
