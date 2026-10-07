@@ -491,19 +491,19 @@ Convex 側は auth.config.ts の Issuer 設定 (securetoken.google.com/poohma) �
 #### 5.3.1 フロントエンドにおける管理者セクションの安全な分離（AdminRestrictedSection）
 
 一般メンバーが家族管理画面等の管理者専用機能にアクセスした際、単に操作ボタンを非活性化したり実UIの上にオーバーレイを重ねるだけでは、裏側で不要な Convex Query やフックが購読・実行されてしまうリスクがあります。
-そのため、PoohMa では共通コンポーネント `AdminRestrictedSection` を導入し、以下の二重保護を行います：
+そのため、PoohMa では共通コンポーネント `AdminRestrictedSection` を導入し、以下の二重保護を行います。
 
 1. **実コンポーネントのアンマウント（完全遮断）**: 一般メンバー表示時は children（実コンポーネント）をレンダリングせずアンマウントします。これにより実フック・Convex Query・イベントハンドラが端末上で一切稼働しません。
 2. **静的スケルトン ＋ 中央オーバーレイマスク**: 代替として、機能の外形を模した純粋な静的スケルトン（`pointer-events-none`, `aria-hidden="true"`, `blur`）を背景に配置し、中央にロックアイコンと「管理者機能」メッセージを重ねて描画します。
 3. **React Hooks ルール遵守のラッパー設計**: 実コンポーネントを `*Content` として分離し、最外層のラッパーコンポーネントが `isAdmin` に基づいて `AdminRestrictedSection` または `*Content` を排他的に描画することで、アーリーリターンによるフック呼び出し順序の不整合（Biome `useHookAtTopLevel`）を完全に排除します。
 
-1. `accountId` が明示的に渡された場合：
+1. `accountId` が明示的に渡された場合
    - DB から当該 `users` レコードを取得。
    - `user.userId === identity.subject`（ログイン中 Firebase UID）であることを検証（IDOR 防止）。不一致の場合は `Unauthorized` 例外を送出。
-2. `accountId` が省略された場合：
+2. `accountId` が省略された場合
    - ログイン中 Firebase UID に紐づく先頭の `users` レコードへ自動フォールバック（下位互換性確保）。
 
-生のConvex `query` / `mutation` を直接エクスポートすることは禁止し、必ず上記のカスタムビルダーを経由する。実装例（ `convex/records.ts` の `updateRecord` ）：
+生のConvex `query` / `mutation` を直接エクスポートすることは禁止し、必ず上記のカスタムビルダーを経由する。以下に実装例（ `convex/records.ts` の `updateRecord` ）を示す。
 
 ```txt
 export const updateRecord = familyBoundMutation({
@@ -1319,7 +1319,7 @@ convex/crons.ts に登録されている定期ジョブ一覧:
 | `CredentialId` があり、当該レコードに属する | **UPDATE / SKIP (Cred)** | クレデンシャル項目の差分を判定。空セルは既存値を維持 |
 
 ### 14.4 セキュリティ・E2EE・整合性保護
-- **空セルによる値保護**: CSVのセルが空（未入力）の場合は**既存の値を維持（SKIP）**し、意図しないデータ消去を防止する。
+- **空セルによる値保護**: CSVのセルが空（未入力）の場合は**既存の値を維持（SKIP）** し、意図しないデータ消去を防止する。
 - **削除の非サポート**: CSVから行やクレデンシャルを削除しても、DB上のデータは**削除しない**（削除はアプリUIから明示的に実行）。
 - **E2EE整合性**:
   - CSV側の `PasswordHint` が空の場合: DB上の既存暗号化データをそのまま維持（暗号化処理・マスターキーアンロック不要）。

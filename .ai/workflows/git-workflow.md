@@ -47,7 +47,8 @@ feat(auth): ログイン時のトークン再発行処理を追加
 ・セッション切れによる意図しないログアウトを防止
 '@
 $tmpMsgFile = [System.IO.Path]::GetTempFileName()
-[System.IO.File]::WriteAllText($tmpMsgFile, $commitMsg, [System.Text.Encoding]::UTF8)
+$utf8NoBom = New-Object System.Text.UTF8Encoding $false
+[System.IO.File]::WriteAllText($tmpMsgFile, $commitMsg, $utf8NoBom)
 try {
   git commit -F $tmpMsgFile
 } finally {
@@ -64,7 +65,7 @@ PowerShell 上で `gh pr create`、`gh issue create`、`gh pr comment` を実行
 - **`--body` フラグで直接ダブルクォート文字列を渡さないこと**（PowerShell が Markdown 内のバッククォート `` ` `` をエスケープ文字として誤解釈し、ベル文字やバックスラッシュに化けるため）。
 - **ダブルクォートヒアドキュメント（`@" ... "@`）を使わないこと**（必ず `@' ... '@` を使用すること）。
 - **パイプライン（`|`）で直接 `gh` に渡さないこと**（エンコーディングにより日本語が `?` に化けるため）。
-- 本文を渡す際は、必ず **シングルクォートヒアドキュメントで作成した UTF-8 一時ファイルを経由する** こと。
+- 本文を渡す際は、必ず **シングルクォートヒアドキュメントで作成した BOM なし UTF-8 一時ファイルを経由する** こと（.NET の `[System.Text.Encoding]::UTF8` はデフォルトで BOM が付与され、先頭に不要文字 `\uFEFF` が混入するため）。
 
 ### PR 作成（`gh pr create`）実行スクリプトテンプレート
 
@@ -76,7 +77,8 @@ $prBody = @'
 ・`EmailTemplateDefinition` の定義
 '@
 $tmpBodyFile = [System.IO.Path]::GetTempFileName()
-[System.IO.File]::WriteAllText($tmpBodyFile, $prBody, [System.Text.Encoding]::UTF8)
+$utf8NoBom = New-Object System.Text.UTF8Encoding $false
+[System.IO.File]::WriteAllText($tmpBodyFile, $prBody, $utf8NoBom)
 try {
   gh pr create --title "feat: メールテンプレートの追加" --body-file $tmpBodyFile
 } finally {
@@ -93,7 +95,8 @@ $commentBody = @'
 `apps/web/public/llms.txt` の説明を修正しました。
 '@
 $tmpFile = [System.IO.Path]::GetTempFileName()
-[System.IO.File]::WriteAllText($tmpFile, $commentBody, [System.Text.Encoding]::UTF8)
+$utf8NoBom = New-Object System.Text.UTF8Encoding $false
+[System.IO.File]::WriteAllText($tmpFile, $commentBody, $utf8NoBom)
 try {
   # 新規コメント投稿
   gh pr comment <PR番号> --body-file $tmpFile

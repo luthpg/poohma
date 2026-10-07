@@ -304,7 +304,7 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
             `${currentAccount.email}${currentAccount?.family != null ? ` [${currentAccount.family.name}]` : ""}`,
           );
           setBiometricEnabled(true);
-          toast.success("指紋/FaceIDでのロック解除を有効にしました。");
+          toast.success("指紋 / Face ID でのロック解除を有効にしました。");
 
           // 登録通知メール送信（バックグラウンド）
           getClientRequestContext()
@@ -552,7 +552,7 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
                     disabled={isUnlocking || isBiometricAuthenticating}
                     className="rounded border-border bg-background checked:bg-primary text-primary focus:ring-primary/20 h-4 w-4"
                   />
-                  <span>次回から指紋/FaceIDでロック解除する</span>
+                  <span>次回から指紋 / Face ID でロック解除する</span>
                 </label>
                 <details className="text-xs text-muted-foreground/80 cursor-pointer select-none">
                   <summary className="hover:text-foreground transition-colors">
@@ -593,7 +593,7 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
                 ) : (
                   <>
                     <Fingerprint className="h-5 w-5" />
-                    指紋 / FaceID でロック解除
+                    指紋 / Face ID でロック解除
                   </>
                 )}
               </button>

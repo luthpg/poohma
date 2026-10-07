@@ -321,9 +321,9 @@ function RouteComponent() {
                         </h3>
                         <ul className="text-[#4d4d4d] dark:text-zinc-400 text-sm md:text-base leading-relaxed list-disc">
                           {[
-                            "サーバーに保存されるのはあなたが決めたヒントだけ",
+                            "サーバーに保存されるのは、あなたが決めたヒントだけ",
                             "実際のパスワードは保存しなくてOK",
-                            "ヒント自体も暗号化されていますので、復元には家族パスコードが必要です",
+                            "ヒントも暗号化されるので、復元には家族パスコードが必要",
                           ].map((item) => (
                             <JpText as="li" key={item}>
                               {item}
