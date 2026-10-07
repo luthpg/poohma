@@ -79,6 +79,7 @@ export function CsvHelpDialog({
       "OwnerType",
       "Admins",
       "Tags",
+      "IsArchived",
     ];
     for (let i = 1; i <= MAX_CREDENTIALS_PER_RECORD; i++) {
       columns.push(
@@ -98,6 +99,7 @@ export function CsvHelpDialog({
       OwnerType: "family",
       Admins: "admin@example.com",
       Tags: "生活,サブスク",
+      IsArchived: "FALSE",
       CredentialId1: "",
       Label1: "メインアカウント",
       LoginID1: "sample_user@example.com",
@@ -116,6 +118,7 @@ export function CsvHelpDialog({
       OwnerType: "user",
       Admins: "",
       Tags: "個人,金融",
+      IsArchived: "TRUE",
       CredentialId1: "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
       Label1: "更新後ラベル",
       LoginID1: "updated_login@example.com",

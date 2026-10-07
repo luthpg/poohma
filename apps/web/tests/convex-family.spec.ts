@@ -77,6 +77,7 @@ const seedTwoUserFamily_ = async (t: ReturnType<typeof convexTest>) => {
       ownerType: "user",
       admins: [],
       tags: [],
+      isArchived: false,
       updatedAt: Date.now(),
     });
 
@@ -105,6 +106,7 @@ const seedTwoUserFamily_ = async (t: ReturnType<typeof convexTest>) => {
       ownerType: "user",
       admins: [],
       tags: [],
+      isArchived: false,
       updatedAt: Date.now(),
     });
 
@@ -458,6 +460,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           ownerType: "user",
           admins: [],
           tags: [],
+          isArchived: false,
           updatedAt: Date.now(),
         });
 
@@ -1273,6 +1276,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           ownerType: "user",
           admins: [],
           tags: [],
+          isArchived: false,
           updatedAt: Date.now(),
         });
 
@@ -1427,6 +1431,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           familyId: oldFamilyId,
           ownerType: "user",
           admins: [],
+          isArchived: false,
           updatedAt: Date.now(),
         });
 
@@ -1615,6 +1620,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           tags: [],
           revision: 0,
           updatedByAccountId: userDupCredId,
+          isArchived: false,
           updatedAt: Date.now(),
         });
         await ctx.db.insert("credentials", {
@@ -1638,6 +1644,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           tags: [],
           revision: 0,
           updatedByAccountId: userDupCredId,
+          isArchived: false,
           updatedAt: Date.now(),
         });
         await ctx.db.insert("credentials", {
@@ -1840,6 +1847,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           familyId: oldFamilyId,
           ownerType: "user",
           admins: [],
+          isArchived: false,
           updatedAt: Date.now(),
         });
         await ctx.db.insert("credentials", {
@@ -1884,6 +1892,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           familyId: oldFamilyId,
           ownerType: "user",
           admins: [],
+          isArchived: false,
           updatedAt: Date.now(),
         });
         await ctx.db.insert("credentials", {
@@ -2028,6 +2037,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           ownerType: "user",
           admins: [],
           tags: [],
+          isArchived: false,
           updatedAt: Date.now(),
         });
         await ctx.db.insert("credentials", {
@@ -2069,6 +2079,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           ownerType: "user",
           admins: [],
           tags: [],
+          isArchived: false,
           updatedAt: Date.now(),
         });
       });
@@ -2151,6 +2162,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
           ownerType: "family",
           admins: [stayingId],
           tags: [],
+          isArchived: false,
           updatedAt: Date.now(),
         });
       });
@@ -2462,6 +2474,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
           ownerType: "family",
           admins: [userLeaveId], // userLeave is the only admin
           tags: [],
+          isArchived: false,
           updatedAt: Date.now(),
         });
       });
@@ -2534,6 +2547,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
           ownerType: "family",
           admins: [userSoloId],
           tags: [],
+          isArchived: false,
           updatedAt: Date.now(),
         });
       });
@@ -2721,6 +2735,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
           ownerType: "user",
           admins: [],
           tags: [],
+          isArchived: false,
           updatedAt: 2000,
         });
         await ctx.db.insert("credentials", {
@@ -3204,6 +3219,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
           ownerFamilyId: familyId,
           admins: [userBId],
           tags: [],
+          isArchived: false,
           updatedAt: Date.now(),
         });
       });
@@ -3405,6 +3421,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
           ownerType: "user",
           admins: [],
           tags: [],
+          isArchived: false,
           updatedAt: Date.now(),
         });
 
@@ -3842,6 +3859,7 @@ describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
           ownerType: "family",
           admins: [], // ファミリー管理者に委ねられている
           tags: [],
+          isArchived: false,
           updatedAt: Date.now(),
         });
       });

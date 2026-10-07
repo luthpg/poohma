@@ -76,13 +76,13 @@ export function RecordForm({
           {form.draftSaveStatus === "paused" && (
             <span className="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-medium">
               <Lock className="h-3.5 w-3.5" />
-              一時停止中（パスコード未入力）
+              一時停止中
               <button
                 type="button"
                 onClick={() => form.requireUnlock()}
                 className="underline hover:text-foreground font-semibold ml-1 cursor-pointer"
               >
-                ロック解除
+                自動保存開始
               </button>
             </span>
           )}

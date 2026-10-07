@@ -26,6 +26,7 @@ export interface RecordCreatePayload {
   ownerType?: "user" | "family";
   adminEmails?: string[];
   tags: string[];
+  isArchived?: boolean;
   credentials: Array<{
     id?: string;
     label?: string;
@@ -46,6 +47,7 @@ export interface RecordUpdatePayload {
   ownerType?: "user" | "family";
   adminEmails?: string[];
   tags?: string[];
+  isArchived?: boolean;
   credentials: Array<{
     stableId?: string;
     label?: string;
@@ -266,6 +268,25 @@ export function useImportCsvDiff(options?: UseImportCsvDiffOptions) {
           const recordId = (row.RecordId || "").trim();
           const title = (row.Title || "").trim();
 
+          const isArchivedRaw = (row.IsArchived || "").trim();
+          if (
+            isArchivedRaw &&
+            isArchivedRaw.toLowerCase() !== "true" &&
+            isArchivedRaw.toLowerCase() !== "false"
+          ) {
+            preliminaryItems.push({
+              index,
+              csvRow,
+              action: "ERROR",
+              title: title || "(無題)",
+              stableId: recordId || undefined,
+              changedFields: [],
+              changes: [],
+              errorReason: `IsArchived には TRUE または FALSE を指定してください（入力値: "${isArchivedRaw}"）`,
+            });
+            continue;
+          }
+
           // 1. Title が空の場合はエラー
           if (!title && !recordId) {
             preliminaryItems.push({
@@ -472,6 +493,21 @@ export function useImportCsvDiff(options?: UseImportCsvDiffOptions) {
             }
           }
 
+          const isArchivedStr = (row.IsArchived || "").trim().toLowerCase();
+          if (isArchivedStr === "true" || isArchivedStr === "false") {
+            const newIsArchived = isArchivedStr === "true";
+            const currentIsArchived = existing.isArchived ?? false;
+            if (newIsArchived !== currentIsArchived) {
+              changes.push({
+                field: "isArchived",
+                label: "アーカイブ状態",
+                before: currentIsArchived ? "アーカイブ" : "利用中",
+                after: newIsArchived ? "アーカイブ" : "利用中",
+              });
+              changedFields.push("IsArchived");
+            }
+          }
+
           // クレデンシャルの差分
           for (let cIdx = 1; cIdx <= MAX_CREDENTIALS_PER_RECORD; cIdx++) {
             const credId = (row[`CredentialId${cIdx}`] || "").trim();
@@ -668,6 +704,8 @@ export function useImportCsvDiff(options?: UseImportCsvDiffOptions) {
                 (row.OwnerType || "").trim().toLowerCase() === "family"
                   ? "family"
                   : "user";
+              const isArchivedStr = (row.IsArchived || "").trim().toLowerCase();
+              const isArchived = isArchivedStr === "true";
 
               item.createPayload = {
                 title: item.title,
@@ -679,6 +717,7 @@ export function useImportCsvDiff(options?: UseImportCsvDiffOptions) {
                 ownerType,
                 adminEmails: admins.length > 0 ? admins : undefined,
                 tags,
+                isArchived,
                 credentials,
               };
             } else if (item.action === "UPDATE") {
@@ -757,6 +796,15 @@ export function useImportCsvDiff(options?: UseImportCsvDiffOptions) {
                 ownerTypeRaw === "family" || ownerTypeRaw === "user"
                   ? ownerTypeRaw
                   : undefined;
+              const updateIsArchivedStr = (row.IsArchived || "")
+                .trim()
+                .toLowerCase();
+              const updateIsArchived =
+                updateIsArchivedStr === "true"
+                  ? true
+                  : updateIsArchivedStr === "false"
+                    ? false
+                    : undefined;
 
               if (item.stableId) {
                 item.updatePayload = {
@@ -770,6 +818,9 @@ export function useImportCsvDiff(options?: UseImportCsvDiffOptions) {
                   ownerType,
                   adminEmails: admins,
                   tags,
+                  isArchived: item.changedFields.includes("IsArchived")
+                    ? updateIsArchived
+                    : undefined,
                   credentials,
                 };
               }

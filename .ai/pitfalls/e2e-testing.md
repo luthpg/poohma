@@ -77,5 +77,19 @@ Playwright E2E テストおよびフロントエンド遷移における落と�
   await expect(page).toHaveURL(/.*\/login/);
   ```
 
+---
+
+### Convex Preview 環境における E2E テストの再利用（reuse）とクリーン（recreate）のトレードオフ
+
+- **問題**: ローカルで `pnpm test:e2e`（または `test:e2e:show`）を反復実行した際、先行テスト（例: `e2ee-seed-import` 等の統合ジャーニーテスト）が途中で失敗・中断すると、Convex Preview DB 上にテスト用サブアカウントや家族データが残留し、後続テストで「未認証リダイレクト（`/login` へ強制遷移）」が連鎖発生して無関係なテストまで巻き添えで落ちる。
+- **原因**: 通常の `pnpm test:e2e` はデプロイ高速化のために既存の Preview Deployment を再利用（`--preview-name`）しており、先行テストの失敗でクリーンアップされなかったゴミデータが DB に残存してセッションやユニーク制約の競合を引き起こすため。
+- **回避法**:
+  1. 通常の開発反復時は高速な再利用モード（`test:e2e`）で良いが、**セッション切断やデータ不整合による連鎖失敗が発生した際、およびコミット前・PR提出前の最終フル検証時は `pnpm test:e2e:clean`（`--preview-create`）を実行**して Preview DB を完全に初期化・地ならしする。
+  2. これにより、`e2e/.auth` の古いストレージも破棄され、`auth.setup.ts` で完全に新規の Firebase ID トークンとセッション Cookie からクリーンにテストが開始される。
+- **関連実装**:
+  - `apps/web/scripts/setup-e2e-preview.ts`
+  - `apps/web/e2e/auth.setup.ts`
+
+
 
 

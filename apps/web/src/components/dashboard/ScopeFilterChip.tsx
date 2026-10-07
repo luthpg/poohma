@@ -70,7 +70,7 @@ export function ScopeFilterChip({
           <CurrentIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           <span className="tracking-tight">{currentConfig.label}</span>
           {counts && (
-            <span className="text-[11px] font-normal opacity-70">
+            <span className="hidden md:inline text-[11px] font-normal opacity-70">
               ({counts[currentFilter]})
             </span>
           )}

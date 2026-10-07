@@ -351,6 +351,7 @@ export const resetDemoFamilyInternal = internalMutation({
         admins: [primaryAdmin._id],
         tags: recordData.tags,
         stableId: crypto.randomUUID(),
+        isArchived: false,
         revision: 0,
         updatedAt: now,
         updatedByAccountId: primaryAdmin._id,

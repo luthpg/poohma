@@ -92,6 +92,7 @@ describe("2.2.1 閲覧権限（ownerType）の境界値テスト (Convex版)", (
         ownerType: "user",
         admins: [],
         tags: [],
+        isArchived: false,
         updatedAt: Date.now(),
       });
 
@@ -109,6 +110,7 @@ describe("2.2.1 閲覧権限（ownerType）の境界値テスト (Convex版)", (
         ownerType: "family",
         admins: [userAId],
         tags: [],
+        isArchived: false,
         updatedAt: Date.now(),
       });
     });
@@ -438,6 +440,7 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
         ownerType: "user",
         admins: [],
         tags: [],
+        isArchived: false,
         updatedAt: Date.now(),
       });
 
@@ -455,6 +458,7 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
         ownerType: "family",
         admins: [userBId],
         tags: [],
+        isArchived: false,
         updatedAt: Date.now(),
       });
     });
@@ -515,6 +519,7 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
         ownerType: "user",
         admins: [],
         tags: [],
+        isArchived: false,
         updatedAt: Date.now(),
       });
     });
@@ -595,6 +600,7 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
         ownerType: "family",
         admins: [userAId],
         tags: [],
+        isArchived: false,
         updatedAt: Date.now(),
       });
     });
@@ -660,6 +666,7 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
         ownerType: "user",
         admins: [],
         tags: [],
+        isArchived: false,
         updatedAt: Date.now(),
       });
 
@@ -675,6 +682,7 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
         ownerType: "user",
         admins: [],
         tags: [],
+        isArchived: false,
         updatedAt: Date.now(),
       });
     });
@@ -752,6 +760,7 @@ describe("Drive型ACLモデルのCRUDと共有機能テスト", () => {
         ownerType: "user",
         admins: [],
         tags: [],
+        isArchived: false,
         updatedAt: Date.now(),
       });
     });
@@ -820,6 +829,7 @@ describe("レコード削除・一括操作の認可検証 (deleteRecord / delet
         ownerType: "user",
         admins: [],
         tags: [],
+        isArchived: false,
         updatedAt: Date.now(),
       });
     });
@@ -873,6 +883,7 @@ describe("レコード削除・一括操作の認可検証 (deleteRecord / delet
         ownerType: "user",
         admins: [],
         tags: [],
+        isArchived: false,
         updatedAt: Date.now(),
       });
       othersPrivateId = await ctx.db.insert("serviceRecords", {
@@ -887,6 +898,7 @@ describe("レコード削除・一括操作の認可検証 (deleteRecord / delet
         ownerType: "user",
         admins: [],
         tags: [],
+        isArchived: false,
         updatedAt: Date.now(),
       });
     });
@@ -945,6 +957,7 @@ describe("レコード削除・一括操作の認可検証 (deleteRecord / delet
         ownerType: "family",
         admins: [userAId],
         tags: [],
+        isArchived: false,
         updatedAt: Date.now(),
       });
     });
@@ -1019,6 +1032,7 @@ describe("レコード削除・一括操作の認可検証 (deleteRecord / delet
         ownerFamilyId: family1Id,
         admins: [user1Id],
         tags: [],
+        isArchived: false,
         updatedAt: Date.now(),
       });
       const sharedRecord = await ctx.db.get(sharedRecordId);
@@ -1035,6 +1049,7 @@ describe("レコード削除・一括操作の認可検証 (deleteRecord / delet
         ownerType: "user",
         admins: [],
         tags: [],
+        isArchived: false,
         updatedAt: Date.now(),
       });
       const privateRecord = await ctx.db.get(privateRecordId);
@@ -1101,6 +1116,7 @@ describe("レコード削除・一括操作の認可検証 (deleteRecord / delet
         updatedByAccountId: accountId,
         title: "Order Test Record",
         tags: [],
+        isArchived: false,
         updatedAt: Date.now(),
       });
     });
@@ -1194,6 +1210,7 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
         ownerType: "user",
         admins: [],
         tags: [],
+        isArchived: false,
         updatedAt: Date.now(),
       });
 
@@ -1211,6 +1228,7 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
         ownerFamilyId: familyId,
         admins: [userAId],
         tags: [],
+        isArchived: false,
         updatedAt: Date.now(),
       });
 
@@ -1228,6 +1246,7 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
         ownerFamilyId: familyId,
         admins: [userBId],
         tags: [],
+        isArchived: false,
         updatedAt: Date.now(),
       });
 
@@ -1244,6 +1263,7 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
         ownerType: "user",
         admins: [],
         tags: [],
+        isArchived: false,
         updatedAt: Date.now(),
       });
 
@@ -1343,6 +1363,7 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
         ownerType: "user",
         admins: [],
         tags: [],
+        isArchived: false,
         updatedAt: Date.now(),
       });
 
@@ -1359,6 +1380,7 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
         ownerType: "user",
         admins: [],
         tags: [],
+        isArchived: false,
         updatedAt: Date.now(),
       });
 
@@ -1376,6 +1398,7 @@ describe("2.2.8 CSVエクスポート（fetchRecordsForExport）の権限・整�
         ownerFamilyId: familyId,
         admins: [userAId],
         tags: [],
+        isArchived: false,
         updatedAt: Date.now(),
       });
     });
@@ -1486,6 +1509,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
         ownerType: "family",
         admins: [userAId],
         tags: [],
+        isArchived: false,
         updatedAt: 1000,
       });
     });
@@ -1575,6 +1599,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
         ownerType: "family",
         admins: [userAId],
         tags: [],
+        isArchived: false,
         updatedAt: 1000,
       });
 
@@ -1633,6 +1658,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
         ownerType: "user",
         admins: [],
         tags: [],
+        isArchived: false,
         updatedAt: now,
       });
 
@@ -1710,6 +1736,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
         ownerType: "family",
         admins: [userAId],
         tags: [],
+        isArchived: false,
         updatedAt: 5000,
       });
     });
@@ -1830,6 +1857,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
           ownerFamilyId: familyId,
           admins: [userAId],
           tags: ["chunk-test"],
+          isArchived: false,
           updatedAt: Date.now() + i,
         });
 
@@ -1917,6 +1945,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
           ownerFamilyId: familyId,
           admins: [userAId],
           tags: ["limit-test"],
+          isArchived: false,
           updatedAt: Date.now() + i,
         });
 
@@ -1986,6 +2015,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
           ownerFamilyId: familyId,
           admins: [userAId],
           tags: ["paginated-test"],
+          isArchived: false,
           updatedAt: Date.now() + i,
         });
 
@@ -2095,6 +2125,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
         ownerType: "family",
         admins: [],
         tags: [],
+        isArchived: false,
         updatedAt: Date.now(),
       });
       rec2Id = await ctx.db.insert("serviceRecords", {
@@ -2110,6 +2141,7 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
         ownerType: "family",
         admins: [],
         tags: [],
+        isArchived: false,
         updatedAt: Date.now(),
       });
     });
@@ -2199,6 +2231,7 @@ describe("2.2.14 CSV差分インポート・安定ID（stableId）検証", () =>
         admins: [],
         stableId: stableUUID,
         tags: ["work"],
+        isArchived: false,
         updatedAt: Date.now(),
       });
       await ctx.db.insert("credentials", {
@@ -2279,6 +2312,7 @@ describe("2.2.14 CSV差分インポート・安定ID（stableId）検証", () =>
         admins: [adminUserId],
         stableId: stableUUID,
         tags: ["shared"],
+        isArchived: false,
         updatedAt: Date.now(),
       });
     });
@@ -2332,6 +2366,7 @@ describe("2.2.14 CSV差分インポート・安定ID（stableId）検証", () =>
         admins: [],
         stableId: existingStableId,
         tags: ["old-tag"],
+        isArchived: false,
         updatedAt: Date.now(),
       });
       await ctx.db.insert("credentials", {
@@ -2501,6 +2536,7 @@ describe("2.2.14 CSV差分インポート・安定ID（stableId）検証", () =>
         stableId: recStableId,
         revision: 0,
         updatedByAccountId: userAccountId,
+        isArchived: false,
         updatedAt: Date.now(),
       });
     });
@@ -2614,6 +2650,7 @@ describe("2.4 getRecords 検索・フィルタリング機能 (Convex版)", () =
         ownerType: "family",
         admins: [userAccountId],
         tags: ["検索", "便利"],
+        isArchived: false,
         updatedAt: Date.now(),
       });
       await ctx.db.insert("credentials", {
@@ -2641,6 +2678,7 @@ describe("2.4 getRecords 検索・フィルタリング機能 (Convex版)", () =
         ownerType: "family",
         admins: [userAccountId],
         tags: ["ショッピング", "通販"],
+        isArchived: false,
         updatedAt: Date.now(),
       });
       await ctx.db.insert("credentials", {
@@ -2668,6 +2706,7 @@ describe("2.4 getRecords 検索・フィルタリング機能 (Convex版)", () =
         ownerType: "family",
         admins: [userAccountId],
         tags: ["開発", "仕事"],
+        isArchived: false,
         updatedAt: Date.now(),
       });
       await ctx.db.insert("credentials", {
@@ -2739,5 +2778,139 @@ describe("2.4 getRecords 検索・フィルタリング機能 (Convex版)", () =
       q: "グーグル　developer",
     });
     expect(resAndFullMismatch).toHaveLength(0);
+  });
+});
+
+describe("レコードのアーカイブ・復元機能テスト (Issue #154)", () => {
+  it("アーカイブ・復元・一覧フィルタ（active / archived / all）が正しく動作すること", async () => {
+    const t = convexTest(schema, modules);
+
+    let familyId!: Id<"families">;
+
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "Test Family",
+        updatedAt: Date.now(),
+      });
+      await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        familyRole: "admin",
+        userId: "admin_user",
+        email: "admin@example.com",
+        familyId,
+      });
+      await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        familyRole: "viewer",
+        userId: "member_user",
+        email: "member@example.com",
+        familyId,
+      });
+    });
+
+    const admin = t.withIdentity({ subject: "admin_user" });
+    const member = t.withIdentity({ subject: "member_user" });
+
+    // 1. レコード作成（初期状態は isArchived: false）
+    const record1Id = await admin.mutation(api.records.createRecord, {
+      title: "Service 1",
+      credentials: [],
+      tags: [],
+      ownerType: "user",
+    });
+    const record2Id = await admin.mutation(api.records.createRecord, {
+      title: "Service 2",
+      credentials: [],
+      tags: [],
+      ownerType: "family",
+    });
+
+    // 初期状態: デフォルト（active）で2件取得
+    const initialActive = await admin.query(api.records.getRecords, {});
+    expect(initialActive).toHaveLength(2);
+    expect(initialActive.map((r) => r._id)).toContain(record1Id);
+    expect(initialActive.map((r) => r._id)).toContain(record2Id);
+
+    // アーカイブ一覧は0件
+    const initialArchived = await admin.query(api.records.getRecords, {
+      archiveStatus: "archived",
+    });
+    expect(initialArchived).toHaveLength(0);
+
+    // 2. record1 をアーカイブ
+    await admin.mutation(api.records.archiveRecord, { id: record1Id });
+
+    // 通常一覧（active）からは record1 が消え、record2 のみになる
+    const afterArchiveActive = await admin.query(api.records.getRecords, {});
+    expect(afterArchiveActive).toHaveLength(1);
+    expect(afterArchiveActive[0]?._id).toBe(record2Id);
+
+    // アーカイブ一覧には record1 のみが含まれる
+    const afterArchiveArchived = await admin.query(api.records.getRecords, {
+      archiveStatus: "archived",
+    });
+    expect(afterArchiveArchived).toHaveLength(1);
+    expect(afterArchiveArchived[0]?._id).toBe(record1Id);
+    expect(afterArchiveArchived[0]?.isArchived).toBe(true);
+    expect(afterArchiveArchived[0]?.archivedAt).toBeDefined();
+
+    // all 一覧には両方が含まれる
+    const afterArchiveAll = await admin.query(api.records.getRecords, {
+      archiveStatus: "all",
+    });
+    expect(afterArchiveAll).toHaveLength(2);
+
+    // 3. 権限制御: 共有レコード（record2）に対して、管理者ではない member がアーカイブしようとするとエラー
+    await expect(
+      member.mutation(api.records.archiveRecord, { id: record2Id }),
+    ).rejects.toThrow();
+
+    // 4. 一括アーカイブ: record2 を一括アーカイブ
+    const bulkArchiveResult = await admin.mutation(
+      api.records.bulkArchiveRecords,
+      {
+        ids: [record2Id],
+      },
+    );
+    expect(bulkArchiveResult.count).toBe(1);
+
+    // 全てアーカイブ済みになったことを確認
+    const allArchived = await admin.query(api.records.getRecords, {
+      archiveStatus: "archived",
+    });
+    expect(allArchived).toHaveLength(2);
+
+    // 5. 一括利用再開: record1 と record2 を一括利用再開
+    const bulkUnarchiveResult = await admin.mutation(
+      api.records.bulkUnarchiveRecords,
+      {
+        ids: [record1Id, record2Id],
+      },
+    );
+    expect(bulkUnarchiveResult.count).toBe(2);
+
+    // 利用中一覧に2件とも戻る
+    const restoredActive = await admin.query(api.records.getRecords, {});
+    expect(restoredActive).toHaveLength(2);
+
+    // 6. 単体利用再開: 再度アーカイブして unarchiveRecord で利用再開
+    await admin.mutation(api.records.archiveRecord, { id: record1Id });
+    expect(
+      (await admin.query(api.records.getRecords, { archiveStatus: "archived" }))
+        .length,
+    ).toBe(1);
+
+    await admin.mutation(api.records.unarchiveRecord, { id: record1Id });
+    expect(
+      (await admin.query(api.records.getRecords, { archiveStatus: "archived" }))
+        .length,
+    ).toBe(0);
+    expect(
+      (await admin.query(api.records.getRecords, { archiveStatus: "active" }))
+        .length,
+    ).toBe(2);
   });
 });

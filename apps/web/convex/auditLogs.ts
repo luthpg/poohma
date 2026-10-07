@@ -14,6 +14,8 @@ export interface LogAuditParams {
     | "RECORD_CREATE"
     | "RECORD_UPDATE"
     | "RECORD_DELETE"
+    | "RECORD_ARCHIVE"
+    | "RECORD_UNARCHIVE"
     | "CREDENTIAL_CREATE"
     | "CREDENTIAL_UPDATE"
     | "CREDENTIAL_DELETE"

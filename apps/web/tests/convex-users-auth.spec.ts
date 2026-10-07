@@ -203,6 +203,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           revision: 0,
           updatedByAccountId: oldAccId1,
           tags: [],
+          isArchived: false,
           updatedAt: 1000,
         });
         joinReqId = await ctx.db.insert("joinRequests", {
@@ -555,6 +556,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           revision: 0,
           updatedByAccountId: userAccId,
           tags: [],
+          isArchived: false,
           updatedAt: Date.now(),
         });
         const otherUserAccId = await ctx.db.insert("users", {
@@ -633,6 +635,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           revision: 0,
           updatedByAccountId: leavingAccId,
           tags: [],
+          isArchived: false,
           updatedAt: Date.now(),
         });
         sharedRecId = await ctx.db.insert("serviceRecords", {
@@ -647,6 +650,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           revision: 0,
           updatedByAccountId: leavingAccId,
           tags: [],
+          isArchived: false,
           updatedAt: Date.now(),
         });
       });
@@ -701,6 +705,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           revision: 0,
           updatedByAccountId: userAccId,
           tags: [],
+          isArchived: false,
           updatedAt: Date.now(),
         });
         famRecId = await ctx.db.insert("serviceRecords", {
@@ -715,6 +720,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           revision: 0,
           updatedByAccountId: userAccId,
           tags: [],
+          isArchived: false,
           updatedAt: Date.now(),
         });
       });
@@ -787,6 +793,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           revision: 0,
           updatedByAccountId: myAcc1,
           tags: [],
+          isArchived: false,
           updatedAt: Date.now(),
         });
         sharedRecId = await ctx.db.insert("serviceRecords", {
@@ -801,6 +808,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           revision: 0,
           updatedByAccountId: myAcc1,
           tags: [],
+          isArchived: false,
           updatedAt: Date.now(),
         });
         noFamRecId = await ctx.db.insert("serviceRecords", {
@@ -815,6 +823,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           revision: 0,
           updatedByAccountId: myAcc2,
           tags: [],
+          isArchived: false,
           updatedAt: Date.now(),
         });
       });
@@ -1358,6 +1367,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
           tags: [],
           revision: 0,
           updatedByAccountId: adminId,
+          isArchived: false,
           updatedAt: Date.now(),
         });
       });
