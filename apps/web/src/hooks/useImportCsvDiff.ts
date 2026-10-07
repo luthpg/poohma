@@ -268,6 +268,25 @@ export function useImportCsvDiff(options?: UseImportCsvDiffOptions) {
           const recordId = (row.RecordId || "").trim();
           const title = (row.Title || "").trim();
 
+          const isArchivedRaw = (row.IsArchived || "").trim();
+          if (
+            isArchivedRaw &&
+            isArchivedRaw.toLowerCase() !== "true" &&
+            isArchivedRaw.toLowerCase() !== "false"
+          ) {
+            preliminaryItems.push({
+              index,
+              csvRow,
+              action: "ERROR",
+              title: title || "(無題)",
+              stableId: recordId || undefined,
+              changedFields: [],
+              changes: [],
+              errorReason: `IsArchived には TRUE または FALSE を指定してください（入力値: "${isArchivedRaw}"）`,
+            });
+            continue;
+          }
+
           // 1. Title が空の場合はエラー
           if (!title && !recordId) {
             preliminaryItems.push({
@@ -799,7 +818,9 @@ export function useImportCsvDiff(options?: UseImportCsvDiffOptions) {
                   ownerType,
                   adminEmails: admins,
                   tags,
-                  isArchived: updateIsArchived,
+                  isArchived: item.changedFields.includes("IsArchived")
+                    ? updateIsArchived
+                    : undefined,
                   credentials,
                 };
               }

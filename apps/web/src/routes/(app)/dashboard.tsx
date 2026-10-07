@@ -578,6 +578,8 @@ function RouteComponent() {
   };
 
   const handleArchiveStatusChange = (status: "active" | "archived" | "all") => {
+    setSelectedIds([]);
+    setIsSelectMode(false);
     navigate({
       search: (prev) => ({
         ...prev,
@@ -1346,7 +1348,7 @@ function RecordListSection({
             <p className="text-xs text-muted-foreground mb-4">
               検索条件やフィルターを変更してお試しください。
             </p>
-            {searchParams.archiveStatus === "active" && (
+            {(searchParams.archiveStatus ?? "active") === "active" && (
               <button
                 type="button"
                 onClick={() => handleArchiveStatusChange("all")}

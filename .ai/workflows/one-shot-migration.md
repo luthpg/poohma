@@ -97,10 +97,10 @@ flowchart TD
 
 - 開発環境での完全合格をユーザーに報告し、本番適用の合意を得る。
 - **本番環境でも開発環境と全く同じステップ**を順に実行する：
-  1. 本番環境の全体バックアップ作成（`convex export --prod --path .local/migrations/prod-backup-before.zip`）
+  1. 本番環境の全体バックアップ作成（`pnpm -F @poohma/web exec convex export --prod --path .local/migrations/prod-backup-before.zip`）
   2. ユーザーに対話ターミナルで `pnpm convex:deploy` の実行を依頼（非対話環境でのプロンプト停止を回避）
-  3. 本番環境でワンショットマイグレ実行（`npx convex run --prod migrations:xxx`）
-  4. 本番環境の事後バックアップ作成（`convex export --prod --path .local/migrations/prod-backup-after.zip`）
+  3. 本番環境でワンショットマイグレ実行（`pnpm -F @poohma/web exec convex run --prod migrations:xxx`）
+  4. 本番環境の事後バックアップ作成（`pnpm -F @poohma/web exec convex export --prod --path .local/migrations/prod-backup-after.zip`）
   5. 実施前後のデータ機械突合チェック（全件検証・暗号化含む他フィールドの無改変・欠損 0 件の確認）
   6. ユーザーへの完了報告
 
