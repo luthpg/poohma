@@ -216,8 +216,22 @@ PoohMa のブランドカラー本体（`#f97316` / orange-500：ロゴや変更
 - Button Alignment & Tap Targets:
   - **右端 (Primary)**: Submit相当（登録・保存・編集）をオレンジPrimaryボタンスタイル（`min-h-[44px]`）で右端に配置。
   - **右隣 (Secondary)**: キャンセルボタン（`min-h-[44px]`）をメインボタンの左隣に配置。
-  - **左端 (Destructive)**: 削除ボタンを左端に隔離配置（誤タップ防止）。モバイル（`< sm`）ではゴミ箱アイコン単体（`min-h-[44px] min-w-[44px]` で 44px 以上のタップ領域を確保）、PCではアイコン＋テキスト。
+  - **左端 (Destructive / Safety Combo)**:
+    - レコード編集・新規作成: 削除ボタンを左端に隔離配置（誤タップ防止）。モバイル（`< sm`）ではゴミ箱アイコン単体（`min-h-[44px] min-w-[44px]` で 44px 以上のタップ領域を確保）、PCではアイコン＋テキスト。
+    - レコード詳細閲覧: 誤削除事故を防ぐ安全動線として**コンボボタン（スプリットボタン）**を採用。メインアクションは「アーカイブ（退避）」とし、右側の小ボタンからドロップダウンメニューを展開して「完全に削除する...」を選択可能。アーカイブ済みレコードの場合は「利用を再開」ボタンスタイルへ反転。
+  - **フッター内共有切替 (Share Toggle)**:
+    - レコード詳細フッター内（左側アクション群）に、未共有時は「家族と共有」、共有時は「個人レコードにする（確認ダイアログ付き）」ボタンを統合配置。編集画面へ入ることなくワンタップで所有権を相互切替可能。
 - Main Scroll Offset: メインコンテンツ末尾に `pb-24 sm:pb-32` のスクロール余白を常時確保。
+
+### Archive & Status Badges (Color Tokens)
+
+- **アーカイブバッジ / バナー (Amber)**:
+  - バッジ: `bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border-amber-500/30`
+  - 詳細画面アーカイブ警告バナー: `border-amber-200 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/20 text-amber-900 dark:text-amber-200`
+  - 確認ダイアログ Primary CTA: ダークモード対応のアンバー背景（`dark:bg-amber-600 dark:hover:bg-amber-500`）
+- **ステータス切替セレクト (Dashboard Toolbar)**:
+  - 一覧ツールバーのソートセレクト横に配置されるコンパクトSelect（「利用中」「アーカイブ」「すべて」）。
+  - レコード0件時でもツールバーを描画し、ステータスセレクトのみ操作可能（一括選択・ビュー切替は `disabled`）。空状態（`DashboardEmptyState`）には「利用中のレコードを表示」クイック復帰リンクを装備。
 
 ### Navigation
 

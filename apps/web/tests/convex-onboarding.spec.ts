@@ -113,6 +113,7 @@ describe("オンボーディング Convexバックエンドテスト", () => {
         admins: [],
         tags: ["通常"],
         isSample: false,
+        isArchived: false,
         revision: 0,
         updatedByAccountId: userId,
         updatedAt: Date.now(),

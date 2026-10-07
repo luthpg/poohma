@@ -7,6 +7,9 @@ import {
 } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import {
+  AlertTriangle,
+  Archive,
+  ArchiveRestore,
   Globe,
   LayoutGrid,
   List,
@@ -79,6 +82,7 @@ const searchSchema = z.object({
     ])
     .optional(),
   view: z.enum(["card", "list"]).optional(),
+  archiveStatus: z.enum(["active", "archived", "all"]).optional(),
   onboarding: z.string().optional(),
 });
 
@@ -88,18 +92,22 @@ export const Route = createFileRoute("/(app)/dashboard")({
     const prefs = await getDashboardPrefs();
     return { prefs };
   },
-  loaderDeps: ({ search: { q, tag, filter, sort, view } }) => ({
+  loaderDeps: ({ search: { q, tag, filter, sort, view, archiveStatus } }) => ({
     q,
     tag,
     filter,
     sort,
     view,
+    archiveStatus,
   }),
-  loader: async ({ context, deps: { q, tag, filter, sort, view } }) => {
+  loader: async ({
+    context,
+    deps: { q, tag, filter, sort, view, archiveStatus },
+  }) => {
     return {
       user: context.user ?? null,
       prefs: context.prefs,
-      searchParams: { q, tag, filter, sort, view },
+      searchParams: { q, tag, filter, sort, view, archiveStatus },
     };
   },
   component: RouteComponent,
@@ -223,6 +231,7 @@ function RouteComponent() {
     accountId: activeAccountId || undefined,
     q: searchParams.q,
     tag: searchParams.tag,
+    archiveStatus: searchParams.archiveStatus,
   });
   const family = useQuery(api.families.getFamilyMembers, {
     accountId: activeAccountId || undefined,
@@ -359,7 +368,7 @@ function RouteComponent() {
     setSelectedIds([]);
   }, [searchParams.filter]);
   const [activeModal, setActiveModal] = useState<
-    "tag" | "visibility" | "admin" | "delete" | null
+    "tag" | "visibility" | "admin" | "delete" | "archive" | "unarchive" | null
   >(null);
   const [bulkTagInput, setBulkTagInput] = useState<string[]>([]);
 
@@ -414,19 +423,90 @@ function RouteComponent() {
     [selectedRecords, activeAccountId, isFamilyAdmin],
   );
 
+  // 管理権限を持つレコード（個人レコード、または自分が管理者の家族共有レコード）
+  const manageableRecords = useMemo(
+    () =>
+      selectedRecords.filter((r) => {
+        if (r.ownerType !== "family") return true;
+        if (isFamilyAdmin) return true;
+        return Boolean(
+          activeAccountId && (r.admins ?? []).includes(activeAccountId),
+        );
+      }),
+    [selectedRecords, activeAccountId, isFamilyAdmin],
+  );
+
+  // 管理者権限がないため一括操作（アーカイブ・復元・削除）の対象外となるレコード
+  const excludedManageRecords = useMemo(
+    () =>
+      selectedRecords
+        .filter((r) => {
+          if (r.ownerType !== "family") return false;
+          if (isFamilyAdmin) return false;
+          return !(
+            activeAccountId && (r.admins ?? []).includes(activeAccountId)
+          );
+        })
+        .map((r) => ({ id: r._id, title: r.title })),
+    [selectedRecords, activeAccountId, isFamilyAdmin],
+  );
+
   const deleteRecordsMut = useMutation(api.records.deleteRecords);
+  const bulkArchiveMut = useMutation(api.records.bulkArchiveRecords);
+  const bulkUnarchiveMut = useMutation(api.records.bulkUnarchiveRecords);
   const bulkUpdateRecordsMut = useMutation(api.records.bulkUpdateRecords);
   const bulkShareMut = useMutation(api.records.bulkShareRecords);
   const bulkUnshareMut = useMutation(api.records.bulkUnshareRecords);
 
+  const handleBulkArchive = async () => {
+    const targetIds = manageableRecords.map(
+      (r) => r._id as Id<"serviceRecords">,
+    );
+    if (targetIds.length === 0) return;
+    try {
+      const result = await bulkArchiveMut({
+        accountId: activeAccountId || undefined,
+        ids: targetIds,
+      });
+      toast.success(`${result.count} 件のレコードをアーカイブしました`);
+      setSelectedIds([]);
+      setIsSelectMode(false);
+      setActiveModal(null);
+    } catch (_err) {
+      toast.error("アーカイブに失敗しました");
+    }
+  };
+
+  const handleBulkUnarchive = async () => {
+    const targetIds = manageableRecords.map(
+      (r) => r._id as Id<"serviceRecords">,
+    );
+    if (targetIds.length === 0) return;
+    try {
+      const result = await bulkUnarchiveMut({
+        accountId: activeAccountId || undefined,
+        ids: targetIds,
+      });
+      toast.success(`${result.count} 件のレコードの利用を再開しました`);
+      setSelectedIds([]);
+      setIsSelectMode(false);
+      setActiveModal(null);
+    } catch (_err) {
+      toast.error("利用再開に失敗しました");
+    }
+  };
+
   const handleBulkDelete = async () => {
-    if (selectedIds.length === 0) return;
+    const targetIds = manageableRecords.map(
+      (r) => r._id as Id<"serviceRecords">,
+    );
+    if (targetIds.length === 0) return;
     try {
       await deleteRecordsMut({
         accountId: activeAccountId || undefined,
-        ids: selectedIds as Id<"serviceRecords">[],
+        ids: targetIds,
       });
-      toast.success(`${selectedIds.length} 件のレコードを削除しました`);
+      toast.success(`${targetIds.length} 件のレコードを削除しました`);
       setSelectedIds([]);
       setIsSelectMode(false);
       setActiveModal(null);
@@ -495,6 +575,15 @@ function RouteComponent() {
     } catch (_err: unknown) {
       toast.error("一括共有解除に失敗しました");
     }
+  };
+
+  const handleArchiveStatusChange = (status: "active" | "archived" | "all") => {
+    navigate({
+      search: (prev) => ({
+        ...prev,
+        archiveStatus: status === "active" ? undefined : status,
+      }),
+    });
   };
 
   return (
@@ -612,6 +701,7 @@ function RouteComponent() {
         handleTagClick={handleTagClick}
         handleSortChange={handleSortChange}
         handleViewModeChange={handleViewModeChange}
+        handleArchiveStatusChange={handleArchiveStatusChange}
         isSelectMode={isSelectMode}
         setIsSelectMode={setIsSelectMode}
         selectedIds={selectedIds}
@@ -630,40 +720,71 @@ function RouteComponent() {
             {selectedIds.length} 件選択中
           </div>
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar min-w-0 flex-1 justify-start py-0.5 overscroll-x-contain">
-            <button
-              type="button"
-              onClick={() => setActiveModal("tag")}
-              className="rounded-md bg-secondary hover:bg-accent px-3 py-2 h-9 text-[13px] font-medium text-foreground flex items-center gap-1.5 transition shrink-0 cursor-pointer"
-            >
-              <Tag className="h-4 w-4 text-orange-500" />
-              タグ追加
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveModal("visibility")}
-              className="rounded-md bg-secondary hover:bg-accent px-3 py-2 h-9 text-[13px] font-medium text-foreground flex items-center gap-1.5 transition shrink-0 cursor-pointer"
-            >
-              <Globe className="h-4 w-4 text-blue-500" />
-              公開設定
-            </button>
-            {family && selectedSharedCount > 0 && (
-              <button
-                type="button"
-                onClick={() => setActiveModal("admin")}
-                className="rounded-md bg-secondary hover:bg-accent px-3 py-2 h-9 text-[13px] font-medium text-foreground flex items-center gap-1.5 transition shrink-0 cursor-pointer"
-              >
-                <ShieldCheck className="h-4 w-4 text-orange-500" />
-                管理者設定
-              </button>
+            {searchParams.archiveStatus === "archived" ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setActiveModal("unarchive")}
+                  className="rounded-md bg-amber-500/10 hover:bg-amber-500/20 px-3 py-2 h-9 text-[13px] font-medium text-amber-700 dark:text-amber-400 flex items-center gap-1.5 transition shrink-0 cursor-pointer"
+                >
+                  <ArchiveRestore className="h-4 w-4" />
+                  利用を再開
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveModal("delete")}
+                  className="rounded-md bg-red-500/10 hover:bg-red-500/20 px-3 py-2 h-9 text-[13px] font-medium text-red-500 flex items-center gap-1.5 transition shrink-0 cursor-pointer"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  完全削除
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setActiveModal("tag")}
+                  className="rounded-md bg-secondary hover:bg-accent px-3 py-2 h-9 text-[13px] font-medium text-foreground flex items-center gap-1.5 transition shrink-0 cursor-pointer"
+                >
+                  <Tag className="h-4 w-4 text-orange-500" />
+                  タグ追加
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveModal("visibility")}
+                  className="rounded-md bg-secondary hover:bg-accent px-3 py-2 h-9 text-[13px] font-medium text-foreground flex items-center gap-1.5 transition shrink-0 cursor-pointer"
+                >
+                  <Globe className="h-4 w-4 text-blue-500" />
+                  公開設定
+                </button>
+                {family && selectedSharedCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveModal("admin")}
+                    className="rounded-md bg-secondary hover:bg-accent px-3 py-2 h-9 text-[13px] font-medium text-foreground flex items-center gap-1.5 transition shrink-0 cursor-pointer"
+                  >
+                    <ShieldCheck className="h-4 w-4 text-orange-500" />
+                    管理者設定
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setActiveModal("archive")}
+                  className="rounded-md bg-amber-500/10 hover:bg-amber-500/20 px-3 py-2 h-9 text-[13px] font-medium text-amber-700 dark:text-amber-400 flex items-center gap-1.5 transition shrink-0 cursor-pointer"
+                >
+                  <Archive className="h-4 w-4" />
+                  アーカイブ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveModal("delete")}
+                  className="rounded-md bg-red-500/10 hover:bg-red-500/20 px-3 py-2 h-9 text-[13px] font-medium text-red-500 flex items-center gap-1.5 transition shrink-0 cursor-pointer"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  削除
+                </button>
+              </>
             )}
-            <button
-              type="button"
-              onClick={() => setActiveModal("delete")}
-              className="rounded-md bg-red-500/10 hover:bg-red-500/20 px-3 py-2 h-9 text-[13px] font-medium text-red-500 flex items-center gap-1.5 transition shrink-0 cursor-pointer"
-            >
-              <Trash2 className="h-4 w-4" />
-              削除
-            </button>
             <div className="w-[1px] h-6 bg-border mx-1 shrink-0" />
             <button
               type="button"
@@ -728,6 +849,128 @@ function RouteComponent() {
         </Suspense>
       )}
 
+      {/* 一括アーカイブ確認モーダル */}
+      {activeModal === "archive" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-lg animate-in fade-in duration-200">
+            <h3 className="text-lg font-semibold text-foreground mb-2 flex items-center gap-2">
+              <Archive className="h-5 w-5 text-amber-500" />
+              レコードの一括アーカイブ
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              選択した {manageableRecords.length}{" "}
+              件のレコードをアーカイブしますか？
+              <br />
+              利用中の一覧から非表示になりますが、アーカイブ一覧からいつでも利用を再開できます。
+            </p>
+
+            {excludedManageRecords.length > 0 && (
+              <div
+                data-testid="excluded-records-alert"
+                className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs space-y-1.5 my-3"
+              >
+                <div className="flex items-center gap-1.5 font-semibold text-amber-700 dark:text-amber-400">
+                  <AlertTriangle className="size-3.5 shrink-0" />
+                  <span>
+                    管理者権限がないため対象外（
+                    {excludedManageRecords.length} 件）
+                  </span>
+                </div>
+                <p className="text-muted-foreground">
+                  以下のレコードはあなたが管理者ではないため、アーカイブの対象外です:
+                </p>
+                <ul className="list-disc list-inside space-y-0.5 text-foreground max-h-24 overflow-y-auto pl-1 font-medium">
+                  {excludedManageRecords.map((r) => (
+                    <li key={r.id} className="truncate">
+                      {r.title}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setActiveModal(null)}
+                className="w-full sm:w-auto rounded-md border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-accent transition cursor-pointer text-center"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkArchive}
+                disabled={manageableRecords.length === 0}
+                className="w-full sm:w-auto rounded-md bg-amber-600 hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-500 px-4 py-2 text-sm font-medium text-white transition cursor-pointer text-center disabled:opacity-50"
+              >
+                アーカイブする
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 一括アーカイブ解除確認モーダル */}
+      {activeModal === "unarchive" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-lg animate-in fade-in duration-200">
+            <h3 className="text-lg font-semibold text-foreground mb-2 flex items-center gap-2">
+              <ArchiveRestore className="h-5 w-5 text-amber-500" />
+              利用を再開
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              選択した {manageableRecords.length}{" "}
+              件のレコードの利用を再開しますか？
+              <br />
+              利用中の一覧に再度表示されるようになります。
+            </p>
+
+            {excludedManageRecords.length > 0 && (
+              <div
+                data-testid="excluded-records-alert"
+                className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs space-y-1.5 my-3"
+              >
+                <div className="flex items-center gap-1.5 font-semibold text-amber-700 dark:text-amber-400">
+                  <AlertTriangle className="size-3.5 shrink-0" />
+                  <span>
+                    管理者権限がないため対象外（
+                    {excludedManageRecords.length} 件）
+                  </span>
+                </div>
+                <p className="text-muted-foreground">
+                  以下のレコードはあなたが管理者ではないため、利用再開の対象外です:
+                </p>
+                <ul className="list-disc list-inside space-y-0.5 text-foreground max-h-24 overflow-y-auto pl-1 font-medium">
+                  {excludedManageRecords.map((r) => (
+                    <li key={r.id} className="truncate">
+                      {r.title}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setActiveModal(null)}
+                className="w-full sm:w-auto rounded-md border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-accent transition cursor-pointer text-center"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkUnarchive}
+                disabled={manageableRecords.length === 0}
+                className="w-full sm:w-auto rounded-md bg-amber-600 hover:bg-amber-700 px-4 py-2 text-sm font-medium text-white transition cursor-pointer text-center disabled:opacity-50"
+              >
+                利用を再開する
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 削除確認モーダル */}
       {activeModal === "delete" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
@@ -735,12 +978,38 @@ function RouteComponent() {
             <h3 className="text-lg font-semibold text-red-500 mb-2">
               レコードの一括削除
             </h3>
-            <p className="text-sm text-muted-foreground mb-6">
-              選択した {selectedIds.length} 件のレコードを削除しますか？
+            <p className="text-sm text-muted-foreground mb-4">
+              選択した {manageableRecords.length} 件のレコードを削除しますか？
               <br />
               この操作は取り消すことができません。
             </p>
-            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3">
+
+            {excludedManageRecords.length > 0 && (
+              <div
+                data-testid="excluded-records-alert"
+                className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs space-y-1.5 my-3"
+              >
+                <div className="flex items-center gap-1.5 font-semibold text-amber-700 dark:text-amber-400">
+                  <AlertTriangle className="size-3.5 shrink-0" />
+                  <span>
+                    管理者権限がないため対象外（
+                    {excludedManageRecords.length} 件）
+                  </span>
+                </div>
+                <p className="text-muted-foreground">
+                  以下のレコードはあなたが管理者ではないため、削除の対象外です:
+                </p>
+                <ul className="list-disc list-inside space-y-0.5 text-foreground max-h-24 overflow-y-auto pl-1 font-medium">
+                  {excludedManageRecords.map((r) => (
+                    <li key={r.id} className="truncate">
+                      {r.title}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 mt-6">
               <button
                 type="button"
                 onClick={() => setActiveModal(null)}
@@ -751,7 +1020,8 @@ function RouteComponent() {
               <button
                 type="button"
                 onClick={handleBulkDelete}
-                className="w-full sm:w-auto rounded-md bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 transition cursor-pointer text-center"
+                disabled={manageableRecords.length === 0}
+                className="w-full sm:w-auto rounded-md bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 transition cursor-pointer text-center disabled:opacity-50"
               >
                 削除する
               </button>
@@ -861,6 +1131,7 @@ function RecordListSection({
   handleTagClick,
   handleSortChange,
   handleViewModeChange,
+  handleArchiveStatusChange,
   isSelectMode,
   setIsSelectMode,
   selectedIds,
@@ -879,6 +1150,7 @@ function RecordListSection({
   selectedIds: string[];
   onToggleSelect: (id: string) => void;
   onSelectAll: (ids: string[]) => void;
+  handleArchiveStatusChange: (status: "active" | "archived" | "all") => void;
   isOnboardingTour1Active?: boolean;
 }) {
   const { activeAccountId } = useAccount();
@@ -887,6 +1159,7 @@ function RecordListSection({
     q: searchParams.q,
     tag: searchParams.tag,
     sort: sortParam,
+    archiveStatus: searchParams.archiveStatus,
   });
 
   const currentFilter = (searchParams.filter as ScopeFilterType) || "all";
@@ -927,97 +1200,163 @@ function RecordListSection({
     !searchParams.tag &&
     (!searchParams.filter || searchParams.filter === "all");
 
+  const isInitialEmpty =
+    isNormalList &&
+    (!searchParams.archiveStatus || searchParams.archiveStatus === "active") &&
+    records.length === 0;
+
   return (
     <>
-      {filteredRecords.length > 0 && (
-        <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            {isSelectMode ? (
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={
-                    filteredRecords.length > 0 &&
-                    selectedIds.length === filteredRecords.length
-                  }
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      onSelectAll(filteredRecords.map((r) => r._id));
-                    } else {
-                      onSelectAll([]);
-                    }
-                  }}
-                  className="rounded border-border text-orange-500 focus:ring-orange-500 h-4 w-4 cursor-pointer"
-                />
-                <span className="text-[13px] font-medium text-muted-foreground">
-                  すべて選択
-                </span>
-              </label>
-            ) : (
-              <div
-                className="text-[14px] text-muted-foreground font-medium tracking-geist-ui"
-                data-testid="record-count"
-              >
-                {filteredRecords.length} 件のレコード
-              </div>
-            )}
-          </div>
-          <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={() => {
-                onSelectAll([]);
-                setIsSelectMode(!isSelectMode);
-              }}
-              className={`rounded-md border px-3 py-1.5 h-8 text-[12px] font-medium transition cursor-pointer flex items-center justify-center shrink-0 ${
-                isSelectMode
-                  ? "bg-orange-500 border-orange-500 text-white hover:bg-orange-600 shadow-sm"
-                  : "bg-card border-border/50 text-foreground hover:bg-accent"
-              }`}
-            >
-              {isSelectMode ? "選択終了" : "一括操作"}
-            </button>
-            <select
-              value={
-                sortParam === "updatedAt-desc"
-                  ? "date-desc"
-                  : sortParam === "updatedAt-asc"
-                    ? "date-asc"
-                    : sortParam
-              }
-              onChange={(e) => handleSortChange(e.target.value as SortParam)}
-              className="rounded-md border border-border/50 bg-card px-2 py-1.5 h-8 text-[12px] font-medium text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-            >
-              <option value="name-asc">名前（昇順）</option>
-              <option value="url-asc">URL（昇順）</option>
-              <option value="url-desc">URL（降順）</option>
-              <option value="date-desc">最終更新日（降順）</option>
-              <option value="date-asc">最終更新日（昇順）</option>
-            </select>
-            <div className="flex items-center rounded-md border border-border/50 bg-card shadow-sm h-8 overflow-hidden">
-              <button
-                type="button"
-                onClick={() => handleViewModeChange("card")}
-                className={`p-1.5 transition-colors ${viewMode === "card" ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}
-                title="カード表示"
-              >
-                <LayoutGrid className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleViewModeChange("list")}
-                className={`p-1.5 transition-colors ${viewMode === "list" ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}
-                title="リスト表示"
-              >
-                <List className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
+      {searchParams.archiveStatus === "archived" && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3.5 py-2.5 text-xs text-amber-800 dark:text-amber-300 mb-4">
+          <Archive className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          <span>
+            アーカイブされたレコードを表示しています（利用中の一覧からは非表示になります）
+          </span>
         </div>
       )}
 
+      {/* ツールバー（フィルター時も常に表示され、ステータス変更が可能） */}
+      <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          {isSelectMode ? (
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={
+                  filteredRecords.length > 0 &&
+                  selectedIds.length === filteredRecords.length
+                }
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    onSelectAll(filteredRecords.map((r) => r._id));
+                  } else {
+                    onSelectAll([]);
+                  }
+                }}
+                className="rounded border-border text-orange-500 focus:ring-orange-500 h-4 w-4 cursor-pointer"
+              />
+              <span className="text-[13px] font-medium text-muted-foreground">
+                すべて選択
+              </span>
+            </label>
+          ) : (
+            <div
+              className="text-[14px] text-muted-foreground font-medium tracking-geist-ui"
+              data-testid="record-count"
+            >
+              {filteredRecords.length} 件のレコード
+            </div>
+          )}
+        </div>
+        <div className="flex items-center justify-between sm:justify-end gap-1.5 sm:gap-2.5 w-full sm:w-auto overflow-x-auto no-scrollbar">
+          <button
+            type="button"
+            disabled={filteredRecords.length === 0}
+            onClick={() => {
+              onSelectAll([]);
+              setIsSelectMode(!isSelectMode);
+            }}
+            className={`rounded-md border px-2 sm:px-3 py-1.5 h-8 text-[11px] sm:text-[12px] font-medium transition flex items-center justify-center shrink-0 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer ${
+              isSelectMode
+                ? "bg-orange-500 border-orange-500 text-white hover:bg-orange-600 shadow-sm"
+                : "bg-card border-border/50 text-foreground hover:bg-accent"
+            }`}
+          >
+            {isSelectMode ? "選択終了" : "一括操作"}
+          </button>
+          <select
+            value={
+              sortParam === "updatedAt-desc"
+                ? "date-desc"
+                : sortParam === "updatedAt-asc"
+                  ? "date-asc"
+                  : sortParam
+            }
+            onChange={(e) => handleSortChange(e.target.value as SortParam)}
+            aria-label="並び替え"
+            className="rounded-md border border-border/50 bg-card px-1.5 sm:px-2 py-1.5 h-8 text-[11px] sm:text-[12px] font-medium text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50 shrink-0"
+          >
+            <option value="date-desc">新着順</option>
+            <option value="date-asc">古い順</option>
+            <option value="name-asc">名前順</option>
+            <option value="url-asc">URL順</option>
+            <option value="url-desc">URL降順</option>
+          </select>
+          <select
+            value={searchParams.archiveStatus ?? "active"}
+            onChange={(e) => {
+              const val = e.target.value as "active" | "archived" | "all";
+              handleArchiveStatusChange(val);
+            }}
+            aria-label="表示ステータス"
+            className="rounded-md border border-border/50 bg-card px-1.5 sm:px-2 py-1.5 h-8 text-[11px] sm:text-[12px] font-medium text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50 shrink-0"
+          >
+            <option value="active">利用中</option>
+            <option value="archived">アーカイブ</option>
+            <option value="all">すべて</option>
+          </select>
+          <div className="flex items-center rounded-md border border-border/50 bg-card shadow-sm h-8 overflow-hidden shrink-0">
+            <button
+              type="button"
+              onClick={() => handleViewModeChange("card")}
+              className={`p-1.5 transition-colors ${viewMode === "card" ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}
+              title="カード表示"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleViewModeChange("list")}
+              className={`p-1.5 transition-colors ${viewMode === "list" ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}
+              title="リスト表示"
+            >
+              <List className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
       {filteredRecords.length === 0 ? (
-        <DashboardEmptyState />
+        isInitialEmpty ? (
+          <DashboardEmptyState />
+        ) : searchParams.archiveStatus === "archived" ? (
+          <div className="rounded-xl border border-dashed border-border p-12 text-center my-6">
+            <Archive className="mx-auto h-10 w-10 text-muted-foreground/40 mb-3" />
+            <h3 className="text-sm font-semibold text-foreground mb-1">
+              アーカイブされたレコードはありません
+            </h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              レコード詳細からいつでもレコードをアーカイブできます。
+            </p>
+            <button
+              type="button"
+              onClick={() => handleArchiveStatusChange("active")}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent transition cursor-pointer"
+            >
+              利用中のレコードを表示
+            </button>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-border p-12 text-center my-6">
+            <Search className="mx-auto h-10 w-10 text-muted-foreground/40 mb-3" />
+            <h3 className="text-sm font-semibold text-foreground mb-1">
+              一致するレコードが見つかりません
+            </h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              検索条件やフィルターを変更してお試しください。
+            </p>
+            {searchParams.archiveStatus === "active" && (
+              <button
+                type="button"
+                onClick={() => handleArchiveStatusChange("all")}
+                className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent transition cursor-pointer"
+              >
+                すべてのレコードを表示
+              </button>
+            )}
+          </div>
+        )
       ) : sortParam === "name-asc" ? (
         <>
           <IndexScrollBar
@@ -1234,6 +1573,15 @@ function ServiceListItem({
                 </>
               )}
             </span>
+            {record.isArchived && (
+              <span
+                data-testid="archive-badge"
+                className="inline-flex items-center gap-1 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium border bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
+              >
+                <Archive className="h-3 w-3" aria-hidden="true" />
+                <span>アーカイブ</span>
+              </span>
+            )}
           </div>
           {record.url && (
             <span className="text-[12px] text-muted-foreground truncate">
@@ -1365,25 +1713,36 @@ function ServiceCard({
             {record.title}
           </span>
           {/* 所有設定バッジ */}
-          <span
-            className={`inline-flex items-center gap-1 shrink-0 rounded-full px-2 py-0.5 text-[10px] md:text-xs font-medium border ${
-              record.ownerType === "family"
-                ? "bg-blue-100/60 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-blue-500/20"
-                : "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-500/20"
-            }`}
-          >
-            {record.ownerType === "family" ? (
-              <>
-                <Users className="h-3 w-3" aria-hidden="true" />
-                <span>共有中</span>
-              </>
-            ) : (
-              <>
-                <Lock className="h-3 w-3" aria-hidden="true" />
-                <span>自分のみ</span>
-              </>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] md:text-xs font-medium border ${
+                record.ownerType === "family"
+                  ? "bg-blue-100/60 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-blue-500/20"
+                  : "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-500/20"
+              }`}
+            >
+              {record.ownerType === "family" ? (
+                <>
+                  <Users className="h-3 w-3" aria-hidden="true" />
+                  <span>共有中</span>
+                </>
+              ) : (
+                <>
+                  <Lock className="h-3 w-3" aria-hidden="true" />
+                  <span>自分のみ</span>
+                </>
+              )}
+            </span>
+            {record.isArchived && (
+              <span
+                data-testid="archive-badge"
+                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] md:text-xs font-medium border bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
+              >
+                <Archive className="h-3 w-3" aria-hidden="true" />
+                <span>アーカイブ</span>
+              </span>
             )}
-          </span>
+          </div>
         </div>
 
         {/* ログインID表示 */}

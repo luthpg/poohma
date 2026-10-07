@@ -182,11 +182,21 @@ export const getRecords = authenticatedQuery({
     tag: v.optional(v.string()),
     sort: v.optional(v.string()),
     limit: v.optional(v.number()),
+    archiveStatus: v.optional(
+      v.union(v.literal("active"), v.literal("archived"), v.literal("all")),
+    ),
   },
   handler: async (ctx, args) => {
     const { user } = ctx;
 
     let records = await collectVisibleRecords(ctx, user);
+
+    const archiveStatus = args.archiveStatus ?? "active";
+    if (archiveStatus === "active") {
+      records = records.filter((r) => !r.isArchived);
+    } else if (archiveStatus === "archived") {
+      records = records.filter((r) => r.isArchived);
+    }
 
     if (args.tag) {
       records = records.filter((r) => r.tags.includes(args.tag as string));
@@ -278,6 +288,9 @@ export const getRecordsPaginated = authenticatedQuery({
     paginationOpts: paginationOptsValidator,
     q: v.optional(v.string()),
     tag: v.optional(v.string()),
+    archiveStatus: v.optional(
+      v.union(v.literal("active"), v.literal("archived"), v.literal("all")),
+    ),
   },
   handler: async (ctx, args) => {
     const { user } = ctx;
@@ -307,6 +320,14 @@ export const getRecordsPaginated = authenticatedQuery({
     });
 
     let records = visiblePage;
+
+    const archiveStatus = args.archiveStatus ?? "active";
+    if (archiveStatus === "active") {
+      records = records.filter((r) => !r.isArchived);
+    } else if (archiveStatus === "archived") {
+      records = records.filter((r) => r.isArchived);
+    }
+
     if (args.tag) {
       records = records.filter((r) => r.tags.includes(args.tag as string));
     }
@@ -544,6 +565,7 @@ export const createRecord = familyBoundMutation({
       tags: args.tags,
       stableId: crypto.randomUUID(),
       revision: 0,
+      isArchived: false,
       updatedAt: now,
       updatedByAccountId: user._id,
     });
@@ -987,6 +1009,166 @@ export const deleteCredential = familyBoundMutation({
           : "クレデンシャル削除",
       },
     });
+  },
+});
+
+export const archiveRecord = familyBoundMutation({
+  args: { id: v.id("serviceRecords") },
+  handler: async (ctx, args) => {
+    const record = await ctx.db.get(args.id);
+    if (!record) throw new Error("Record not found");
+
+    requireAdminAccess(ctx.user, record);
+    if (record.isArchived) return;
+
+    const now = Date.now();
+    await ctx.db.patch(args.id, {
+      isArchived: true,
+      archivedAt: now,
+      revision: record.revision + 1,
+      updatedAt: now,
+      updatedByAccountId: ctx.user._id,
+    });
+
+    const ownerType = getEffectiveOwnerType(record);
+    const ownerFamilyId =
+      ownerType === "family" ? record.ownerFamilyId : undefined;
+    const targetAccountId = ownerType === "user" ? record.accountId : undefined;
+
+    await logAuditEvent(ctx, {
+      actor: ctx.user,
+      recordId: args.id,
+      ownerType,
+      ownerFamilyId,
+      targetAccountId,
+      action: "RECORD_ARCHIVE",
+      metadata: {
+        targetTitle: record.title,
+      },
+    });
+  },
+});
+
+export const unarchiveRecord = familyBoundMutation({
+  args: { id: v.id("serviceRecords") },
+  handler: async (ctx, args) => {
+    const record = await ctx.db.get(args.id);
+    if (!record) throw new Error("Record not found");
+
+    requireAdminAccess(ctx.user, record);
+    if (!record.isArchived) return;
+
+    const now = Date.now();
+    await ctx.db.patch(args.id, {
+      isArchived: false,
+      archivedAt: undefined,
+      revision: record.revision + 1,
+      updatedAt: now,
+      updatedByAccountId: ctx.user._id,
+    });
+
+    const ownerType = getEffectiveOwnerType(record);
+    const ownerFamilyId =
+      ownerType === "family" ? record.ownerFamilyId : undefined;
+    const targetAccountId = ownerType === "user" ? record.accountId : undefined;
+
+    await logAuditEvent(ctx, {
+      actor: ctx.user,
+      recordId: args.id,
+      ownerType,
+      ownerFamilyId,
+      targetAccountId,
+      action: "RECORD_UNARCHIVE",
+      metadata: {
+        targetTitle: record.title,
+      },
+    });
+  },
+});
+
+export const bulkArchiveRecords = familyBoundMutation({
+  args: { ids: v.array(v.id("serviceRecords")) },
+  handler: async (ctx, args) => {
+    let count = 0;
+    const now = Date.now();
+    for (const id of args.ids) {
+      const record = await ctx.db.get(id);
+      if (!record) continue;
+
+      requireAdminAccess(ctx.user, record);
+      if (record.isArchived) continue;
+
+      await ctx.db.patch(id, {
+        isArchived: true,
+        archivedAt: now,
+        revision: record.revision + 1,
+        updatedAt: now,
+        updatedByAccountId: ctx.user._id,
+      });
+
+      const ownerType = getEffectiveOwnerType(record);
+      const ownerFamilyId =
+        ownerType === "family" ? record.ownerFamilyId : undefined;
+      const targetAccountId =
+        ownerType === "user" ? record.accountId : undefined;
+
+      await logAuditEvent(ctx, {
+        actor: ctx.user,
+        recordId: id,
+        ownerType,
+        ownerFamilyId,
+        targetAccountId,
+        action: "RECORD_ARCHIVE",
+        metadata: {
+          targetTitle: record.title,
+        },
+      });
+      count++;
+    }
+    return { count };
+  },
+});
+
+export const bulkUnarchiveRecords = familyBoundMutation({
+  args: { ids: v.array(v.id("serviceRecords")) },
+  handler: async (ctx, args) => {
+    let count = 0;
+    const now = Date.now();
+    for (const id of args.ids) {
+      const record = await ctx.db.get(id);
+      if (!record) continue;
+
+      requireAdminAccess(ctx.user, record);
+      if (!record.isArchived) continue;
+
+      await ctx.db.patch(id, {
+        isArchived: false,
+        archivedAt: undefined,
+        revision: record.revision + 1,
+        updatedAt: now,
+        updatedByAccountId: ctx.user._id,
+      });
+
+      const ownerType = getEffectiveOwnerType(record);
+      const ownerFamilyId =
+        ownerType === "family" ? record.ownerFamilyId : undefined;
+      const targetAccountId =
+        ownerType === "user" ? record.accountId : undefined;
+
+      await logAuditEvent(ctx, {
+        actor: ctx.user,
+        recordId: id,
+        ownerType,
+        ownerFamilyId,
+        targetAccountId,
+        action: "RECORD_UNARCHIVE",
+        metadata: {
+          targetTitle: record.title,
+        },
+      });
+      count++;
+    }
+    return { count };
   },
 });
 
@@ -1585,6 +1767,7 @@ export const fetchRecordsForExport = authenticatedMutation({
         const creds = await getCredentialsForRecord(ctx, r._id);
         return {
           ...r,
+          isArchived: r.isArchived ?? false,
           stableId: r.stableId,
           credentials: creds.map((c) => ({
             _id: c._id,
@@ -1721,6 +1904,7 @@ export const importRecords = familyBoundMutation({
           tags: record.tags,
           stableId: crypto.randomUUID(),
           revision: 0,
+          isArchived: false,
           updatedAt: now,
           updatedByAccountId: user._id,
         });
@@ -2042,7 +2226,8 @@ export const getStaleRecords = authenticatedQuery({
 
     const visibleRecords = await collectVisibleRecords(ctx, ctx.user);
     const staleRecords = visibleRecords.filter(
-      (record) => !record.isSample && record.updatedAt < threshold,
+      (record) =>
+        !record.isSample && !record.isArchived && record.updatedAt < threshold,
     );
 
     return staleRecords.map((r) => ({
@@ -2249,6 +2434,7 @@ export const getRecordsForDiffImport = authenticatedQuery({
           url: r.url,
           memo: r.memo,
           ownerType: r.ownerType,
+          isArchived: r.isArchived ?? false,
           canEdit: isRecordAdmin(user, r),
           adminEmails: (admins ?? [])
             .map((id) => emailById.get(id))
@@ -2285,6 +2471,7 @@ export const applyImportDiff = familyBoundMutation({
         admins: v.optional(v.array(v.string())),
         adminEmails: v.optional(v.array(v.string())),
         tags: v.array(v.string()),
+        isArchived: v.optional(v.boolean()),
         credentials: v.array(
           v.object({
             id: v.optional(v.string()),
@@ -2308,6 +2495,7 @@ export const applyImportDiff = familyBoundMutation({
         ownerType: v.optional(v.union(v.literal("user"), v.literal("family"))),
         adminEmails: v.optional(v.array(v.string())),
         tags: v.optional(v.array(v.string())),
+        isArchived: v.optional(v.boolean()),
         credentials: v.array(
           v.object({
             stableId: v.optional(v.string()),
@@ -2409,6 +2597,8 @@ export const applyImportDiff = familyBoundMutation({
         tags: item.tags,
         stableId: crypto.randomUUID(),
         revision: 0,
+        isArchived: item.isArchived ?? false,
+        archivedAt: item.isArchived ? now : undefined,
         updatedAt: now,
         updatedByAccountId: user._id,
       });
@@ -2486,6 +2676,12 @@ export const applyImportDiff = familyBoundMutation({
       if (item.url !== undefined) patchData.url = item.url;
       if (item.memo !== undefined) patchData.memo = item.memo;
       if (item.tags !== undefined) patchData.tags = item.tags;
+      if (item.isArchived !== undefined) {
+        patchData.isArchived = item.isArchived;
+        patchData.archivedAt = item.isArchived
+          ? (record.archivedAt ?? now)
+          : undefined;
+      }
 
       const willBeFamily =
         item.ownerType === "family" ||

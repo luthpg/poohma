@@ -7,13 +7,24 @@ import {
   useSearch,
 } from "@tanstack/react-router";
 import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
-import { ArrowLeft, Check, Lock, Share2, Trash2, Users } from "lucide-react";
+import {
+  Archive,
+  ArchiveRestore,
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  Lock,
+  Share2,
+  Trash2,
+  Users,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
 import { AutolinkText } from "@/components/common/AutolinkText";
+import { JpText } from "@/components/JpText";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { usePasscode } from "@/components/PasscodeProvider";
 import { RecordAuditHistoryAccordion } from "@/components/records/RecordAuditHistoryAccordion";
@@ -28,9 +39,14 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { CopyButton } from "@/components/ui/CopyButton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { useAccount } from "@/hooks/useAccount";
@@ -335,6 +351,9 @@ function RecordDetailComponent({
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
   const [pendingPayload, setPendingPayload] =
     useState<RecordSubmitPayload | null>(null);
+  const [isArchiveAlertOpen, setIsArchiveAlertOpen] = useState(false);
+  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
+  const [isUnshareAlertOpen, setIsUnshareAlertOpen] = useState(false);
   const initialFormValues: Partial<RecordFormValues> = useMemo(() => {
     return {
       title: record.title,
@@ -500,7 +519,10 @@ function RecordDetailComponent({
   const getOgpInfo = useAction(api.actions.getOgpInfo);
   const updateRecord = useMutation(api.records.updateRecord);
   const deleteRecord = useMutation(api.records.deleteRecord);
+  const archiveRecord = useMutation(api.records.archiveRecord);
+  const unarchiveRecord = useMutation(api.records.unarchiveRecord);
   const shareRecord = useMutation(api.records.shareRecord);
+  const unshareRecord = useMutation(api.records.unshareRecord);
   const startEditingSession = useMutation(api.records.startEditingSession);
   const heartbeatEditingSession = useMutation(
     api.records.heartbeatEditingSession,
@@ -860,6 +882,72 @@ function RecordDetailComponent({
     }
   };
 
+  const handleShare = async () => {
+    setIsLoading(true);
+    try {
+      await shareRecord({
+        id: record._id,
+        accountId: activeAccountId || undefined,
+      });
+      toast.success("家族と共有しました");
+      await router.invalidate();
+    } catch {
+      toast.error("共有に失敗しました");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUnshare = async () => {
+    setIsLoading(true);
+    try {
+      await unshareRecord({
+        id: record._id,
+        accountId: activeAccountId || undefined,
+      });
+      toast.success("共有を解除し、個人用レコードにしました");
+      await router.invalidate();
+    } catch {
+      toast.error("共有の解除に失敗しました");
+    } finally {
+      setIsLoading(false);
+      setIsUnshareAlertOpen(false);
+    }
+  };
+
+  const handleArchive = async () => {
+    setIsLoading(true);
+    try {
+      await archiveRecord({
+        accountId: activeAccountId || undefined,
+        id: record._id,
+      });
+      toast.success("レコードをアーカイブしました");
+      await navigate({ to: "/dashboard" });
+    } catch {
+      toast.error("アーカイブに失敗しました");
+    } finally {
+      setIsLoading(false);
+      setIsArchiveAlertOpen(false);
+    }
+  };
+
+  const handleUnarchive = async () => {
+    setIsLoading(true);
+    try {
+      await unarchiveRecord({
+        accountId: activeAccountId || undefined,
+        id: record._id,
+      });
+      toast.success("レコードの利用を再開しました");
+      await router.invalidate();
+    } catch {
+      toast.error("利用再開に失敗しました");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleDelete = async () => {
     setIsLoading(true);
 
@@ -874,6 +962,7 @@ function RecordDetailComponent({
       toast.error("削除に失敗しました");
     } finally {
       setIsLoading(false);
+      setIsDeleteAlertOpen(false);
     }
   };
 
@@ -1136,6 +1225,28 @@ function RecordDetailComponent({
         </button>
       </div>
 
+      {/* アーカイブ状態バナー */}
+      {record.isArchived && (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs sm:text-sm text-amber-800 dark:text-amber-300 shadow-sm">
+          <div className="flex items-center gap-2">
+            <Archive className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <span>
+              このレコードはアーカイブされています（利用中の一覧からは非表示になります）
+            </span>
+          </div>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={handleUnarchive}
+              disabled={isLoading}
+              className="shrink-0 rounded-md bg-amber-500/20 hover:bg-amber-500/30 px-2.5 py-1 text-xs font-semibold text-amber-900 dark:text-amber-200 transition cursor-pointer"
+            >
+              利用を再開
+            </button>
+          )}
+        </div>
+      )}
+
       {/* 閲覧中に他メンバーが編集中である場合の警告バナー */}
       {isBeingEditedByOther && (
         <div className="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-xs sm:text-sm text-amber-800 dark:text-amber-300 flex items-start gap-3 shadow-sm">
@@ -1277,21 +1388,7 @@ function RecordDetailComponent({
                 <button
                   type="button"
                   disabled={isLoading}
-                  onClick={async () => {
-                    setIsLoading(true);
-                    try {
-                      await shareRecord({
-                        id: record._id,
-                        accountId: activeAccountId || undefined,
-                      });
-                      toast.success("家族と共有しました");
-                      await router.invalidate();
-                    } catch {
-                      toast.error("共有に失敗しました");
-                    } finally {
-                      setIsLoading(false);
-                    }
-                  }}
+                  onClick={handleShare}
                   className="rounded-full bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 px-3 py-1 text-[12px] font-medium transition flex items-center gap-1 cursor-pointer"
                 >
                   <Share2 className="h-3 w-3" />
@@ -1399,41 +1496,189 @@ function RecordDetailComponent({
           {isEditable && (
             <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-border/80 bg-background/95 backdrop-blur-md px-4 py-2.5 sm:px-6 sm:py-3.5 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] dark:shadow-[0_-4px_12px_rgba(0,0,0,0.3)] pb-[max(0.625rem,env(safe-area-inset-bottom))] sm:pb-[max(0.875rem,env(safe-area-inset-bottom))]">
               <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 sm:gap-4">
-                <div>
+                <div className="flex items-center gap-2">
+                  {/* 共有状態アクション（未共有なら家族に共有、共有中なら個人レコードにする） */}
+                  {!isShared && isOwner && (
+                    <button
+                      type="button"
+                      disabled={isLoading}
+                      onClick={handleShare}
+                      aria-label="レコードを家族と共有する"
+                      className="flex h-9 sm:h-10 min-h-11 items-center justify-center gap-1.5 rounded-md border border-orange-500/30 bg-orange-500/10 hover:bg-orange-500/20 px-2.5 sm:px-3 text-xs sm:text-[14px] font-medium text-orange-600 dark:text-orange-400 transition cursor-pointer"
+                    >
+                      <Share2 className="h-4 w-4" />
+                      <span>
+                        <span className="hidden sm:inline">家族と</span>共有
+                      </span>
+                    </button>
+                  )}
+                  {isShared && isAdmin && (
+                    <button
+                      type="button"
+                      disabled={isLoading}
+                      onClick={() => setIsUnshareAlertOpen(true)}
+                      aria-label="レコードを個人用にする"
+                      className="flex h-9 sm:h-10 min-h-11 items-center justify-center gap-1.5 rounded-md border border-border bg-card hover:bg-accent px-2.5 sm:px-3 text-xs sm:text-[14px] font-medium text-foreground transition cursor-pointer"
+                    >
+                      <Lock className="h-4 w-4 text-muted-foreground" />
+                      <span>
+                        個人<span className="hidden sm:inline">レコードに</span>
+                        する
+                      </span>
+                    </button>
+                  )}
+
                   {isAdmin && (
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <button
-                          type="button"
-                          aria-label="レコードを削除する"
-                          className="flex h-9 sm:h-10 min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-md px-2.5 sm:px-4 text-xs sm:text-[14px] font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition cursor-pointer"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          <span className="hidden sm:inline">削除する</span>
-                        </button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>
-                            レコードを削除しますか？
-                          </AlertDialogTitle>
-                          <AlertDialogDescription>
-                            この操作は取り消せません。本当に削除してもよろしいですか？
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-0">
-                          <AlertDialogCancel className="w-full sm:w-auto cursor-pointer">
-                            キャンセル
-                          </AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={handleDelete}
-                            className="w-full sm:w-auto bg-red-500 hover:bg-red-600 focus:ring-red-500 cursor-pointer"
+                    <>
+                      {record.isArchived ? (
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={handleUnarchive}
+                            disabled={isLoading}
+                            aria-label="レコードの利用を再開する"
+                            className="flex h-9 sm:h-10 min-h-11 items-center justify-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 px-3 sm:px-4 text-xs sm:text-[14px] font-medium text-amber-700 dark:text-amber-400 transition cursor-pointer"
                           >
-                            削除する
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                            <ArchiveRestore className="h-4 w-4" />
+                            <span>利用を再開</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIsDeleteAlertOpen(true)}
+                            disabled={isLoading}
+                            aria-label="レコードを完全に削除する"
+                            className="flex h-9 sm:h-10 min-h-11 items-center justify-center gap-1.5 rounded-md px-2.5 sm:px-3 text-xs sm:text-[14px] font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition cursor-pointer"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span className="hidden sm:inline">完全に削除</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="inline-flex rounded-md shadow-sm border border-border">
+                          <button
+                            type="button"
+                            onClick={() => setIsArchiveAlertOpen(true)}
+                            disabled={isLoading}
+                            aria-label="レコードをアーカイブする"
+                            className="flex h-9 sm:h-10 min-h-11 items-center justify-center gap-1.5 rounded-l-md bg-card px-3 sm:px-4 text-xs sm:text-[14px] font-medium text-foreground hover:bg-accent transition cursor-pointer"
+                          >
+                            <Archive className="h-4 w-4 text-muted-foreground" />
+                            <span>アーカイブ</span>
+                          </button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                type="button"
+                                disabled={isLoading}
+                                aria-label="その他の削除オプション"
+                                className="flex h-9 sm:h-10 min-h-11 w-8 sm:w-9 items-center justify-center rounded-r-md border-l border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground transition cursor-pointer"
+                              >
+                                <ChevronDown className="h-3.5 w-3.5" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-48">
+                              <DropdownMenuItem
+                                onClick={() => setIsDeleteAlertOpen(true)}
+                                className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/20 cursor-pointer flex items-center gap-2"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                <span>完全に削除する...</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      )}
+
+                      {/* 共有解除確認ダイアログ */}
+                      <AlertDialog
+                        open={isUnshareAlertOpen}
+                        onOpenChange={setIsUnshareAlertOpen}
+                      >
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              個人レコードに変更しますか？
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              <JpText>
+                                共有を解除すると、このレコードはあなたの個人用（自分のみ）になり、他の家族メンバーは閲覧できなくなります。
+                              </JpText>
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3">
+                            <AlertDialogCancel className="w-full sm:w-auto cursor-pointer">
+                              キャンセル
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={handleUnshare}
+                              className="w-full sm:w-auto bg-orange-600 hover:bg-orange-700 dark:bg-orange-600 dark:hover:bg-orange-500 focus:ring-orange-500 dark:focus:ring-orange-400 cursor-pointer text-white"
+                            >
+                              個人レコードにする
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+
+                      {/* アーカイブ確認ダイアログ */}
+                      <AlertDialog
+                        open={isArchiveAlertOpen}
+                        onOpenChange={setIsArchiveAlertOpen}
+                      >
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              レコードをアーカイブしますか？
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              <JpText>
+                                アーカイブすると利用中の一覧画面から非表示になります。データは保持され、いつでもアーカイブ一覧から利用を再開できます。
+                              </JpText>
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3">
+                            <AlertDialogCancel className="w-full sm:w-auto cursor-pointer">
+                              キャンセル
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={handleArchive}
+                              className="w-full sm:w-auto bg-amber-600 hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-500 focus:ring-amber-500 dark:focus:ring-amber-400 cursor-pointer text-white"
+                            >
+                              アーカイブする
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+
+                      {/* 完全削除確認ダイアログ */}
+                      <AlertDialog
+                        open={isDeleteAlertOpen}
+                        onOpenChange={setIsDeleteAlertOpen}
+                      >
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              レコードを完全に削除しますか？
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              <JpText>
+                                この操作は取り消せません。レコードのすべての情報が完全に削除されます。
+                              </JpText>
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3">
+                            <AlertDialogCancel className="w-full sm:w-auto cursor-pointer">
+                              キャンセル
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={handleDelete}
+                              className="w-full sm:w-auto bg-red-500 hover:bg-red-600 focus:ring-red-500 cursor-pointer"
+                            >
+                              完全に削除する
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </>
                   )}
                 </div>
                 <div className="flex items-center gap-2 sm:gap-3">

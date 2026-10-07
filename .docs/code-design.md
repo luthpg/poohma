@@ -312,7 +312,8 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 | familyId | Id<families> | 暗号化スコープ・所属家族ID |
 | tags | string\[] | タグ |
 | isPinned | boolean | ピン留め状態（デフォルトfalse、FR-REC-18） |
-| isArchived | boolean | アーカイブ（非表示）状態（デフォルトfalse、FR-REC-23） |
+| isArchived | boolean | アーカイブ（非表示）状態（デフォルトfalse、FR-REC-16, Issue #154） |
+| archivedAt | number(optional) | アーカイブ退避日時（epoch ms） |
 | needsUpdate | boolean | 「要更新」フラグ（デフォルトfalse、FR-REC-17） |
 | updateRequestedBy | string(optional) | 更新リクエストを送ったユーザーID |
 | updateRequestedAt | number(optional) | 更新リクエスト日時 |
@@ -323,7 +324,7 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 | isSample | boolean(optional) | サンプルデータフラグ（オンボーディング用のサンプルレコードはtrue） |
 | updatedAt | number | 更新日時 |
 
-インデックス: by_family_sortKey, by_family_isSample, by_ownerType_accountId, by_ownerType_ownerFamilyId, by_userId, by_accountId, by_family_updatedAt, by_ownerType_accountId_updatedAt, by_family_stableId, by_stableId
+インデックス: by_family_sortKey, by_family_isSample, by_family_isArchived, by_ownerType_accountId, by_ownerType_ownerFamilyId, by_userId, by_accountId, by_family_updatedAt, by_ownerType_accountId_updatedAt, by_family_stableId, by_stableId
 
 #### credentials
 
@@ -936,20 +937,20 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 
 | 関数 | 種別 | 認可 | 概要 |
 | ----------------------------------------------------------------- | ------------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| getRecords | Query | authenticated | 一覧取得。家族所属時は by\_family\_sortKey インデックスで同一家族レコードを取得し、非所属時は by\_ownerType\_accountId で個人レコードを取得。フルテーブルスキャンを完全排除（Issue #137）。検索・タグ・所有者フィルタ・並び替え・取得上限（limit）に対応。credentials読み取りは有界並行（32件バッチ）で実行。既定でisArchived=falseのみ返す |
-| getRecordsPaginated | Query | authenticated | ページネーション対応の一覧取得（Convex usePaginatedQuery準拠）。ページ内レコードに対してのみcredentialsを有界並行バッチで結合し、同時I/O上限を回避 |
-| getArchivedRecords | Query | authenticated | アーカイブ済みレコードの一覧取得（FR-REC-23） |
+| getRecords | Query | authenticated | 一覧取得。家族所属時は by\_family\_sortKey / by\_family\_isArchived インデックスで同一家族レコードを取得し、非所属時は by\_ownerType\_accountId で個人レコードを取得。フルテーブルスキャンを完全排除（Issue #137）。検索・タグ・所有者フィルタ・並び替え・取得上限（limit）に対応。表示ステータスフィルタ（archiveStatus: "active" \| "archived" \| "all"）に対応し、既定で "active"（isArchived=false）のみ返す。credentials読み取りは有界並行（32件バッチ）で実行 |
+| getRecordsPaginated | Query | authenticated | ページネーション対応の一覧取得（Convex usePaginatedQuery準拠）。表示ステータスフィルタ（archiveStatus）対応。ページ内レコードに対してのみcredentialsを有界並行バッチで結合し、同時I/O上限を回避 |
+| getArchivedRecords | Query | authenticated | アーカイブ済みレコードの一覧取得（FR-REC-16, Issue #154） |
 | getRecordDetail | Query | authenticated | 詳細取得（rls.tsによるrequireContentAccess制御）。adminUsersをファミリー管理者＋admins配列から動的マージして返却。取得時にrecordAccessLogへVIEWEDを記録し、lastViewedAt/Byを更新 |
 | getAvailableTags | Query | authenticated | 閲覧可能レコードから使用中タグ一覧を抽出（by\_family\_sortKey経由） |
 | getOwnedRecords | Query | authenticated | 自分が管理可能な全レコード取得（個人レコード＋自分が管理者の共有レコード、CSVエクスポート用） |
-| fetchRecordsForExport | Mutation | authenticated | CSVエクスポート用レコード一括取得（stableId含む。サーバー側でCSVエクスポート通知メールもスケジュール送信） |
+| fetchRecordsForExport | Mutation | authenticated | CSVエクスポート用レコード一括取得（stableId、isArchived含む。サーバー側でCSVエクスポート通知メールもスケジュール送信） |
 | shareRecord | Mutation | familyBound | ワンタップで個人レコードを家族共有レコード（ownerType: "family"）に昇格。共有者が閲覧者の場合はadminsに追加、ファミリー管理者の場合は空配列（共有変更通知メール送信） |
 | unshareRecord | Mutation | familyBound | ワンタップで共有レコードを個人レコード（ownerType: "user", admins: []）に戻す（管理者限定・共有変更通知メール送信） |
 | addRecordAdmin / removeRecordAdmin | Mutation | recordAdmin | 共有レコードの個別管理者（一般メンバー）の追加・解除（管理者限定・管理者変更通知メール送信。ファミリー管理者の冗長追加は防止） |
 | bulkSetRecordAdmin | Mutation | familyBound | 選択した共有レコード群に対して個別管理者の追加／解除を一括適用（管理者限定） |
 | bulkShareRecords / bulkUnshareRecords | Mutation | familyBound | 選択した個人レコードの一括共有 / 共有レコードの一括共有解除（isRecordAdminで認可検証） |
-| getRecordsForDiffImport | Query | authenticated | CSV差分インポート突合用にアクセス可能なレコード一覧を軽量取得（編集可否を示す `canEdit` 付与、暗号化フィールドは除外、最小権限原則） |
-| applyImportDiff | Mutation | familyBound | CSV差分プレビューで承認された新規登録・更新を一括反映（家族境界・管理者認可検証、非空フィールドのみ更新、監査ログ記録） |
+| getRecordsForDiffImport | Query | authenticated | CSV差分インポート突合用にアクセス可能なレコード一覧を軽量取得（編集可否を示す `canEdit` 付与、isArchived含む、暗号化フィールドは除外、最小権限原則） |
+| applyImportDiff | Mutation | familyBound | CSV差分プレビューで承認された新規登録・更新を一括反映（isArchived対応、家族境界・管理者認可検証、非空フィールドのみ更新、監査ログ記録） |
 | createRecord | Mutation | familyBound | レコード新規作成（zodによるサーバー再検証、sortKey自動算出、ownerType: "user" \| "family"、credentials最大10件チェック、stableId自動生成、revision: 0初期化） |
 | updateRecord | Mutation | familyBound | レコード更新（requireAdminAccessチェックにより閲覧専用メンバーによる更新を防止、sortKey再算出、共有解除時は管理者権限を要求、revisionによる楽観的ロック競合検証、forceフラグによる強制上書き、完了時セッション自動削除） |
 | deleteRecord / deleteRecords | Mutation | familyBound | 単体／一括削除（requireAdminAccessチェック、非管理者の共有レコード削除を防止） |
@@ -957,7 +958,8 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 | importRecords | Mutation | familyBound | CSVインポート（全件新規作成、最大500件、家族内メールアドレスの厳格突合、行ごとのバリデーション結果を返却、stableId自動生成、revision: 0初期化） |
 | bulkUpdateRecords | Mutation | familyBound | 一括タグ付与／所有設定変更（所有設定変更は確認モーダルを経由） |
 | togglePin | Mutation | familyBound | isPinnedの切り替え（FR-REC-18） |
-| archiveRecord / unarchiveRecord | Mutation | familyBound | isArchivedの切り替え（FR-REC-23） |
+| archiveRecord / unarchiveRecord | Mutation | familyBound | 対象レコードのアーカイブ／利用再開（isArchived, archivedAtの更新、管理者限定、監査ログ記録、FR-REC-16, Issue #154） |
+| bulkArchiveRecords / bulkUnarchiveRecords | Mutation | familyBound | 選択した複数レコードの一括アーカイブ／一括利用再開（管理者権限のあるレコードのみ適用、非管理者共有レコードは除外アラート、監査ログ記録） |
 | requestUpdate | Mutation | familyBound | needsUpdate等を設定し、オーナーへ通知メールを送信（FR-REC-17） |
 | resolveUpdateRequest | Mutation | familyBound | レコード編集保存時にneedsUpdateを自動解除 |
 | mergeTags | Mutation | familyBound | 指定タグ名を持つ自分の閲覧可能レコード群のtags配列を一括置換（FR-REC-22） |

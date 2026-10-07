@@ -192,6 +192,29 @@ flowchart TD
 
 ---
 
+### 2.7 サービスレコードのアーカイブ（論理削除）と利用再開 (`isArchived` / Issue #154)
+
+```mermaid
+flowchart TD
+    Active["利用中 (isArchived: false)<br/>通常の一覧・検索・クイックフィルターに表示"]
+    Active -->|"アーカイブ実行 (archiveRecord / bulkArchiveRecords)<br/>※管理者権限必須"| Archived["アーカイブ済み (isArchived: true, archivedAt: epoch ms)<br/>専用のアーカイブ一覧へ退避 (利用中一覧から非表示)"]
+    Archived -->|"利用再開 (unarchiveRecord / bulkUnarchiveRecords)<br/>※管理者権限必須"| Active
+    Active -->|"完全削除 (deleteRecord / deleteRecords)<br/>※コンボボタン展開メニューから実行"| Deleted["完全削除 (DB物理削除 & 関連credentials削除)"]
+    Archived -->|"完全削除 (deleteRecord / deleteRecords)"| Deleted
+```
+
+- **状態定義**:
+  - `利用中`: `isArchived === false`。通常一覧に表示される。
+  - `アーカイブ`: `isArchived === true`、`archivedAt: number`（退避日時）。利用中一覧からは非表示になり、「アーカイブ」表示フィルターから閲覧・利用再開可能。
+- **権限境界**:
+  - アーカイブおよび利用再開の実行は、対象レコードの編集権限を持つ管理者（`isOwner` または `isAdmin`）に限定（非管理者共有レコードは一括操作時も除外アラートを表示）。
+- **インデックス最適化**:
+  - `serviceRecords` テーブルに複合インデックス `by_family_isArchived: ["familyId", "isArchived"]` を配置し、家族スコープごとの高速なフィルタリング・ページネーションを保証。
+- **監査ログ**:
+  - 状態変更時に `RECORD_ARCHIVE` / `RECORD_UNARCHIVE` の監査ログを記録。
+
+---
+
 ## 5. レコード制約・バリデーション境界 (Constraints & Limits)
 
 巨大ドキュメント生成防止およびUI・DB・CSVインポート間の整合性担保のため、以下の制約を設けている。

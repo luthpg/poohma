@@ -174,12 +174,15 @@ export default defineSchema({
     stableId: v.string(), // CSV差分インポート・エクスポート用 UUID v4
     revision: v.number(), // 楽観的ロック用（0からインクリメント）
     isSample: v.optional(v.boolean()), // オンボーディング用サンプルデータ識別フラグ
+    isArchived: v.boolean(), // アーカイブフラグ（論理削除）
+    archivedAt: v.optional(v.number()), // アーカイブ日時 (epoch ms)
     updatedAt: v.number(),
   })
     .index("by_userId", ["userId"])
     .index("by_accountId", ["accountId"])
     .index("by_family_sortKey", ["familyId", "sortKey"])
     .index("by_family_isSample", ["familyId", "isSample"])
+    .index("by_family_isArchived", ["familyId", "isArchived"])
     .index("by_ownerType_accountId", ["ownerType", "accountId"])
     .index("by_ownerType_ownerFamilyId", ["ownerType", "ownerFamilyId"])
     .index("by_family_updatedAt", ["familyId", "updatedAt"])
@@ -246,6 +249,8 @@ export default defineSchema({
       v.literal("RECORD_CREATE"),
       v.literal("RECORD_UPDATE"),
       v.literal("RECORD_DELETE"),
+      v.literal("RECORD_ARCHIVE"),
+      v.literal("RECORD_UNARCHIVE"),
       v.literal("CREDENTIAL_CREATE"),
       v.literal("CREDENTIAL_UPDATE"),
       v.literal("CREDENTIAL_DELETE"),

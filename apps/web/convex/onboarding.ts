@@ -132,6 +132,7 @@ export const insertSampleRecords = familyBoundMutation({
         tags: recordData.tags,
         stableId: crypto.randomUUID(),
         isSample: true,
+        isArchived: false,
         revision: 0,
         updatedAt: now,
         updatedByAccountId: user._id,

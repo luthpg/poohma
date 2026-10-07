@@ -54,6 +54,7 @@ export function createTestRecordData(
     updatedByAccountId: data.accountId,
     tags: [],
     stableId: crypto.randomUUID(),
+    isArchived: false,
     updatedAt: Date.now(),
     ...data,
   };

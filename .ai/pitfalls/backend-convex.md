@@ -96,3 +96,62 @@ Convex バックエンド開発における落とし穴と回避法です。
     3. `joinRequests` の削除は **作成から 48 時間以上経過した申請のみ** に限定し、直近の申請者を保護する。
     4. 直近 10 分以内の連続実行は Convex 側のクールダウンガードにより安全にスキップする。
 
+---
+
+### 非対話環境における `convex deploy` のプロンプト停止とユーザー手動委任
+
+- **問題 (Problem)**:
+  - AI Agent や自動化スクリプトなど非対話ターミナルから `pnpm convex:deploy`（`convex deploy`）を実行した際、ローカルの `.env.local` 等の `CONVEX_DEPLOYMENT` が dev 環境を向いていると、Convex CLI が本番環境への誤プッシュ防止のための対話確認「`Do you want to push your code to your prod deployment...? (Y/n)`」を求め、プロセスが永遠に応答待ちでハングまたはタイムアウトする。
+  - `echo y |` パイプや `CI=true` 環境変数を付与してもバイパスできず失敗する。
+- **原因 (Root Cause)**:
+  - Convex CLI が本番安全装置として TTY / 対話型入力を前提としたプロンプトを強制する仕様であるため。
+- **誤ったアプローチ (Anti-Pattern)**:
+  - 非対話シェルから無理に入力を注入しようと試行錯誤したり、CI用の本番デプロイキー（`CONVEX_DEPLOY_KEY`）をローカル環境に無理やり設定してガードを無力化すること。
+- **正しいアプローチ (Correct Pattern)**:
+  - 本番環境へのデプロイ操作は、安全管理の観点からも **「ユーザー自身の対話ターミナルで `pnpm convex:deploy` を実行してもらい、完了報告を受ける」** 運用とする。
+  - AI Agent 側はデプロイコードの準備（一時マイグレ関数の配置やスキーマ調整）までを担当し、本番適用のトリガーはユーザーに委任する。
+- **再発防止 (Prevention)**:
+  - ワンショットマイグレーション手順において、本番デプロイ手順には「ユーザーへ対話ターミナルでの実行を依頼する」ステップを明記する。
+- **関連実装 (Related Code References)**:
+  - `.ai/workflows/one-shot-migration.md`
+  - `apps/web/convex/schema.ts`
+
+---
+
+### Monorepo における `convex export` のパス解決（二重ディレクトリ ENOENT 回避）
+
+- **問題 (Problem)**:
+  - ルートから `pnpm -F @poohma/web exec convex export --path apps/web/.local/migrations/backup.zip` を実行すると、`ENOENT: no such file or directory` エラーでエクスポートに失敗する。
+- **原因 (Root Cause)**:
+  - `pnpm -F @poohma/web exec` は作業ディレクトリ（Cwd）をパッケージルート（`apps/web`）に変更してコマンドを実行するため、引数に `apps/web/...` を含めると `apps/web/apps/web/.local/...` と解釈されて二重ディレクトリパスになり、出力先ディレクトリが存在せず失敗する。
+- **誤ったアプローチ (Anti-Pattern)**:
+  - 失敗した際に無理に絶対パスを構築したり、ディレクトリ構成の変更を試みること。
+- **正しいアプローチ (Correct Pattern)**:
+  - パッケージルートからの相対パス（例: `--path .local/migrations/backup.zip`）を指定するか、完全な絶対パスを明示的に渡す。
+- **再発防止 (Prevention)**:
+  - Convex CLI 呼び出し時の Cwd を常に意識し、パッケージ相対パスで指定する。
+- **関連実装 (Related Code References)**:
+  - `.ai/workflows/one-shot-migration.md`
+
+---
+
+### ZIP エクスポート（`documents.jsonl`）による移行前後全件の 1:1 機械突合検証
+
+- **問題 (Problem)**:
+  - マイグレーション関数がエラーなしで完了（`success`）したとしても、クエリ条件漏れによる一部レコードの未更新や、意図しない他フィールド（暗号化ペイロード、IV、タイムスタンプ等）の巻き込み破損・欠落が発生していても気付かないリスクがある。
+- **原因 (Root Cause)**:
+  - 関数の実行ステータスのみに依存し、実データの全件 Diff を確認していないこと。
+- **誤ったアプローチ (Anti-Pattern)**:
+  - Convex の Query API をアドホックに叩いて先頭数件だけを目視確認すること（全件チェックにならず、大量件数時に負荷やページネーションの漏れが生じる）。
+- **正しいアプローチ (Correct Pattern)**:
+  - 移行直前と移行直後に `convex export` でスナップショット ZIP を取得し、ZIP 内の `[table]/documents.jsonl` を直接読み取って機械的に突合するスクリプトを実行する。
+  - **検証条件**:
+    1. 総件数が完全に一致すること（レコードの消失や二重作成がないこと）
+    2. 対象レコードの追加・変更フィールド（例: `isArchived`）のみが期待通りの値になっていること
+    3. 対象外の全フィールド（ID、作成日時、暗号化データ等）が実行前と 1 文字も異ならず完全一致すること
+- **再発防止 (Prevention)**:
+  - ワンショットマイグレーションでは必ずこの突合スクリプトをワンショット実行して「全件一致・差分は指定フィールドのみ」を保証してから完了とする。
+- **関連実装 (Related Code References)**:
+  - `.ai/workflows/one-shot-migration.md`
+  - `apps/web/convex/schema.ts`
+

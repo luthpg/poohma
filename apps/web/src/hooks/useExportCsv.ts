@@ -33,6 +33,7 @@ export function useExportCsv() {
           OwnerType: record.ownerType ?? "user",
           Admins: (record.adminEmails ?? []).join(", "),
           Tags: record.tags.join(","),
+          IsArchived: record.isArchived ? "TRUE" : "FALSE",
         };
         record.credentials.forEach((cred, i) => {
           const idx = i + 1;
@@ -124,6 +125,7 @@ export function useExportCsv() {
         "OwnerType",
         "Admins",
         "Tags",
+        "IsArchived",
       ];
       for (let i = 1; i <= MAX_CREDENTIALS_PER_RECORD; i++) {
         columns.push(
