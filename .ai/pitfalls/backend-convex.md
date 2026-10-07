@@ -127,6 +127,7 @@ Convex バックエンド開発における落とし穴と回避法です。
 - **誤ったアプローチ (Anti-Pattern)**:
   - 失敗した際に無理に絶対パスを構築したり、ディレクトリ構成の変更を試みること。
 - **正しいアプローチ (Correct Pattern)**:
+  - 出力先の親ディレクトリが存在しない場合は、事前に `mkdir -p .local/migrations` を実行しておく（存在しないパスへの出力は Convex CLI が `ENOENT` で失敗するため）。
   - パッケージルートからの相対パス（例: `--path .local/migrations/backup.zip`）を指定するか、完全な絶対パスを明示的に渡す。
 - **再発防止 (Prevention)**:
   - Convex CLI 呼び出し時の Cwd を常に意識し、パッケージ相対パスで指定する。

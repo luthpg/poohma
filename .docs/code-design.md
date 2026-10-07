@@ -937,9 +937,8 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 
 | 関数 | 種別 | 認可 | 概要 |
 | ----------------------------------------------------------------- | ------------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| getRecords | Query | authenticated | 一覧取得。家族所属時は by\_family\_sortKey / by\_family\_isArchived インデックスで同一家族レコードを取得し、非所属時は by\_ownerType\_accountId で個人レコードを取得。フルテーブルスキャンを完全排除（Issue #137）。検索・タグ・所有者フィルタ・並び替え・取得上限（limit）に対応。表示ステータスフィルタ（archiveStatus: "active" \| "archived" \| "all"）に対応し、既定で "active"（isArchived=false）のみ返す。credentials読み取りは有界並行（32件バッチ）で実行 |
+| getRecords | Query | authenticated | 一覧取得。家族所属時は by\_family\_sortKey インデックスで同一家族レコードを取得し、非所属時は by\_ownerType\_accountId で個人レコードを取得。フルテーブルスキャンを完全排除（Issue #137）。検索・タグ・所有者フィルタ・並び替え・取得上限（limit）に対応。表示ステータスフィルタ（archiveStatus: "active" \| "archived" \| "all"）をインメモリで適用し、既定で "active"（isArchived=false）のみ返す。credentials読み取りは有界並行（32件バッチ）で実行 |
 | getRecordsPaginated | Query | authenticated | ページネーション対応の一覧取得（Convex usePaginatedQuery準拠）。表示ステータスフィルタ（archiveStatus）対応。ページ内レコードに対してのみcredentialsを有界並行バッチで結合し、同時I/O上限を回避 |
-| getArchivedRecords | Query | authenticated | アーカイブ済みレコードの一覧取得（FR-REC-16, Issue #154） |
 | getRecordDetail | Query | authenticated | 詳細取得（rls.tsによるrequireContentAccess制御）。adminUsersをファミリー管理者＋admins配列から動的マージして返却。取得時にrecordAccessLogへVIEWEDを記録し、lastViewedAt/Byを更新 |
 | getAvailableTags | Query | authenticated | 閲覧可能レコードから使用中タグ一覧を抽出（by\_family\_sortKey経由） |
 | getOwnedRecords | Query | authenticated | 自分が管理可能な全レコード取得（個人レコード＋自分が管理者の共有レコード、CSVエクスポート用） |
