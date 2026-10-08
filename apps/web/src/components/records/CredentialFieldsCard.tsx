@@ -1,4 +1,5 @@
-import { Lightbulb, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Lightbulb, Trash2 } from "lucide-react";
+import { useState } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -30,6 +31,7 @@ export function CredentialFieldsCard({
   isFieldModified,
   isEditMode = false,
 }: CredentialFieldsCardProps) {
+  const [isLabelOpen, setIsLabelOpen] = useState(Boolean(credential.label));
   const isLabelModified = isFieldModified?.(`credential_${index}_label`);
   const isLoginIdModified = isFieldModified?.(`credential_${index}_loginId`);
   const isHintModified = isFieldModified?.(`credential_${index}_passwordHint`);
@@ -130,23 +132,46 @@ export function CredentialFieldsCard({
           </div>
         </div>
 
-        {/* 3. 補助項目: ラベル */}
-        <div className="mt-3 border-t border-border/50 pt-4">
-          <div className={getModifiedClass(isLabelModified)}>
-            <label
-              htmlFor={`label-input-${index}`}
-              className="mb-1.5 block text-[13px] text-muted-foreground"
+        {/* 3. 補助項目: ラベル（任意設定・デフォルト折りたたみ） */}
+        <div className="mt-4 border-t border-border/50 pt-3">
+          <button
+            type="button"
+            onClick={() => setIsLabelOpen(!isLabelOpen)}
+            className="inline-flex items-center gap-1.5 text-[12px] md:text-[13px] text-muted-foreground hover:text-foreground transition cursor-pointer"
+          >
+            {isLabelOpen ? (
+              <ChevronUp className="h-3.5 w-3.5 shrink-0" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+            )}
+            <span>ラベルを設定（例：パパ用）</span>
+            {!isLabelOpen && credential.label && (
+              <span className="ml-1 text-orange-500 font-medium">
+                ({credential.label})
+              </span>
+            )}
+          </button>
+
+          {isLabelOpen && (
+            <div
+              className={`mt-2.5 animate-in fade-in duration-150 ${getModifiedClass(isLabelModified)}`}
             >
-              ラベル <span className="text-[12px]">（例：パパ用）</span>
-            </label>
-            <input
-              id={`label-input-${index}`}
-              type="text"
-              value={credential.label}
-              onChange={(e) => onChange(index, "label", e.target.value)}
-              className="h-10 w-full max-w-[280px] rounded-md bg-card px-3 text-base shadow-border focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50"
-            />
-          </div>
+              <label
+                htmlFor={`label-input-${index}`}
+                className="mb-1.5 block text-[13px] text-muted-foreground"
+              >
+                ラベル <span className="text-[12px]">（アカウント識別用）</span>
+              </label>
+              <input
+                id={`label-input-${index}`}
+                type="text"
+                value={credential.label}
+                onChange={(e) => onChange(index, "label", e.target.value)}
+                placeholder="例: パパ用、仕事用"
+                className="h-10 w-full max-w-[280px] rounded-md bg-card px-3 text-base shadow-border focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50"
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>

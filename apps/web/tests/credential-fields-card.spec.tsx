@@ -176,4 +176,29 @@ describe("CredentialFieldsCard Component", () => {
     const loginIdContainer = screen.getByLabelText("ログインID").closest("div");
     expect(loginIdContainer?.className).toContain("before:opacity-0");
   });
+
+  it("labelが未設定の場合は初期状態で折りたたまれ、ボタンクリックで展開されること", () => {
+    render(
+      <CredentialFieldsCard
+        index={0}
+        credential={{ ...sampleCredential, label: "" }}
+        removable={false}
+        onChange={vi.fn()}
+        onRemove={vi.fn()}
+      />,
+    );
+
+    // 初期状態ではラベル入力欄が存在しない（折りたたまれている）
+    expect(screen.queryByLabelText(/ラベル/)).toBeNull();
+
+    // トグルボタンをクリック
+    const toggleButton = screen.getByRole("button", {
+      name: /ラベルを設定/,
+    });
+    expect(toggleButton).toBeTruthy();
+    fireEvent.click(toggleButton);
+
+    // 展開されてラベル入力欄が表示される
+    expect(screen.getByLabelText(/ラベル/)).toBeTruthy();
+  });
 });

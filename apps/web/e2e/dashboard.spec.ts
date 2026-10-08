@@ -152,14 +152,14 @@ test.describe("認証済みルートのアクセス検証", () => {
       // 既にアンロック済みの場合はスキップ
     }
 
-    // 1. 主要項目の入力欄が表示されていること
+    // 1. 主要項目の入力欄が表示され、補助ラベル欄はデフォルトで折りたたまれていること
     const loginIdInput = page.locator("input#login-id-input-0");
     const hintInput = page.locator("input#pw-hint-input-0");
     const labelInput = page.locator("input#label-input-0");
 
     await expect(loginIdInput).toBeVisible({ timeout: 10000 });
     await expect(hintInput).toBeVisible({ timeout: 10000 });
-    await expect(labelInput).toBeVisible({ timeout: 10000 });
+    await expect(labelInput).not.toBeVisible();
 
     // 2. パスワードヒント欄に placeholder がなく、説明文が常時表示されていること
     await expect(hintInput).not.toHaveAttribute("placeholder");
@@ -169,9 +169,14 @@ test.describe("認証済みルートのアクセス検証", () => {
       "パスワードを思い出すための手がかりを書いてください",
     );
 
-    // 3. 入力操作ができること
+    // 3. 入力操作ができること（ラベル欄はトグルボタンで開いて入力）
     await loginIdInput.fill("test-user@example.com");
     await hintInput.fill("秘密のヒントメモ");
+
+    const labelToggleBtn = page.locator('button:has-text("ラベルを設定")');
+    await expect(labelToggleBtn).toBeVisible();
+    await labelToggleBtn.click();
+    await expect(labelInput).toBeVisible({ timeout: 5000 });
     await labelInput.fill("メインアカウント");
 
     await expect(loginIdInput).toHaveValue("test-user@example.com");
