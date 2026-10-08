@@ -2917,6 +2917,14 @@ export const mergeOrRenameTags = familyBoundMutation({
       const remainingTags = record.tags.filter((t) => !sourceTagsSet.has(t));
       const newTags = Array.from(new Set([...remainingTags, targetTag]));
 
+      // タグ集合が変わらない場合は無駄な更新・監査ログをスキップ（bulkRemoveTags と統一）
+      if (
+        newTags.length === record.tags.length &&
+        newTags.every((t) => record.tags.includes(t))
+      ) {
+        continue;
+      }
+
       if (newTags.length > MAX_TAGS_PER_RECORD) {
         throw new Error(
           `タグは${MAX_TAGS_PER_RECORD}個まで登録できます (レコード「${record.title}」で超過)`,
