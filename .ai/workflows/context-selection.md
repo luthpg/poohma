@@ -17,6 +17,7 @@ PoohMa では、AI Agent がタスクに着手する際、無作為にファイ�
 | **テスト・E2E** | `apps/web/tests/**`<br>`apps/web/e2e/**` | [`.ai/testing.md`](../testing.md)<br>[`.ai/pitfalls/e2e-testing.md`](../pitfalls/e2e-testing.md)<br>[`.ai/workflows/test-refactoring.md`](test-refactoring.md) | ・テスト失敗時のプロダクションコード改変禁止<br>・コミット前の `pnpm test:e2e` ローカル合格義務<br>・重複テストの整理（「削除すると何を見逃すか」基準） |
 | **CI/CD・GitHub Actions** | `.github/workflows/**` | [`.ai/invariants.md`](../invariants.md) (第7節)<br>[`.ai/pitfalls/workflow-ci.md`](../pitfalls/workflow-ci.md) | ・コミット前の `pnpm lint:workflows` 合格義務<br>・引数インジェクション防止 (`jq --arg`)<br>・curl タイムアウト必須、変数クォート |
 | **外部レビュー対応** | PR コメント (CodeRabbit等) | [`.ai/invariants.md`](../invariants.md)<br>[`.ai/pitfalls/review-and-guardrails.md`](../pitfalls/review-and-guardrails.md) | ・外部AIの提案を盲目追従しない（毅然と却下する基準）<br>・「念のため二重にする」過剰冗長化の完全排除 |
+| **Git操作・シェル実行・パス指定** | すべてのコマンド実行、Git操作 | [`.ai/pitfalls/environment-shell.md`](../pitfalls/environment-shell.md)<br>[`.ai/workflows/git-workflow.md`](git-workflow.md) | ・`(app)` や `$` を含むパスのシングルクォート囲み義務<br>・BOMなしUTF-8一時ファイル経由 |
 
 ---
 
