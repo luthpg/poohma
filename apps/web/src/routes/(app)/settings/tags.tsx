@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import {
   AlertCircle,
@@ -11,11 +11,12 @@ import {
   Tag,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
 import { SubHeader } from "@/components/common/SubHeader";
+import { Button } from "@/components/ui/button";
 import { useAccount } from "@/hooks/useAccount";
 import { usePersistentQuery } from "@/hooks/usePersistentQuery";
 
@@ -96,218 +97,228 @@ function TagManagementPage() {
     setIsModalOpen(true);
   };
 
-  return (
-    <div className="min-h-screen bg-background pb-24 overflow-x-hidden">
-      <div className="container mx-auto max-w-4xl px-4 py-4 sm:py-6 space-y-5">
-        {/* 共通スマート子ヘッダー */}
-        <SubHeader
-          className="sm:-mx-4 sm:px-4"
-          backLabel="設定へ戻る"
-          fallbackTo="/settings"
-        >
-          <span className="text-muted-foreground text-xs sm:text-sm">/</span>
-          <span className="text-foreground font-medium text-xs sm:text-sm">
-            タグ管理
-          </span>
-        </SubHeader>
+  // ページ遷移時に先頭スクロール
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
-        {/* ページヘッダー & 説明 */}
-        <div className="rounded-xl bg-card p-4 sm:p-5 shadow-card border border-border/60">
-          <div className="flex items-start gap-3">
-            <div className="p-2 rounded-lg bg-orange-500/10 text-orange-500 shrink-0 mt-0.5">
+  return (
+    <div className="container mx-auto max-w-5xl px-4 py-6 sm:py-8 space-y-6 pb-24">
+      {/* 共通スマート子ヘッダー */}
+      <SubHeader
+        className="sm:-mx-4 sm:px-4"
+        backLabel="設定へ戻る"
+        fallbackTo="/settings"
+        rightElement={
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs font-medium cursor-pointer"
+          >
+            <Link to="/dashboard">ダッシュボードへ</Link>
+          </Button>
+        }
+      >
+        <span className="text-muted-foreground text-xs sm:text-sm">/</span>
+        <span className="text-foreground font-medium text-xs sm:text-sm">
+          タグ管理
+        </span>
+      </SubHeader>
+
+      {/* ページタイトル & ヘッダー */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-5">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2.5">
+            <div className="h-9 w-9 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-500">
               <Tag className="h-5 w-5" />
             </div>
-            <div className="space-y-1 min-w-0">
-              <h1 className="text-base sm:text-lg font-bold text-foreground tracking-tight">
-                タグの表記揺れ解消・統合
-              </h1>
-              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                登録されているタグの一覧です。表記揺れのあるタグの名称変更（リネーム）や、複数のタグを選んで1つにまとめる統合が行えます。
-                操作前に影響を受けるレコード件数を確認できます。
-              </p>
-            </div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+              タグ管理
+            </h1>
           </div>
+          <p className="text-xs sm:text-sm text-muted-foreground">
+            登録されているタグの一覧です。表記揺れのあるタグの名称変更（リネーム）や、複数のタグを選んで1つにまとめる統合が行えます。
+          </p>
+        </div>
+      </div>
+
+      {/* 検索・フィルターバー */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="relative flex-1 min-w-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="タグを検索..."
+            className="w-full rounded-lg bg-card border border-border pl-9 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
 
-        {/* 検索・フィルターバー */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          <div className="relative flex-1 min-w-0">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="タグを検索..."
-              className="w-full rounded-lg bg-card border border-border pl-9 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between sm:justify-end gap-3 text-xs text-muted-foreground shrink-0">
-            {filteredTags.length > 0 && (
-              <label className="flex items-center gap-1.5 cursor-pointer sm:hidden select-none">
-                <input
-                  type="checkbox"
-                  checked={isAllSelected}
-                  onChange={handleToggleSelectAll}
-                  aria-label="すべてのタグを選択"
-                  className="rounded border-border text-orange-500 focus:ring-orange-500"
-                />
-                <span>全選択</span>
-              </label>
-            )}
-            <span>
-              全 {tagStats.length} 件中 {filteredTags.length} 件
-            </span>
-          </div>
+        <div className="flex items-center justify-between sm:justify-end gap-3 text-xs text-muted-foreground shrink-0">
+          {filteredTags.length > 0 && (
+            <label className="flex items-center gap-1.5 cursor-pointer sm:hidden select-none">
+              <input
+                type="checkbox"
+                checked={isAllSelected}
+                onChange={handleToggleSelectAll}
+                aria-label="すべてのタグを選択"
+                className="rounded border-border text-orange-500 focus:ring-orange-500"
+              />
+              <span>全選択</span>
+            </label>
+          )}
+          <span>
+            全 {tagStats.length} 件中 {filteredTags.length} 件
+          </span>
         </div>
+      </div>
 
-        {/* タグ一覧コンテナ */}
-        <div className="rounded-xl border border-border bg-card shadow-card overflow-hidden">
-          {filteredTags.length === 0 ? (
-            <div className="py-12 text-center text-sm text-muted-foreground">
-              {tagStats.length === 0
-                ? "登録されているタグはありません"
-                : "一致するタグが見つかりません"}
-            </div>
-          ) : (
-            <>
-              {/* モバイルビュー: カード型リスト（横圧縮を完全防止） */}
-              <div className="divide-y divide-border/60 sm:hidden">
-                {filteredTags.map((item) => {
-                  const isSelected = selectedTags.includes(item.tag);
-                  return (
-                    <div
-                      key={item.tag}
-                      className={`p-3.5 flex items-center justify-between gap-3 transition-colors ${
-                        isSelected ? "bg-orange-500/5" : ""
-                      }`}
+      {/* タグ一覧コンテナ */}
+      <div className="rounded-xl border border-border bg-card shadow-card overflow-hidden">
+        {filteredTags.length === 0 ? (
+          <div className="py-12 text-center text-sm text-muted-foreground">
+            {tagStats.length === 0
+              ? "登録されているタグはありません"
+              : "一致するタグが見つかりません"}
+          </div>
+        ) : (
+          <>
+            {/* モバイルビュー: カード型リスト（横圧縮を完全防止） */}
+            <div className="divide-y divide-border/60 sm:hidden">
+              {filteredTags.map((item) => {
+                const isSelected = selectedTags.includes(item.tag);
+                return (
+                  <div
+                    key={item.tag}
+                    className={`p-3.5 flex items-center justify-between gap-3 transition-colors ${
+                      isSelected ? "bg-orange-500/5" : ""
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleToggleSelectTag(item.tag)}
+                        aria-label={`${item.tag} を選択`}
+                        className="h-4 w-4 rounded border-border text-orange-500 focus:ring-orange-500 cursor-pointer shrink-0"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-secondary text-secondary-foreground text-xs font-medium border border-border/80 max-w-full">
+                          <Tag className="h-3 w-3 opacity-60 shrink-0" />
+                          <span className="truncate">{item.tag}</span>
+                        </div>
+                        <div className="text-[11px] text-muted-foreground mt-1 flex flex-wrap items-center gap-1">
+                          <span className="font-semibold text-foreground">
+                            {item.totalRecordCount} 件
+                          </span>
+                          {item.readonlyRecordCount > 0 && (
+                            <span className="opacity-80">
+                              (可能: {item.manageableRecordCount} / 閲覧:{" "}
+                              {item.readonlyRecordCount})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleOpenSingleRename(item.tag)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-orange-600 hover:text-orange-700 hover:bg-orange-500/10 transition cursor-pointer shrink-0"
                     >
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => handleToggleSelectTag(item.tag)}
-                          aria-label={`${item.tag} を選択`}
-                          className="h-4 w-4 rounded border-border text-orange-500 focus:ring-orange-500 cursor-pointer shrink-0"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-secondary text-secondary-foreground text-xs font-medium border border-border/80 max-w-full">
+                      <Edit3 className="h-3.5 w-3.5" />
+                      <span>変更</span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* デスクトップビュー: テーブル表示 */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-muted/40 border-b border-border text-xs text-muted-foreground">
+                  <tr>
+                    <th className="py-3 px-4 w-10">
+                      <input
+                        type="checkbox"
+                        checked={isAllSelected}
+                        onChange={handleToggleSelectAll}
+                        aria-label="すべてのタグを選択"
+                        className="rounded border-border text-orange-500 focus:ring-orange-500 cursor-pointer"
+                      />
+                    </th>
+                    <th className="py-3 px-4 font-medium">タグ名</th>
+                    <th className="py-3 px-4 font-medium">使用件数</th>
+                    <th className="py-3 px-4 font-medium text-right">操作</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {filteredTags.map((item) => {
+                    const isSelected = selectedTags.includes(item.tag);
+                    return (
+                      <tr
+                        key={item.tag}
+                        className={`transition-colors hover:bg-muted/30 ${
+                          isSelected ? "bg-orange-500/5" : ""
+                        }`}
+                      >
+                        <td className="py-3 px-4">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleToggleSelectTag(item.tag)}
+                            aria-label={`${item.tag} を選択`}
+                            className="rounded border-border text-orange-500 focus:ring-orange-500 cursor-pointer"
+                          />
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-secondary text-secondary-foreground text-xs font-medium border border-border/80 max-w-xs">
                             <Tag className="h-3 w-3 opacity-60 shrink-0" />
                             <span className="truncate">{item.tag}</span>
                           </div>
-                          <div className="text-[11px] text-muted-foreground mt-1 flex flex-wrap items-center gap-1">
-                            <span className="font-semibold text-foreground">
-                              {item.totalRecordCount} 件
+                        </td>
+                        <td className="py-3 px-4 text-xs">
+                          <span className="font-semibold text-foreground">
+                            {item.totalRecordCount}
+                          </span>
+                          <span className="text-muted-foreground ml-1">件</span>
+                          {item.readonlyRecordCount > 0 && (
+                            <span className="text-[11px] text-muted-foreground ml-2">
+                              (変更可能: {item.manageableRecordCount} /
+                              閲覧専用: {item.readonlyRecordCount})
                             </span>
-                            {item.readonlyRecordCount > 0 && (
-                              <span className="opacity-80">
-                                (可能: {item.manageableRecordCount} / 閲覧:{" "}
-                                {item.readonlyRecordCount})
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => handleOpenSingleRename(item.tag)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-orange-600 hover:text-orange-700 hover:bg-orange-500/10 transition cursor-pointer shrink-0"
-                      >
-                        <Edit3 className="h-3.5 w-3.5" />
-                        <span>変更</span>
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* デスクトップビュー: テーブル表示 */}
-              <div className="hidden sm:block overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-muted/40 border-b border-border text-xs text-muted-foreground">
-                    <tr>
-                      <th className="py-3 px-4 w-10">
-                        <input
-                          type="checkbox"
-                          checked={isAllSelected}
-                          onChange={handleToggleSelectAll}
-                          aria-label="すべてのタグを選択"
-                          className="rounded border-border text-orange-500 focus:ring-orange-500 cursor-pointer"
-                        />
-                      </th>
-                      <th className="py-3 px-4 font-medium">タグ名</th>
-                      <th className="py-3 px-4 font-medium">使用件数</th>
-                      <th className="py-3 px-4 font-medium text-right">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/60">
-                    {filteredTags.map((item) => {
-                      const isSelected = selectedTags.includes(item.tag);
-                      return (
-                        <tr
-                          key={item.tag}
-                          className={`transition-colors hover:bg-muted/30 ${
-                            isSelected ? "bg-orange-500/5" : ""
-                          }`}
-                        >
-                          <td className="py-3 px-4">
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => handleToggleSelectTag(item.tag)}
-                              aria-label={`${item.tag} を選択`}
-                              className="rounded border-border text-orange-500 focus:ring-orange-500 cursor-pointer"
-                            />
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-secondary text-secondary-foreground text-xs font-medium border border-border/80 max-w-xs">
-                              <Tag className="h-3 w-3 opacity-60 shrink-0" />
-                              <span className="truncate">{item.tag}</span>
-                            </div>
-                          </td>
-                          <td className="py-3 px-4 text-xs">
-                            <span className="font-semibold text-foreground">
-                              {item.totalRecordCount}
-                            </span>
-                            <span className="text-muted-foreground ml-1">
-                              件
-                            </span>
-                            {item.readonlyRecordCount > 0 && (
-                              <span className="text-[11px] text-muted-foreground ml-2">
-                                (変更可能: {item.manageableRecordCount} /
-                                閲覧専用: {item.readonlyRecordCount})
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenSingleRename(item.tag)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-orange-600 hover:text-orange-700 hover:bg-orange-500/10 transition cursor-pointer"
-                            >
-                              <Edit3 className="h-3.5 w-3.5" />
-                              変更
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-        </div>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenSingleRename(item.tag)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-orange-600 hover:text-orange-700 hover:bg-orange-500/10 transition cursor-pointer"
+                          >
+                            <Edit3 className="h-3.5 w-3.5" />
+                            変更
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
 
       {/* 選択時の一括操作バー（モバイルでも横圧縮されない最適化レイアウト） */}
