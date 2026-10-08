@@ -137,7 +137,9 @@ export function CredentialFieldsCard({
           <button
             type="button"
             onClick={() => setIsLabelOpen(!isLabelOpen)}
-            className="inline-flex items-center gap-1.5 text-[12px] md:text-[13px] text-muted-foreground hover:text-foreground transition cursor-pointer"
+            aria-expanded={isLabelOpen}
+            aria-controls={`label-container-${index}`}
+            className="inline-flex items-center gap-1.5 text-[12px] md:text-[13px] text-muted-foreground hover:text-foreground transition cursor-pointer rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50"
           >
             {isLabelOpen ? (
               <ChevronUp className="h-3.5 w-3.5 shrink-0" />
@@ -154,6 +156,7 @@ export function CredentialFieldsCard({
 
           {isLabelOpen && (
             <div
+              id={`label-container-${index}`}
               className={`mt-2.5 animate-in fade-in duration-150 ${getModifiedClass(isLabelModified)}`}
             >
               <label

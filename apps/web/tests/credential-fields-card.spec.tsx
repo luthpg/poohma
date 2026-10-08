@@ -196,9 +196,11 @@ describe("CredentialFieldsCard Component", () => {
       name: /ラベルを設定/,
     });
     expect(toggleButton).toBeTruthy();
+    expect(toggleButton.getAttribute("aria-expanded")).toBe("false");
     fireEvent.click(toggleButton);
 
-    // 展開されてラベル入力欄が表示される
+    // 展開されてラベル入力欄が表示され、aria-expanded が true になる
+    expect(toggleButton.getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByLabelText(/ラベル/)).toBeTruthy();
   });
 });

@@ -1515,7 +1515,7 @@ function RecordDetailComponent({
                       type="button"
                       disabled={isLoading}
                       onClick={() => setIsUnshareAlertOpen(true)}
-                      aria-label="レコードを個人用にする"
+                      aria-label="レコードの共有を解除する"
                       className="flex h-9 sm:h-10 min-h-11 items-center justify-center gap-1.5 rounded-md border border-border bg-card hover:bg-accent px-2.5 sm:px-3 text-xs sm:text-[14px] font-medium text-foreground transition cursor-pointer"
                     >
                       <Lock className="h-4 w-4 text-muted-foreground" />

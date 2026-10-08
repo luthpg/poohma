@@ -133,23 +133,19 @@ test.describe("認証済みルートのアクセス検証", () => {
     await page.waitForURL(/.*\/records\/new/, { timeout: 20000 });
     await ensureOnboardingCompleted(page);
 
-    // アンロックプロンプトが表示された場合はパスコードを入力して解除
+    // アンロックプロンプトが表示されている場合はパスコードを入力して解除
     const unlockInput = page.locator('input[placeholder="パスコード"]');
-    try {
-      if (await unlockInput.isVisible({ timeout: 5000 })) {
-        const passcode =
-          process.env.E2E_FAMILY_PASSCODE || "PoohMa#Secure2026!Pass";
-        await unlockInput.fill(passcode);
-        const unlockBtn = page.locator('button:has-text("ロック解除")');
-        if (await unlockBtn.isVisible()) {
-          await unlockBtn.click();
-        } else {
-          await page.keyboard.press("Enter");
-        }
-        await expect(unlockInput).not.toBeVisible({ timeout: 10000 });
+    if (await unlockInput.isVisible()) {
+      const passcode =
+        process.env.E2E_FAMILY_PASSCODE || "PoohMa#Secure2026!Pass";
+      await unlockInput.fill(passcode);
+      const unlockBtn = page.locator('button:has-text("ロック解除")');
+      if (await unlockBtn.isVisible()) {
+        await unlockBtn.click();
+      } else {
+        await page.keyboard.press("Enter");
       }
-    } catch {
-      // 既にアンロック済みの場合はスキップ
+      await expect(unlockInput).not.toBeVisible({ timeout: 10000 });
     }
 
     // 1. 主要項目の入力欄が表示され、補助ラベル欄はデフォルトで折りたたまれていること
@@ -175,7 +171,9 @@ test.describe("認証済みルートのアクセス検証", () => {
 
     const labelToggleBtn = page.locator('button:has-text("ラベルを設定")');
     await expect(labelToggleBtn).toBeVisible();
+    await expect(labelToggleBtn).toHaveAttribute("aria-expanded", "false");
     await labelToggleBtn.click();
+    await expect(labelToggleBtn).toHaveAttribute("aria-expanded", "true");
     await expect(labelInput).toBeVisible({ timeout: 5000 });
     await labelInput.fill("メインアカウント");
 

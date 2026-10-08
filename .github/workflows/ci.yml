@@ -127,5 +127,4 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Convex Deploy Dry Run
-        working-directory: apps/web
         run: pnpm run convex:deploy:dry-run
