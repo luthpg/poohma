@@ -1,9 +1,9 @@
 import { HOUR, MINUTE, RateLimiter } from "@convex-dev/rate-limiter";
-import { ConvexError, v } from "convex/values";
 import {
   CONTACT_CATEGORIES,
   type ContactCategory,
-} from "../src/constants/contacts";
+} from "@poohma/shared/constants/contacts";
+import { ConvexError, v } from "convex/values";
 import { components, internal } from "./_generated/api";
 import { internalAction, mutation } from "./_generated/server";
 

@@ -10,12 +10,10 @@ export function getEmailBaseUrl(): string {
     return process.env.VITE_SITE_URL.replace(/\/+$/, "");
   }
   try {
-    if (
-      typeof import.meta !== "undefined" &&
-      import.meta.env &&
-      typeof import.meta.env.VITE_SITE_URL === "string"
-    ) {
-      return import.meta.env.VITE_SITE_URL.replace(/\/+$/, "");
+    const metaEnv = (import.meta as unknown as { env?: Record<string, string> })
+      .env;
+    if (metaEnv && typeof metaEnv.VITE_SITE_URL === "string") {
+      return metaEnv.VITE_SITE_URL.replace(/\/+$/, "");
     }
   } catch {
     // import.meta 参照不可環境のフォールバック

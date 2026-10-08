@@ -1,5 +1,5 @@
+import { computeSortKey } from "@poohma/shared/utils/index-group";
 import { v } from "convex/values";
-import { computeSortKey } from "../src/utils/index-group";
 import type { Id } from "./_generated/dataModel";
 import { authenticatedMutation, familyBoundMutation } from "./customBuilders";
 import { deleteCredentialsForRecord } from "./records";

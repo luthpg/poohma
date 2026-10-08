@@ -1,6 +1,6 @@
 import dns from "node:dns/promises";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { validateUrlSafety } from "@/utils/url-safety";
+import { validateUrlSafety } from "../src/utils/url-safety";
 
 // node:dns/promises モジュール全体をモック化
 vi.mock("node:dns/promises");

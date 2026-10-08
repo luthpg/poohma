@@ -1,3 +1,4 @@
+import { MAX_TAGS_PER_RECORD } from "@poohma/shared/schemas";
 import { Command as CommandPrimitive } from "cmdk";
 import { X } from "lucide-react";
 import * as React from "react";
@@ -10,7 +11,6 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
-import { MAX_TAGS_PER_RECORD } from "@/utils/schemas";
 
 interface TagInputProps {
   value: string[];

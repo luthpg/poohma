@@ -1,5 +1,5 @@
+import { computeSortKey } from "@poohma/shared/utils/index-group";
 import { v } from "convex/values";
-import { computeSortKey } from "../src/utils/index-group";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { logAuditEvent } from "./auditLogs";

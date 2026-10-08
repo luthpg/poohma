@@ -1,18 +1,18 @@
 import { EventEmitter } from "node:events";
 import type http from "node:http";
 import https from "node:https";
+import { computeSortKey } from "@poohma/shared/utils/index-group";
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import schema from "../convex/schema";
-import { computeSortKey } from "../src/utils/index-group";
 import { mockCryptoMaterials } from "./test-helpers";
 
 const modules = import.meta.glob("../convex/**/*.ts");
 
 // E2EE url-safety のモック
-vi.mock("../src/utils/url-safety", () => {
+vi.mock("@poohma/shared/utils/url-safety", () => {
   return {
     validateUrlSafety: vi.fn().mockResolvedValue("93.184.216.34"),
     isPrivateIp: vi.fn().mockReturnValue(false),

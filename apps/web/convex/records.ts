@@ -1,13 +1,13 @@
-import { paginationOptsValidator } from "convex/server";
-import { v } from "convex/values";
-import { z } from "zod";
-import { computeSortKey } from "../src/utils/index-group";
 import {
   CredentialInputSchema,
   MAX_CREDENTIALS_PER_RECORD,
   MAX_TAGS_PER_RECORD,
   RecordInputSchema,
-} from "../src/utils/schemas";
+} from "@poohma/shared/schemas";
+import { computeSortKey } from "@poohma/shared/utils/index-group";
+import { paginationOptsValidator } from "convex/server";
+import { v } from "convex/values";
+import { z } from "zod";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import {

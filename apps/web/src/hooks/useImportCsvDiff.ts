@@ -1,3 +1,4 @@
+import { MAX_CREDENTIALS_PER_RECORD } from "@poohma/shared/schemas";
 import { useConvex, useMutation } from "convex/react";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
@@ -5,7 +6,6 @@ import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
 import { usePasscode } from "@/components/PasscodeProvider";
 import { processInChunks } from "@/utils/chunk-processor";
-import { MAX_CREDENTIALS_PER_RECORD } from "@/utils/schemas";
 
 export type DiffAction = "CREATE" | "UPDATE" | "SKIP" | "ERROR";
 

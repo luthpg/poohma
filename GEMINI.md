@@ -108,6 +108,7 @@ poohma/                    # ルート（Turborepo）
 │   └── tests/             # ユニット / 結合 / E2E テスト
 ├── workers/backup/        # Cloudflare Workers バックアップ（@poohma/backup）
 ├── packages/              # 共通パッケージ
+│   ├── shared/            # 共通ライブラリ・部品（@poohma/shared）
 │   └── knowledge-tools/   # AI開発基盤・Knowledge運用ツール（@poohma/knowledge-tools）
 ├── .ai/                   # AI Knowledge Base（ドメイン、不変条件、落とし穴）
 └── .agents/skills/        # Antigravity 専門スキル

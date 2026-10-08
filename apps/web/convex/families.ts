@@ -1,8 +1,8 @@
-import { v } from "convex/values";
 import {
   RotatePasscodeInputSchema,
   UpdateFamilyNameSchema,
-} from "../src/utils/schemas";
+} from "@poohma/shared/schemas";
+import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {

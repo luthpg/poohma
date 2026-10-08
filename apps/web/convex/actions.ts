@@ -3,13 +3,13 @@
 import http from "node:http";
 import https from "node:https";
 import { URL } from "node:url";
+import { resolveEmail } from "@poohma/shared/emails";
+import { emailPayload } from "@poohma/shared/emails/registry";
+import { validateUrlSafety } from "@poohma/shared/utils/url-safety";
 import { render } from "@react-email/render";
 import * as cheerio from "cheerio";
 import { v } from "convex/values";
 import { Resend } from "resend";
-import { resolveEmail } from "../src/emails/dispatch";
-import { emailPayload } from "../src/emails/registry";
-import { validateUrlSafety } from "../src/utils/url-safety";
 import { action, internalAction } from "./_generated/server";
 
 async function fetchSafeBuffer(

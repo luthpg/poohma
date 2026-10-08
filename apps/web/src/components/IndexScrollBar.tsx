@@ -1,7 +1,7 @@
+import type { IndexGroupKey } from "@poohma/shared/utils/index-group";
 import { ArrowDown } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import type { IndexGroupKey } from "@/utils/index-group";
 
 interface IndexScrollBarProps {
   availableGroups: IndexGroupKey[];

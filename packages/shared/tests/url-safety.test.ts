@@ -1,6 +1,6 @@
 import dns from "node:dns/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isPrivateIp, validateUrlSafety } from "@/utils/url-safety";
+import { isPrivateIp, validateUrlSafety } from "../src/utils/url-safety";
 
 describe("isPrivateIp", () => {
   // IPv4 プライベートアドレス

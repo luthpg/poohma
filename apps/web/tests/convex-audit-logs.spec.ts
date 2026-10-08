@@ -1,9 +1,9 @@
+import { computeSortKey } from "@poohma/shared/utils/index-group";
 import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
 import { api, internal } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import schema from "../convex/schema";
-import { computeSortKey } from "../src/utils/index-group";
 import {
   createTestFamilyData,
   createTestRecordData,

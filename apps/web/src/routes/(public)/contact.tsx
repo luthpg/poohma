@@ -1,3 +1,4 @@
+import { CONTACT_CATEGORIES } from "@poohma/shared/constants/contacts";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { onAuthStateChanged } from "firebase/auth";
@@ -8,7 +9,6 @@ import { z } from "zod";
 import { api } from "@/../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { CONTACT_CATEGORIES } from "@/constants/contacts";
 import { auth } from "@/utils/firebase";
 
 export const Route = createFileRoute("/(public)/contact")({

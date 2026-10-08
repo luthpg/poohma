@@ -1,3 +1,4 @@
+import { groupRecordsByIndex } from "@poohma/shared/utils/index-group";
 import {
   createFileRoute,
   getRouteApi,
@@ -63,7 +64,6 @@ import {
   getDashboardPrefs,
   setDashboardPrefs,
 } from "@/services/prefs.functions";
-import { groupRecordsByIndex } from "@/utils/index-group";
 
 const searchSchema = z.object({
   q: z.string().optional(),

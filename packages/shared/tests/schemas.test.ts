@@ -4,7 +4,7 @@ import {
   CreateFamilyInputSchema,
   RecordInputSchema,
   RotatePasscodeInputSchema,
-} from "@/utils/schemas";
+} from "../src/schemas/index";
 
 describe("RecordInputSchema", () => {
   it("should validate a valid record with encrypted hint", () => {
