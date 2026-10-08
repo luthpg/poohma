@@ -1519,10 +1519,7 @@ function RecordDetailComponent({
                       className="flex h-9 sm:h-10 min-h-11 items-center justify-center gap-1.5 rounded-md border border-border bg-card hover:bg-accent px-2.5 sm:px-3 text-xs sm:text-[14px] font-medium text-foreground transition cursor-pointer"
                     >
                       <Lock className="h-4 w-4 text-muted-foreground" />
-                      <span>
-                        個人<span className="hidden sm:inline">レコードに</span>
-                        する
-                      </span>
+                      <span>共有解除</span>
                     </button>
                   )}
 

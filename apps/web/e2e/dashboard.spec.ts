@@ -125,4 +125,72 @@ test.describe("認証済みルートのアクセス検証", () => {
     );
     expect(reactChildErrors).toHaveLength(0);
   });
+
+  test("アカウント登録フォーム（/records/new）で、ログインID・パスワードヒント・ラベルが縦配置で正しく描画・操作できること", async ({
+    page,
+  }) => {
+    await page.goto("/records/new");
+    await page.waitForURL(/.*\/records\/new/, { timeout: 20000 });
+    await ensureOnboardingCompleted(page);
+
+    // アンロックプロンプトが表示された場合はパスコードを入力して解除
+    const unlockInput = page.locator('input[placeholder="パスコード"]');
+    try {
+      if (await unlockInput.isVisible({ timeout: 5000 })) {
+        const passcode =
+          process.env.E2E_FAMILY_PASSCODE || "PoohMa#Secure2026!Pass";
+        await unlockInput.fill(passcode);
+        const unlockBtn = page.locator('button:has-text("ロック解除")');
+        if (await unlockBtn.isVisible()) {
+          await unlockBtn.click();
+        } else {
+          await page.keyboard.press("Enter");
+        }
+        await expect(unlockInput).not.toBeVisible({ timeout: 10000 });
+      }
+    } catch {
+      // 既にアンロック済みの場合はスキップ
+    }
+
+    // 1. 主要項目の入力欄が表示されていること
+    const loginIdInput = page.locator("input#login-id-input-0");
+    const hintInput = page.locator("input#pw-hint-input-0");
+    const labelInput = page.locator("input#label-input-0");
+
+    await expect(loginIdInput).toBeVisible({ timeout: 10000 });
+    await expect(hintInput).toBeVisible({ timeout: 10000 });
+    await expect(labelInput).toBeVisible({ timeout: 10000 });
+
+    // 2. パスワードヒント欄に placeholder がなく、説明文が常時表示されていること
+    await expect(hintInput).not.toHaveAttribute("placeholder");
+    const hintDescription = page.locator("#pw-hint-description-0");
+    await expect(hintDescription).toBeVisible();
+    await expect(hintDescription).toContainText(
+      "パスワードを思い出すための手がかりを書いてください",
+    );
+
+    // 3. 入力操作ができること
+    await loginIdInput.fill("test-user@example.com");
+    await hintInput.fill("秘密のヒントメモ");
+    await labelInput.fill("メインアカウント");
+
+    await expect(loginIdInput).toHaveValue("test-user@example.com");
+    await expect(hintInput).toHaveValue("秘密のヒントメモ");
+    await expect(labelInput).toHaveValue("メインアカウント");
+
+    // 4. アカウント追加と削除ができること
+    const addButton = page.locator('button:has-text("+ 追加する")');
+    await addButton.click();
+
+    const secondLoginId = page.locator("input#login-id-input-1");
+    await expect(secondLoginId).toBeVisible({ timeout: 10000 });
+
+    const deleteButton = page
+      .locator('button[aria-label="このアカウント情報を削除"]')
+      .last();
+    await expect(deleteButton).toBeVisible();
+    await deleteButton.click();
+
+    await expect(secondLoginId).not.toBeVisible();
+  });
 });

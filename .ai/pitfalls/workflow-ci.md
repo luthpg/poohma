@@ -124,3 +124,16 @@ PR やブランチ差分を検査するワークフローでは、必ず `fetch-
 ```
 
 また、シェルスクリプト内で `${{ github.base_ref }}` を扱う際は、シェルインジェクションや SC2086 を防止するため、必ず `env:` を経由して `"$GITHUB_BASE_REF"` として安全に参照すること。
+
+---
+
+## 7. CI ステップ実行コマンドとルート package.json スクリプトの一元管理（Single Source of Truth）
+
+### 事象
+
+CI ワークフローファイル（`.github/workflows/ci.yml` 等）内で `pnpm exec convex deploy --dry-run` などの生のコマンドを直接記述していると、ルート `package.json` で定義された管理スクリプトとの間でオプション変更や環境変数対応の乖離が生じるリスクがある。
+
+### 対策
+
+CI 内で実行するコマンド群は、可能な限りルート `package.json` の scripts（例: `convex:deploy:dry-run`）として一元定義し、CI 側からは `pnpm run <script-name>` を呼び出すことで、ローカル開発と CI の挙動の一貫性（Single Source of Truth）を保つ。
+

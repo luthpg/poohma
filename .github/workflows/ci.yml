@@ -128,4 +128,4 @@ jobs:
 
       - name: Convex Deploy Dry Run
         working-directory: apps/web
-        run: pnpm exec convex deploy --dry-run
+        run: pnpm run convex:deploy:dry-run
