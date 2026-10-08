@@ -25,6 +25,7 @@ import { Route as appRecordsIdRouteImport } from './routes/(app)/records/$id'
 import { Route as appRecordsNewRouteImport } from './routes/(app)/records/new'
 import { Route as appSettingsIndexRouteImport } from './routes/(app)/settings/index'
 import { Route as appSettingsBulkRouteImport } from './routes/(app)/settings/bulk'
+import { Route as appSettingsTagsRouteImport } from './routes/(app)/settings/tags'
 import { Route as publicNewsIndexRouteImport } from './routes/(public)/news/index'
 import { Route as publicNewsIdRouteImport } from './routes/(public)/news/$id'
 
@@ -106,6 +107,11 @@ const appSettingsBulkRoute = appSettingsBulkRouteImport.update({
   path: '/settings/bulk',
   getParentRoute: () => appRouteRoute,
 } as any)
+const appSettingsTagsRoute = appSettingsTagsRouteImport.update({
+  id: '/settings/tags',
+  path: '/settings/tags',
+  getParentRoute: () => appRouteRoute,
+} as any)
 const publicNewsIndexRoute = publicNewsIndexRouteImport.update({
   id: '/news/',
   path: '/news/',
@@ -131,6 +137,7 @@ export interface FileRoutesByFullPath {
   '/records/$id': typeof appRecordsIdRoute
   '/records/new': typeof appRecordsNewRoute
   '/settings/bulk': typeof appSettingsBulkRoute
+  '/settings/tags': typeof appSettingsTagsRoute
   '/news/$id': typeof publicNewsIdRoute
   '/settings/': typeof appSettingsIndexRoute
   '/news/': typeof publicNewsIndexRoute
@@ -149,6 +156,7 @@ export interface FileRoutesByTo {
   '/records/$id': typeof appRecordsIdRoute
   '/records/new': typeof appRecordsNewRoute
   '/settings/bulk': typeof appSettingsBulkRoute
+  '/settings/tags': typeof appSettingsTagsRoute
   '/news/$id': typeof publicNewsIdRoute
   '/settings': typeof appSettingsIndexRoute
   '/news': typeof publicNewsIndexRoute
@@ -170,6 +178,7 @@ export interface FileRoutesById {
   '/(app)/records/$id': typeof appRecordsIdRoute
   '/(app)/records/new': typeof appRecordsNewRoute
   '/(app)/settings/bulk': typeof appSettingsBulkRoute
+  '/(app)/settings/tags': typeof appSettingsTagsRoute
   '/(public)/news/$id': typeof publicNewsIdRoute
   '/(app)/settings/': typeof appSettingsIndexRoute
   '/(public)/news/': typeof publicNewsIndexRoute
@@ -190,6 +199,7 @@ export interface FileRouteTypes {
     | '/records/$id'
     | '/records/new'
     | '/settings/bulk'
+    | '/settings/tags'
     | '/news/$id'
     | '/settings/'
     | '/news/'
@@ -208,6 +218,7 @@ export interface FileRouteTypes {
     | '/records/$id'
     | '/records/new'
     | '/settings/bulk'
+    | '/settings/tags'
     | '/news/$id'
     | '/settings'
     | '/news'
@@ -228,6 +239,7 @@ export interface FileRouteTypes {
     | '/(app)/records/$id'
     | '/(app)/records/new'
     | '/(app)/settings/bulk'
+    | '/(app)/settings/tags'
     | '/(public)/news/$id'
     | '/(app)/settings/'
     | '/(public)/news/'
@@ -352,6 +364,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof appSettingsBulkRouteImport
       parentRoute: typeof appRouteRoute
     }
+    '/(app)/settings/tags': {
+      id: '/(app)/settings/tags'
+      path: '/settings/tags'
+      fullPath: '/settings/tags'
+      preLoaderRoute: typeof appSettingsTagsRouteImport
+      parentRoute: typeof appRouteRoute
+    }
     '/(public)/news/': {
       id: '/(public)/news/'
       path: '/news'
@@ -376,6 +395,7 @@ interface appRouteRouteChildren {
   appRecordsIdRoute: typeof appRecordsIdRoute
   appRecordsNewRoute: typeof appRecordsNewRoute
   appSettingsBulkRoute: typeof appSettingsBulkRoute
+  appSettingsTagsRoute: typeof appSettingsTagsRoute
   appSettingsIndexRoute: typeof appSettingsIndexRoute
 }
 
@@ -386,6 +406,7 @@ const appRouteRouteChildren: appRouteRouteChildren = {
   appRecordsIdRoute: appRecordsIdRoute,
   appRecordsNewRoute: appRecordsNewRoute,
   appSettingsBulkRoute: appSettingsBulkRoute,
+  appSettingsTagsRoute: appSettingsTagsRoute,
   appSettingsIndexRoute: appSettingsIndexRoute,
 }
 

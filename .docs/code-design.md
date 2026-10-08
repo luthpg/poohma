@@ -961,7 +961,10 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 | bulkArchiveRecords / bulkUnarchiveRecords | Mutation | familyBound | 選択した複数レコードの一括アーカイブ／一括利用再開（管理者権限のあるレコードのみ適用、非管理者共有レコードは除外アラート、監査ログ記録） |
 | requestUpdate | Mutation | familyBound | needsUpdate等を設定し、オーナーへ通知メールを送信（FR-REC-17） |
 | resolveUpdateRequest | Mutation | familyBound | レコード編集保存時にneedsUpdateを自動解除 |
-| mergeTags | Mutation | familyBound | 指定タグ名を持つ自分の閲覧可能レコード群のtags配列を一括置換（FR-REC-22） |
+| getTagManagementList | Query | familyBound | 閲覧可能な全レコードからタグごとの統計（総数、管理可能件数、閲覧専用件数）を集計・ソートして取得（FR-REC-22, Issue #153） |
+| previewTagOperation | Query | familyBound | タグの変更・統合（N → 1）実行前の影響範囲（更新対象件数、権限なしスキップ件数、重複排除件数）をプレビュー取得（FR-REC-22, Issue #153） |
+| mergeOrRenameTags | Mutation | familyBound | タグの変更・統合（N → 1）を実行。操作者が管理権限（isRecordAdmin）を持つレコードのみ更新し、権限のないレコードはスキップ、Setによる重複排除、監査ログ記録（FR-REC-22, Issue #153） |
+| bulkRemoveTags | Mutation | familyBound | 選択した複数レコードから指定したタグを一括で外す（ダッシュボード用）。管理権限のあるレコードのみ更新、監査ログ記録（FR-REC-22, Issue #153） |
 | getRecordAccessLog | Query | authenticated | 対象レコードのrecordAccessLogをタイムラインとして取得（rls.tsチェック、FR-REC-16） |
 | startEditingSession / heartbeatEditingSession / endEditingSession | Mutation | familyBound | recordEditingSessionsの作成・更新・削除（FR-REC-15、TTL 5分、ハートビート30秒） |
 | getActiveEditors | Query | authenticated | 対象レコードを編集中のユーザー一覧を取得（Convexのリアクティブクエリでクライアントが購読、TTL 5分超過分は自動除外） |

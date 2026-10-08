@@ -455,6 +455,7 @@ function RouteComponent() {
   const bulkArchiveMut = useMutation(api.records.bulkArchiveRecords);
   const bulkUnarchiveMut = useMutation(api.records.bulkUnarchiveRecords);
   const bulkUpdateRecordsMut = useMutation(api.records.bulkUpdateRecords);
+  const bulkRemoveTagsMut = useMutation(api.records.bulkRemoveTags);
   const bulkShareMut = useMutation(api.records.bulkShareRecords);
   const bulkUnshareMut = useMutation(api.records.bulkUnshareRecords);
 
@@ -515,10 +516,13 @@ function RouteComponent() {
     }
   };
 
-  const handleBulkTagAdd = async () => {
-    if (selectedIds.length === 0) return;
+  const handleBulkTagAdd = async (tagsToAdd: string[]) => {
+    const targetIds = manageableRecords.map(
+      (r) => r._id as Id<"serviceRecords">,
+    );
+    if (targetIds.length === 0) return;
 
-    if (bulkTagInput.length === 0) {
+    if (tagsToAdd.length === 0) {
       toast.error("タグを入力してください");
       return;
     }
@@ -526,16 +530,42 @@ function RouteComponent() {
     try {
       await bulkUpdateRecordsMut({
         accountId: activeAccountId || undefined,
-        ids: selectedIds as Id<"serviceRecords">[],
-        data: { tags: bulkTagInput },
+        ids: targetIds,
+        data: { tags: tagsToAdd },
       });
-      toast.success(`${selectedIds.length} 件のレコードにタグを追加しました`);
+      toast.success(`${targetIds.length} 件のレコードにタグを追加しました`);
       setBulkTagInput([]);
       setSelectedIds([]);
       setIsSelectMode(false);
       setActiveModal(null);
     } catch (_err) {
       toast.error("タグの追加に失敗しました");
+    }
+  };
+
+  const handleBulkTagRemove = async (tagsToRemove: string[]) => {
+    const targetIds = manageableRecords.map(
+      (r) => r._id as Id<"serviceRecords">,
+    );
+    if (targetIds.length === 0) return;
+
+    if (tagsToRemove.length === 0) {
+      toast.error("外すタグを選択してください");
+      return;
+    }
+
+    try {
+      const result = await bulkRemoveTagsMut({
+        accountId: activeAccountId || undefined,
+        recordIds: targetIds,
+        tagsToRemove,
+      });
+      toast.success(`${result.updatedCount} 件のレコードからタグを外しました`);
+      setSelectedIds([]);
+      setIsSelectMode(false);
+      setActiveModal(null);
+    } catch (_err) {
+      toast.error("タグを外す処理に失敗しました");
     }
   };
 
@@ -803,12 +833,14 @@ function RouteComponent() {
         </div>
       )}
 
-      {/* タグ追加モーダル */}
+      {/* タグ一括操作モーダル */}
       {activeModal === "tag" && (
         <BulkTagModal
           bulkTagInput={bulkTagInput}
           setBulkTagInput={setBulkTagInput}
-          onSubmit={handleBulkTagAdd}
+          manageableRecords={manageableRecords}
+          onSubmitAdd={() => handleBulkTagAdd(bulkTagInput)}
+          onSubmitRemove={handleBulkTagRemove}
           onCancel={() => {
             setActiveModal(null);
             setBulkTagInput([]);
@@ -1069,57 +1101,170 @@ function RecordListBannerSection({
   );
 }
 
-// 一括タグ追加モーダルコンポーネント
+// 一括タグ操作モーダルコンポーネント (追加 / 外す)
 function BulkTagModal({
   bulkTagInput,
   setBulkTagInput,
-  onSubmit,
+  manageableRecords,
+  onSubmitAdd,
+  onSubmitRemove,
   onCancel,
 }: {
   bulkTagInput: string[];
   setBulkTagInput: (tags: string[]) => void;
-  onSubmit: () => void;
+  manageableRecords: Array<{ tags: string[] }>;
+  onSubmitAdd: () => void;
+  onSubmitRemove: (tags: string[]) => void;
   onCancel: () => void;
 }) {
   const { activeAccountId } = useAccount();
+  const [activeTab, setActiveTab] = useState<"add" | "remove">("add");
+  const [selectedTagsToRemove, setSelectedTagsToRemove] = useState<string[]>(
+    [],
+  );
+
   const availableTags =
     usePersistentQuery<string[]>(api.records.getAvailableTags, {
       accountId: activeAccountId || undefined,
     }) || [];
 
+  // 選択中レコードに付与されているタグの一覧（使用件数付き）
+  const existingTagCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const record of manageableRecords) {
+      for (const tag of record.tags) {
+        counts.set(tag, (counts.get(tag) || 0) + 1);
+      }
+    }
+    return Array.from(counts.entries())
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => a.tag.localeCompare(b.tag, "ja"));
+  }, [manageableRecords]);
+
+  const toggleTagToRemove = (tag: string) => {
+    setSelectedTagsToRemove((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
       <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-lg animate-in fade-in duration-200">
-        <h3 className="text-lg font-semibold mb-2">
-          選択したレコードにタグを追加
-        </h3>
-        <p className="text-sm text-muted-foreground mb-4">
-          追加したいタグを入力してください。既存のタグにマージされます。
-        </p>
-        <div className="mb-6">
-          <TagInput
-            value={bulkTagInput}
-            onChange={setBulkTagInput}
-            availableTags={availableTags}
-            placeholder="タグを入力 (Enterで確定)..."
-          />
-        </div>
-        <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3">
+        <div className="flex border-b border-border mb-4">
           <button
             type="button"
-            onClick={onCancel}
-            className="w-full sm:w-auto rounded-md border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-accent transition cursor-pointer text-center"
-          >
-            キャンセル
-          </button>
-          <button
-            type="button"
-            onClick={onSubmit}
-            className="w-full sm:w-auto rounded-md bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition cursor-pointer text-center"
+            onClick={() => setActiveTab("add")}
+            className={`pb-2 px-4 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+              activeTab === "add"
+                ? "border-orange-500 text-orange-500"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
           >
             追加
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("remove")}
+            className={`pb-2 px-4 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+              activeTab === "remove"
+                ? "border-orange-500 text-orange-500"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            外す
+          </button>
         </div>
+
+        {activeTab === "add" ? (
+          <>
+            <h3 className="text-lg font-semibold mb-2">
+              選択したレコードにタグを追加
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              追加したいタグを入力してください。既存のタグにマージされます。
+            </p>
+            <div className="mb-6">
+              <TagInput
+                value={bulkTagInput}
+                onChange={setBulkTagInput}
+                availableTags={availableTags}
+                placeholder="タグを入力 (Enterで確定)..."
+              />
+            </div>
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="w-full sm:w-auto rounded-md border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-accent transition cursor-pointer text-center"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={onSubmitAdd}
+                className="w-full sm:w-auto rounded-md bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition cursor-pointer text-center"
+              >
+                追加
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <h3 className="text-lg font-semibold mb-2">
+              選択したレコードからタグを外す
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              選択したレコードから、タグを外します。外されたタグが他のレコードで使用されていない場合は削除となります。
+            </p>
+            <div className="mb-6 min-h-[60px]">
+              {existingTagCounts.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">
+                  選択したレコードにタグは設定されていません
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1">
+                  {existingTagCounts.map(({ tag, count }) => {
+                    const isSelected = selectedTagsToRemove.includes(tag);
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => toggleTagToRemove(tag)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition cursor-pointer border ${
+                          isSelected
+                            ? "bg-destructive/15 text-destructive border-destructive/40 font-semibold"
+                            : "bg-secondary text-secondary-foreground border-border hover:bg-secondary/80"
+                        }`}
+                      >
+                        <span>{tag}</span>
+                        <span className="text-[10px] opacity-70">
+                          ({count})
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="w-full sm:w-auto rounded-md border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-accent transition cursor-pointer text-center"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={() => onSubmitRemove(selectedTagsToRemove)}
+                disabled={selectedTagsToRemove.length === 0}
+                className="w-full sm:w-auto rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 transition cursor-pointer text-center disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                選択したタグを外す
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

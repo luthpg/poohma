@@ -2913,4 +2913,358 @@ describe("レコードのアーカイブ・復元機能テスト (Issue #154)", 
         .length,
     ).toBe(2);
   });
+
+  describe("タグ管理・一括操作機能 (Issue #153)", () => {
+    it("getTagManagementList: 権限に応じた管理可能/閲覧専用件数が集計され、タグ名順で取得できること", async () => {
+      const t = convexTest(schema, modules);
+      let familyId!: Id<"families">;
+      let adminAccountId!: Id<"users">;
+      let viewerAccountId!: Id<"users">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          name: "Tag Test Family",
+          masterKeyEncrypted: "enc",
+          masterKeyIv: "iv",
+          masterKeySalt: "salt",
+          kdfIterations: 1000,
+          cryptoVersion: 1,
+          updatedAt: Date.now(),
+        });
+
+        adminAccountId = await ctx.db.insert("users", {
+          userId: "admin_user",
+          email: "admin@example.com",
+          familyId,
+          familyRole: "admin",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+
+        viewerAccountId = await ctx.db.insert("users", {
+          userId: "viewer_user",
+          email: "viewer@example.com",
+          familyId,
+          familyRole: "viewer",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+
+        // 共有レコード1 (viewerがadminに入っていない -> viewerにとっては閲覧専用)
+        await ctx.db.insert("serviceRecords", {
+          title: "共有レコード1",
+          userId: "admin_user",
+          accountId: adminAccountId,
+          familyId,
+          sortKey: "A001",
+          ownerType: "family",
+          ownerFamilyId: familyId,
+          admins: [adminAccountId],
+          updatedByAccountId: adminAccountId,
+          tags: ["仕事", "重要"],
+          stableId: crypto.randomUUID(),
+          revision: 0,
+          isArchived: false,
+          updatedAt: Date.now(),
+        });
+
+        // 共有レコード2 (viewerがadminsに入っている -> viewerにとっても管理可能)
+        await ctx.db.insert("serviceRecords", {
+          title: "共有レコード2",
+          userId: "viewer_user",
+          accountId: viewerAccountId,
+          familyId,
+          sortKey: "A002",
+          ownerType: "family",
+          ownerFamilyId: familyId,
+          admins: [adminAccountId, viewerAccountId],
+          updatedByAccountId: viewerAccountId,
+          tags: ["仕事", "趣味"],
+          stableId: crypto.randomUUID(),
+          revision: 0,
+          isArchived: false,
+          updatedAt: Date.now(),
+        });
+      });
+
+      const adminClient = t.withIdentity({
+        subject: "admin_user",
+        email: "admin@example.com",
+      });
+      const viewerClient = t.withIdentity({
+        subject: "viewer_user",
+        email: "viewer@example.com",
+      });
+
+      // 管理者から見た集計（管理者は全共有レコードの管理者）
+      const adminTags = await adminClient.query(
+        api.records.getTagManagementList,
+        {},
+      );
+      expect(adminTags).toEqual([
+        {
+          tag: "仕事",
+          totalRecordCount: 2,
+          manageableRecordCount: 2,
+          readonlyRecordCount: 0,
+        },
+        {
+          tag: "趣味",
+          totalRecordCount: 1,
+          manageableRecordCount: 1,
+          readonlyRecordCount: 0,
+        },
+        {
+          tag: "重要",
+          totalRecordCount: 1,
+          manageableRecordCount: 1,
+          readonlyRecordCount: 0,
+        },
+      ]);
+
+      // 閲覧者から見た集計（共有レコード1は個別管理者に含まれないため閲覧専用）
+      const viewerTags = await viewerClient.query(
+        api.records.getTagManagementList,
+        {},
+      );
+      expect(viewerTags).toEqual([
+        {
+          tag: "仕事",
+          totalRecordCount: 2,
+          manageableRecordCount: 1,
+          readonlyRecordCount: 1,
+        },
+        {
+          tag: "趣味",
+          totalRecordCount: 1,
+          manageableRecordCount: 1,
+          readonlyRecordCount: 0,
+        },
+        {
+          tag: "重要",
+          totalRecordCount: 1,
+          manageableRecordCount: 0,
+          readonlyRecordCount: 1,
+        },
+      ]);
+    });
+
+    it("previewTagOperation & mergeOrRenameTags: タグの統合・リネームと権限別スキップ、重複排除が正しく動作すること", async () => {
+      const t = convexTest(schema, modules);
+      let familyId!: Id<"families">;
+      let adminAccountId!: Id<"users">;
+      let viewerAccountId!: Id<"users">;
+      let r1Id!: Id<"serviceRecords">;
+      let r2Id!: Id<"serviceRecords">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          name: "Tag Test Family 2",
+          masterKeyEncrypted: "enc",
+          masterKeyIv: "iv",
+          masterKeySalt: "salt",
+          kdfIterations: 1000,
+          cryptoVersion: 1,
+          updatedAt: Date.now(),
+        });
+
+        adminAccountId = await ctx.db.insert("users", {
+          userId: "admin_user_2",
+          email: "admin2@example.com",
+          familyId,
+          familyRole: "admin",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+
+        viewerAccountId = await ctx.db.insert("users", {
+          userId: "viewer_user_2",
+          email: "viewer2@example.com",
+          familyId,
+          familyRole: "viewer",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+
+        // r1: 管理者のみ管理可能。タグ: ["保険", "ほけん", "メイン"]
+        r1Id = await ctx.db.insert("serviceRecords", {
+          title: "保険レコードA",
+          userId: "admin_user_2",
+          accountId: adminAccountId,
+          familyId,
+          sortKey: "B001",
+          ownerType: "family",
+          ownerFamilyId: familyId,
+          admins: [adminAccountId],
+          updatedByAccountId: adminAccountId,
+          tags: ["保険", "ほけん", "メイン"],
+          stableId: crypto.randomUUID(),
+          revision: 0,
+          isArchived: false,
+          updatedAt: Date.now(),
+        });
+
+        // r2: viewerも管理可能。タグ: ["ほけん", "サブ"]
+        r2Id = await ctx.db.insert("serviceRecords", {
+          title: "保険レコードB",
+          userId: "viewer_user_2",
+          accountId: viewerAccountId,
+          familyId,
+          sortKey: "B002",
+          ownerType: "family",
+          ownerFamilyId: familyId,
+          admins: [adminAccountId, viewerAccountId],
+          updatedByAccountId: viewerAccountId,
+          tags: ["ほけん", "サブ"],
+          stableId: crypto.randomUUID(),
+          revision: 0,
+          isArchived: false,
+          updatedAt: Date.now(),
+        });
+      });
+
+      const viewerClient = t.withIdentity({
+        subject: "viewer_user_2",
+        email: "viewer2@example.com",
+      });
+
+      // viewer からプレビュー: ["保険", "ほけん"] を "生命保険" に統合する場合
+      const preview = await viewerClient.query(
+        api.records.previewTagOperation,
+        {
+          sourceTags: ["保険", "ほけん"],
+          targetTag: "生命保険",
+        },
+      );
+      expect(preview.totalAffectedCount).toBe(2);
+      expect(preview.manageableCount).toBe(1); // r2 のみ
+      expect(preview.readonlyCount).toBe(1); // r1 はスキップ対象
+      expect(preview.alreadyHasTargetCount).toBe(0);
+
+      // viewer が統合を実行
+      const mergeRes = await viewerClient.mutation(
+        api.records.mergeOrRenameTags,
+        {
+          sourceTags: ["保険", "ほけん"],
+          targetTag: "生命保険",
+        },
+      );
+      expect(mergeRes.updatedCount).toBe(1);
+      expect(mergeRes.skippedCount).toBe(1);
+
+      // r1 (admin専用) は変更されずそのまま
+      await t.run(async (ctx) => {
+        const r1 = await ctx.db.get(r1Id);
+        expect(r1?.tags).toEqual(["保険", "ほけん", "メイン"]);
+
+        // r2 は "ほけん" が "生命保険" に変わり、"サブ" は維持
+        const r2 = await ctx.db.get(r2Id);
+        expect(r2?.tags).toEqual(["サブ", "生命保険"]);
+      });
+
+      // admin から残りの r1 に対して統合を実行
+      const adminClient = t.withIdentity({
+        subject: "admin_user_2",
+        email: "admin2@example.com",
+      });
+      const adminMergeRes = await adminClient.mutation(
+        api.records.mergeOrRenameTags,
+        {
+          sourceTags: ["保険", "ほけん"],
+          targetTag: "生命保険",
+        },
+      );
+      expect(adminMergeRes.updatedCount).toBe(1); // r1 が更新される
+      expect(adminMergeRes.skippedCount).toBe(0);
+
+      await t.run(async (ctx) => {
+        const r1 = await ctx.db.get(r1Id);
+        // "保険", "ほけん" の2つが "生命保険" 1つに重複排除されて統合
+        expect(r1?.tags).toEqual(["メイン", "生命保険"]);
+      });
+    });
+
+    it("bulkRemoveTags: 選択したレコード群から指定タグを一括で外せること", async () => {
+      const t = convexTest(schema, modules);
+      let familyId!: Id<"families">;
+      let adminAccountId!: Id<"users">;
+      let r1Id!: Id<"serviceRecords">;
+      let r2Id!: Id<"serviceRecords">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          name: "Tag Test Family 3",
+          masterKeyEncrypted: "enc",
+          masterKeyIv: "iv",
+          masterKeySalt: "salt",
+          kdfIterations: 1000,
+          cryptoVersion: 1,
+          updatedAt: Date.now(),
+        });
+
+        adminAccountId = await ctx.db.insert("users", {
+          userId: "admin_user_3",
+          email: "admin3@example.com",
+          familyId,
+          familyRole: "admin",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+
+        r1Id = await ctx.db.insert("serviceRecords", {
+          title: "レコード1",
+          userId: "admin_user_3",
+          accountId: adminAccountId,
+          familyId,
+          sortKey: "C001",
+          ownerType: "family",
+          ownerFamilyId: familyId,
+          admins: [adminAccountId],
+          updatedByAccountId: adminAccountId,
+          tags: ["不要タグ", "重要", "仕事"],
+          stableId: crypto.randomUUID(),
+          revision: 0,
+          isArchived: false,
+          updatedAt: Date.now(),
+        });
+
+        r2Id = await ctx.db.insert("serviceRecords", {
+          title: "レコード2",
+          userId: "admin_user_3",
+          accountId: adminAccountId,
+          familyId,
+          sortKey: "C002",
+          ownerType: "family",
+          ownerFamilyId: familyId,
+          admins: [adminAccountId],
+          updatedByAccountId: adminAccountId,
+          tags: ["不要タグ", "プライベート"],
+          stableId: crypto.randomUUID(),
+          revision: 0,
+          isArchived: false,
+          updatedAt: Date.now(),
+        });
+      });
+
+      const adminClient = t.withIdentity({
+        subject: "admin_user_3",
+        email: "admin3@example.com",
+      });
+
+      const removeRes = await adminClient.mutation(api.records.bulkRemoveTags, {
+        recordIds: [r1Id, r2Id],
+        tagsToRemove: ["不要タグ"],
+      });
+      expect(removeRes.updatedCount).toBe(2);
+      expect(removeRes.skippedCount).toBe(0);
+
+      await t.run(async (ctx) => {
+        const r1 = await ctx.db.get(r1Id);
+        expect(r1?.tags).toEqual(["重要", "仕事"]);
+
+        const r2 = await ctx.db.get(r2Id);
+        expect(r2?.tags).toEqual(["プライベート"]);
+      });
+    });
+  });
 });
