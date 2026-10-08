@@ -779,7 +779,7 @@ function RouteComponent() {
                   className="rounded-md bg-secondary hover:bg-accent px-3 py-2 h-9 text-[13px] font-medium text-foreground flex items-center gap-1.5 transition shrink-0 cursor-pointer"
                 >
                   <Tag className="h-4 w-4 text-orange-500" />
-                  タグ追加
+                  タグ操作
                 </button>
                 <button
                   type="button"

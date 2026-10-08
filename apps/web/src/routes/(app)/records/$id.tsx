@@ -1506,10 +1506,8 @@ function RecordDetailComponent({
                       aria-label="レコードを家族と共有する"
                       className="flex h-9 sm:h-10 min-h-11 items-center justify-center gap-1.5 rounded-md border border-orange-500/30 bg-orange-500/10 hover:bg-orange-500/20 px-2.5 sm:px-3 text-xs sm:text-[14px] font-medium text-orange-600 dark:text-orange-400 transition cursor-pointer"
                     >
-                      <Share2 className="h-4 w-4" />
-                      <span>
-                        <span className="hidden sm:inline">家族と</span>共有
-                      </span>
+                      <Users className="h-4 w-4" />
+                      <span>家族共有</span>
                     </button>
                   )}
                   {isShared && isAdmin && (

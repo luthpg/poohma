@@ -30,6 +30,18 @@ interface TagStat {
   readonlyRecordCount: number;
 }
 
+interface PreviewResult {
+  totalAffectedCount: number;
+  manageableCount: number;
+  readonlyCount: number;
+  alreadyHasTargetCount: number;
+  sampleRecords: Array<{
+    id: Id<"serviceRecords">;
+    title: string;
+    canEdit: boolean;
+  }>;
+}
+
 function TagManagementPage() {
   const { activeAccountId } = useAccount();
   const [searchQuery, setSearchQuery] = useState("");
@@ -85,23 +97,31 @@ function TagManagementPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-16">
-      <SubHeader fallbackTo="/settings">
-        <h1 className="text-lg font-bold text-foreground">タグ管理</h1>
-      </SubHeader>
+    <div className="min-h-screen bg-background pb-24 overflow-x-hidden">
+      <div className="container mx-auto max-w-4xl px-4 py-4 sm:py-6 space-y-5">
+        {/* 共通スマート子ヘッダー */}
+        <SubHeader
+          className="sm:-mx-4 sm:px-4"
+          backLabel="設定へ戻る"
+          fallbackTo="/settings"
+        >
+          <span className="text-muted-foreground text-xs sm:text-sm">/</span>
+          <span className="text-foreground font-medium text-xs sm:text-sm">
+            タグ管理
+          </span>
+        </SubHeader>
 
-      <main className="mx-auto max-w-4xl px-4 pt-6">
-        {/* 説明カード */}
-        <div className="rounded-lg bg-card p-5 shadow-card border border-border/50 mb-6">
+        {/* ページヘッダー & 説明 */}
+        <div className="rounded-xl bg-card p-4 sm:p-5 shadow-card border border-border/60">
           <div className="flex items-start gap-3">
-            <div className="p-2 rounded-md bg-orange-500/10 text-orange-500 shrink-0 mt-0.5">
+            <div className="p-2 rounded-lg bg-orange-500/10 text-orange-500 shrink-0 mt-0.5">
               <Tag className="h-5 w-5" />
             </div>
-            <div className="space-y-1">
-              <h2 className="text-base font-semibold text-foreground">
+            <div className="space-y-1 min-w-0">
+              <h1 className="text-base sm:text-lg font-bold text-foreground tracking-tight">
                 タグの表記揺れ解消・統合
-              </h2>
-              <p className="text-xs text-muted-foreground leading-relaxed">
+              </h1>
+              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
                 登録されているタグの一覧です。表記揺れのあるタグの名称変更（リネーム）や、複数のタグを選んで1つにまとめる統合が行えます。
                 操作前に影響を受けるレコード件数を確認できます。
               </p>
@@ -110,15 +130,15 @@ function TagManagementPage() {
         </div>
 
         {/* 検索・フィルターバー */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-4">
-          <div className="relative flex-1">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="relative flex-1 min-w-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="タグを検索..."
-              className="w-full rounded-md bg-card border border-border pl-9 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+              className="w-full rounded-lg bg-card border border-border pl-9 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50"
             />
             {searchQuery && (
               <button
@@ -131,13 +151,27 @@ function TagManagementPage() {
             )}
           </div>
 
-          <div className="text-xs text-muted-foreground shrink-0 text-right sm:text-left">
-            全 {tagStats.length} 件中 {filteredTags.length} 件表示
+          <div className="flex items-center justify-between sm:justify-end gap-3 text-xs text-muted-foreground shrink-0">
+            {filteredTags.length > 0 && (
+              <label className="flex items-center gap-1.5 cursor-pointer sm:hidden select-none">
+                <input
+                  type="checkbox"
+                  checked={isAllSelected}
+                  onChange={handleToggleSelectAll}
+                  aria-label="すべてのタグを選択"
+                  className="rounded border-border text-orange-500 focus:ring-orange-500"
+                />
+                <span>全選択</span>
+              </label>
+            )}
+            <span>
+              全 {tagStats.length} 件中 {filteredTags.length} 件
+            </span>
           </div>
         </div>
 
-        {/* タグ一覧テーブル */}
-        <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
+        {/* タグ一覧コンテナ */}
+        <div className="rounded-xl border border-border bg-card shadow-card overflow-hidden">
           {filteredTags.length === 0 ? (
             <div className="py-12 text-center text-sm text-muted-foreground">
               {tagStats.length === 0
@@ -145,139 +179,186 @@ function TagManagementPage() {
                 : "一致するタグが見つかりません"}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-muted/40 border-b border-border text-xs text-muted-foreground">
-                  <tr>
-                    <th className="py-3 px-4 w-10">
-                      <input
-                        type="checkbox"
-                        checked={isAllSelected}
-                        onChange={handleToggleSelectAll}
-                        aria-label="すべてのタグを選択"
-                        className="rounded border-border text-orange-500 focus:ring-orange-500 cursor-pointer"
-                      />
-                    </th>
-                    <th className="py-3 px-4 font-medium">タグ名</th>
-                    <th className="py-3 px-4 font-medium">使用件数</th>
-                    <th className="py-3 px-4 font-medium text-right">操作</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/60">
-                  {filteredTags.map((item) => {
-                    const isSelected = selectedTags.includes(item.tag);
-                    return (
-                      <tr
-                        key={item.tag}
-                        className={`transition-colors hover:bg-muted/30 ${
-                          isSelected ? "bg-orange-500/5" : ""
-                        }`}
-                      >
-                        <td className="py-3 px-4">
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => handleToggleSelectTag(item.tag)}
-                            aria-label={`${item.tag} を選択`}
-                            className="rounded border-border text-orange-500 focus:ring-orange-500 cursor-pointer"
-                          />
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-secondary text-secondary-foreground text-xs font-medium border border-border/80">
-                            <Tag className="h-3 w-3 opacity-60" />
-                            <span>{item.tag}</span>
+            <>
+              {/* モバイルビュー: カード型リスト（横圧縮を完全防止） */}
+              <div className="divide-y divide-border/60 sm:hidden">
+                {filteredTags.map((item) => {
+                  const isSelected = selectedTags.includes(item.tag);
+                  return (
+                    <div
+                      key={item.tag}
+                      className={`p-3.5 flex items-center justify-between gap-3 transition-colors ${
+                        isSelected ? "bg-orange-500/5" : ""
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleToggleSelectTag(item.tag)}
+                          aria-label={`${item.tag} を選択`}
+                          className="h-4 w-4 rounded border-border text-orange-500 focus:ring-orange-500 cursor-pointer shrink-0"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-secondary text-secondary-foreground text-xs font-medium border border-border/80 max-w-full">
+                            <Tag className="h-3 w-3 opacity-60 shrink-0" />
+                            <span className="truncate">{item.tag}</span>
                           </div>
-                        </td>
-                        <td className="py-3 px-4 text-xs">
-                          <span className="font-semibold text-foreground">
-                            {item.totalRecordCount}
-                          </span>
-                          <span className="text-muted-foreground ml-1">件</span>
-                          {item.readonlyRecordCount > 0 && (
-                            <span className="text-[11px] text-muted-foreground ml-2">
-                              (変更可能: {item.manageableRecordCount} /
-                              閲覧専用: {item.readonlyRecordCount})
+                          <div className="text-[11px] text-muted-foreground mt-1 flex flex-wrap items-center gap-1">
+                            <span className="font-semibold text-foreground">
+                              {item.totalRecordCount} 件
                             </span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenSingleRename(item.tag)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-orange-600 hover:text-orange-700 hover:bg-orange-500/10 transition cursor-pointer"
-                          >
-                            <Edit3 className="h-3.5 w-3.5" />
-                            変更
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                            {item.readonlyRecordCount > 0 && (
+                              <span className="opacity-80">
+                                (可能: {item.manageableRecordCount} / 閲覧:{" "}
+                                {item.readonlyRecordCount})
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleOpenSingleRename(item.tag)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-orange-600 hover:text-orange-700 hover:bg-orange-500/10 transition cursor-pointer shrink-0"
+                      >
+                        <Edit3 className="h-3.5 w-3.5" />
+                        <span>変更</span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* デスクトップビュー: テーブル表示 */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-muted/40 border-b border-border text-xs text-muted-foreground">
+                    <tr>
+                      <th className="py-3 px-4 w-10">
+                        <input
+                          type="checkbox"
+                          checked={isAllSelected}
+                          onChange={handleToggleSelectAll}
+                          aria-label="すべてのタグを選択"
+                          className="rounded border-border text-orange-500 focus:ring-orange-500 cursor-pointer"
+                        />
+                      </th>
+                      <th className="py-3 px-4 font-medium">タグ名</th>
+                      <th className="py-3 px-4 font-medium">使用件数</th>
+                      <th className="py-3 px-4 font-medium text-right">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60">
+                    {filteredTags.map((item) => {
+                      const isSelected = selectedTags.includes(item.tag);
+                      return (
+                        <tr
+                          key={item.tag}
+                          className={`transition-colors hover:bg-muted/30 ${
+                            isSelected ? "bg-orange-500/5" : ""
+                          }`}
+                        >
+                          <td className="py-3 px-4">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => handleToggleSelectTag(item.tag)}
+                              aria-label={`${item.tag} を選択`}
+                              className="rounded border-border text-orange-500 focus:ring-orange-500 cursor-pointer"
+                            />
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-secondary text-secondary-foreground text-xs font-medium border border-border/80 max-w-xs">
+                              <Tag className="h-3 w-3 opacity-60 shrink-0" />
+                              <span className="truncate">{item.tag}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-xs">
+                            <span className="font-semibold text-foreground">
+                              {item.totalRecordCount}
+                            </span>
+                            <span className="text-muted-foreground ml-1">
+                              件
+                            </span>
+                            {item.readonlyRecordCount > 0 && (
+                              <span className="text-[11px] text-muted-foreground ml-2">
+                                (変更可能: {item.manageableRecordCount} /
+                                閲覧専用: {item.readonlyRecordCount})
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenSingleRename(item.tag)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-orange-600 hover:text-orange-700 hover:bg-orange-500/10 transition cursor-pointer"
+                            >
+                              <Edit3 className="h-3.5 w-3.5" />
+                              変更
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
+      </div>
 
-        {/* 選択時の一括操作バー */}
-        {selectedTags.length > 0 && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-card/95 border border-border shadow-xl backdrop-blur-md rounded-full px-5 py-2.5 animate-in slide-in-from-bottom-4 duration-200">
-            <span className="text-xs font-medium text-foreground">
-              <span className="font-bold text-orange-500">
-                {selectedTags.length}
-              </span>{" "}
-              件のタグを選択中
-            </span>
-            <div className="h-3.5 w-[1px] bg-border" />
+      {/* 選択時の一括操作バー（モバイルでも横圧縮されない最適化レイアウト） */}
+      {selectedTags.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-lg bg-card/95 border border-border shadow-xl backdrop-blur-md rounded-xl p-3 sm:px-5 sm:py-3 flex items-center justify-between gap-2.5 sm:gap-4 animate-in slide-in-from-bottom-4 duration-200">
+          <div className="text-xs sm:text-sm font-semibold text-foreground shrink-0">
+            <span className="text-orange-500 font-bold">
+              {selectedTags.length}
+            </span>{" "}
+            件選択中
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={handleOpenBulkMerge}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium shadow-sm transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs sm:text-sm font-medium shadow-sm transition cursor-pointer"
             >
               <Layers className="h-3.5 w-3.5" />
-              {selectedTags.length === 1 ? "タグを変更" : "選択したタグを統合"}
+              <span>
+                {selectedTags.length === 1 ? "タグを変更" : "選択タグを統合"}
+              </span>
             </button>
             <button
               type="button"
               onClick={() => setSelectedTags([])}
-              className="text-xs text-muted-foreground hover:text-foreground cursor-pointer px-1.5 py-1"
+              className="text-xs text-muted-foreground hover:text-foreground cursor-pointer px-2 py-1.5"
             >
-              選択解除
+              解除
             </button>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* タグ変更・統合モーダル */}
-        {isModalOpen && (
-          <TagMergeModal
-            sourceTags={modalSourceTags}
-            allAvailableTags={tagStats.map((t) => t.tag)}
-            onClose={() => {
-              setIsModalOpen(false);
-              setModalSourceTags([]);
-            }}
-            onSuccess={() => {
-              setIsModalOpen(false);
-              setModalSourceTags([]);
-              setSelectedTags([]);
-            }}
-          />
-        )}
-      </main>
+      {/* タグ変更・統合モーダル */}
+      {isModalOpen && (
+        <TagMergeModal
+          sourceTags={modalSourceTags}
+          allAvailableTags={tagStats.map((t) => t.tag)}
+          onClose={() => {
+            setIsModalOpen(false);
+            setModalSourceTags([]);
+          }}
+          onSuccess={() => {
+            setIsModalOpen(false);
+            setModalSourceTags([]);
+            setSelectedTags([]);
+          }}
+        />
+      )}
     </div>
   );
-}
-
-interface PreviewResult {
-  totalAffectedCount: number;
-  manageableCount: number;
-  readonlyCount: number;
-  alreadyHasTargetCount: number;
-  sampleRecords: Array<{
-    id: Id<"serviceRecords">;
-    title: string;
-    canEdit: boolean;
-  }>;
 }
 
 // === タグ変更・統合 統一モーダル (N → 1) ===
@@ -364,10 +445,10 @@ function TagMergeModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg rounded-lg border border-border bg-card p-6 shadow-xl animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto">
+      <div className="w-full max-w-lg rounded-xl border border-border bg-card p-4 sm:p-6 shadow-xl animate-in fade-in duration-200 my-auto max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between pb-3 border-b border-border">
-          <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+          <h3 className="text-base sm:text-lg font-semibold text-foreground flex items-center gap-2">
             {isSingle ? (
               <>
                 <Edit3 className="h-5 w-5 text-orange-500" />
@@ -383,7 +464,7 @@ function TagMergeModal({
           <button
             type="button"
             onClick={onClose}
-            className="text-muted-foreground hover:text-foreground cursor-pointer"
+            className="text-muted-foreground hover:text-foreground cursor-pointer p-1"
           >
             <X className="h-4 w-4" />
           </button>
@@ -400,18 +481,18 @@ function TagMergeModal({
                 変更元のタグが選択されていません
               </p>
             ) : (
-              <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-2 rounded-md bg-muted/30 border border-border">
+              <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto p-2 rounded-lg bg-muted/30 border border-border">
                 {sourceTags.map((tag) => (
                   <span
                     key={tag}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-secondary text-secondary-foreground text-xs font-medium border border-border"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-secondary text-secondary-foreground text-xs font-medium border border-border max-w-full"
                   >
-                    <span>{tag}</span>
+                    <span className="truncate">{tag}</span>
                     {sourceTags.length > 1 && (
                       <button
                         type="button"
                         onClick={() => handleRemoveSourceTag(tag)}
-                        className="text-muted-foreground hover:text-destructive cursor-pointer ml-0.5"
+                        className="text-muted-foreground hover:text-destructive cursor-pointer ml-0.5 shrink-0"
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -423,7 +504,7 @@ function TagMergeModal({
           </div>
 
           {/* 矢印アイコン */}
-          <div className="flex justify-center my-1 text-muted-foreground">
+          <div className="flex justify-center my-0.5 text-muted-foreground">
             <ArrowRight className="h-4 w-4 rotate-90 sm:rotate-0" />
           </div>
 
@@ -442,7 +523,7 @@ function TagMergeModal({
               onChange={(e) => setTargetTag(e.target.value)}
               placeholder="新しいタグ名を入力..."
               maxLength={50}
-              className="w-full rounded-md bg-card border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+              className="w-full rounded-lg bg-card border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50"
             />
             {/* 既存タグからの候補 */}
             <div className="mt-2 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
@@ -466,7 +547,7 @@ function TagMergeModal({
           </div>
 
           {/* 影響プレビュー */}
-          <div className="rounded-md bg-muted/40 p-3.5 border border-border/80 text-xs space-y-2">
+          <div className="rounded-lg bg-muted/40 p-3 sm:p-3.5 border border-border/80 text-xs space-y-2">
             <div className="font-medium text-foreground flex items-center justify-between">
               <span>影響レコードの確認:</span>
               <span className="font-bold text-orange-500">
@@ -517,7 +598,7 @@ function TagMergeModal({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="w-full sm:w-auto rounded-md border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-accent transition cursor-pointer text-center"
+              className="w-full sm:w-auto rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-accent transition cursor-pointer text-center"
             >
               キャンセル
             </button>
@@ -529,7 +610,7 @@ function TagMergeModal({
                 !targetTag.trim() ||
                 (preview && preview.manageableCount === 0)
               }
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-md bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition cursor-pointer text-center disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition cursor-pointer text-center disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
                 <>
