@@ -16,6 +16,7 @@
     "email:export": "email export --dir src/emails/templates",
     "convex:dev": "convex dev",
     "convex:deploy": "convex deploy",
+    "convex:deploy:dry-run": "convex deploy --dry-run",
     "convex:codegen": "convex codegen",
     "test:browser": "vitest run --project=browser-e2ee",
     "build:e2e-bridge": "tsx scripts/build-e2e-bridge.ts",

@@ -15,6 +15,9 @@ type Story = StoryObj<typeof CredentialFieldsCard>;
 function InteractiveCard(props: {
   initialCredential: RecordFormCredential;
   removable: boolean;
+  index?: number;
+  isEditMode?: boolean;
+  modifiedFields?: string[];
 }) {
   const [credential, setCredential] = useState<RecordFormCredential>(
     props.initialCredential,
@@ -31,11 +34,13 @@ function InteractiveCard(props: {
   return (
     <div className="max-w-2xl p-4 bg-background">
       <CredentialFieldsCard
-        index={0}
+        index={props.index ?? 0}
         credential={credential}
         removable={props.removable}
         onChange={handleChange}
         onRemove={() => alert("削除ボタンがクリックされました")}
+        isEditMode={props.isEditMode}
+        isFieldModified={(f) => props.modifiedFields?.includes(f) ?? false}
       />
     </div>
   );
@@ -64,6 +69,22 @@ export const RemovableWithValues: Story = {
         passwordHint: "愛犬の名前+西暦",
       }}
       removable={true}
+    />
+  ),
+};
+
+export const EditModeModified: Story = {
+  render: () => (
+    <InteractiveCard
+      initialCredential={{
+        id: "cred-1",
+        label: "ママ用",
+        loginId: "mama@example.com",
+        passwordHint: "母の旧姓+西暦",
+      }}
+      removable={false}
+      isEditMode={true}
+      modifiedFields={["credential_0_passwordHint"]}
     />
   ),
 };

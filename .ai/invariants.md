@@ -175,3 +175,5 @@
   - PR 時の差分検知や base ブランチとのドキュメント同期判定のため、CI の `actions/checkout` には必ず `fetch-depth: 0` を指定する。
 - **Knowledge 参照検証と Doc-Sync Gate**:
   - `check-and-test` ジョブ内で `pnpm check:knowledge` および `pnpm check:doc-sync -- --base "origin/$GITHUB_BASE_REF" --ci` を実行し、参照切れや REQUIRED レベルのドキュメント未更新が残存する状態でのマージを CI 側で厳格にブロックする。
+- **CI 実行コマンドのスクリプト集約（Single Source of Truth）**:
+  - CI ワークフローで実行する検証・デプロイコマンド（Convex dry-run 等）は、個別の生コマンドではなくルート `package.json` のスクリプト（`pnpm run <script-name>`）に集約し、ローカル開発と CI での実行オプションの Single Source of Truth を維持する。
