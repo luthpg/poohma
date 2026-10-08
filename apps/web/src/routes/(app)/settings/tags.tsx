@@ -152,7 +152,7 @@ function TagManagementPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="タグを検索..."
-            className="w-full rounded-lg bg-card border border-border pl-9 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+            className="w-full rounded-lg bg-card border border-border pl-9 pr-8 py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50"
           />
           {searchQuery && (
             <button
@@ -534,7 +534,7 @@ function TagMergeModal({
               onChange={(e) => setTargetTag(e.target.value)}
               placeholder="新しいタグ名を入力..."
               maxLength={50}
-              className="w-full rounded-lg bg-card border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+              className="w-full rounded-lg bg-card border border-border px-3 py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50"
             />
             {/* 既存タグからの候補 */}
             <div className="mt-2 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
