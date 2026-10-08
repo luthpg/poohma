@@ -18,6 +18,7 @@ import {
   Database,
   Download,
   Mail,
+  Tag,
 } from "lucide-react";
 import { type SubmitEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -717,6 +718,28 @@ function SettingsComponent() {
           >
             <Database className="h-4 w-4" />
             データ管理を開く
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      </div>
+
+      {/* タグ管理セクション */}
+      <div className="rounded-lg bg-card p-6 shadow-card border border-border/50 mt-8 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h2 className="text-[18px] font-semibold text-foreground tracking-geist-ui flex items-center gap-2">
+              <Tag className="h-4.5 w-4.5 text-orange-500" />
+              タグ管理
+            </h2>
+            <p className="text-[12px] text-muted-foreground">
+              登録されているタグの一覧確認、表記揺れの名称変更（リネーム）や複数タグの統合が行えます。
+            </p>
+          </div>
+          <Link
+            to="/settings/tags"
+            className="inline-flex items-center justify-center rounded-md bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border px-4 py-2 text-[13px] font-medium transition shrink-0 gap-1.5 cursor-pointer shadow-sm"
+          >
+            タグ管理を開く
             <ChevronRight className="h-3.5 w-3.5" />
           </Link>
         </div>

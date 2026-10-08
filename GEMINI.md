@@ -130,6 +130,7 @@ PoohMa では、AI Agent と人間の協調（Human-in-the-Loop）による継�
 | **E2E / ユニットテスト作成・改修・整理** | [`.ai/testing.md`](./.ai/testing.md)<br>[`.ai/workflows/test-refactoring.md`](./.ai/workflows/test-refactoring.md)<br>[`.ai/pitfalls/e2e-testing.md`](./.ai/pitfalls/e2e-testing.md) | ・テスト失敗時のプロダクションコード改変禁止<br>・「削除すると何を見逃すか」基準の重複排除<br>・`convex dev --once` のワンショット実行 |
 | **認証・セッション・暗号(E2EE)** | [`.ai/invariants.md`](./.ai/invariants.md) (1〜4節)<br>[`.ai/pitfalls/auth-session.md`](./.ai/pitfalls/auth-session.md)<br>[`.ai/pitfalls/crypto-e2ee.md`](./.ai/pitfalls/crypto-e2ee.md) | ・長期セッションの Single Source of Truth（Firebase Auth）<br>・Session Cookie の位置付け<br>・鍵階層（DEK / MasterKey / PRF）の破壊防止 |
 | **CI/CD・GitHub Actions 改修** | [`.ai/invariants.md`](./.ai/invariants.md) (第7節)<br>[`.ai/pitfalls/workflow-ci.md`](./.ai/pitfalls/workflow-ci.md) | ・`pnpm lint:workflows` の事前実行義務<br>・`jq --arg` 引数展開<br>・curl タイムアウト必須<br>・変数クォート（SC2086防止） |
+| **Git操作・シェル実行・パス指定** | [`.ai/pitfalls/environment-shell.md`](./.ai/pitfalls/environment-shell.md)<br>[`.ai/workflows/git-workflow.md`](./.ai/workflows/git-workflow.md) | ・`(app)` や `$` を含むパスのシングルクォート囲み義務<br>・Git/ghに渡すテキスト作成時はBOMなしUTF-8一時ファイル経由 |
 
 ### 7.2 Knowledge Feedback（Human-in-the-Loop 知見還元）
 - 実装・レビュー・CI/E2E対応で得られた普遍的知見は、勝手に書き込まず、必ず [`.ai/workflows/knowledge-feedback.md`](./.ai/workflows/knowledge-feedback.md) の基準とフォーマットに従って「知見草案」をユーザーへ提示し、合意を得てから `.ai/pitfalls/` へ反映すること。

@@ -35,6 +35,8 @@ description: >-
 - **テスト作成と実行**: [`.ai/pitfalls/e2e-testing.md`](../../../.ai/pitfalls/e2e-testing.md)
   - テスト失敗を理由にしたプロダクションコード改変の禁止。
   - 結合動作変更後は必ず `pnpm test:e2e` をローカル検証してからコミットする。
+- **実行環境 & シェル (PowerShell 7)**: [`.ai/pitfalls/environment-shell.md`](../../../.ai/pitfalls/environment-shell.md), [`.ai/workflows/git-workflow.md`](../../../.ai/workflows/git-workflow.md)
+  - `(app)` や `$` を含むパスのシングルクォート囲み義務、Git/ghに渡すテキスト作成時はBOMなしUTF-8一時ファイル経由。
 
 ---
 

@@ -2762,3 +2762,269 @@ export const applyImportDiff = familyBoundMutation({
     return { createdCount, updatedCount };
   },
 });
+
+// === タグ管理・一括操作 API (Issue #153) ===
+
+/**
+ * 閲覧可能な全レコードからタグごとの統計（総数、管理可能数、閲覧専用数）を取得
+ */
+export const getTagManagementList = familyBoundQuery({
+  args: {},
+  handler: async (ctx) => {
+    const { user } = ctx;
+    const visibleRecords = await collectVisibleRecords(ctx, user, false);
+
+    const tagMap = new Map<
+      string,
+      {
+        totalRecordCount: number;
+        manageableRecordCount: number;
+        readonlyRecordCount: number;
+      }
+    >();
+
+    for (const record of visibleRecords) {
+      const canEdit = isRecordAdmin(user, record);
+      for (const tag of record.tags) {
+        let entry = tagMap.get(tag);
+        if (!entry) {
+          entry = {
+            totalRecordCount: 0,
+            manageableRecordCount: 0,
+            readonlyRecordCount: 0,
+          };
+          tagMap.set(tag, entry);
+        }
+        entry.totalRecordCount++;
+        if (canEdit) {
+          entry.manageableRecordCount++;
+        } else {
+          entry.readonlyRecordCount++;
+        }
+      }
+    }
+
+    return Array.from(tagMap.entries())
+      .map(([tag, stats]) => ({
+        tag,
+        ...stats,
+      }))
+      .sort((a, b) => a.tag.localeCompare(b.tag, "ja"));
+  },
+});
+
+/**
+ * タグの変更・統合（N → 1）実行前の影響範囲をプレビュー
+ */
+export const previewTagOperation = familyBoundQuery({
+  args: {
+    sourceTags: v.array(v.string()),
+    targetTag: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const { user } = ctx;
+    const targetTagTrimmed = args.targetTag.trim();
+    const sourceTagsSet = new Set(
+      args.sourceTags.map((t) => t.trim()).filter((t) => t.length > 0),
+    );
+
+    const visibleRecords = await collectVisibleRecords(ctx, user, false);
+    const matchingRecords = visibleRecords.filter((r) =>
+      r.tags.some((t) => sourceTagsSet.has(t)),
+    );
+
+    let manageableCount = 0;
+    let readonlyCount = 0;
+    let alreadyHasTargetCount = 0;
+    const sampleRecords: Array<{
+      id: Id<"serviceRecords">;
+      title: string;
+      canEdit: boolean;
+    }> = [];
+
+    for (const record of matchingRecords) {
+      const canEdit = isRecordAdmin(user, record);
+      if (canEdit) {
+        manageableCount++;
+        if (targetTagTrimmed && record.tags.includes(targetTagTrimmed)) {
+          alreadyHasTargetCount++;
+        }
+      } else {
+        readonlyCount++;
+      }
+
+      if (sampleRecords.length < 5) {
+        sampleRecords.push({
+          id: record._id,
+          title: record.title,
+          canEdit,
+        });
+      }
+    }
+
+    return {
+      totalAffectedCount: matchingRecords.length,
+      manageableCount,
+      readonlyCount,
+      alreadyHasTargetCount,
+      sampleRecords,
+    };
+  },
+});
+
+/**
+ * タグの変更・統合（N → 1）を実行
+ * 操作者が管理権限を持つレコードのみ更新し、権限のないレコードはスキップする
+ */
+export const mergeOrRenameTags = familyBoundMutation({
+  args: {
+    sourceTags: v.array(v.string()),
+    targetTag: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const { user } = ctx;
+    const targetTag = args.targetTag.trim();
+    if (!targetTag) {
+      throw new Error("変更先タグ名を入力してください");
+    }
+    if (targetTag.length > 50) {
+      throw new Error("タグは50文字以内で入力してください");
+    }
+
+    const sourceTagsSet = new Set(
+      args.sourceTags.map((t) => t.trim()).filter((t) => t.length > 0),
+    );
+    if (sourceTagsSet.size === 0) {
+      throw new Error("変更元のタグを1つ以上指定してください");
+    }
+
+    const visibleRecords = await collectVisibleRecords(ctx, user, false);
+    const matchingRecords = visibleRecords.filter((r) =>
+      r.tags.some((t) => sourceTagsSet.has(t)),
+    );
+
+    let updatedCount = 0;
+    let skippedCount = 0;
+    const now = Date.now();
+
+    for (const record of matchingRecords) {
+      if (!isRecordAdmin(user, record)) {
+        skippedCount++;
+        continue;
+      }
+
+      // sourceTagsを除外し、targetTagを追加
+      const remainingTags = record.tags.filter((t) => !sourceTagsSet.has(t));
+      const newTags = Array.from(new Set([...remainingTags, targetTag]));
+
+      // タグ集合が変わらない場合は無駄な更新・監査ログをスキップ（bulkRemoveTags と統一）
+      if (
+        newTags.length === record.tags.length &&
+        newTags.every((t) => record.tags.includes(t))
+      ) {
+        continue;
+      }
+
+      if (newTags.length > MAX_TAGS_PER_RECORD) {
+        throw new Error(
+          `タグは${MAX_TAGS_PER_RECORD}個まで登録できます (レコード「${record.title}」で超過)`,
+        );
+      }
+
+      await ctx.db.patch(record._id, {
+        tags: newTags,
+        updatedAt: now,
+        updatedByAccountId: user._id,
+      });
+
+      await logAuditEvent(ctx, {
+        actor: user,
+        ownerType: getEffectiveOwnerType(record),
+        ownerFamilyId: getEffectiveOwnerFamilyId(record),
+        targetAccountId: record.accountId,
+        recordId: record._id,
+        action: "RECORD_UPDATE",
+        metadata: {
+          targetTitle: record.title,
+          changedFields: ["tags"],
+          detail: `タグの変更・統合 (変更先: ${targetTag})`,
+        },
+      });
+
+      updatedCount++;
+    }
+
+    return { updatedCount, skippedCount };
+  },
+});
+
+/**
+ * 選択したレコード群から指定したタグを一括で外す（ダッシュボード用）
+ * 操作者が管理権限を持つレコードのみ更新し、権限のないレコードはスキップする
+ */
+export const bulkRemoveTags = familyBoundMutation({
+  args: {
+    recordIds: v.array(v.id("serviceRecords")),
+    tagsToRemove: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { user } = ctx;
+    const tagsToRemoveSet = new Set(
+      args.tagsToRemove.map((t) => t.trim()).filter((t) => t.length > 0),
+    );
+
+    if (tagsToRemoveSet.size === 0) {
+      throw new Error("外すタグを1つ以上指定してください");
+    }
+
+    let updatedCount = 0;
+    let skippedCount = 0;
+    const now = Date.now();
+
+    for (const recordId of args.recordIds) {
+      const record = await ctx.db.get(recordId);
+      if (!record) continue;
+
+      // 家族境界チェック
+      if (record.familyId && record.familyId !== ctx.familyId) {
+        continue;
+      }
+
+      // 管理権限チェック
+      if (!isRecordAdmin(user, record)) {
+        skippedCount++;
+        continue;
+      }
+
+      const newTags = record.tags.filter((t) => !tagsToRemoveSet.has(t));
+      if (newTags.length === record.tags.length) {
+        // 対象タグを持たない場合は更新不要
+        continue;
+      }
+
+      await ctx.db.patch(record._id, {
+        tags: newTags,
+        updatedAt: now,
+        updatedByAccountId: user._id,
+      });
+
+      await logAuditEvent(ctx, {
+        actor: user,
+        ownerType: getEffectiveOwnerType(record),
+        ownerFamilyId: getEffectiveOwnerFamilyId(record),
+        targetAccountId: record.accountId,
+        recordId: record._id,
+        action: "RECORD_UPDATE",
+        metadata: {
+          targetTitle: record.title,
+          changedFields: ["tags"],
+          detail: `タグの一括削除 (${Array.from(tagsToRemoveSet).join(", ")})`,
+        },
+      });
+
+      updatedCount++;
+    }
+
+    return { updatedCount, skippedCount };
+  },
+});
