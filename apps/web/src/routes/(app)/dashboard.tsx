@@ -520,7 +520,10 @@ function RouteComponent() {
     const targetIds = manageableRecords.map(
       (r) => r._id as Id<"serviceRecords">,
     );
-    if (targetIds.length === 0) return;
+    if (targetIds.length === 0) {
+      toast.error("管理権限のあるレコードが選択されていません");
+      return;
+    }
 
     if (tagsToAdd.length === 0) {
       toast.error("タグを入力してください");
@@ -547,7 +550,10 @@ function RouteComponent() {
     const targetIds = manageableRecords.map(
       (r) => r._id as Id<"serviceRecords">,
     );
-    if (targetIds.length === 0) return;
+    if (targetIds.length === 0) {
+      toast.error("管理権限のあるレコードが選択されていません");
+      return;
+    }
 
     if (tagsToRemove.length === 0) {
       toast.error("外すタグを選択してください");
