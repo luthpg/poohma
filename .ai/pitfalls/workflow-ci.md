@@ -137,3 +137,17 @@ CI ワークフローファイル（`.github/workflows/ci.yml` 等）内で `pnp
 
 CI 内で実行するコマンド群は、可能な限りルート `package.json` の scripts（例: `convex:deploy:dry-run`）として一元定義し、CI 側からは `pnpm run <script-name>` を呼び出すことで、ローカル開発と CI の挙動の一貫性（Single Source of Truth）を保つ。
 
+---
+
+## 8. モノレポ分離・スクリプト移管時の CI ワークフロー追従漏れ（ERR_PNPM_RECURSIVE_RUN_NO_SCRIPT）
+
+### 事象
+
+モノレポ化やパッケージ分離に伴い、スクリプトの責務を別パッケージへ移管（例: 旧 setup-e2e-preview.ts を `packages/backend/scripts/setup-preview.ts` へ移動し、`apps/web/package.json` から旧スクリプトを削除）した際、GitHub Actions ワークフロー（`.github/workflows/deploy-staging.yml` 等）内に `pnpm --filter @poohma/web run setup:e2e-preview` の直接呼び出しが残存していると、CI 実行時に `[ERR_PNPM_RECURSIVE_RUN_NO_SCRIPT] None of the selected packages has a "..." script` でジョブが即死する。
+
+### 対策
+
+1. **ワークフロー定義の横断検索義務**: パッケージ間でスクリプトの移管・削除を行った際は、ルートやアプリケーションの `package.json` だけでなく、必ず `.github/workflows/*.yml` も対象に旧スクリプト名の参照がないかを grep 検索して追従すること。
+2. **移管先パッケージへの即時切り替え**: 旧パッケージに不要な後方互換ダミースクリプトを残さず（KISS原則）、CI ワークフロー側の呼び出し先を新パッケージ（例: `pnpm --filter @poohma/backend run preview:setup`）へ直ちに更新する。
+
+

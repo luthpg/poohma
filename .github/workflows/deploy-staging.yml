@@ -142,7 +142,7 @@ jobs:
         run: printf 'DISABLE_EMAIL_DELIVERY=true\n' > apps/web/.env.e2e.local
 
       - name: Setup Convex E2E Preview Deployment
-        run: pnpm --filter @poohma/web run setup:e2e-preview
+        run: pnpm --filter @poohma/backend run preview:setup
 
       - name: Pull Vercel Environment Information
         run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}

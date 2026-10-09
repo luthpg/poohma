@@ -169,6 +169,11 @@
 - **内部シークレット送信時の HTTPS 検証**:
   - `CONVEX_INTERNAL_SECRET` などの高権限シークレットを送信する際は、送信先 URL が `https://` で始まっていることを事前に検証し、誤設定による平文送信（CWE-319）を防止すること。
 
+### パッケージ分離・スクリプト移管時のワークフロー参照整合性
+
+- モノレポ内のパッケージ分離やスクリプト移管時、`.github/workflows/*.yml` 内で旧パッケージのスクリプト（`pnpm --filter <old-pkg> run <old-script>`）を参照したまま放置してはならない。
+- 必ずワークフロー定義内のコマンドも新パッケージ（例: `pnpm --filter @poohma/backend run preview:setup`）へ即時追従させ、未定義スクリプトによる CI ジョブ即死を防止すること。
+
 ### CI での Knowledge・ドキュメント同期（Doc-Sync Gate）の強制
 
 - **完全履歴チェックアウト（`fetch-depth: 0`）**:
