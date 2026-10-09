@@ -156,3 +156,21 @@ Convex バックエンド開発における落とし穴と回避法です。
   - `.ai/workflows/one-shot-migration.md`
   - `packages/backend/convex/schema.ts`
 
+---
+
+### Monorepo におけるルート `convex.json` の必須性（`auth.config.ts` 欠落と `no providers configured` 罠）
+
+- **問題 (Problem)**:
+  - Convex バックエンドを `packages/backend/convex` などのサブディレクトリに分離したモノレポ構成において、Vercel や CI ビルドスクリプトがリポジトリルートから `convex deploy` を実行すると、デプロイ自体はエラーなく成功するように見えるが、Convex サーバー上で `auth.config.ts` が認識されず「プロバイダ 0 件」としてプッシュされてしまう。
+  - その結果、ステージングや本番でログインしようとするとブラウザ側で `Failed to authenticate: "No auth provider found matching the given token (no providers configured). Check convex/auth.config.ts."` エラーが発生し、認証に失敗する。
+- **原因 (Root Cause)**:
+  - Convex CLI は設定ファイルが存在しない場合、デフォルトでカレントディレクトリ直下の `"convex/"` を探索する。
+  - ルート直下に `convex/auth.config.ts` が存在しないため、CLI の `bundleAuthConfig` はプロバイダ定義なし（`[]`）と判定してデプロイを完了させてしまう。
+- **回避法 (Correct Pattern)**:
+  - リポジトリルートに `convex.json` を配置し、`"functions": "packages/backend/convex/"` を明記する。
+  - これにより、リポジトリルートから実行された場合でも Convex CLI がサブディレクトリ配下の `convex` を正しく探索し、`auth.config.ts` を含む完全な設定が同期される。
+- **関連実装 (Related Code References)**:
+  - `convex.json`
+  - `packages/backend/convex/auth.config.ts`
+
+
