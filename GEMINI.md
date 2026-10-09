@@ -102,14 +102,14 @@
 
 ```text
 poohma/                    # ルート（Turborepo）
-├── apps/web/              # TanStack Start + Convex（@poohma/web）
-│   ├── convex/            # Convex バックエンド（schema, functions, _generated）
+├── apps/web/              # Web フロントエンド（TanStack Start, Vite）
 │   ├── src/               # フロントエンド（@/* エイリアス）
-│   └── tests/             # ユニット / 結合 / E2E テスト
-├── workers/backup/        # Cloudflare Workers バックアップ（@poohma/backup）
+│   └── tests/             # UI / ブラウザ / E2E テスト
 ├── packages/              # 共通パッケージ
-│   ├── shared/            # 共通ライブラリ・部品（@poohma/shared）
+│   ├── backend/           # Convex バックエンド（@poohma/backend: schema, functions, RLS, 結合テスト）
+│   ├── shared/            # 共通モジュール・部品（@poohma/shared: schemas, emails, utils）
 │   └── knowledge-tools/   # AI開発基盤・Knowledge運用ツール（@poohma/knowledge-tools）
+├── workers/backup/        # Cloudflare Workers バックアップ（@poohma/backup）
 ├── .ai/                   # AI Knowledge Base（ドメイン、不変条件、落とし穴）
 └── .agents/skills/        # Antigravity 専門スキル
 ```

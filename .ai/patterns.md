@@ -142,14 +142,14 @@ window.addEventListener("storage", (e) => {
 
 ---
 
-## 8. Convex バックエンド関数のテストパターン (`apps/web/tests/convex-records.spec.ts` 等)
+## 8. Convex バックエンド関数のテストパターン (`packages/backend/tests/convex-records.spec.ts` 等)
 
 `convex-test` を使用し、認証コンテキスト（`as(user)`）や customBuilders、RLS をモックした統合テストを記述する。
 
 ```typescript
 import { convexTest } from "convex-test";
-import { api } from "@/../convex/_generated/api";
-import schema from "@/../convex/schema";
+import { api } from "../convex/_generated/api";
+import schema from "../convex/schema";
 
 test("authenticated user can create record", async () => {
   const t = convexTest(schema);

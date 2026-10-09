@@ -1,9 +1,9 @@
+import { api } from "@poohma/backend/api";
+import type { Id } from "@poohma/backend/dataModel";
 import { useConvex, usePaginatedQuery } from "convex/react";
 import { Download, History } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { api } from "@/../convex/_generated/api";
-import type { Id } from "@/../convex/_generated/dataModel";
 import {
   Accordion,
   AccordionContent,

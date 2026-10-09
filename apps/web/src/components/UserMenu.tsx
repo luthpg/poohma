@@ -1,3 +1,4 @@
+import { api } from "@poohma/backend/api";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
@@ -24,7 +25,6 @@ import {
   Users,
 } from "lucide-react";
 import { useState } from "react";
-import { api } from "@/../convex/_generated/api";
 import { useTheme } from "@/components/theme-provider";
 import { UserAvatar } from "@/components/UserAvatar";
 import {

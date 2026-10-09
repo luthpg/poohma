@@ -1,4 +1,4 @@
-import { api } from "@/../convex/_generated/api";
+import { api } from "@poohma/backend/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAccount } from "@/hooks/useAccount";
 import { usePersistentQuery } from "@/hooks/usePersistentQuery";

@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
+import { api } from "@poohma/backend/api";
 import { ConvexHttpClient } from "convex/browser";
-import { api } from "../../convex/_generated/api";
 import { ensureTestUserCustomToken } from "./ensure-test-user";
 
 /**

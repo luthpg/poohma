@@ -1891,7 +1891,8 @@ describe("同時編集検知と楽観的ロック競合防止（FR-REC-15）", (
     // 各レコードの credentials を検証
     for (const record of records) {
       expect(record.credentials).toHaveLength(1);
-      const cred = record.credentials[0]!;
+      const cred = record.credentials[0];
+      if (!cred) throw new Error("Credential not found");
 
       // 一覧表示・検索用のフィールドが存在すること
       expect(cred._id).toBeDefined();
@@ -2252,7 +2253,8 @@ describe("2.2.14 CSV差分インポート・安定ID（stableId）検証", () =>
 
     const records = await user.query(api.records.getRecordsForDiffImport, {});
     expect(records.length).toBe(1);
-    const r = records[0]!;
+    const r = records[0];
+    if (!r) throw new Error("Record not found");
     expect(r.stableId).toBe(stableUUID);
     expect(r.title).toBe("Diff Target Service");
     expect(r.url).toBe("https://diff.example.com");
@@ -2324,7 +2326,8 @@ describe("2.2.14 CSV差分インポート・安定ID（stableId）検証", () =>
 
     const records = await viewer.query(api.records.getRecordsForDiffImport, {});
     expect(records.length).toBe(1);
-    const r = records[0]!;
+    const r = records[0];
+    if (!r) throw new Error("Record not found");
     expect(r.stableId).toBe(stableUUID);
     expect(r.title).toBe("Family Shared Service");
     expect(r.canEdit).toBe(false);

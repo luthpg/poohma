@@ -1,3 +1,5 @@
+import { api } from "@poohma/backend/api";
+import type { Id } from "@poohma/backend/dataModel";
 import {
   createFileRoute,
   getRouteApi,
@@ -21,8 +23,6 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
-import { api } from "@/../convex/_generated/api";
-import type { Id } from "@/../convex/_generated/dataModel";
 import { AutolinkText } from "@/components/common/AutolinkText";
 import { JpText } from "@/components/JpText";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";

@@ -16,6 +16,7 @@
     ],
     "memo": "Apple製品購入",
     "ogpDescription": "下取りや柔軟な支払いオプションで今すぐ購入。パーソナルショッピングのサポートサービスを提供します。送料無料。Apple Storeの魅力のすべてをオンラインでどうぞ。",
+    "ogpImage": "https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/og-default?wid=1200&hei=630&fmt=jpeg&qlt=95&.v=1525370171638",
     "tags": [],
     "title": "アップルストア",
     "titleReading": "あっぷるすとあ",
@@ -30,6 +31,7 @@
     ],
     "memo": "レシピサイト",
     "ogpDescription": "利用者数 No.1レシピサービス。食材を検索するだけで今日つくるものがきまります。家庭の簡単実用レシピが多数。自分のレシピを公開できます。",
+    "ogpImage": "https://global-web-assets.cpcdn.com/assets/logo_ogp-517a0426790ebd6d55d6731fe3aed29e1a781172d5b7dd31daf79edb235a9c15.png",
     "tags": ["仕事"],
     "title": "クックパッド",
     "titleReading": "くっくぱっど",
@@ -68,6 +70,7 @@
     ],
     "memo": "動画サイト",
     "ogpDescription": "日本最大級の動画サービス、ニコニコ（niconico）。動画にコメントを付けて楽しむニコニコ動画や、生放送番組にリアルタイムでコメントを付けられるニコニコ生放送のほか、イラスト・マンガ・最新ニュース・ゲームなど、エンターテイメントを全て無料で楽しめる！",
+    "ogpImage": "https://resource.video.nimg.jp/web/images/ogp.png?return",
     "tags": ["ショッピング"],
     "title": "ニコニコ動画",
     "titleReading": "にこにこどうが",
@@ -86,6 +89,7 @@
     ],
     "memo": "ニュース電子版",
     "ogpDescription": "日本経済新聞の電子版。日経や日経ＢＰの提供する経済、企業、国際、政治、マーケット、情報・通信、社会など各分野のニュース。ビジネス、マネー、IT、スポーツ、住宅、キャリアなどの専門情報も満載。",
+    "ogpImage": "https://www.nikkei.com/.resources/k-components/rectangle.rev-d54ea30.png",
     "tags": [],
     "title": "日本経済新聞",
     "titleReading": "にほんけいざいしんぶん",
@@ -129,6 +133,7 @@
     ],
     "memo": "家計簿・資産管理",
     "ogpDescription": "すべての人のお金のプラットフォーム MoneyForward - お金・資産管理なら家計簿アプリ「マネーフォワード ME (ミー)」を今すぐダウンロード！法人・個人事業主向け「マネーフォワード クラウド」で会計ソフトなどバックオフィス効率化も",
+    "ogpImage": "https://moneyforward.com/assets/home/ogp_corporate_image.png",
     "tags": [],
     "title": "マネーフォワード",
     "titleReading": "まねーふぉわーど",
@@ -189,6 +194,7 @@
     ],
     "memo": "デザインツール",
     "ogpDescription": "Adobe is changing the world through digital experiences. We help our customers create, deliver and optimize content and applications.",
+    "ogpImage": "https://www.adobe.com/homepage/assets/product-icons/jpg/media_1e1d6ce6caa68dfd49689c46528c152d9fdeaad6f.jpg",
     "tags": ["金融", "ショッピング"],
     "title": "Adobe Creative Cloud",
     "url": "https://www.adobe.com"
@@ -247,6 +253,7 @@
     ],
     "memo": "分散型SNS",
     "ogpDescription": "Social media as it should be. Find your community among millions of users, unleash your creativity, and have some fun again.",
+    "ogpImage": "https://bsky.app/static/social-card-default-gradient.png",
     "tags": [],
     "title": "Bluesky",
     "url": "https://bsky.app"
@@ -285,6 +292,7 @@
     ],
     "memo": "UI デザインツール",
     "ogpDescription": "Figma is the canvas where design, code, and AI come together. From first idea to shipped product — go from concept to production with your whole team, in one place.",
+    "ogpImage": "https://cdn.sanity.io/images/599r6htc/regionalized/b08d37520f7d5ad8d6562975b5932dd2d9a862bb-1200x630.gif?w=1200&q=70&fit=max&auto=format",
     "tags": ["ニュース"],
     "title": "Figma",
     "url": "https://www.figma.com"
@@ -302,6 +310,7 @@
     ],
     "memo": "ソースコード管理",
     "ogpDescription": "Join the world's most widely adopted, AI-powered developer platform where millions of developers, businesses, and the largest open source community build software that advances humanity.",
+    "ogpImage": "https://images.ctfassets.net/8aevphvgewt8/4pe4eOtUJ0ARpZRE4fNekf/f52b1f9c52f059a33170229883731ed0/GH-Homepage-Universe-img.png",
     "tags": ["ゲーム", "動画"],
     "title": "GitHub",
     "url": "https://github.com"
@@ -319,6 +328,7 @@
     ],
     "memo": "Appleクラウド",
     "ogpDescription": "Log in to iCloud to access your photos, mail, notes, documents and more. Sign in with your Apple Account or create a new account to start using Apple services.",
+    "ogpImage": "https://www.icloud.com/icloud_logo/icloud_logo.png",
     "tags": ["ショッピング"],
     "title": "iCloud",
     "url": "https://www.icloud.com"
@@ -336,6 +346,7 @@
     ],
     "memo": "写真SNS",
     "ogpDescription": "Create an account or log in to Instagram - Share what you're into with the people who get you.",
+    "ogpImage": "https://static.cdninstagram.com/rsrc.php/v4/yD/r/R0fBIMurK8v.png",
     "tags": ["クラウド"],
     "title": "Instagram",
     "url": "https://www.instagram.com"
@@ -385,6 +396,7 @@
     ],
     "memo": "リンク管理ツール",
     "ogpDescription": "Your personal bookmark manager",
+    "ogpImage": "https://linkbox.ciderlabs.link/icon.png",
     "tags": ["仕事", "ショッピング"],
     "title": "Linkbox",
     "url": "https://linkbox.ciderlabs.link"
@@ -455,6 +467,7 @@
     ],
     "memo": "パスワード管理アプリ",
     "ogpDescription": "家族でアカウント情報を安全に共有・管理。パスワードのヒントを暗号化して安全に管理しよう！",
+    "ogpImage": "https://poohma.ciderlabs.link/android-chrome-512x512.png",
     "tags": [],
     "title": "PoohMa",
     "url": "https://poohma.ciderlabs.link"
@@ -505,6 +518,7 @@
     ],
     "memo": "音楽ストリーミング",
     "ogpDescription": "Spotify is a digital music service that gives you access to millions of songs.",
+    "ogpImage": "https://open.spotifycdn.com/cdn/images/download-page-image-mac.fec937cc.png",
     "tags": [],
     "title": "Spotify",
     "url": "https://open.spotify.com"
@@ -522,6 +536,7 @@
     ],
     "memo": "ゲームエンジン",
     "ogpDescription": "Develop, deploy, and grow with Unity, the world’s leading 3D game engine. Build for all major platforms from mobile, to PC and console as well as XR, acquire players, monetize your game, and power industrial applications.",
+    "ogpImage": "https://cdn.sanity.io/images/fuvbjjlp/production/9a58ef0b0a39424aaf70dd4c30539b477ae54697-1200x630.png",
     "tags": [],
     "title": "Unity",
     "url": "https://unity.com"
@@ -539,6 +554,7 @@
     ],
     "memo": "メッセンジャー",
     "ogpDescription": "Use WhatsApp Messenger to stay in touch with friends and family. WhatsApp is free and offers simple, secure, reliable messaging and calling, available on phones all over the world.",
+    "ogpImage": "https://static.whatsapp.net/rsrc.php/v4/yO/r/rukeqTVNJDY.png",
     "tags": ["仕事"],
     "title": "WhatsApp",
     "url": "https://www.whatsapp.com"
@@ -560,6 +576,7 @@
     ],
     "memo": "オンライン百科事典",
     "ogpDescription": "Wikipedia is a free online encyclopedia, created and edited by volunteers around the world and hosted by the Wikimedia Foundation.",
+    "ogpImage": "https://upload.wikimedia.org/wikipedia/en/thumb/8/80/Wikipedia-logo-v2.svg/250px-Wikipedia-logo-v2.svg.png",
     "tags": ["SNS", "ツール"],
     "title": "Wikipedia",
     "url": "https://www.wikipedia.org"
@@ -581,6 +598,7 @@
     ],
     "memo": "動画広告なし",
     "ogpDescription": "With YouTube Premium, enjoy ad-free access, downloads, and background play on YouTube and YouTube Music.",
+    "ogpImage": "https://www.gstatic.com/youtube/img/promos/growth/YTP_logo_social_1200x630.png?days_since_epoch=20716",
     "tags": ["ショッピング", "学習"],
     "title": "YouTube Premium",
     "url": "https://www.youtube.com/premium"
@@ -598,6 +616,7 @@
     ],
     "memo": "技術情報プラットフォーム",
     "ogpDescription": "Zennはエンジニアが技術・開発についての知見をシェアする場所です。本の販売や、読者からのバッジの受付により対価を受け取ることができます。",
+    "ogpImage": "https://static.zenn.studio/images/logo-only-dark.png",
     "tags": [],
     "title": "Zenn",
     "url": "https://zenn.dev"
@@ -619,6 +638,7 @@
     ],
     "memo": "ビデオ会議",
     "ogpDescription": "Modernize workflows with Zoom's trusted collaboration tools: including video meetings, Zoom Chat, VoIP phone, webinars, whiteboard, contact center, and events.",
+    "ogpImage": "https://st1.zoom.us/homepage/20260918-1235/primary/dist/assets/images/thumb.png",
     "tags": ["ツール", "仕事"],
     "title": "Zoom",
     "url": "https://zoom.us"

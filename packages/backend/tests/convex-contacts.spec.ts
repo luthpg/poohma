@@ -137,10 +137,10 @@ describe("Convex Contacts (お問い合わせ機能)", () => {
       "casetest@example.com",
       "CASETEST@EXAMPLE.COM",
     ];
-    for (let i = 0; i < 3; i++) {
+    for (const [i, email] of emailVariants.entries()) {
       const res = await t.mutation(api.contacts.createContact, {
         name: "ケーステスト",
-        email: emailVariants[i]!,
+        email,
         category: "一般的なお問い合わせ",
         message: `ケーステスト${i + 1}回目のメッセージです。`,
       });

@@ -1,10 +1,10 @@
+import { api } from "@poohma/backend/api";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
-import { api } from "@/../convex/_generated/api";
 import { RecordForm } from "@/components/records/RecordForm";
 import { useAccount } from "@/hooks/useAccount";
 import { useRecordForm } from "@/hooks/useRecordForm";

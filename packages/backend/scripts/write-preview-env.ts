@@ -4,7 +4,8 @@ import { fileURLToPath } from "node:url";
 
 const dirname =
   import.meta.dirname ?? path.dirname(fileURLToPath(import.meta.url));
-const previewEnvPath = path.resolve(dirname, "../e2e/.env.e2e-preview");
+const rootDir = path.resolve(dirname, "../../..");
+const previewEnvPath = path.resolve(rootDir, "apps/web/e2e/.env.e2e-preview");
 
 const convexUrl = process.env.VITE_CONVEX_URL || "";
 const convexSiteUrl = process.env.VITE_CONVEX_SITE_URL || "";

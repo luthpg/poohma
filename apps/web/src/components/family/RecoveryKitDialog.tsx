@@ -1,3 +1,4 @@
+import { api } from "@poohma/backend/api";
 import { useMutation } from "convex/react";
 import {
   AlertTriangle,
@@ -13,7 +14,6 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { api } from "@/../convex/_generated/api";
 import { JpText } from "@/components/JpText";
 import { Button } from "@/components/ui/button";
 import {

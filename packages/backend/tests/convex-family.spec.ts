@@ -1344,7 +1344,10 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
       );
       expect(migrationData.records.length).toBe(1);
 
-      const targetCredId = migrationData.records[0]!.credentials[0]!.id;
+      const targetRecord = migrationData.records[0];
+      const targetCred = targetRecord?.credentials[0];
+      if (!targetCred) throw new Error("Target credential not found");
+      const targetCredId = targetCred.id;
 
       // 3. commit
       const commitRes = await userSolo.mutation(
@@ -1680,8 +1683,12 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
       const r1 = migrationData.records.find((r) => r._id === record1Id);
       const r2 = migrationData.records.find((r) => r._id === record2Id);
       if (!r1 || !r2) throw new Error("Records not found in migration data");
-      const r1CredId = r1.credentials[0]!.id;
-      const r2CredId = r2.credentials[0]!.id;
+      const r1Cred = r1.credentials[0];
+      const r2Cred = r2.credentials[0];
+      if (!r1Cred || !r2Cred)
+        throw new Error("Credentials not found in migration data");
+      const r1CredId = r1Cred.id;
+      const r2CredId = r2Cred.id;
 
       // recordId を付与してコミット
       await userDup.mutation(api.families.commitFamilyMigration, {
@@ -2211,7 +2218,7 @@ import {
   generateDEK,
   unwrapDEK,
   wrapDEK,
-} from "@/lib/crypto";
+} from "../../../apps/web/src/lib/crypto";
 
 describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
   it("旧パスコードでラップされたDEKが、新しいパスコードのマスターキーで正しく再ラップされ、データが復号可能な状態を維持できること", async () => {

@@ -1,9 +1,9 @@
+import { api } from "@poohma/backend/api";
+import type { Id } from "@poohma/backend/dataModel";
 import { MAX_CREDENTIALS_PER_RECORD } from "@poohma/shared/schemas";
 import { useConvex, useMutation } from "convex/react";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
-import { api } from "@/../convex/_generated/api";
-import type { Id } from "@/../convex/_generated/dataModel";
 import { usePasscode } from "@/components/PasscodeProvider";
 import { processInChunks } from "@/utils/chunk-processor";
 

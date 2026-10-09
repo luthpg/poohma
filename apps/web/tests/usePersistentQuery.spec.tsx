@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
+
+import { api } from "@poohma/backend/api";
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "@/../convex/_generated/api";
 import {
   clearQueryCache,
   getQueryFunctionKey,

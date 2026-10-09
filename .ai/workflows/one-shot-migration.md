@@ -110,7 +110,7 @@ flowchart TD
 - **マイグレ処理ファイルの完全消去**:
   - 一時マイグレーションファイル（例: `convex/migrations.ts`）や一時スクリプトを削除する（リポジトリ・本番に残さない）。
 - **スキーマの必須化（後方互換性の排除）**:
-  - `apps/web/convex/schema.ts` で対象フィールドの `v.optional()` を解除し、必須型にする。
+  - `packages/backend/convex/schema.ts` で対象フィールドの `v.optional()` を解除し、必須型にする。
   - `pnpm convex:dev:once` で型定義（`dataModel.d.ts`）を再生成する。
 - **ビジネスロジックの整理**:
   - 対象フィールドを扱う Mutations, Queries, UI から、旧データ補完コード（`record.field ?? fallback` や `if (!record.field)`）を削除し、必須前提のシンプルなコードへ刷新する。

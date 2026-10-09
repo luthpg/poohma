@@ -259,8 +259,8 @@ PR レビュー対応、外部 AI（CodeRabbit等）指摘の審査、および�
 - **再発防止 (Prevention)**:
   外部 AI のスキーマ・後方互換性に関する指摘を受けた際は、まず「本番・検証環境にその旧形式データが実在するか（マイグレーション完了済みか）」を確認し、完了済みの場合は不要な後方互換コードを追加しない。
 - **関連実装 (Related Code References)**:
-  - `apps/web/convex/users.ts`
-  - `apps/web/convex/rls.ts`
+  - `packages/backend/convex/users.ts`
+  - `packages/backend/convex/rls.ts`
 
 ---
 

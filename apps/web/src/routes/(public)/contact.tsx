@@ -1,3 +1,4 @@
+import { api } from "@poohma/backend/api";
 import { CONTACT_CATEGORIES } from "@poohma/shared/constants/contacts";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
@@ -6,7 +7,6 @@ import { CheckCircle2, Send } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
-import { api } from "@/../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { auth } from "@/utils/firebase";

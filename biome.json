@@ -33,8 +33,11 @@
   },
   "overrides": [
     {
-      "includes": ["convex/_generated/**/*"],
+      "includes": ["**/convex/_generated/**/*"],
       "linter": {
+        "enabled": false
+      },
+      "assist": {
         "enabled": false
       }
     }

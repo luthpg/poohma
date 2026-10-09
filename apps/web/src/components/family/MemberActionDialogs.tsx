@@ -1,6 +1,6 @@
+import type { Id } from "@poohma/backend/dataModel";
 import { AlertTriangle, Download, KeyRound } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { Id } from "@/../convex/_generated/dataModel";
 import {
   AlertDialog,
   AlertDialogAction,

@@ -5,8 +5,8 @@ import { fileURLToPath } from "node:url";
 
 const dirname =
   import.meta.dirname ?? path.dirname(fileURLToPath(import.meta.url));
-const webDir = path.resolve(dirname, "..");
-const targetFile = path.resolve(dirname, "../convex/demoRecords.json");
+const backendDir = path.resolve(dirname, "..");
+const targetFile = path.resolve(backendDir, "convex/demoRecords.json");
 
 console.log(
   "Exporting demo records from Convex via demo:exportDemoRecordsInternal...",
@@ -33,7 +33,7 @@ try {
       argsArg,
     ],
     {
-      cwd: webDir,
+      cwd: backendDir,
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "inherit"],
     },

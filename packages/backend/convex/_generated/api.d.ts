@@ -8,11 +8,6 @@
  * @module
  */
 
-import type {
-  ApiFromModules,
-  FilterApi,
-  FunctionReference,
-} from "convex/server";
 import type * as actions from "../actions.js";
 import type * as auditLogs from "../auditLogs.js";
 import type * as contacts from "../contacts.js";
@@ -28,6 +23,12 @@ import type * as recovery from "../recovery.js";
 import type * as rls from "../rls.js";
 import type * as users from "../users.js";
 import type * as viewLogs from "../viewLogs.js";
+
+import type {
+  ApiFromModules,
+  FilterApi,
+  FunctionReference,
+} from "convex/server";
 
 declare const fullApi: ApiFromModules<{
   actions: typeof actions;
