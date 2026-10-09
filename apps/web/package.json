@@ -18,9 +18,9 @@
     "build:e2e-bridge": "tsx scripts/build-e2e-bridge.ts",
     "verify:bundle": "tsx scripts/verify-bundle-safety.ts",
     "fonts:download": "tsx scripts/download-fonts.ts",
-    "test:e2e": "playwright test",
-    "test:e2e:show": "playwright test --headed",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e": "pnpm build:e2e-bridge && playwright test",
+    "test:e2e:show": "pnpm build:e2e-bridge && playwright test --headed",
+    "test:e2e:ui": "pnpm build:e2e-bridge && playwright test --ui"
   },
   "dependencies": {
     "@cantoo/fontkit": "^2.0.12",
