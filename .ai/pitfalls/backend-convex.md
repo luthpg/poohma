@@ -158,19 +158,20 @@ Convex バックエンド開発における落とし穴と回避法です。
 
 ---
 
-### Monorepo におけるルート `convex.json` の必須性（`auth.config.ts` 欠落と `no providers configured` 罠）
+### Monorepo 移行後のビルドコマンドにおける Convex パッケージ指定漏れ（関数全削除・`no providers configured` 罠）
 
 - **問題 (Problem)**:
-  - Convex バックエンドを `packages/backend/convex` などのサブディレクトリに分離したモノレポ構成において、Vercel や CI ビルドスクリプトがリポジトリルートから `convex deploy` を実行すると、デプロイ自体はエラーなく成功するように見えるが、Convex サーバー上で `auth.config.ts` が認識されず「プロバイダ 0 件」としてプッシュされてしまう。
-  - その結果、ステージングや本番でログインしようとするとブラウザ側で `Failed to authenticate: "No auth provider found matching the given token (no providers configured). Check convex/auth.config.ts."` エラーが発生し、認証に失敗する。
+  - Convex バックエンドを旧配置（`apps/web` 配下の `convex` ディレクトリ）から `packages/backend/convex` などの独立パッケージへ分離したモノレポ構成において、Vercel の Build Command やデプロイスクリプトが移行前のディレクトリ（例: `cd apps/web && convex deploy` やリポジトリルート）のまま実行されると、デプロイ自体はエラーなく成功（終了コード 0）するが、Convex サーバー上の関数がすべて空（0件）になり、`auth.config.ts` も認識されず認証プロバイダが 0 件としてプッシュされてしまう。
+  - その結果、ステージングや本番でログインしようとするとブラウザ側で `Failed to authenticate: "No auth provider found matching the given token (no providers configured). Check convex/auth.config.ts."` エラーが発生し、全機能が動作不能になる。
 - **原因 (Root Cause)**:
-  - Convex CLI は設定ファイルが存在しない場合、デフォルトでカレントディレクトリ直下の `"convex/"` を探索する。
-  - ルート直下に `convex/auth.config.ts` が存在しないため、CLI の `bundleAuthConfig` はプロバイダ定義なし（`[]`）と判定してデプロイを完了させてしまう。
+  - Convex CLI は実行ディレクトリ直下に `convex/` が見つからない場合、関数が 0 件でもエラーとせず「0件の関数」としてデプロイを正常終了する。
+  - これにより、サーバー側の全関数および `auth.config.ts` が空で上書き（削除）されてしまう。
 - **回避法 (Correct Pattern)**:
-  - リポジトリルートに `convex.json` を配置し、`"functions": "packages/backend/convex/"` を明記する。
-  - これにより、リポジトリルートから実行された場合でも Convex CLI がサブディレクトリ配下の `convex` を正しく探索し、`auth.config.ts` を含む完全な設定が同期される。
+  - ルートや他パッケージから無理に動かそうとせず、Vercel や CI のビルドコマンドでは必ずモノレポのパッケージフィルタリング（`pnpm --filter @poohma/backend run deploy` や `pnpm server deploy`）を使用して、正しいバックエンドパッケージを対象に実行する。
 - **関連実装 (Related Code References)**:
-  - `convex.json`
+  - `packages/backend/package.json`
+  - `package.json`
   - `packages/backend/convex/auth.config.ts`
+
 
 

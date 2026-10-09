@@ -47,6 +47,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Deploy Convex Backend to Staging
+        run: pnpm --filter @poohma/backend run deploy
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
