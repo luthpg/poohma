@@ -7,10 +7,18 @@
 ```text
 poohma/
 ├── apps/
-│   └── web/               # @poohma/web (TanStack Start + Convex)
-│       ├── convex/        # Convex バックエンド (schema, functions, RLS, customBuilders)
-│       ├── src/           # フロントエンドおよび Server Functions
-│       └── tests/         # テスト群 (Vitest / convex-test)
+│   └── web/               # @poohma/web (TanStack Start フロントエンド & ブラウザE2E)
+│       ├── src/           # UI, Routes, Hooks, Server Functions
+│       ├── e2e/           # Playwright E2E シナリオ
+│       └── tests/         # フロントエンド単体・ブラウザ暗号テスト
+├── packages/
+│   ├── backend/           # @poohma/backend (Convex BaaS バックエンド)
+│   │   ├── convex/        # schema, functions, RLS, customBuilders
+│   │   ├── scripts/       # setup-preview, export-demo-records
+│   │   └── tests/         # バックエンド結合テスト (convex-test)
+│   ├── shared/            # @poohma/shared (共通モジュール・部品)
+│   │   └── src/           # schemas, url-safety, index-group, emails
+│   └── knowledge-tools/   # @poohma/knowledge-tools (AI運用・品質ゲート)
 ├── workers/
 │   └── backup/            # @poohma/backup (Cloudflare Workers + R2 定期自動バックアップ)
 ├── .docs/                 # 人間向けの正規仕様・設計書
@@ -18,14 +26,17 @@ poohma/
 ├── GEMINI.md              # 実行環境ルール・QA・Git・.ai/利用規約
 ├── biome.json             # 統一 Lint / Format 設定
 ├── turbo.json             # Turborepo パイプライン設定
-└── package.json           # ルートスクリプト
+└── package.json           # ルートスクリプト & オーケストレーション
 ```
 
 ### Workspaceの責務
 
 | Workspace | 責務 | 主要技術 |
 | --- | --- | --- |
-| `apps/web` | メインWebアプリケーション（フロントエンド、SSR、Server Functions、Convex BaaSバックエンド） | React 19, TanStack Start, TanStack Router, Convex, Tailwind CSS v4, shadcn/ui, Web Crypto API |
+| `apps/web` | メインWebアプリケーション（フロントエンド、SSR、Server Functions） | React 19, TanStack Start, TanStack Router, Tailwind CSS v4, shadcn/ui, Web Crypto API |
+| `packages/backend` | Convex BaaS バックエンド（スキーマ、関数、RLS、プレビュー構築） | Convex, convex-helpers, convex-test, TypeScript |
+| `packages/shared` | 共通バリデーションスキーマ、URL検証（SSRF対策）、メール定義 | Zod, React Email, ipaddr.js, TypeScript |
+| `packages/knowledge-tools` | AI開発支援、Doc-Sync、参照整合性検証ツール | TypeScript, simple-git |
 | `workers/backup` | Convex Cloud からの定期データエクスポートおよび Cloudflare R2 へのアーカイブ保存 | Cloudflare Workers, Cloudflare R2, Wrangler, Fetch |
 
 ---

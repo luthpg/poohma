@@ -64,11 +64,6 @@ export default defineConfig({
             "e2e/**",
             "tests/browser-e2e/**",
           ],
-          server: {
-            deps: {
-              inline: ["convex-test"],
-            },
-          },
         },
       },
       {

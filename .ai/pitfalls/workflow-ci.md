@@ -150,4 +150,64 @@ CI 内で実行するコマンド群は、可能な限りルート `package.json
 1. **ワークフロー定義の横断検索義務**: パッケージ間でスクリプトの移管・削除を行った際は、ルートやアプリケーションの `package.json` だけでなく、必ず `.github/workflows/*.yml` も対象に旧スクリプト名の参照がないかを grep 検索して追従すること。
 2. **移管先パッケージへの即時切り替え**: 旧パッケージに不要な後方互換ダミースクリプトを残さず（KISS原則）、CI ワークフロー側の呼び出し先を新パッケージ（例: `pnpm --filter @poohma/backend run preview:setup`）へ直ちに更新する。
 
+---
+
+## 9. 環境間デプロイキーの共有・フォールバック混同による環境上書き事故
+
+### 事象
+
+本番ワークフロー（`deploy-production.yml`）とステージングワークフロー（`deploy-staging.yml`）で、同一の `secrets.CONVEX_DEPLOY_KEY` を参照していた場合：
+1. Secret が開発用インスタンスを向いていると、本番デプロイ時にも開発環境へ反映されてしまい本番が更新されない。
+2. 逆に Secret を本番用キーに更新すると、ステージングのワークフローが本番インスタンスを直接上書きしてしまう。
+3. さらに「未設定なら開発用や本番用をフォールバックする」コードを入れると、シークレットの設定漏れ時に本番への誤爆がサイレントに発生する。
+
+### 対策
+
+- **フォールバックの完全排除（Single Source of Truth & KISS原則）**:
+  - 本番用（`CONVEX_DEPLOY_KEY`）とステージング用（`CONVEX_STAGING_DEPLOY_KEY`）のシークレット名を厳格に分離する。
+  - ステージング側ではフォールバックコード（`|| secrets.CONVEX_DEPLOY_KEY` 等）を一切置かず、キー未設定時は直ちに fail-fast させて他環境への誤爆を遮断する。
+
+---
+
+## 10. ジョブ間での環境変数（Convex Preview URL等）の output/input 伝播不足による E2E 後処理のサイレント失敗
+
+### 事象
+
+マルチジョブ構成のワークフローで、前段のプロビジョニングジョブ（`deploy-e2e`）が動的に Preview 環境（`VITE_CONVEX_URL`）を作成してローカル `.env` に書き出しているにもかかわらず、その URL をジョブの `outputs` として定義していなかった。
+後続のテスト実行ジョブ（`e2e` / `workflow_call`）は別ランナー・別コンテナで動作するため前段のローカルファイルを参照できず、`VITE_CONVEX_URL` が未定義となり `auth.teardown.ts` が例外で失敗。
+さらに Teardown 側が `catch (error) {}` で例外を握りつぶしていたため、CI 上はグリーン（成功）に見えながらテストデータが残存し続けるゾンビデータ問題が発生した。
+
+### 対策
+
+1. **ジョブ間での明示的 outputs / inputs 伝播**:
+   前段ジョブで動的生成された環境情報（URL等）は、必ずステップの `$GITHUB_OUTPUT` およびジョブの `outputs` を経由して後続ジョブの `inputs` / `env` へ渡す。
+2. **Teardown 例外の握りつぶし禁止**:
+   テスト後処理のエラーは握りつぶさず明示的にテスト失敗として表面化させ、環境変数の受け渡し不備やパージ失敗を CI で即時検知可能にする。
+
+---
+
+## 11. CI 支援スクリプト内での child_process 文字列結合による OS コマンドインジェクション（CWE-78）
+
+### 事象
+
+`setup-preview.ts` 等の Node.js スクリプト内で、`execSync(`pnpm exec convex env set --from-file ${JSON.stringify(filePath)}`)` のように文字列結合でコマンドを組み立てて実行していた。
+`JSON.stringify()` は単にダブルクォートで文字列を囲むだけであり、POSIX シェルでは `$()` やバッククォートによるコマンド置換がシェル展開されてしまうため、CodeQL 等の静的解析で `Shell command built from environment values`（CWE-78: OS Command Injection）として重大警告を受ける。
+
+### 対策
+
+シェル（`cmd.exe` や `/bin/sh`）を一切経由しない `execFileSync` パターンを採用する：
+```ts
+import { execFileSync } from "node:child_process";
+
+const pnpmExecPath = process.env.npm_execpath;
+if (!pnpmExecPath) throw new Error("npm_execpath is missing");
+
+execFileSync(
+  process.execPath,
+  [pnpmExecPath, "exec", "convex", "env", "set", "--force", "--from-file", filePath, "--deployment", deploymentName],
+  { cwd: backendDir, env: { ...process.env, CONVEX_DEPLOY_KEY: previewKey }, stdio: "inherit" }
+);
+```
+`process.execPath`（Node.js バイナリ）から `pnpmExecPath` を引数配列として直接起動することで、シェル展開の介在余地を根本から排除する。
+
 

@@ -16,7 +16,7 @@ jobs:
   deploy-convex-production:
     name: Deploy Convex Backend
     runs-on: ubuntu-latest
-    if: ${{ github.repository_owner == github.event.repository.owner.login && !github.event.pull_request.head.repo.fork }}
+    if: ${{ github.ref == 'refs/heads/main' && github.repository_owner == github.event.repository.owner.login }}
     env:
       CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
 

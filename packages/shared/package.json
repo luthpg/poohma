@@ -14,7 +14,9 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --coverage",
+    "email:dev": "email dev --dir src/emails/templates --port 7878",
+    "email:export": "email export --dir src/emails/templates"
   },
   "dependencies": {
     "@react-email/components": "^1.0.12",
@@ -26,9 +28,12 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@react-email/ui": "6.11.0",
     "@types/node": "^26.6.3",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@vitest/coverage-v8": "^5.0.3",
+    "react-email": "^6.11.0",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3"
   }

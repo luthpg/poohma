@@ -50,7 +50,7 @@ jobs:
       - name: Deploy Convex Backend to Staging
         run: pnpm --filter @poohma/backend run deploy
         env:
-          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_STAGING_DEPLOY_KEY }}
 
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
@@ -110,6 +110,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       deploy_url: ${{ steps.deploy.outputs.deploy_url }}
+      convex_url: ${{ steps.preview-setup.outputs.convex_url }}
     env:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -147,7 +148,13 @@ jobs:
         run: printf 'DISABLE_EMAIL_DELIVERY=true\n' > apps/web/.env.e2e.local
 
       - name: Setup Convex E2E Preview Deployment
-        run: pnpm --filter @poohma/backend run preview:setup
+        id: preview-setup
+        run: |
+          pnpm --filter @poohma/backend run preview:setup
+          if [ -f apps/web/e2e/.env.e2e-preview ]; then
+            CONVEX_URL=$(grep '^VITE_CONVEX_URL=' apps/web/e2e/.env.e2e-preview | cut -d '=' -f2-)
+            echo "convex_url=$CONVEX_URL" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Pull Vercel Environment Information
         run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
@@ -179,4 +186,5 @@ jobs:
     uses: ./.github/workflows/e2e-staging.yml
     with:
       base_url: ${{ needs.deploy-e2e.outputs.deploy_url }}
+      convex_url: ${{ needs.deploy-e2e.outputs.convex_url }}
     secrets: inherit

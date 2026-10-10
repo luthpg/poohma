@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -40,10 +40,15 @@ if (!previewKey) {
   process.exit(0);
 }
 
+const pnpmExecPath = process.env.npm_execpath;
+if (!pnpmExecPath) {
+  throw new Error("[setup-preview] npm_execpath is missing in environment");
+}
+
 const isClean = process.argv.includes("--clean");
 const previewFlag = isClean
-  ? '--preview-create="e2e-test"'
-  : '--preview-name="e2e-test"';
+  ? "--preview-create=e2e-test"
+  : "--preview-name=e2e-test";
 
 console.log(
   `🚀 [setup-preview] Deploying to Convex Preview (${isClean ? "recreate" : "reuse"})...`,
@@ -51,8 +56,18 @@ console.log(
 
 try {
   // 1. Convex Preview デプロイ & URL書き出し (backendDir 相対パスで安全に実行)
-  execSync(
-    `pnpm exec convex deploy ${previewFlag} --typecheck=disable --codegen=disable --cmd="pnpm exec tsx scripts/write-preview-env.ts"`,
+  execFileSync(
+    process.execPath,
+    [
+      pnpmExecPath,
+      "exec",
+      "convex",
+      "deploy",
+      previewFlag,
+      "--typecheck=disable",
+      "--codegen=disable",
+      "--cmd=pnpm exec tsx scripts/write-preview-env.ts",
+    ],
     {
       cwd: backendDir,
       env: {
@@ -82,6 +97,11 @@ try {
   }
   const previewUrl = new URL(rawUrl);
   const deploymentName = previewUrl.hostname.split(".")[0];
+  if (!deploymentName) {
+    throw new Error(
+      `[setup-preview] Failed to extract deployment name from ${previewUrl.hostname}`,
+    );
+  }
 
   // 3. .env.e2e.local が存在する場合、Preview Deployment に環境変数を設定
   const e2eLocalCandidates = [
@@ -95,8 +115,20 @@ try {
     console.log(
       `⚙️  [setup-preview] Applying server environment variables to preview deployment "${deploymentName}" from ${e2eLocalEnvPath}...`,
     );
-    execSync(
-      `pnpm exec convex env set --force --from-file ${JSON.stringify(e2eLocalEnvPath)} --deployment ${deploymentName}`,
+    execFileSync(
+      process.execPath,
+      [
+        pnpmExecPath,
+        "exec",
+        "convex",
+        "env",
+        "set",
+        "--force",
+        "--from-file",
+        e2eLocalEnvPath,
+        "--deployment",
+        deploymentName,
+      ],
       {
         cwd: backendDir,
         env: {
@@ -116,8 +148,19 @@ try {
   console.log(
     `✉️  [setup-preview] Ensuring DISABLE_EMAIL_DELIVERY=true on "${deploymentName}"...`,
   );
-  execSync(
-    `pnpm exec convex env set DISABLE_EMAIL_DELIVERY true --deployment ${deploymentName}`,
+  execFileSync(
+    process.execPath,
+    [
+      pnpmExecPath,
+      "exec",
+      "convex",
+      "env",
+      "set",
+      "DISABLE_EMAIL_DELIVERY",
+      "true",
+      "--deployment",
+      deploymentName,
+    ],
     {
       cwd: backendDir,
       env: {

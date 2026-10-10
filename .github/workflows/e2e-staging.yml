@@ -7,6 +7,10 @@ on:
         required: false
         type: string
         default: ""
+      convex_url:
+        required: false
+        type: string
+        default: ""
   workflow_dispatch: {}
 
 permissions:
@@ -17,6 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       E2E_BASE_URL: ${{ inputs.base_url != '' && inputs.base_url || vars.E2E_STAGING_URL }}
+      VITE_CONVEX_URL: ${{ inputs.convex_url != '' && inputs.convex_url || vars.VITE_CONVEX_URL }}
       FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
       VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
       VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}

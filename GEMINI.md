@@ -73,7 +73,7 @@
 ## 3. Convex Workflow & Code Generation
 
 - **開発環境へのワンショット反映（ローカル開発・E2Eテスト前）**:
-  `pnpm convex:dev:once`（または `pnpm -F @poohma/web exec convex dev --once`）
+  `pnpm convex:dev:once`（または `pnpm -F @poohma/backend exec convex dev --once`）
   - 常駐プロセス化（watch モード）を回避し、開発環境への反映と型生成をワンショットで実行。
 - **本番・プレビュー環境への一括同期**: `pnpm convex:sync`
 - **個別に実行する場合**: `pnpm convex:deploy` / `pnpm convex:codegen`

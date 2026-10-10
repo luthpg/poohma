@@ -182,3 +182,13 @@
   - `check-and-test` ジョブ内で `pnpm check:knowledge` および `pnpm check:doc-sync -- --base "origin/$GITHUB_BASE_REF" --ci` を実行し、参照切れや REQUIRED レベルのドキュメント未更新が残存する状態でのマージを CI 側で厳格にブロックする。
 - **CI 実行コマンドのスクリプト集約（Single Source of Truth）**:
   - CI ワークフローで実行する検証・デプロイコマンド（Convex dry-run 等）は、個別の生コマンドではなくルート `package.json` のスクリプト（`pnpm run <script-name>`）に集約し、ローカル開発と CI での実行オプションの Single Source of Truth を維持する。
+
+### デプロイキーと環境選択の厳格な分離（フォールバック排除）
+
+- **環境間シークレットの完全分離**:
+  - 本番ワークフロー（`deploy-production.yml`）とステージングワークフロー（`deploy-staging.yml`）で同一の `CONVEX_DEPLOY_KEY` を共有してはならない。
+  - 本番環境は `CONVEX_DEPLOY_KEY`、ステージング環境は `CONVEX_STAGING_DEPLOY_KEY` をそれぞれ専用にバインドする。
+- **デプロイキーの曖昧なフォールバックの禁止（fail-fast 原則）**:
+  - ステージングデプロイにおいて、「キーが未設定なら開発用や本番用キーを流用する」といったフォールバックコードを記述してはならない。環境の混同や本番への誤爆を防ぐため、未設定時は即座に失敗（fail-fast）させる。
+- **本番デプロイワークフローの main ブランチ厳格制限**:
+  - 本番デプロイジョブは手動実行（workflow_dispatch）を含め、必ず `github.ref == 'refs/heads/main'` かつリポジトリオーナーの一致を検証する実行条件を課し、未マージブランチからの本番反映を構造的に遮断する。

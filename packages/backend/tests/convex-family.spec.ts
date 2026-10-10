@@ -2210,1885 +2210,1761 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
   });
 });
 
-import {
-  decrypt,
-  deriveKeyFromPasscode,
-  encrypt,
-  exportKeyToBase64,
-  generateDEK,
-  unwrapDEK,
-  wrapDEK,
-} from "../../../apps/web/src/lib/crypto";
+describe("2.1.5 家族移行（familyMigrations）のアカウント境界とアクセス制御", () => {
+  it("同一Firebase UID内の別アカウントが準備したmigrationIdは実行できず、作成元アカウントのみ実行できること", async () => {
+    const t = convexTest(schema, modules);
 
-describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
-  it("旧パスコードでラップされたDEKが、新しいパスコードのマスターキーで正しく再ラップされ、データが復号可能な状態を維持できること", async () => {
-    //---------------------------------------------------------
-    // 1. 準備段階: 旧パスコードで暗号化されたレコードを模倣
-    //---------------------------------------------------------
-    const oldPasscode = "old-family-passcode-1234";
-    const newPasscode = "new-family-passcode-5678";
-    const secretHint = "super-secret-password-hint";
+    let account1Id!: Id<"users">;
+    let account2Id!: Id<"users">;
 
-    // 鍵の導出 (ストレッチング等はモックするか、実関数を使用)
-    const oldMasterKey = await deriveKeyFromPasscode(
-      oldPasscode,
-      "static-salt-for-test",
-    );
-    const newMasterKey = await deriveKeyFromPasscode(
-      newPasscode,
-      "static-salt-for-test",
-    );
-
-    // 個別DEKの生成とデータの暗号化
-    const originalDek = await generateDEK();
-    const encryptedHint = await encrypt(secretHint, originalDek);
-    const wrappedDekOld = await wrapDEK(originalDek, oldMasterKey);
-
-    // Convexに格納されていると仮定するダミーのデータ構造
-    const mockDbCredential = {
-      id: "cred-test-id",
-      passwordHint: encryptedHint.encrypted,
-      passwordHintIv: encryptedHint.iv,
-      passwordHintDekEncrypted: wrappedDekOld.encrypted,
-      passwordHintDekIv: wrappedDekOld.iv,
-    };
-
-    // ローテーション前: 旧マスターキーではアンラップでき、新マスターキーでは失敗することを確認
-    await expect(
-      unwrapDEK(
-        mockDbCredential.passwordHintDekEncrypted,
-        mockDbCredential.passwordHintDekIv,
-        newMasterKey,
-      ),
-    ).rejects.toThrow();
-
-    //---------------------------------------------------------
-    // 2. 実行段階: family.tsx 内のローテーションロジックのシミュレーション
-    //---------------------------------------------------------
-    // ① 旧マスターキーを使ってDEKを取り出す
-    const unwrappedDek = await unwrapDEK(
-      mockDbCredential.passwordHintDekEncrypted,
-      mockDbCredential.passwordHintDekIv,
-      oldMasterKey,
-    );
-
-    // ② 取り出したDEKを、新しいマスターキーでラップし直す
-    const reWrappedDek = await wrapDEK(unwrappedDek, newMasterKey);
-
-    // ③ 新しいペイロードの作成（これがConvexのMutationに送信される）
-    const rotatedCredentialPayload = {
-      id: mockDbCredential.id,
-      passwordHint: mockDbCredential.passwordHint, // 暗号文自体は不変
-      passwordHintIv: mockDbCredential.passwordHintIv,
-      passwordHintDekEncrypted: reWrappedDek.encrypted, // 新しい封筒
-      passwordHintDekIv: reWrappedDek.iv,
-    };
-
-    //---------------------------------------------------------
-    // 3. 検証段階: 新しいパスコード（新マスターキー）だけで復号ができるか
-    //---------------------------------------------------------
-    // 新しい鍵でDEKをアンラップできるか
-    const decryptedDek = await unwrapDEK(
-      rotatedCredentialPayload.passwordHintDekEncrypted,
-      rotatedCredentialPayload.passwordHintDekIv,
-      newMasterKey,
-    );
-
-    // 復号後のDEKが期待する鍵用途・アルゴリズム・生データと完全に一致することを検証
-    expect(decryptedDek.algorithm.name).toBe("AES-GCM");
-    expect(decryptedDek.usages).toEqual(["encrypt", "decrypt"]);
-    expect(await exportKeyToBase64(decryptedDek)).toBe(
-      await exportKeyToBase64(originalDek),
-    );
-
-    // アンラップしたDEKで、暗号文が元の平文に戻るか
-    const finalPlainHint = await decrypt(
-      rotatedCredentialPayload.passwordHint,
-      rotatedCredentialPayload.passwordHintIv,
-      decryptedDek,
-    );
-
-    // 鍵が書き換わっても、データの中身が正しく復元できること
-    expect(finalPlainHint).toBe(secretHint);
-
-    // ローテーション後: 旧マスターキー（旧パスコード）では復号できないことを検証
-    await expect(
-      unwrapDEK(
-        rotatedCredentialPayload.passwordHintDekEncrypted,
-        rotatedCredentialPayload.passwordHintDekIv,
-        oldMasterKey,
-      ),
-    ).rejects.toThrow();
-  });
-
-  describe("2.1.5 家族移行（familyMigrations）のアカウント境界とアクセス制御", () => {
-    it("同一Firebase UID内の別アカウントが準備したmigrationIdは実行できず、作成元アカウントのみ実行できること", async () => {
-      const t = convexTest(schema, modules);
-
-      let account1Id!: Id<"users">;
-      let account2Id!: Id<"users">;
-
-      // 同一 Firebase UID (user_multi) で2つのアカウントを作成
-      await t.run(async (ctx) => {
-        account1Id = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "user_multi",
-          email: "multi@example.com",
-          displayName: "アカウント1",
-          updatedAt: Date.now(),
-        });
-        account2Id = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "user_multi",
-          email: "multi@example.com",
-          displayName: "アカウント2",
-          updatedAt: Date.now(),
-        });
-      });
-
-      const client1 = t.withIdentity({
-        subject: "user_multi",
+    // 同一 Firebase UID (user_multi) で2つのアカウントを作成
+    await t.run(async (ctx) => {
+      account1Id = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "user_multi",
         email: "multi@example.com",
+        displayName: "アカウント1",
+        updatedAt: Date.now(),
       });
-
-      // アカウント1 で家族移行（新規家族作成）を prepare
-      const { migrationId } = await client1.mutation(
-        api.families.prepareFamilyMigration,
-        {
-          accountId: account1Id,
-          action: "create",
-          name: "マルチ家族",
-          masterKeyEncrypted: "enc_key",
-          masterKeyIv: "iv_key",
-          masterKeySalt: "salt_key",
-        },
-      );
-
-      expect(migrationId).toBeDefined();
-
-      // DB内の migration に accountId が保存されていることを検証
-      const migrationDoc = await t.run(async (ctx) => {
-        return await ctx.db.get(migrationId);
+      account2Id = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "user_multi",
+        email: "multi@example.com",
+        displayName: "アカウント2",
+        updatedAt: Date.now(),
       });
-      expect(migrationDoc?.accountId).toBe(account1Id);
-
-      // アカウント2 で同じ migrationId の暗号化データ取得を試みると拒否される
-      await expect(
-        client1.query(api.families.getMigrationForEncryption, {
-          accountId: account2Id,
-          migrationId,
-        }),
-      ).rejects.toThrow("Migration not found or access denied");
-
-      // アカウント2 で同じ migrationId の commit を試みると拒否される
-      await expect(
-        client1.mutation(api.families.commitFamilyMigration, {
-          accountId: account2Id,
-          migrationId,
-          credentials: [],
-        }),
-      ).rejects.toThrow("Migration not found or access denied");
-
-      // アカウント2 で同じ migrationId の abort を試みると拒否される
-      await expect(
-        client1.mutation(api.families.abortFamilyMigration, {
-          accountId: account2Id,
-          migrationId,
-        }),
-      ).rejects.toThrow("Migration not found or access denied");
-
-      // アカウント1 であれば暗号化データを取得・コミットできる
-      const encryptionData = await client1.query(
-        api.families.getMigrationForEncryption,
-        {
-          accountId: account1Id,
-          migrationId,
-        },
-      );
-      expect(encryptionData.migrationId).toBe(migrationId);
-
-      const commitResult = await client1.mutation(
-        api.families.commitFamilyMigration,
-        {
-          accountId: account1Id,
-          migrationId,
-          credentials: [],
-        },
-      );
-      expect(commitResult.success).toBe(true);
-
-      // アカウント1の familyId が更新され、アカウント2は影響を受けないこと
-      const user1 = await t.run(async (ctx) => ctx.db.get(account1Id));
-      const user2 = await t.run(async (ctx) => ctx.db.get(account2Id));
-      expect(user1?.familyId).toBe(commitResult.familyId);
-      expect(user2?.familyId).toBeUndefined();
     });
 
-    it("家族移行時、共有レコードは旧家族に残り、離脱者が唯一の管理者だった場合は残りの家族メンバー全員が自動昇格すること", async () => {
-      const t = convexTest(schema, modules);
-      let familyOldId!: Id<"families">;
-      let userLeaveId!: Id<"users">;
-      let userRemain1Id!: Id<"users">;
-      let userRemain2Id!: Id<"users">;
-      let sharedRecordId!: Id<"serviceRecords">;
+    const client1 = t.withIdentity({
+      subject: "user_multi",
+      email: "multi@example.com",
+    });
 
-      await t.run(async (ctx) => {
-        familyOldId = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          name: "Old Family",
-          updatedAt: Date.now(),
-        });
+    // アカウント1 で家族移行（新規家族作成）を prepare
+    const { migrationId } = await client1.mutation(
+      api.families.prepareFamilyMigration,
+      {
+        accountId: account1Id,
+        action: "create",
+        name: "マルチ家族",
+        masterKeyEncrypted: "enc_key",
+        masterKeyIv: "iv_key",
+        masterKeySalt: "salt_key",
+      },
+    );
 
-        userLeaveId = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "user_leave",
-          email: "leave@example.com",
-          familyId: familyOldId,
-          updatedAt: Date.now(),
-        });
+    expect(migrationId).toBeDefined();
 
-        userRemain1Id = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "user_remain1",
-          email: "remain1@example.com",
-          familyId: familyOldId,
-          updatedAt: Date.now(),
-        });
+    // DB内の migration に accountId が保存されていることを検証
+    const migrationDoc = await t.run(async (ctx) => {
+      return await ctx.db.get(migrationId);
+    });
+    expect(migrationDoc?.accountId).toBe(account1Id);
 
-        userRemain2Id = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "user_remain2",
-          email: "remain2@example.com",
-          familyId: familyOldId,
-          updatedAt: Date.now(),
-        });
+    // アカウント2 で同じ migrationId の暗号化データ取得を試みると拒否される
+    await expect(
+      client1.query(api.families.getMigrationForEncryption, {
+        accountId: account2Id,
+        migrationId,
+      }),
+    ).rejects.toThrow("Migration not found or access denied");
 
-        sharedRecordId = await ctx.db.insert("serviceRecords", {
-          stableId: crypto.randomUUID(),
-          userId: "user_leave",
-          accountId: userLeaveId,
-          revision: 0,
-          updatedByAccountId: userLeaveId,
-          familyId: familyOldId,
-          ownerFamilyId: familyOldId,
-          title: "Shared Record",
-          sortKey: computeSortKey("Shared Record"),
-          ownerType: "family",
-          admins: [userLeaveId], // userLeave is the only admin
-          tags: [],
-          isArchived: false,
-          updatedAt: Date.now(),
-        });
+    // アカウント2 で同じ migrationId の commit を試みると拒否される
+    await expect(
+      client1.mutation(api.families.commitFamilyMigration, {
+        accountId: account2Id,
+        migrationId,
+        credentials: [],
+      }),
+    ).rejects.toThrow("Migration not found or access denied");
+
+    // アカウント2 で同じ migrationId の abort を試みると拒否される
+    await expect(
+      client1.mutation(api.families.abortFamilyMigration, {
+        accountId: account2Id,
+        migrationId,
+      }),
+    ).rejects.toThrow("Migration not found or access denied");
+
+    // アカウント1 であれば暗号化データを取得・コミットできる
+    const encryptionData = await client1.query(
+      api.families.getMigrationForEncryption,
+      {
+        accountId: account1Id,
+        migrationId,
+      },
+    );
+    expect(encryptionData.migrationId).toBe(migrationId);
+
+    const commitResult = await client1.mutation(
+      api.families.commitFamilyMigration,
+      {
+        accountId: account1Id,
+        migrationId,
+        credentials: [],
+      },
+    );
+    expect(commitResult.success).toBe(true);
+
+    // アカウント1の familyId が更新され、アカウント2は影響を受けないこと
+    const user1 = await t.run(async (ctx) => ctx.db.get(account1Id));
+    const user2 = await t.run(async (ctx) => ctx.db.get(account2Id));
+    expect(user1?.familyId).toBe(commitResult.familyId);
+    expect(user2?.familyId).toBeUndefined();
+  });
+
+  it("家族移行時、共有レコードは旧家族に残り、離脱者が唯一の管理者だった場合は残りの家族メンバー全員が自動昇格すること", async () => {
+    const t = convexTest(schema, modules);
+    let familyOldId!: Id<"families">;
+    let userLeaveId!: Id<"users">;
+    let userRemain1Id!: Id<"users">;
+    let userRemain2Id!: Id<"users">;
+    let sharedRecordId!: Id<"serviceRecords">;
+
+    await t.run(async (ctx) => {
+      familyOldId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "Old Family",
+        updatedAt: Date.now(),
       });
 
-      const userLeaveClient = t.withIdentity({
-        subject: "user_leave",
+      userLeaveId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "user_leave",
         email: "leave@example.com",
+        familyId: familyOldId,
+        updatedAt: Date.now(),
       });
 
-      // userLeave が新家族を作成して移行
-      const prep = await userLeaveClient.mutation(
-        api.families.prepareFamilyMigration,
-        {
-          action: "create",
-          name: "New Solo Family",
-          masterKeyEncrypted: "enc",
-          masterKeyIv: "iv",
-          masterKeySalt: "salt",
-        },
-      );
-
-      await userLeaveClient.mutation(api.families.commitFamilyMigration, {
-        migrationId: prep.migrationId,
-        credentials: [],
+      userRemain1Id = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "user_remain1",
+        email: "remain1@example.com",
+        familyId: familyOldId,
+        updatedAt: Date.now(),
       });
 
-      // DB検証: 共有レコードは旧家族に残り、admins が残った [userRemain1Id, userRemain2Id] に自動昇格されていること
-      await t.run(async (ctx) => {
-        const record = await ctx.db.get(sharedRecordId);
-        expect(record?.familyId).toBe(familyOldId);
-        expect(record?.ownerFamilyId).toBe(familyOldId);
-        expect(record?.ownerType).toBe("family");
-        expect(record?.admins).not.toContain(userLeaveId);
-        expect([...(record?.admins ?? [])].sort()).toEqual(
-          [userRemain1Id, userRemain2Id].sort(),
-        );
+      userRemain2Id = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "user_remain2",
+        email: "remain2@example.com",
+        familyId: familyOldId,
+        updatedAt: Date.now(),
+      });
+
+      sharedRecordId = await ctx.db.insert("serviceRecords", {
+        stableId: crypto.randomUUID(),
+        userId: "user_leave",
+        accountId: userLeaveId,
+        revision: 0,
+        updatedByAccountId: userLeaveId,
+        familyId: familyOldId,
+        ownerFamilyId: familyOldId,
+        title: "Shared Record",
+        sortKey: computeSortKey("Shared Record"),
+        ownerType: "family",
+        admins: [userLeaveId], // userLeave is the only admin
+        tags: [],
+        isArchived: false,
+        updatedAt: Date.now(),
       });
     });
 
-    it("家族唯一のメンバーが移行して離脱した場合、孤立共有レコードおよび旧家族がクリーンアップされること", async () => {
-      const t = convexTest(schema, modules);
-      let familyOldId!: Id<"families">;
-      let userSoloId!: Id<"users">;
-      let sharedRecordId!: Id<"serviceRecords">;
+    const userLeaveClient = t.withIdentity({
+      subject: "user_leave",
+      email: "leave@example.com",
+    });
 
-      await t.run(async (ctx) => {
-        familyOldId = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          name: "Old Solo Family",
-          updatedAt: Date.now(),
-        });
-        userSoloId = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "user_solo_leave",
-          email: "solo_leave@example.com",
-          familyId: familyOldId,
-          updatedAt: Date.now(),
-        });
-        sharedRecordId = await ctx.db.insert("serviceRecords", {
-          stableId: crypto.randomUUID(),
-          userId: "user_solo_leave",
-          accountId: userSoloId,
-          revision: 0,
-          updatedByAccountId: userSoloId,
-          familyId: familyOldId,
-          ownerFamilyId: familyOldId,
-          title: "孤立する共有レコード",
-          sortKey: computeSortKey("孤立する共有レコード"),
-          ownerType: "family",
-          admins: [userSoloId],
-          tags: [],
-          isArchived: false,
-          updatedAt: Date.now(),
-        });
+    // userLeave が新家族を作成して移行
+    const prep = await userLeaveClient.mutation(
+      api.families.prepareFamilyMigration,
+      {
+        action: "create",
+        name: "New Solo Family",
+        masterKeyEncrypted: "enc",
+        masterKeyIv: "iv",
+        masterKeySalt: "salt",
+      },
+    );
+
+    await userLeaveClient.mutation(api.families.commitFamilyMigration, {
+      migrationId: prep.migrationId,
+      credentials: [],
+    });
+
+    // DB検証: 共有レコードは旧家族に残り、admins が残った [userRemain1Id, userRemain2Id] に自動昇格されていること
+    await t.run(async (ctx) => {
+      const record = await ctx.db.get(sharedRecordId);
+      expect(record?.familyId).toBe(familyOldId);
+      expect(record?.ownerFamilyId).toBe(familyOldId);
+      expect(record?.ownerType).toBe("family");
+      expect(record?.admins).not.toContain(userLeaveId);
+      expect([...(record?.admins ?? [])].sort()).toEqual(
+        [userRemain1Id, userRemain2Id].sort(),
+      );
+    });
+  });
+
+  it("家族唯一のメンバーが移行して離脱した場合、孤立共有レコードおよび旧家族がクリーンアップされること", async () => {
+    const t = convexTest(schema, modules);
+    let familyOldId!: Id<"families">;
+    let userSoloId!: Id<"users">;
+    let sharedRecordId!: Id<"serviceRecords">;
+
+    await t.run(async (ctx) => {
+      familyOldId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "Old Solo Family",
+        updatedAt: Date.now(),
       });
-
-      const userSoloClient = t.withIdentity({
-        subject: "user_solo_leave",
+      userSoloId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "user_solo_leave",
         email: "solo_leave@example.com",
+        familyId: familyOldId,
+        updatedAt: Date.now(),
       });
-
-      const prep = await userSoloClient.mutation(
-        api.families.prepareFamilyMigration,
-        {
-          action: "create",
-          name: "New Family",
-          masterKeyEncrypted: "enc",
-          masterKeyIv: "iv",
-          masterKeySalt: "salt",
-        },
-      );
-
-      await userSoloClient.mutation(api.families.commitFamilyMigration, {
-        migrationId: prep.migrationId,
-        credentials: [],
-      });
-
-      // DB検証: 孤立した共有レコードおよびメンバー不在となった旧家族が削除されていること
-      await t.run(async (ctx) => {
-        expect(await ctx.db.get(sharedRecordId)).toBeNull();
-        expect(await ctx.db.get(familyOldId)).toBeNull();
+      sharedRecordId = await ctx.db.insert("serviceRecords", {
+        stableId: crypto.randomUUID(),
+        userId: "user_solo_leave",
+        accountId: userSoloId,
+        revision: 0,
+        updatedByAccountId: userSoloId,
+        familyId: familyOldId,
+        ownerFamilyId: familyOldId,
+        title: "孤立する共有レコード",
+        sortKey: computeSortKey("孤立する共有レコード"),
+        ownerType: "family",
+        admins: [userSoloId],
+        tags: [],
+        isArchived: false,
+        updatedAt: Date.now(),
       });
     });
-  });
 
-  describe("2.1.5 KDFメタデータのスキーマ保存とバリデーション", () => {
-    it("createFamily で指定した kdfIterations / cryptoVersion がそのまま保存されること", async () => {
-      const t = convexTest(schema, modules);
-      await t.run(async (ctx) => {
-        await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "user_kdf",
-          email: "kdf@example.com",
-          updatedAt: Date.now(),
-        });
-      });
-      const user = t.withIdentity({
-        subject: "user_kdf",
+    const userSoloClient = t.withIdentity({
+      subject: "user_solo_leave",
+      email: "solo_leave@example.com",
+    });
+
+    const prep = await userSoloClient.mutation(
+      api.families.prepareFamilyMigration,
+      {
+        action: "create",
+        name: "New Family",
+        masterKeyEncrypted: "enc",
+        masterKeyIv: "iv",
+        masterKeySalt: "salt",
+      },
+    );
+
+    await userSoloClient.mutation(api.families.commitFamilyMigration, {
+      migrationId: prep.migrationId,
+      credentials: [],
+    });
+
+    // DB検証: 孤立した共有レコードおよびメンバー不在となった旧家族が削除されていること
+    await t.run(async (ctx) => {
+      expect(await ctx.db.get(sharedRecordId)).toBeNull();
+      expect(await ctx.db.get(familyOldId)).toBeNull();
+    });
+  });
+});
+
+describe("2.1.5 KDFメタデータのスキーマ保存とバリデーション", () => {
+  it("createFamily で指定した kdfIterations / cryptoVersion がそのまま保存されること", async () => {
+    const t = convexTest(schema, modules);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "user_kdf",
         email: "kdf@example.com",
-      });
-      const familyId = await user.mutation(api.families.createFamily, {
-        name: "KDFテスト家族",
-        masterKeyEncrypted: "enc",
-        masterKeyIv: "iv",
-        masterKeySalt: "salt",
-        kdfIterations: 400_000,
-        cryptoVersion: 1,
-      });
-      await t.run(async (ctx) => {
-        const family = await ctx.db.get(familyId as Id<"families">);
-        expect(family?.kdfIterations).toBe(400_000);
-        expect(family?.cryptoVersion).toBe(1);
+        updatedAt: Date.now(),
       });
     });
+    const user = t.withIdentity({
+      subject: "user_kdf",
+      email: "kdf@example.com",
+    });
+    const familyId = await user.mutation(api.families.createFamily, {
+      name: "KDFテスト家族",
+      masterKeyEncrypted: "enc",
+      masterKeyIv: "iv",
+      masterKeySalt: "salt",
+      kdfIterations: 400_000,
+      cryptoVersion: 1,
+    });
+    await t.run(async (ctx) => {
+      const family = await ctx.db.get(familyId as Id<"families">);
+      expect(family?.kdfIterations).toBe(400_000);
+      expect(family?.cryptoVersion).toBe(1);
+    });
+  });
 
-    it("kdfIterations を省略した場合、サーバー側でレガシー値(300,000)が補完されること", async () => {
-      const t = convexTest(schema, modules);
-      await t.run(async (ctx) => {
-        await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "user_kdf_omit",
-          email: "kdfomit@example.com",
-          updatedAt: Date.now(),
-        });
-      });
-      const user = t.withIdentity({
-        subject: "user_kdf_omit",
+  it("kdfIterations を省略した場合、サーバー側でレガシー値(300,000)が補完されること", async () => {
+    const t = convexTest(schema, modules);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "user_kdf_omit",
         email: "kdfomit@example.com",
+        updatedAt: Date.now(),
       });
-      const familyId = await user.mutation(api.families.createFamily, {
-        name: "省略テスト家族",
+    });
+    const user = t.withIdentity({
+      subject: "user_kdf_omit",
+      email: "kdfomit@example.com",
+    });
+    const familyId = await user.mutation(api.families.createFamily, {
+      name: "省略テスト家族",
+      masterKeyEncrypted: "enc",
+      masterKeyIv: "iv",
+      masterKeySalt: "salt",
+    });
+    await t.run(async (ctx) => {
+      const family = await ctx.db.get(familyId as Id<"families">);
+      expect(family?.kdfIterations).toBe(300_000);
+      expect(family?.cryptoVersion).toBe(1);
+    });
+  });
+});
+
+describe("2.1.6 既存データへのKDFメタデータ マイグレーション", () => {
+  it("kdfIterations 未設定の家族に backfillKdfMetadataInternal を実行すると、レガシー値が補完されること", async () => {
+    const t = convexTest(schema, modules);
+    let familyId!: Id<"families">;
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "レガシー家族",
         masterKeyEncrypted: "enc",
         masterKeyIv: "iv",
         masterKeySalt: "salt",
+        updatedAt: Date.now(),
       });
-      await t.run(async (ctx) => {
-        const family = await ctx.db.get(familyId as Id<"families">);
-        expect(family?.kdfIterations).toBe(300_000);
-        expect(family?.cryptoVersion).toBe(1);
-      });
+    });
+    await t.mutation(internal.families.backfillKdfMetadataInternal, {});
+    await t.run(async (ctx) => {
+      const family = await ctx.db.get(familyId);
+      expect(family?.kdfIterations).toBe(300_000);
+      expect(family?.cryptoVersion).toBe(1);
     });
   });
 
-  describe("2.1.6 既存データへのKDFメタデータ マイグレーション", () => {
-    it("kdfIterations 未設定の家族に backfillKdfMetadataInternal を実行すると、レガシー値が補完されること", async () => {
-      const t = convexTest(schema, modules);
-      let familyId!: Id<"families">;
-      await t.run(async (ctx) => {
-        familyId = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          name: "レガシー家族",
-          masterKeyEncrypted: "enc",
-          masterKeyIv: "iv",
-          masterKeySalt: "salt",
-          updatedAt: Date.now(),
-        });
-      });
-      await t.mutation(internal.families.backfillKdfMetadataInternal, {});
-      await t.run(async (ctx) => {
-        const family = await ctx.db.get(familyId);
-        expect(family?.kdfIterations).toBe(300_000);
-        expect(family?.cryptoVersion).toBe(1);
+  it("既に kdfIterations が設定されている家族は上書きされないこと", async () => {
+    const t = convexTest(schema, modules);
+    let familyId!: Id<"families">;
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "新しめ家族",
+        masterKeyEncrypted: "enc",
+        masterKeyIv: "iv",
+        masterKeySalt: "salt",
+        kdfIterations: 500_000,
+        cryptoVersion: 1,
+        updatedAt: Date.now(),
       });
     });
-
-    it("既に kdfIterations が設定されている家族は上書きされないこと", async () => {
-      const t = convexTest(schema, modules);
-      let familyId!: Id<"families">;
-      await t.run(async (ctx) => {
-        familyId = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          name: "新しめ家族",
-          masterKeyEncrypted: "enc",
-          masterKeyIv: "iv",
-          masterKeySalt: "salt",
-          kdfIterations: 500_000,
-          cryptoVersion: 1,
-          updatedAt: Date.now(),
-        });
-      });
-      await t.mutation(internal.families.backfillKdfMetadataInternal, {});
-      await t.run(async (ctx) => {
-        const family = await ctx.db.get(familyId);
-        expect(family?.kdfIterations).toBe(500_000);
-      });
+    await t.mutation(internal.families.backfillKdfMetadataInternal, {});
+    await t.run(async (ctx) => {
+      const family = await ctx.db.get(familyId);
+      expect(family?.kdfIterations).toBe(500_000);
     });
   });
+});
 
-  describe("2.1.7 パスコードローテーション (rotatePasscode)", () => {
-    it("masterKey情報のみが更新され、users/serviceRecordsは変化しないこと", async () => {
-      const t = convexTest(schema, modules);
-      let familyId!: Id<"families">;
-      let userAId!: Id<"users">;
-      let userBId!: Id<"users">;
+describe("2.1.7 パスコードローテーション (rotatePasscode)", () => {
+  it("masterKey情報のみが更新され、users/serviceRecordsは変化しないこと", async () => {
+    const t = convexTest(schema, modules);
+    let familyId!: Id<"families">;
+    let userAId!: Id<"users">;
+    let userBId!: Id<"users">;
 
-      await t.run(async (ctx) => {
-        familyId = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          name: "F1",
-          masterKeyEncrypted: "b2xkRW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
-          masterKeyIv: "dGVzdGl2MTIzNDU2",
-          masterKeySalt: "dGVzdHNhbHQxMjM0NTY=",
-          kdfIterations: 300_000,
-          cryptoVersion: 1,
-          updatedAt: 1000,
-        });
-
-        userAId = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "ua",
-          email: "a@a.com",
-          familyId,
-          updatedAt: 1000,
-        });
-
-        userBId = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "ub",
-          email: "b@b.com",
-          familyId,
-          updatedAt: 1000,
-        });
-
-        const r1 = await ctx.db.insert("serviceRecords", {
-          stableId: crypto.randomUUID(),
-          userId: "ua",
-          accountId: userAId,
-          revision: 0,
-          updatedByAccountId: userAId,
-          familyId,
-          title: "R1",
-          sortKey: computeSortKey("R1"),
-          ownerType: "user",
-          admins: [],
-          tags: [],
-          isArchived: false,
-          updatedAt: 2000,
-        });
-        await ctx.db.insert("credentials", {
-          recordId: r1,
-          stableId: crypto.randomUUID(),
-          passwordHint: "SGVsbG8gV29ybGQgYXV0aGVudGljYXRlZCBhZWFk",
-          passwordHintIv: "dGVzdGl2MTIzNDU2",
-          passwordHintDekEncrypted: "ZGVrRGF0YUF1dGhlbnRpY2F0ZWQ=",
-          passwordHintDekIv: "ZGVraXZkZWtpdjEyMzQ=",
-          order: 0,
-          updatedAt: 2000,
-        });
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "F1",
+        masterKeyEncrypted: "b2xkRW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
+        masterKeyIv: "dGVzdGl2MTIzNDU2",
+        masterKeySalt: "dGVzdHNhbHQxMjM0NTY=",
+        kdfIterations: 300_000,
+        cryptoVersion: 1,
+        updatedAt: 1000,
       });
 
-      const userA = t.withIdentity({ subject: "ua", email: "a@a.com" });
-      const result = await userA.mutation(api.families.rotatePasscode, {
-        previousMasterKeyEncrypted: "b2xkRW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
+      userAId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "ua",
+        email: "a@a.com",
+        familyId,
+        updatedAt: 1000,
+      });
+
+      userBId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "ub",
+        email: "b@b.com",
+        familyId,
+        updatedAt: 1000,
+      });
+
+      const r1 = await ctx.db.insert("serviceRecords", {
+        stableId: crypto.randomUUID(),
+        userId: "ua",
+        accountId: userAId,
+        revision: 0,
+        updatedByAccountId: userAId,
+        familyId,
+        title: "R1",
+        sortKey: computeSortKey("R1"),
+        ownerType: "user",
+        admins: [],
+        tags: [],
+        isArchived: false,
+        updatedAt: 2000,
+      });
+      await ctx.db.insert("credentials", {
+        recordId: r1,
+        stableId: crypto.randomUUID(),
+        passwordHint: "SGVsbG8gV29ybGQgYXV0aGVudGljYXRlZCBhZWFk",
+        passwordHintIv: "dGVzdGl2MTIzNDU2",
+        passwordHintDekEncrypted: "ZGVrRGF0YUF1dGhlbnRpY2F0ZWQ=",
+        passwordHintDekIv: "ZGVraXZkZWtpdjEyMzQ=",
+        order: 0,
+        updatedAt: 2000,
+      });
+    });
+
+    const userA = t.withIdentity({ subject: "ua", email: "a@a.com" });
+    const result = await userA.mutation(api.families.rotatePasscode, {
+      previousMasterKeyEncrypted: "b2xkRW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
+      masterKeyEncrypted: "bmV3RW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
+      masterKeyIv: "bmV3SXZuZXdJdjEy",
+      masterKeySalt: "bmV3U2FsdE5ld1NhbHQ=",
+      kdfIterations: 400_000,
+      cryptoVersion: 1,
+    });
+
+    expect(result.success).toBe(true);
+
+    const family = await t.run((ctx) => ctx.db.get(familyId));
+    expect(family?.masterKeyEncrypted).toBe(
+      "bmV3RW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
+    );
+    expect(family?.masterKeyIv).toBe("bmV3SXZuZXdJdjEy");
+    expect(family?.masterKeySalt).toBe("bmV3U2FsdE5ld1NhbHQ=");
+    expect(family?.kdfIterations).toBe(400_000);
+    expect(family?.cryptoVersion).toBe(1);
+
+    // users や serviceRecords に変更がないことを確認
+    const record = await t.run(async (ctx) =>
+      ctx.db
+        .query("serviceRecords")
+        .withIndex("by_accountId", (q) => q.eq("accountId", userAId))
+        .first(),
+    );
+    expect(record?.updatedAt).toBe(2000);
+
+    const cred = await t.run(async (ctx) =>
+      record
+        ? ctx.db
+            .query("credentials")
+            .withIndex("by_recordId", (q) => q.eq("recordId", record._id))
+            .first()
+        : null,
+    );
+    expect(cred?.passwordHintDekEncrypted).toBe("ZGVrRGF0YUF1dGhlbnRpY2F0ZWQ=");
+
+    const userAAfter = await t.run((ctx) => ctx.db.get(userAId));
+    expect(userAAfter?.updatedAt).toBe(1000);
+    expect(userAAfter?.familyId).toBe(familyId);
+
+    const userBAfter = await t.run((ctx) => ctx.db.get(userBId));
+    expect(userBAfter?.updatedAt).toBe(1000);
+    expect(userBAfter?.familyId).toBe(familyId);
+  });
+
+  it("他メンバーや他端末での更新によりpreviousMasterKeyEncryptedがDB現在値と不一致の場合はCONFLICTとなること", async () => {
+    const t = convexTest(schema, modules);
+    let familyId!: Id<"families">;
+
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "F1",
+        masterKeyEncrypted: "Y3VycmVudEVuY3J5cHRlZERhdGFBdXRoZW50aWNhdGVk",
+        masterKeyIv: "dGVzdGl2MTIzNDU2",
+        masterKeySalt: "dGVzdHNhbHQxMjM0NTY=",
+        updatedAt: 1000,
+      });
+
+      await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "ua",
+        email: "a@a.com",
+        familyId,
+        updatedAt: 1000,
+      });
+    });
+
+    const userA = t.withIdentity({ subject: "ua", email: "a@a.com" });
+    await expect(
+      userA.mutation(api.families.rotatePasscode, {
+        previousMasterKeyEncrypted:
+          "c3RhbGVFbmNyeXB0ZWREYXRhQXV0aGVudGljYXRlZA==", // 古い値
         masterKeyEncrypted: "bmV3RW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
         masterKeyIv: "bmV3SXZuZXdJdjEy",
         masterKeySalt: "bmV3U2FsdE5ld1NhbHQ=",
-        kdfIterations: 400_000,
-        cryptoVersion: 1,
+      }),
+    ).rejects.toThrow("CONFLICT");
+  });
+
+  it("家族暗号化情報が未初期化の場合は拒否されること", async () => {
+    const t = convexTest(schema, modules);
+
+    await t.run(async (ctx) => {
+      const familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        masterKeyEncrypted: "",
+        masterKeyIv: "",
+        masterKeySalt: "",
+        name: "未初期化家族",
+        updatedAt: 1000,
       });
 
-      expect(result.success).toBe(true);
-
-      const family = await t.run((ctx) => ctx.db.get(familyId));
-      expect(family?.masterKeyEncrypted).toBe(
-        "bmV3RW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
-      );
-      expect(family?.masterKeyIv).toBe("bmV3SXZuZXdJdjEy");
-      expect(family?.masterKeySalt).toBe("bmV3U2FsdE5ld1NhbHQ=");
-      expect(family?.kdfIterations).toBe(400_000);
-      expect(family?.cryptoVersion).toBe(1);
-
-      // users や serviceRecords に変更がないことを確認
-      const record = await t.run(async (ctx) =>
-        ctx.db
-          .query("serviceRecords")
-          .withIndex("by_accountId", (q) => q.eq("accountId", userAId))
-          .first(),
-      );
-      expect(record?.updatedAt).toBe(2000);
-
-      const cred = await t.run(async (ctx) =>
-        record
-          ? ctx.db
-              .query("credentials")
-              .withIndex("by_recordId", (q) => q.eq("recordId", record._id))
-              .first()
-          : null,
-      );
-      expect(cred?.passwordHintDekEncrypted).toBe(
-        "ZGVrRGF0YUF1dGhlbnRpY2F0ZWQ=",
-      );
-
-      const userAAfter = await t.run((ctx) => ctx.db.get(userAId));
-      expect(userAAfter?.updatedAt).toBe(1000);
-      expect(userAAfter?.familyId).toBe(familyId);
-
-      const userBAfter = await t.run((ctx) => ctx.db.get(userBId));
-      expect(userBAfter?.updatedAt).toBe(1000);
-      expect(userBAfter?.familyId).toBe(familyId);
+      await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "ua",
+        email: "a@a.com",
+        familyId,
+        updatedAt: 1000,
+      });
     });
 
-    it("他メンバーや他端末での更新によりpreviousMasterKeyEncryptedがDB現在値と不一致の場合はCONFLICTとなること", async () => {
-      const t = convexTest(schema, modules);
-      let familyId!: Id<"families">;
+    const userA = t.withIdentity({ subject: "ua", email: "a@a.com" });
+    await expect(
+      userA.mutation(api.families.rotatePasscode, {
+        previousMasterKeyEncrypted: "YW55RW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
+        masterKeyEncrypted: "bmV3RW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
+        masterKeyIv: "bmV3SXZuZXdJdjEy",
+        masterKeySalt: "bmV3U2FsdE5ld1NhbHQ=",
+      }),
+    ).rejects.toThrow("Family encryption is not initialized yet");
+  });
 
-      await t.run(async (ctx) => {
-        familyId = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          name: "F1",
-          masterKeyEncrypted: "Y3VycmVudEVuY3J5cHRlZERhdGFBdXRoZW50aWNhdGVk",
-          masterKeyIv: "dGVzdGl2MTIzNDU2",
-          masterKeySalt: "dGVzdHNhbHQxMjM0NTY=",
-          updatedAt: 1000,
-        });
+  it("家族に所属していないユーザーからの呼び出しは拒否されること", async () => {
+    const t = convexTest(schema, modules);
 
-        await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "ua",
-          email: "a@a.com",
-          familyId,
-          updatedAt: 1000,
-        });
-      });
-
-      const userA = t.withIdentity({ subject: "ua", email: "a@a.com" });
-      await expect(
-        userA.mutation(api.families.rotatePasscode, {
-          previousMasterKeyEncrypted:
-            "c3RhbGVFbmNyeXB0ZWREYXRhQXV0aGVudGljYXRlZA==", // 古い値
-          masterKeyEncrypted: "bmV3RW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
-          masterKeyIv: "bmV3SXZuZXdJdjEy",
-          masterKeySalt: "bmV3U2FsdE5ld1NhbHQ=",
-        }),
-      ).rejects.toThrow("CONFLICT");
-    });
-
-    it("家族暗号化情報が未初期化の場合は拒否されること", async () => {
-      const t = convexTest(schema, modules);
-
-      await t.run(async (ctx) => {
-        const familyId = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          masterKeyEncrypted: "",
-          masterKeyIv: "",
-          masterKeySalt: "",
-          name: "未初期化家族",
-          updatedAt: 1000,
-        });
-
-        await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "ua",
-          email: "a@a.com",
-          familyId,
-          updatedAt: 1000,
-        });
-      });
-
-      const userA = t.withIdentity({ subject: "ua", email: "a@a.com" });
-      await expect(
-        userA.mutation(api.families.rotatePasscode, {
-          previousMasterKeyEncrypted:
-            "YW55RW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
-          masterKeyEncrypted: "bmV3RW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
-          masterKeyIv: "bmV3SXZuZXdJdjEy",
-          masterKeySalt: "bmV3U2FsdE5ld1NhbHQ=",
-        }),
-      ).rejects.toThrow("Family encryption is not initialized yet");
-    });
-
-    it("家族に所属していないユーザーからの呼び出しは拒否されること", async () => {
-      const t = convexTest(schema, modules);
-
-      await t.run(async (ctx) => {
-        await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "no_family_user",
-          email: "nofam@a.com",
-          updatedAt: 1000,
-        });
-      });
-
-      const noFamUser = t.withIdentity({
-        subject: "no_family_user",
+    await t.run(async (ctx) => {
+      await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "no_family_user",
         email: "nofam@a.com",
+        updatedAt: 1000,
       });
-
-      await expect(
-        noFamUser.mutation(api.families.rotatePasscode, {
-          previousMasterKeyEncrypted:
-            "YW55RW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
-          masterKeyEncrypted: "bmV3RW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
-          masterKeyIv: "bmV3SXZuZXdJdjEy",
-          masterKeySalt: "bmV3U2FsdE5ld1NhbHQ=",
-        }),
-      ).rejects.toThrow("User does not belong to a family");
     });
 
-    it("一般メンバー（viewer）が rotatePasscode / getRecordsForReEncryption を実行した場合、Access denied で拒否されること", async () => {
-      const t = convexTest(schema, modules);
+    const noFamUser = t.withIdentity({
+      subject: "no_family_user",
+      email: "nofam@a.com",
+    });
 
-      await t.run(async (ctx) => {
-        const familyId = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          name: "F_Viewer_Rotate",
-          masterKeyEncrypted: "encKey",
-          masterKeyIv: "iv",
-          masterKeySalt: "salt",
-          updatedAt: 1000,
-        });
+    await expect(
+      noFamUser.mutation(api.families.rotatePasscode, {
+        previousMasterKeyEncrypted: "YW55RW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
+        masterKeyEncrypted: "bmV3RW5jcnlwdGVkRGF0YUF1dGhlbnRpY2F0ZWQ=",
+        masterKeyIv: "bmV3SXZuZXdJdjEy",
+        masterKeySalt: "bmV3U2FsdE5ld1NhbHQ=",
+      }),
+    ).rejects.toThrow("User does not belong to a family");
+  });
 
-        await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "viewer",
-          userId: "u_viewer_rotate",
-          email: "v_rot@example.com",
-          familyId,
-          updatedAt: 1000,
-        });
+  it("一般メンバー（viewer）が rotatePasscode / getRecordsForReEncryption を実行した場合、Access denied で拒否されること", async () => {
+    const t = convexTest(schema, modules);
+
+    await t.run(async (ctx) => {
+      const familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "F_Viewer_Rotate",
+        masterKeyEncrypted: "encKey",
+        masterKeyIv: "iv",
+        masterKeySalt: "salt",
+        updatedAt: 1000,
       });
 
-      const viewer = t.withIdentity({
-        subject: "u_viewer_rotate",
+      await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "viewer",
+        userId: "u_viewer_rotate",
         email: "v_rot@example.com",
+        familyId,
+        updatedAt: 1000,
+      });
+    });
+
+    const viewer = t.withIdentity({
+      subject: "u_viewer_rotate",
+      email: "v_rot@example.com",
+    });
+
+    await expect(
+      viewer.query(api.families.getRecordsForReEncryption, {}),
+    ).rejects.toThrow("Access denied: Admin role required");
+
+    await expect(
+      viewer.mutation(api.families.rotatePasscode, {
+        previousMasterKeyEncrypted: "encKey",
+        masterKeyEncrypted: "newEncKey",
+        masterKeyIv: "newIv",
+        masterKeySalt: "newSalt",
+      }),
+    ).rejects.toThrow("Access denied: Admin role required");
+  });
+});
+
+describe("2.1.13 メンバーキック機能とExport Vault（E2EEデータ持ち出し）の検証", () => {
+  it("家族メンバーをキックすると、対象ユーザーのfamilyIdが解除され、Export Vaultが作成されること", async () => {
+    const t = convexTest(schema, modules);
+
+    let familyId!: Id<"families">;
+    let userBId!: Id<"users">;
+
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "佐藤家",
+        masterKeyEncrypted: "oldMasterKeyEncryptedBase64==",
+        masterKeyIv: "oldMasterKeyIv==",
+        masterKeySalt: "oldMasterKeySalt==",
+        kdfIterations: 600000,
+        cryptoVersion: 1,
+        updatedAt: Date.now(),
       });
 
-      await expect(
-        viewer.query(api.families.getRecordsForReEncryption, {}),
-      ).rejects.toThrow("Access denied: Admin role required");
+      await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "user_a",
+        email: "a@example.com",
+        displayName: "佐藤 太郎",
+        familyId,
+        updatedAt: Date.now(),
+      });
 
-      await expect(
-        viewer.mutation(api.families.rotatePasscode, {
-          previousMasterKeyEncrypted: "encKey",
-          masterKeyEncrypted: "newEncKey",
-          masterKeyIv: "newIv",
-          masterKeySalt: "newSalt",
-        }),
-      ).rejects.toThrow("Access denied: Admin role required");
+      userBId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "user_b",
+        email: "b@example.com",
+        displayName: "佐藤 次郎",
+        familyId,
+        updatedAt: Date.now(),
+      });
     });
+
+    const userA = t.withIdentity({
+      subject: "user_a",
+      email: "a@example.com",
+    });
+    const result = await userA.mutation(api.families.kickMember, {
+      targetAccountId: userBId,
+    });
+    expect(result.success).toBe(true);
+
+    // ユーザーBのfamilyIdが未設定になっていること
+    const updatedUserB = await t.run(async (ctx) => ctx.db.get(userBId));
+    expect(updatedUserB?.familyId).toBeUndefined();
+
+    // Export Vaultが作成されていること
+    const vault = await t.run(async (ctx) => {
+      return await ctx.db
+        .query("pendingExportVaults")
+        .withIndex("by_accountId", (q) => q.eq("accountId", userBId))
+        .first();
+    });
+    expect(vault).toBeDefined();
+    expect(vault?.oldFamilyId).toBe(familyId);
+    expect(vault?.oldFamilyName).toBe("佐藤家");
+    expect(vault?.masterKeyEncrypted).toBe("oldMasterKeyEncryptedBase64==");
+    expect(vault?.masterKeyIv).toBe("oldMasterKeyIv==");
+    expect(vault?.masterKeySalt).toBe("oldMasterKeySalt==");
+    expect(vault?.kdfIterations).toBe(600000);
+    expect(vault?.cryptoVersion).toBe(1);
+    expect(vault?.expiresAt).toBeGreaterThan(Date.now());
   });
 
-  describe("2.1.13 メンバーキック機能とExport Vault（E2EEデータ持ち出し）の検証", () => {
-    it("家族メンバーをキックすると、対象ユーザーのfamilyIdが解除され、Export Vaultが作成されること", async () => {
-      const t = convexTest(schema, modules);
+  it("自分自身（または自分の別アカウント）をキックしようとすると拒否されること", async () => {
+    const t = convexTest(schema, modules);
 
-      let familyId!: Id<"families">;
-      let userBId!: Id<"users">;
+    let familyId!: Id<"families">;
+    let userAId!: Id<"users">;
+    let userA2Id!: Id<"users">;
 
-      await t.run(async (ctx) => {
-        familyId = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          name: "佐藤家",
-          masterKeyEncrypted: "oldMasterKeyEncryptedBase64==",
-          masterKeyIv: "oldMasterKeyIv==",
-          masterKeySalt: "oldMasterKeySalt==",
-          kdfIterations: 600000,
-          cryptoVersion: 1,
-          updatedAt: Date.now(),
-        });
-
-        await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "user_a",
-          email: "a@example.com",
-          displayName: "佐藤 太郎",
-          familyId,
-          updatedAt: Date.now(),
-        });
-
-        userBId = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "user_b",
-          email: "b@example.com",
-          displayName: "佐藤 次郎",
-          familyId,
-          updatedAt: Date.now(),
-        });
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "佐藤家",
+        masterKeyEncrypted: "encKey",
+        masterKeyIv: "iv",
+        masterKeySalt: "salt",
+        updatedAt: Date.now(),
       });
 
-      const userA = t.withIdentity({
-        subject: "user_a",
+      userAId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "user_a",
         email: "a@example.com",
+        familyId,
+        updatedAt: Date.now(),
       });
-      const result = await userA.mutation(api.families.kickMember, {
-        targetAccountId: userBId,
-      });
-      expect(result.success).toBe(true);
 
-      // ユーザーBのfamilyIdが未設定になっていること
-      const updatedUserB = await t.run(async (ctx) => ctx.db.get(userBId));
-      expect(updatedUserB?.familyId).toBeUndefined();
-
-      // Export Vaultが作成されていること
-      const vault = await t.run(async (ctx) => {
-        return await ctx.db
-          .query("pendingExportVaults")
-          .withIndex("by_accountId", (q) => q.eq("accountId", userBId))
-          .first();
+      // 同一UIDの別アカウント
+      userA2Id = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "user_a",
+        email: "a-work@example.com",
+        familyId,
+        updatedAt: Date.now(),
       });
-      expect(vault).toBeDefined();
-      expect(vault?.oldFamilyId).toBe(familyId);
-      expect(vault?.oldFamilyName).toBe("佐藤家");
-      expect(vault?.masterKeyEncrypted).toBe("oldMasterKeyEncryptedBase64==");
-      expect(vault?.masterKeyIv).toBe("oldMasterKeyIv==");
-      expect(vault?.masterKeySalt).toBe("oldMasterKeySalt==");
-      expect(vault?.kdfIterations).toBe(600000);
-      expect(vault?.cryptoVersion).toBe(1);
-      expect(vault?.expiresAt).toBeGreaterThan(Date.now());
     });
 
-    it("自分自身（または自分の別アカウント）をキックしようとすると拒否されること", async () => {
-      const t = convexTest(schema, modules);
-
-      let familyId!: Id<"families">;
-      let userAId!: Id<"users">;
-      let userA2Id!: Id<"users">;
-
-      await t.run(async (ctx) => {
-        familyId = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          name: "佐藤家",
-          masterKeyEncrypted: "encKey",
-          masterKeyIv: "iv",
-          masterKeySalt: "salt",
-          updatedAt: Date.now(),
-        });
-
-        userAId = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "user_a",
-          email: "a@example.com",
-          familyId,
-          updatedAt: Date.now(),
-        });
-
-        // 同一UIDの別アカウント
-        userA2Id = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "user_a",
-          email: "a-work@example.com",
-          familyId,
-          updatedAt: Date.now(),
-        });
-      });
-
-      const userA = t.withIdentity({
-        subject: "user_a",
-        email: "a@example.com",
-      });
-
-      // 同一アカウントのキック拒否
-      await expect(
-        userA.mutation(api.families.kickMember, {
-          accountId: userAId,
-          targetAccountId: userAId,
-        }),
-      ).rejects.toThrow("Cannot kick yourself");
-
-      // 同一UID別アカウントのキック拒否
-      await expect(
-        userA.mutation(api.families.kickMember, {
-          accountId: userAId,
-          targetAccountId: userA2Id,
-        }),
-      ).rejects.toThrow("Cannot kick yourself");
+    const userA = t.withIdentity({
+      subject: "user_a",
+      email: "a@example.com",
     });
 
-    it("一般メンバー（viewer）が kickMember を実行しようとすると拒否されること", async () => {
-      const t = convexTest(schema, modules);
-      let targetId!: Id<"users">;
+    // 同一アカウントのキック拒否
+    await expect(
+      userA.mutation(api.families.kickMember, {
+        accountId: userAId,
+        targetAccountId: userAId,
+      }),
+    ).rejects.toThrow("Cannot kick yourself");
 
-      await t.run(async (ctx) => {
-        const familyId = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          name: "キック権限家",
-          updatedAt: Date.now(),
-        });
+    // 同一UID別アカウントのキック拒否
+    await expect(
+      userA.mutation(api.families.kickMember, {
+        accountId: userAId,
+        targetAccountId: userA2Id,
+      }),
+    ).rejects.toThrow("Cannot kick yourself");
+  });
 
-        await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "viewer",
-          userId: "viewer_kicker",
-          email: "viewer_kicker@example.com",
-          familyId,
-          updatedAt: Date.now(),
-        });
+  it("一般メンバー（viewer）が kickMember を実行しようとすると拒否されること", async () => {
+    const t = convexTest(schema, modules);
+    let targetId!: Id<"users">;
 
-        targetId = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "viewer",
-          userId: "victim",
-          email: "victim@example.com",
-          familyId,
-          updatedAt: Date.now(),
-        });
+    await t.run(async (ctx) => {
+      const familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "キック権限家",
+        updatedAt: Date.now(),
       });
 
-      const viewer = t.withIdentity({
-        subject: "viewer_kicker",
+      await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "viewer",
+        userId: "viewer_kicker",
         email: "viewer_kicker@example.com",
+        familyId,
+        updatedAt: Date.now(),
       });
 
-      await expect(
-        viewer.mutation(api.families.kickMember, { targetAccountId: targetId }),
-      ).rejects.toThrow("Access denied: Admin role required");
+      targetId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "viewer",
+        userId: "victim",
+        email: "victim@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
     });
 
-    it("別家族のユーザーをキックしようとすると拒否されること", async () => {
-      const t = convexTest(schema, modules);
-
-      let family1Id!: Id<"families">;
-      let family2Id!: Id<"families">;
-      let userOtherId!: Id<"users">;
-
-      await t.run(async (ctx) => {
-        family1Id = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          name: "佐藤家",
-          masterKeyEncrypted: "enc1",
-          masterKeyIv: "iv1",
-          masterKeySalt: "salt1",
-          updatedAt: Date.now(),
-        });
-        family2Id = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          name: "鈴木家",
-          masterKeyEncrypted: "enc2",
-          masterKeyIv: "iv2",
-          masterKeySalt: "salt2",
-          updatedAt: Date.now(),
-        });
-
-        await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "user_a",
-          email: "a@example.com",
-          familyId: family1Id,
-          updatedAt: Date.now(),
-        });
-
-        userOtherId = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "user_other",
-          email: "other@example.com",
-          familyId: family2Id,
-          updatedAt: Date.now(),
-        });
-      });
-
-      const userA = t.withIdentity({
-        subject: "user_a",
-        email: "a@example.com",
-      });
-      await expect(
-        userA.mutation(api.families.kickMember, {
-          targetAccountId: userOtherId,
-        }),
-      ).rejects.toThrow("Target user is not a member of your family");
+    const viewer = t.withIdentity({
+      subject: "viewer_kicker",
+      email: "viewer_kicker@example.com",
     });
 
-    it("キックされたユーザーがadminsに含まれる共有レコードから除外され、管理者が調停されること", async () => {
-      const t = convexTest(schema, modules);
+    await expect(
+      viewer.mutation(api.families.kickMember, { targetAccountId: targetId }),
+    ).rejects.toThrow("Access denied: Admin role required");
+  });
 
-      let familyId!: Id<"families">;
-      let userAId!: Id<"users">;
-      let userBId!: Id<"users">;
-      let sharedRecId!: Id<"serviceRecords">;
+  it("別家族のユーザーをキックしようとすると拒否されること", async () => {
+    const t = convexTest(schema, modules);
 
-      await t.run(async (ctx) => {
-        familyId = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          name: "田中家",
-          masterKeyEncrypted: "encKey",
-          masterKeyIv: "iv",
-          masterKeySalt: "salt",
-          updatedAt: Date.now(),
-        });
+    let family1Id!: Id<"families">;
+    let family2Id!: Id<"families">;
+    let userOtherId!: Id<"users">;
 
-        userAId = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "user_a",
-          email: "a@example.com",
-          familyId,
-          updatedAt: Date.now(),
-        });
-
-        userBId = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "user_b",
-          email: "b@example.com",
-          familyId,
-          updatedAt: Date.now(),
-        });
-
-        // ユーザーBのみが管理者となっている共有レコード
-        sharedRecId = await ctx.db.insert("serviceRecords", {
-          stableId: crypto.randomUUID(),
-          title: "家族Netflix",
-          sortKey: "netflix",
-          userId: "user_b",
-          accountId: userBId,
-          revision: 0,
-          updatedByAccountId: userBId,
-          familyId,
-          ownerType: "family",
-          ownerFamilyId: familyId,
-          admins: [userBId],
-          tags: [],
-          isArchived: false,
-          updatedAt: Date.now(),
-        });
+    await t.run(async (ctx) => {
+      family1Id = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "佐藤家",
+        masterKeyEncrypted: "enc1",
+        masterKeyIv: "iv1",
+        masterKeySalt: "salt1",
+        updatedAt: Date.now(),
+      });
+      family2Id = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "鈴木家",
+        masterKeyEncrypted: "enc2",
+        masterKeyIv: "iv2",
+        masterKeySalt: "salt2",
+        updatedAt: Date.now(),
       });
 
-      const userA = t.withIdentity({
-        subject: "user_a",
+      await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "user_a",
         email: "a@example.com",
-      });
-      await userA.mutation(api.families.kickMember, {
-        targetAccountId: userBId,
+        familyId: family1Id,
+        updatedAt: Date.now(),
       });
 
-      // 管理者が0人になるため、残存メンバー（userAId）に自動昇格調停されていること
-      const record = await t.run(async (ctx) => ctx.db.get(sharedRecId));
-      expect(record?.admins).toEqual([userAId]);
-      expect(record?.ownerFamilyId).toBe(familyId);
+      userOtherId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "user_other",
+        email: "other@example.com",
+        familyId: family2Id,
+        updatedAt: Date.now(),
+      });
     });
 
-    it("getMyPendingExportVault / abandonPendingExportVault が正しく動作すること", async () => {
-      const t = convexTest(schema, modules);
+    const userA = t.withIdentity({
+      subject: "user_a",
+      email: "a@example.com",
+    });
+    await expect(
+      userA.mutation(api.families.kickMember, {
+        targetAccountId: userOtherId,
+      }),
+    ).rejects.toThrow("Target user is not a member of your family");
+  });
 
-      let familyId!: Id<"families">;
-      let userBId!: Id<"users">;
+  it("キックされたユーザーがadminsに含まれる共有レコードから除外され、管理者が調停されること", async () => {
+    const t = convexTest(schema, modules);
 
-      await t.run(async (ctx) => {
-        familyId = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          name: "高橋家",
-          masterKeyEncrypted: "encKey",
-          masterKeyIv: "iv",
-          masterKeySalt: "salt",
-          updatedAt: Date.now(),
-        });
+    let familyId!: Id<"families">;
+    let userAId!: Id<"users">;
+    let userBId!: Id<"users">;
+    let sharedRecId!: Id<"serviceRecords">;
 
-        await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "user_a",
-          email: "a@example.com",
-          familyId,
-          updatedAt: Date.now(),
-        });
-
-        userBId = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "user_b",
-          email: "b@example.com",
-          familyId,
-          updatedAt: Date.now(),
-        });
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "田中家",
+        masterKeyEncrypted: "encKey",
+        masterKeyIv: "iv",
+        masterKeySalt: "salt",
+        updatedAt: Date.now(),
       });
 
-      const userA = t.withIdentity({
-        subject: "user_a",
+      userAId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "user_a",
         email: "a@example.com",
+        familyId,
+        updatedAt: Date.now(),
       });
-      const userB = t.withIdentity({
-        subject: "user_b",
+
+      userBId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "user_b",
         email: "b@example.com",
+        familyId,
+        updatedAt: Date.now(),
       });
 
-      // キック前はnull
-      const vaultBefore = await userB.query(
-        api.families.getMyPendingExportVault,
-        {},
-      );
-      expect(vaultBefore).toBeNull();
-
-      // キック実行
-      await userA.mutation(api.families.kickMember, {
-        targetAccountId: userBId,
+      // ユーザーBのみが管理者となっている共有レコード
+      sharedRecId = await ctx.db.insert("serviceRecords", {
+        stableId: crypto.randomUUID(),
+        title: "家族Netflix",
+        sortKey: "netflix",
+        userId: "user_b",
+        accountId: userBId,
+        revision: 0,
+        updatedByAccountId: userBId,
+        familyId,
+        ownerType: "family",
+        ownerFamilyId: familyId,
+        admins: [userBId],
+        tags: [],
+        isArchived: false,
+        updatedAt: Date.now(),
       });
-
-      // キック後はVaultが取得できること
-      const vaultAfter = await userB.query(
-        api.families.getMyPendingExportVault,
-        {},
-      );
-      expect(vaultAfter).not.toBeNull();
-      expect(vaultAfter?.oldFamilyName).toBe("高橋家");
-
-      // 放棄（手動破棄）
-      await userB.mutation(api.families.abandonPendingExportVault, {});
-
-      // 破棄後はnull
-      const vaultAfterAbandon = await userB.query(
-        api.families.getMyPendingExportVault,
-        {},
-      );
-      expect(vaultAfterAbandon).toBeNull();
     });
 
-    it("期限切れのExport Vaultは定期クリーンアップ（cleanupExpiredExportVaultsInternal）で削除されること", async () => {
-      const t = convexTest(schema, modules);
-
-      let userBId!: Id<"users">;
-
-      await t.run(async (ctx) => {
-        const famId = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          name: "旧家",
-          updatedAt: Date.now(),
-        });
-
-        userBId = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "user_b",
-          email: "b@example.com",
-          updatedAt: Date.now(),
-        });
-
-        // 過去の失効済みVault
-        await ctx.db.insert("pendingExportVaults", {
-          cryptoVersion: 1,
-          kdfIterations: 300_000,
-          accountId: userBId,
-          userId: "user_b",
-          oldFamilyId: famId,
-          oldFamilyName: "旧家",
-          masterKeyEncrypted: "enc",
-          masterKeyIv: "iv",
-          masterKeySalt: "salt",
-          createdAt: Date.now() - 31 * 24 * 60 * 60 * 1000,
-          expiresAt: Date.now() - 1000, // 期限切れ
-        });
-      });
-
-      const userB = t.withIdentity({
-        subject: "user_b",
-        email: "b@example.com",
-      });
-
-      // 期限切れなのでgetMyPendingExportVaultからはnull
-      const vault = await userB.query(api.families.getMyPendingExportVault, {});
-      expect(vault).toBeNull();
-
-      // クリーンアップ実行
-      await t.mutation(
-        internal.families.cleanupExpiredExportVaultsInternal,
-        {},
-      );
-
-      // DBからも物理削除されていること
-      const count = await t.run(async (ctx) => {
-        const list = await ctx.db.query("pendingExportVaults").collect();
-        return list.length;
-      });
-      expect(count).toBe(0);
+    const userA = t.withIdentity({
+      subject: "user_a",
+      email: "a@example.com",
+    });
+    await userA.mutation(api.families.kickMember, {
+      targetAccountId: userBId,
     });
 
-    it("キックされたユーザーが新家族を作成して個人レコードを持ち出すと、移行完了時にVaultが削除されること", async () => {
-      const t = convexTest(schema, modules);
+    // 管理者が0人になるため、残存メンバー（userAId）に自動昇格調停されていること
+    const record = await t.run(async (ctx) => ctx.db.get(sharedRecId));
+    expect(record?.admins).toEqual([userAId]);
+    expect(record?.ownerFamilyId).toBe(familyId);
+  });
 
-      let oldFamilyId!: Id<"families">;
-      let userBId!: Id<"users">;
-      let personalRecId!: Id<"serviceRecords">;
-      let credDocId!: Id<"credentials">;
+  it("getMyPendingExportVault / abandonPendingExportVault が正しく動作すること", async () => {
+    const t = convexTest(schema, modules);
 
-      await t.run(async (ctx) => {
-        oldFamilyId = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          name: "小林家",
-          masterKeyEncrypted: "oldEncKey",
-          masterKeyIv: "oldIv",
-          masterKeySalt: "oldSalt",
-          updatedAt: Date.now(),
-        });
+    let familyId!: Id<"families">;
+    let userBId!: Id<"users">;
 
-        await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "user_a",
-          email: "a@example.com",
-          familyId: oldFamilyId,
-          updatedAt: Date.now(),
-        });
-
-        userBId = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "user_b",
-          email: "b@example.com",
-          familyId: oldFamilyId,
-          updatedAt: Date.now(),
-        });
-
-        // ユーザーBの個人所有レコード（PRIVATE）
-        personalRecId = await ctx.db.insert("serviceRecords", {
-          stableId: crypto.randomUUID(),
-          title: "個人銀行",
-          sortKey: "personal_bank",
-          userId: "user_b",
-          accountId: userBId,
-          revision: 0,
-          updatedByAccountId: userBId,
-          familyId: oldFamilyId,
-          ownerType: "user",
-          admins: [],
-          tags: [],
-          isArchived: false,
-          updatedAt: Date.now(),
-        });
-
-        credDocId = await ctx.db.insert("credentials", {
-          recordId: personalRecId,
-          stableId: crypto.randomUUID(),
-          label: "メイン",
-          loginId: "userBLogin",
-          passwordHint: "oldEncryptedHint",
-          passwordHintIv: "oldHintIv",
-          updatedAt: Date.now(),
-        });
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "高橋家",
+        masterKeyEncrypted: "encKey",
+        masterKeyIv: "iv",
+        masterKeySalt: "salt",
+        updatedAt: Date.now(),
       });
 
-      const userA = t.withIdentity({
-        subject: "user_a",
+      await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "user_a",
         email: "a@example.com",
+        familyId,
+        updatedAt: Date.now(),
       });
-      const userB = t.withIdentity({
-        subject: "user_b",
+
+      userBId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "user_b",
         email: "b@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+    });
+
+    const userA = t.withIdentity({
+      subject: "user_a",
+      email: "a@example.com",
+    });
+    const userB = t.withIdentity({
+      subject: "user_b",
+      email: "b@example.com",
+    });
+
+    // キック前はnull
+    const vaultBefore = await userB.query(
+      api.families.getMyPendingExportVault,
+      {},
+    );
+    expect(vaultBefore).toBeNull();
+
+    // キック実行
+    await userA.mutation(api.families.kickMember, {
+      targetAccountId: userBId,
+    });
+
+    // キック後はVaultが取得できること
+    const vaultAfter = await userB.query(
+      api.families.getMyPendingExportVault,
+      {},
+    );
+    expect(vaultAfter).not.toBeNull();
+    expect(vaultAfter?.oldFamilyName).toBe("高橋家");
+
+    // 放棄（手動破棄）
+    await userB.mutation(api.families.abandonPendingExportVault, {});
+
+    // 破棄後はnull
+    const vaultAfterAbandon = await userB.query(
+      api.families.getMyPendingExportVault,
+      {},
+    );
+    expect(vaultAfterAbandon).toBeNull();
+  });
+
+  it("期限切れのExport Vaultは定期クリーンアップ（cleanupExpiredExportVaultsInternal）で削除されること", async () => {
+    const t = convexTest(schema, modules);
+
+    let userBId!: Id<"users">;
+
+    await t.run(async (ctx) => {
+      const famId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "旧家",
+        updatedAt: Date.now(),
       });
 
-      // ユーザーAがユーザーBをキック
-      await userA.mutation(api.families.kickMember, {
-        targetAccountId: userBId,
+      userBId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "user_b",
+        email: "b@example.com",
+        updatedAt: Date.now(),
       });
 
-      // ユーザーBのVaultが存在することを確認
-      const myVault = await userB.query(
-        api.families.getMyPendingExportVault,
-        {},
-      );
-      expect(myVault).not.toBeNull();
+      // 過去の失効済みVault
+      await ctx.db.insert("pendingExportVaults", {
+        cryptoVersion: 1,
+        kdfIterations: 300_000,
+        accountId: userBId,
+        userId: "user_b",
+        oldFamilyId: famId,
+        oldFamilyName: "旧家",
+        masterKeyEncrypted: "enc",
+        masterKeyIv: "iv",
+        masterKeySalt: "salt",
+        createdAt: Date.now() - 31 * 24 * 60 * 60 * 1000,
+        expiresAt: Date.now() - 1000, // 期限切れ
+      });
+    });
 
-      // ユーザーBが新家族を作成して個人データを移行
-      const { migrationId, targetFamilyId } = await userB.mutation(
-        api.families.prepareFamilyMigration,
+    const userB = t.withIdentity({
+      subject: "user_b",
+      email: "b@example.com",
+    });
+
+    // 期限切れなのでgetMyPendingExportVaultからはnull
+    const vault = await userB.query(api.families.getMyPendingExportVault, {});
+    expect(vault).toBeNull();
+
+    // クリーンアップ実行
+    await t.mutation(internal.families.cleanupExpiredExportVaultsInternal, {});
+
+    // DBからも物理削除されていること
+    const count = await t.run(async (ctx) => {
+      const list = await ctx.db.query("pendingExportVaults").collect();
+      return list.length;
+    });
+    expect(count).toBe(0);
+  });
+
+  it("キックされたユーザーが新家族を作成して個人レコードを持ち出すと、移行完了時にVaultが削除されること", async () => {
+    const t = convexTest(schema, modules);
+
+    let oldFamilyId!: Id<"families">;
+    let userBId!: Id<"users">;
+    let personalRecId!: Id<"serviceRecords">;
+    let credDocId!: Id<"credentials">;
+
+    await t.run(async (ctx) => {
+      oldFamilyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "小林家",
+        masterKeyEncrypted: "oldEncKey",
+        masterKeyIv: "oldIv",
+        masterKeySalt: "oldSalt",
+        updatedAt: Date.now(),
+      });
+
+      await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "user_a",
+        email: "a@example.com",
+        familyId: oldFamilyId,
+        updatedAt: Date.now(),
+      });
+
+      userBId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "user_b",
+        email: "b@example.com",
+        familyId: oldFamilyId,
+        updatedAt: Date.now(),
+      });
+
+      // ユーザーBの個人所有レコード（PRIVATE）
+      personalRecId = await ctx.db.insert("serviceRecords", {
+        stableId: crypto.randomUUID(),
+        title: "個人銀行",
+        sortKey: "personal_bank",
+        userId: "user_b",
+        accountId: userBId,
+        revision: 0,
+        updatedByAccountId: userBId,
+        familyId: oldFamilyId,
+        ownerType: "user",
+        admins: [],
+        tags: [],
+        isArchived: false,
+        updatedAt: Date.now(),
+      });
+
+      credDocId = await ctx.db.insert("credentials", {
+        recordId: personalRecId,
+        stableId: crypto.randomUUID(),
+        label: "メイン",
+        loginId: "userBLogin",
+        passwordHint: "oldEncryptedHint",
+        passwordHintIv: "oldHintIv",
+        updatedAt: Date.now(),
+      });
+    });
+
+    const userA = t.withIdentity({
+      subject: "user_a",
+      email: "a@example.com",
+    });
+    const userB = t.withIdentity({
+      subject: "user_b",
+      email: "b@example.com",
+    });
+
+    // ユーザーAがユーザーBをキック
+    await userA.mutation(api.families.kickMember, {
+      targetAccountId: userBId,
+    });
+
+    // ユーザーBのVaultが存在することを確認
+    const myVault = await userB.query(api.families.getMyPendingExportVault, {});
+    expect(myVault).not.toBeNull();
+
+    // ユーザーBが新家族を作成して個人データを移行
+    const { migrationId, targetFamilyId } = await userB.mutation(
+      api.families.prepareFamilyMigration,
+      {
+        action: "create",
+        name: "新しいBの家",
+        masterKeyEncrypted: "newEncKey",
+        masterKeyIv: "newIv",
+        masterKeySalt: "newSalt",
+      },
+    );
+
+    // 移行コミット（再暗号化クレデンシャルを渡す）
+    await userB.mutation(api.families.commitFamilyMigration, {
+      migrationId,
+      credentials: [
         {
-          action: "create",
-          name: "新しいBの家",
-          masterKeyEncrypted: "newEncKey",
-          masterKeyIv: "newIv",
-          masterKeySalt: "newSalt",
+          recordId: personalRecId,
+          id: credDocId,
+          passwordHint: "newReEncryptedHint",
+          passwordHintIv: "newHintIv",
         },
-      );
+      ],
+    });
 
-      // 移行コミット（再暗号化クレデンシャルを渡す）
-      await userB.mutation(api.families.commitFamilyMigration, {
-        migrationId,
-        credentials: [
-          {
-            recordId: personalRecId,
-            id: credDocId,
-            passwordHint: "newReEncryptedHint",
-            passwordHintIv: "newHintIv",
-          },
-        ],
+    // 移行後、ユーザーBの新家族が反映されていること
+    const updatedUserB = await t.run(async (ctx) => ctx.db.get(userBId));
+    expect(updatedUserB?.familyId).toBe(targetFamilyId);
+
+    // 個人レコードのfamilyIdが新家族に更新されていること
+    const updatedRecord = await t.run(async (ctx) => ctx.db.get(personalRecId));
+    expect(updatedRecord?.familyId).toBe(targetFamilyId);
+
+    // クレデンシャルが新暗号データに更新されていること
+    const updatedCred = await t.run(async (ctx) => ctx.db.get(credDocId));
+    expect(updatedCred?.passwordHint).toBe("newReEncryptedHint");
+
+    // 持ち出し完了に伴い、Export Vaultが自動削除されていること
+    const vaultAfterCommit = await userB.query(
+      api.families.getMyPendingExportVault,
+      {},
+    );
+    expect(vaultAfterCommit).toBeNull();
+  });
+});
+
+describe("家族ロール管理（updateMemberRole & 認可・不変条件ガード）", () => {
+  it("ファミリー管理者は他のメンバーを昇格・降格できること", async () => {
+    const t = convexTest(schema, modules);
+    let familyId!: Id<"families">;
+    let targetAccId!: Id<"users">;
+
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "Role Test Family",
+        updatedAt: Date.now(),
       });
+      await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "admin_user",
+        email: "admin@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+      targetAccId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "viewer",
+        userId: "target_user",
+        email: "target@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+    });
 
-      // 移行後、ユーザーBの新家族が反映されていること
-      const updatedUserB = await t.run(async (ctx) => ctx.db.get(userBId));
-      expect(updatedUserB?.familyId).toBe(targetFamilyId);
+    const adminUser = t.withIdentity({
+      subject: "admin_user",
+      email: "admin@example.com",
+    });
 
-      // 個人レコードのfamilyIdが新家族に更新されていること
-      const updatedRecord = await t.run(async (ctx) =>
-        ctx.db.get(personalRecId),
-      );
-      expect(updatedRecord?.familyId).toBe(targetFamilyId);
+    // 昇格: viewer -> admin
+    await adminUser.mutation(api.families.updateMemberRole, {
+      targetAccountId: targetAccId,
+      role: "admin",
+    });
 
-      // クレデンシャルが新暗号データに更新されていること
-      const updatedCred = await t.run(async (ctx) => ctx.db.get(credDocId));
-      expect(updatedCred?.passwordHint).toBe("newReEncryptedHint");
+    await t.run(async (ctx) => {
+      const u = await ctx.db.get(targetAccId);
+      expect(u?.familyRole).toBe("admin");
+    });
 
-      // 持ち出し完了に伴い、Export Vaultが自動削除されていること
-      const vaultAfterCommit = await userB.query(
-        api.families.getMyPendingExportVault,
-        {},
-      );
-      expect(vaultAfterCommit).toBeNull();
+    // 降格: admin -> viewer (adminAccId がまだ管理者に残っているため可能)
+    await adminUser.mutation(api.families.updateMemberRole, {
+      targetAccountId: targetAccId,
+      role: "viewer",
+    });
+
+    await t.run(async (ctx) => {
+      const u = await ctx.db.get(targetAccId);
+      expect(u?.familyRole).toBe("viewer");
     });
   });
 
-  describe("家族ロール管理（updateMemberRole & 認可・不変条件ガード）", () => {
-    it("ファミリー管理者は他のメンバーを昇格・降格できること", async () => {
-      const t = convexTest(schema, modules);
-      let familyId!: Id<"families">;
-      let targetAccId!: Id<"users">;
+  it("デフォルト閲覧者によるupdateMemberRoleは拒否されること", async () => {
+    const t = convexTest(schema, modules);
+    let familyId!: Id<"families">;
+    let targetAccId!: Id<"users">;
 
-      await t.run(async (ctx) => {
-        familyId = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          name: "Role Test Family",
-          updatedAt: Date.now(),
-        });
-        await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "admin_user",
-          email: "admin@example.com",
-          familyId,
-          updatedAt: Date.now(),
-        });
-        targetAccId = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "viewer",
-          userId: "target_user",
-          email: "target@example.com",
-          familyId,
-          updatedAt: Date.now(),
-        });
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "Role Test Family",
+        updatedAt: Date.now(),
       });
-
-      const adminUser = t.withIdentity({
-        subject: "admin_user",
+      await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "admin_user",
         email: "admin@example.com",
+        familyId,
+        updatedAt: Date.now(),
       });
+      targetAccId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "viewer",
+        userId: "viewer_user",
+        email: "viewer@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+    });
 
-      // 昇格: viewer -> admin
-      await adminUser.mutation(api.families.updateMemberRole, {
+    const viewerUser = t.withIdentity({
+      subject: "viewer_user",
+      email: "viewer@example.com",
+    });
+
+    await expect(
+      viewerUser.mutation(api.families.updateMemberRole, {
         targetAccountId: targetAccId,
         role: "admin",
+      }),
+    ).rejects.toThrow("Access denied: Admin role required");
+  });
+
+  it("最後の管理者の降格は拒否されること", async () => {
+    const t = convexTest(schema, modules);
+    let familyId!: Id<"families">;
+    let soleAdminAccId!: Id<"users">;
+
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "Role Test Family",
+        updatedAt: Date.now(),
       });
-
-      await t.run(async (ctx) => {
-        const u = await ctx.db.get(targetAccId);
-        expect(u?.familyRole).toBe("admin");
-      });
-
-      // 降格: admin -> viewer (adminAccId がまだ管理者に残っているため可能)
-      await adminUser.mutation(api.families.updateMemberRole, {
-        targetAccountId: targetAccId,
-        role: "viewer",
-      });
-
-      await t.run(async (ctx) => {
-        const u = await ctx.db.get(targetAccId);
-        expect(u?.familyRole).toBe("viewer");
-      });
-    });
-
-    it("デフォルト閲覧者によるupdateMemberRoleは拒否されること", async () => {
-      const t = convexTest(schema, modules);
-      let familyId!: Id<"families">;
-      let targetAccId!: Id<"users">;
-
-      await t.run(async (ctx) => {
-        familyId = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          name: "Role Test Family",
-          updatedAt: Date.now(),
-        });
-        await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "admin_user",
-          email: "admin@example.com",
-          familyId,
-          updatedAt: Date.now(),
-        });
-        targetAccId = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "viewer",
-          userId: "viewer_user",
-          email: "viewer@example.com",
-          familyId,
-          updatedAt: Date.now(),
-        });
-      });
-
-      const viewerUser = t.withIdentity({
-        subject: "viewer_user",
-        email: "viewer@example.com",
-      });
-
-      await expect(
-        viewerUser.mutation(api.families.updateMemberRole, {
-          targetAccountId: targetAccId,
-          role: "admin",
-        }),
-      ).rejects.toThrow("Access denied: Admin role required");
-    });
-
-    it("最後の管理者の降格は拒否されること", async () => {
-      const t = convexTest(schema, modules);
-      let familyId!: Id<"families">;
-      let soleAdminAccId!: Id<"users">;
-
-      await t.run(async (ctx) => {
-        familyId = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          name: "Role Test Family",
-          updatedAt: Date.now(),
-        });
-        soleAdminAccId = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "sole_admin_user",
-          email: "soleadmin@example.com",
-          familyId,
-          updatedAt: Date.now(),
-        });
-        await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "viewer",
-          userId: "viewer_user",
-          email: "viewer@example.com",
-          familyId,
-          updatedAt: Date.now(),
-        });
-      });
-
-      const soleAdmin = t.withIdentity({
-        subject: "sole_admin_user",
+      soleAdminAccId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "sole_admin_user",
         email: "soleadmin@example.com",
+        familyId,
+        updatedAt: Date.now(),
       });
-
-      await expect(
-        soleAdmin.mutation(api.families.updateMemberRole, {
-          targetAccountId: soleAdminAccId,
-          role: "viewer",
-        }),
-      ).rejects.toThrow("Cannot demote the last admin");
-    });
-
-    it("kickMember: 閲覧者によるキックおよび自分自身のキックは拒否されること", async () => {
-      const t = convexTest(schema, modules);
-      let familyId!: Id<"families">;
-      let adminAccId!: Id<"users">;
-      let viewerAccId!: Id<"users">;
-
-      await t.run(async (ctx) => {
-        familyId = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          name: "Kick Test Family",
-          updatedAt: Date.now(),
-        });
-        adminAccId = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "admin_user",
-          email: "admin@example.com",
-          familyId,
-          updatedAt: Date.now(),
-        });
-        viewerAccId = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "viewer",
-          userId: "viewer_user",
-          email: "viewer@example.com",
-          familyId,
-          updatedAt: Date.now(),
-        });
-      });
-
-      const viewerUser = t.withIdentity({
-        subject: "viewer_user",
+      await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "viewer",
+        userId: "viewer_user",
         email: "viewer@example.com",
-      });
-      const adminUser = t.withIdentity({
-        subject: "admin_user",
-        email: "admin@example.com",
-      });
-
-      // 閲覧者によるキックは拒否
-      await expect(
-        viewerUser.mutation(api.families.kickMember, {
-          targetAccountId: adminAccId,
-        }),
-      ).rejects.toThrow("Access denied: Admin role required");
-
-      // 自分自身のキックは拒否
-      await expect(
-        adminUser.mutation(api.families.kickMember, {
-          targetAccountId: adminAccId,
-        }),
-      ).rejects.toThrow("Cannot kick yourself");
-
-      // 管理者による閲覧者メンバーのキックは成功
-      await adminUser.mutation(api.families.kickMember, {
-        targetAccountId: viewerAccId,
-      });
-      await t.run(async (ctx) => {
-        const u = await ctx.db.get(viewerAccId);
-        expect(u?.familyId).toBeUndefined();
+        familyId,
+        updatedAt: Date.now(),
       });
     });
 
-    it("approveJoinRequest / rejectJoinRequest: ファミリー管理者のみ承認・却下でき、閲覧者は拒否されること", async () => {
-      const t = convexTest(schema, modules);
-      let familyId!: Id<"families">;
-      let req1Id!: Id<"joinRequests">;
-      let req2Id!: Id<"joinRequests">;
+    const soleAdmin = t.withIdentity({
+      subject: "sole_admin_user",
+      email: "soleadmin@example.com",
+    });
 
-      await t.run(async (ctx) => {
-        familyId = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          name: "Join Approval Family",
-          updatedAt: Date.now(),
-        });
-        await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "admin_user",
-          email: "admin@example.com",
-          familyId,
-          updatedAt: Date.now(),
-        });
-        await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "viewer",
-          userId: "viewer_user",
-          email: "viewer@example.com",
-          familyId,
-          updatedAt: Date.now(),
-        });
-        const app1AccId = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          userId: "applicant_1",
-          email: "app1@example.com",
-          familyRole: "viewer",
-          updatedAt: Date.now(),
-        });
-        const app2AccId = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          userId: "applicant_2",
-          email: "app2@example.com",
-          familyRole: "viewer",
-          updatedAt: Date.now(),
-        });
-        req1Id = await ctx.db.insert("joinRequests", {
-          familyId,
-          userId: "applicant_1",
-          accountId: app1AccId,
-          status: "pending",
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        });
-        req2Id = await ctx.db.insert("joinRequests", {
-          familyId,
-          userId: "applicant_2",
-          accountId: app2AccId,
-          status: "pending",
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        });
+    await expect(
+      soleAdmin.mutation(api.families.updateMemberRole, {
+        targetAccountId: soleAdminAccId,
+        role: "viewer",
+      }),
+    ).rejects.toThrow("Cannot demote the last admin");
+  });
+
+  it("kickMember: 閲覧者によるキックおよび自分自身のキックは拒否されること", async () => {
+    const t = convexTest(schema, modules);
+    let familyId!: Id<"families">;
+    let adminAccId!: Id<"users">;
+    let viewerAccId!: Id<"users">;
+
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "Kick Test Family",
+        updatedAt: Date.now(),
       });
-
-      const viewer = t.withIdentity({
-        subject: "viewer_user",
+      adminAccId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "admin_user",
+        email: "admin@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+      viewerAccId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "viewer",
+        userId: "viewer_user",
         email: "viewer@example.com",
-      });
-      const admin = t.withIdentity({
-        subject: "admin_user",
-        email: "admin@example.com",
-      });
-
-      // 閲覧者による承認・却下は Admin role required で拒否されること
-      await expect(
-        viewer.mutation(api.families.approveJoinRequest, {
-          requestId: req1Id,
-        }),
-      ).rejects.toThrow("Access denied: Admin role required");
-
-      await expect(
-        viewer.mutation(api.families.rejectJoinRequest, {
-          requestId: req2Id,
-        }),
-      ).rejects.toThrow("Access denied: Admin role required");
-
-      // 管理者による承認・却下は成功すること
-      await admin.mutation(api.families.approveJoinRequest, {
-        requestId: req1Id,
-      });
-      await admin.mutation(api.families.rejectJoinRequest, {
-        requestId: req2Id,
-      });
-
-      await t.run(async (ctx) => {
-        const r1 = await ctx.db.get(req1Id);
-        expect(r1?.status).toBe("approved");
-        const r2 = await ctx.db.get(req2Id);
-        expect(r2?.status).toBe("rejected");
+        familyId,
+        updatedAt: Date.now(),
       });
     });
 
-    it("reconcileAdminsOnLeave: ファミリー管理者が残存している場合、adminsが空のレコードで閲覧者は自動昇格しないこと", async () => {
-      const t = convexTest(schema, modules);
-      let familyId!: Id<"families">;
-      let leavingAdminId!: Id<"users">;
-      let remainingAdminId!: Id<"users">;
-      let viewerId!: Id<"users">;
-      let sharedRecId!: Id<"serviceRecords">;
+    const viewerUser = t.withIdentity({
+      subject: "viewer_user",
+      email: "viewer@example.com",
+    });
+    const adminUser = t.withIdentity({
+      subject: "admin_user",
+      email: "admin@example.com",
+    });
 
-      await t.run(async (ctx) => {
-        familyId = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          name: "Leave Reconcile Family",
-          updatedAt: Date.now(),
-        });
-        leavingAdminId = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "leaving_admin",
-          email: "leaving@example.com",
-          familyId,
-          updatedAt: Date.now(),
-        });
-        remainingAdminId = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "admin",
-          userId: "remaining_admin",
-          email: "remaining@example.com",
-          familyId,
-          updatedAt: Date.now(),
-        });
-        viewerId = await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          familyRole: "viewer",
-          userId: "viewer_member",
-          email: "viewer_member@example.com",
-          familyId,
-          updatedAt: Date.now(),
-        });
-        sharedRecId = await ctx.db.insert("serviceRecords", {
-          stableId: crypto.randomUUID(),
-          userId: "leaving_admin",
-          accountId: leavingAdminId,
-          revision: 0,
-          updatedByAccountId: leavingAdminId,
-          familyId,
-          ownerFamilyId: familyId,
-          title: "Shared Without Explicit Admins",
-          sortKey: "shared",
-          ownerType: "family",
-          admins: [], // ファミリー管理者に委ねられている
-          tags: [],
-          isArchived: false,
-          updatedAt: Date.now(),
-        });
-      });
+    // 閲覧者によるキックは拒否
+    await expect(
+      viewerUser.mutation(api.families.kickMember, {
+        targetAccountId: adminAccId,
+      }),
+    ).rejects.toThrow("Access denied: Admin role required");
 
-      const remainingAdmin = t.withIdentity({
-        subject: "remaining_admin",
-        email: "remaining@example.com",
-      });
+    // 自分自身のキックは拒否
+    await expect(
+      adminUser.mutation(api.families.kickMember, {
+        targetAccountId: adminAccId,
+      }),
+    ).rejects.toThrow("Cannot kick yourself");
 
-      // remainingAdmin が leavingAdmin をキック（家族離脱時の reconcileAdminsOnLeave をトリガー）
-      await remainingAdmin.mutation(api.families.kickMember, {
-        targetAccountId: leavingAdminId,
-      });
-
-      // 残存メンバーに remainingAdmin がいるため、sharedRecId の admins は [] のまま維持され、viewerId は追加されないこと
-      await t.run(async (ctx) => {
-        const rec = await ctx.db.get(sharedRecId);
-        expect(rec?.admins).toEqual([]);
-        expect(rec?.admins).not.toContain(viewerId);
-        expect(rec?.admins).not.toContain(remainingAdminId);
-      });
+    // 管理者による閲覧者メンバーのキックは成功
+    await adminUser.mutation(api.families.kickMember, {
+      targetAccountId: viewerAccId,
+    });
+    await t.run(async (ctx) => {
+      const u = await ctx.db.get(viewerAccId);
+      expect(u?.familyId).toBeUndefined();
     });
   });
 
-  describe("2.1.18 家族グループ名の変更 (Issue 177)", () => {
-    it("ファミリー管理者が家族グループ名を変更でき、getFamilyMembersに反映されること", async () => {
-      const t = convexTest(schema, modules);
-      let familyId!: Id<"families">;
+  it("approveJoinRequest / rejectJoinRequest: ファミリー管理者のみ承認・却下でき、閲覧者は拒否されること", async () => {
+    const t = convexTest(schema, modules);
+    let familyId!: Id<"families">;
+    let req1Id!: Id<"joinRequests">;
+    let req2Id!: Id<"joinRequests">;
 
-      await t.run(async (ctx) => {
-        familyId = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          name: "元の家族名",
-          updatedAt: Date.now(),
-        });
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "Join Approval Family",
+        updatedAt: Date.now(),
+      });
+      await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "admin_user",
+        email: "admin@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+      await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "viewer",
+        userId: "viewer_user",
+        email: "viewer@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+      const app1AccId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        userId: "applicant_1",
+        email: "app1@example.com",
+        familyRole: "viewer",
+        updatedAt: Date.now(),
+      });
+      const app2AccId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        userId: "applicant_2",
+        email: "app2@example.com",
+        familyRole: "viewer",
+        updatedAt: Date.now(),
+      });
+      req1Id = await ctx.db.insert("joinRequests", {
+        familyId,
+        userId: "applicant_1",
+        accountId: app1AccId,
+        status: "pending",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      req2Id = await ctx.db.insert("joinRequests", {
+        familyId,
+        userId: "applicant_2",
+        accountId: app2AccId,
+        status: "pending",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+    });
 
-        await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          userId: "family_admin_177",
-          email: "admin177@example.com",
-          displayName: "管理者",
-          familyId,
-          familyRole: "admin",
-          updatedAt: Date.now(),
-        });
+    const viewer = t.withIdentity({
+      subject: "viewer_user",
+      email: "viewer@example.com",
+    });
+    const admin = t.withIdentity({
+      subject: "admin_user",
+      email: "admin@example.com",
+    });
+
+    // 閲覧者による承認・却下は Admin role required で拒否されること
+    await expect(
+      viewer.mutation(api.families.approveJoinRequest, {
+        requestId: req1Id,
+      }),
+    ).rejects.toThrow("Access denied: Admin role required");
+
+    await expect(
+      viewer.mutation(api.families.rejectJoinRequest, {
+        requestId: req2Id,
+      }),
+    ).rejects.toThrow("Access denied: Admin role required");
+
+    // 管理者による承認・却下は成功すること
+    await admin.mutation(api.families.approveJoinRequest, {
+      requestId: req1Id,
+    });
+    await admin.mutation(api.families.rejectJoinRequest, {
+      requestId: req2Id,
+    });
+
+    await t.run(async (ctx) => {
+      const r1 = await ctx.db.get(req1Id);
+      expect(r1?.status).toBe("approved");
+      const r2 = await ctx.db.get(req2Id);
+      expect(r2?.status).toBe("rejected");
+    });
+  });
+
+  it("reconcileAdminsOnLeave: ファミリー管理者が残存している場合、adminsが空のレコードで閲覧者は自動昇格しないこと", async () => {
+    const t = convexTest(schema, modules);
+    let familyId!: Id<"families">;
+    let leavingAdminId!: Id<"users">;
+    let remainingAdminId!: Id<"users">;
+    let viewerId!: Id<"users">;
+    let sharedRecId!: Id<"serviceRecords">;
+
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "Leave Reconcile Family",
+        updatedAt: Date.now(),
+      });
+      leavingAdminId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "leaving_admin",
+        email: "leaving@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+      remainingAdminId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "remaining_admin",
+        email: "remaining@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+      viewerId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "viewer",
+        userId: "viewer_member",
+        email: "viewer_member@example.com",
+        familyId,
+        updatedAt: Date.now(),
+      });
+      sharedRecId = await ctx.db.insert("serviceRecords", {
+        stableId: crypto.randomUUID(),
+        userId: "leaving_admin",
+        accountId: leavingAdminId,
+        revision: 0,
+        updatedByAccountId: leavingAdminId,
+        familyId,
+        ownerFamilyId: familyId,
+        title: "Shared Without Explicit Admins",
+        sortKey: "shared",
+        ownerType: "family",
+        admins: [], // ファミリー管理者に委ねられている
+        tags: [],
+        isArchived: false,
+        updatedAt: Date.now(),
+      });
+    });
+
+    const remainingAdmin = t.withIdentity({
+      subject: "remaining_admin",
+      email: "remaining@example.com",
+    });
+
+    // remainingAdmin が leavingAdmin をキック（家族離脱時の reconcileAdminsOnLeave をトリガー）
+    await remainingAdmin.mutation(api.families.kickMember, {
+      targetAccountId: leavingAdminId,
+    });
+
+    // 残存メンバーに remainingAdmin がいるため、sharedRecId の admins は [] のまま維持され、viewerId は追加されないこと
+    await t.run(async (ctx) => {
+      const rec = await ctx.db.get(sharedRecId);
+      expect(rec?.admins).toEqual([]);
+      expect(rec?.admins).not.toContain(viewerId);
+      expect(rec?.admins).not.toContain(remainingAdminId);
+    });
+  });
+});
+
+describe("2.1.18 家族グループ名の変更 (Issue 177)", () => {
+  it("ファミリー管理者が家族グループ名を変更でき、getFamilyMembersに反映されること", async () => {
+    const t = convexTest(schema, modules);
+    let familyId!: Id<"families">;
+
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "元の家族名",
+        updatedAt: Date.now(),
       });
 
-      const adminUser = t.withIdentity({
-        subject: "family_admin_177",
+      await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        userId: "family_admin_177",
         email: "admin177@example.com",
-      });
-
-      // 1. 家族グループ名を変更
-      const res = await adminUser.mutation(api.families.updateFamilyName, {
-        name: "新しい家族名",
-      });
-
-      expect(res.success).toBe(true);
-      expect(res.name).toBe("新しい家族名");
-
-      // 2. getFamilyMembers で新しい名前が返ること
-      const membersInfo = await adminUser.query(
-        api.families.getFamilyMembers,
-        {},
-      );
-      expect(membersInfo?.name).toBe("新しい家族名");
-
-      // 3. DB の families ドキュメントが更新されていること
-      await t.run(async (ctx) => {
-        const familyDoc = await ctx.db.get(familyId);
-        expect(familyDoc?.name).toBe("新しい家族名");
-        expect(familyDoc?.updatedAt).toBeDefined();
+        displayName: "管理者",
+        familyId,
+        familyRole: "admin",
+        updatedAt: Date.now(),
       });
     });
 
-    it("前後の空白が自動的にトリムされて保存されること", async () => {
-      const t = convexTest(schema, modules);
-      let familyId!: Id<"families">;
+    const adminUser = t.withIdentity({
+      subject: "family_admin_177",
+      email: "admin177@example.com",
+    });
 
-      await t.run(async (ctx) => {
-        familyId = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          name: "トリム前家族名",
-          updatedAt: Date.now(),
-        });
+    // 1. 家族グループ名を変更
+    const res = await adminUser.mutation(api.families.updateFamilyName, {
+      name: "新しい家族名",
+    });
 
-        await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          userId: "trim_admin_177",
-          email: "trim@example.com",
-          familyId,
-          familyRole: "admin",
-          updatedAt: Date.now(),
-        });
+    expect(res.success).toBe(true);
+    expect(res.name).toBe("新しい家族名");
+
+    // 2. getFamilyMembers で新しい名前が返ること
+    const membersInfo = await adminUser.query(
+      api.families.getFamilyMembers,
+      {},
+    );
+    expect(membersInfo?.name).toBe("新しい家族名");
+
+    // 3. DB の families ドキュメントが更新されていること
+    await t.run(async (ctx) => {
+      const familyDoc = await ctx.db.get(familyId);
+      expect(familyDoc?.name).toBe("新しい家族名");
+      expect(familyDoc?.updatedAt).toBeDefined();
+    });
+  });
+
+  it("前後の空白が自動的にトリムされて保存されること", async () => {
+    const t = convexTest(schema, modules);
+    let familyId!: Id<"families">;
+
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "トリム前家族名",
+        updatedAt: Date.now(),
       });
 
-      const adminUser = t.withIdentity({
-        subject: "trim_admin_177",
+      await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        userId: "trim_admin_177",
         email: "trim@example.com",
-      });
-
-      const res = await adminUser.mutation(api.families.updateFamilyName, {
-        name: "   空白付き家族名   ",
-      });
-
-      expect(res.name).toBe("空白付き家族名");
-
-      await t.run(async (ctx) => {
-        const doc = await ctx.db.get(familyId);
-        expect(doc?.name).toBe("空白付き家族名");
+        familyId,
+        familyRole: "admin",
+        updatedAt: Date.now(),
       });
     });
 
-    it("空文字、空白のみ、100文字超の名前はバリデーションエラーになること", async () => {
-      const t = convexTest(schema, modules);
-      let familyId!: Id<"families">;
+    const adminUser = t.withIdentity({
+      subject: "trim_admin_177",
+      email: "trim@example.com",
+    });
 
-      await t.run(async (ctx) => {
-        familyId = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          name: "バリデーション家族",
-          updatedAt: Date.now(),
-        });
+    const res = await adminUser.mutation(api.families.updateFamilyName, {
+      name: "   空白付き家族名   ",
+    });
 
-        await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          userId: "val_admin_177",
-          email: "val@example.com",
-          familyId,
-          familyRole: "admin",
-          updatedAt: Date.now(),
-        });
+    expect(res.name).toBe("空白付き家族名");
+
+    await t.run(async (ctx) => {
+      const doc = await ctx.db.get(familyId);
+      expect(doc?.name).toBe("空白付き家族名");
+    });
+  });
+
+  it("空文字、空白のみ、100文字超の名前はバリデーションエラーになること", async () => {
+    const t = convexTest(schema, modules);
+    let familyId!: Id<"families">;
+
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "バリデーション家族",
+        updatedAt: Date.now(),
       });
 
-      const adminUser = t.withIdentity({
-        subject: "val_admin_177",
+      await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        userId: "val_admin_177",
         email: "val@example.com",
+        familyId,
+        familyRole: "admin",
+        updatedAt: Date.now(),
       });
-
-      // 空文字
-      await expect(
-        adminUser.mutation(api.families.updateFamilyName, { name: "" }),
-      ).rejects.toThrow();
-
-      // 空白のみ
-      await expect(
-        adminUser.mutation(api.families.updateFamilyName, { name: "    " }),
-      ).rejects.toThrow();
-
-      // 101文字（上限100文字超）
-      const longName = "あ".repeat(101);
-      await expect(
-        adminUser.mutation(api.families.updateFamilyName, { name: longName }),
-      ).rejects.toThrow();
     });
 
-    it("一般メンバー (viewer) は家族名を変更できないこと（認可エラー）", async () => {
-      const t = convexTest(schema, modules);
-      let familyId!: Id<"families">;
+    const adminUser = t.withIdentity({
+      subject: "val_admin_177",
+      email: "val@example.com",
+    });
 
-      await t.run(async (ctx) => {
-        familyId = await ctx.db.insert("families", {
-          ...mockCryptoMaterials,
-          name: "閲覧者テスト家族",
-          updatedAt: Date.now(),
-        });
+    // 空文字
+    await expect(
+      adminUser.mutation(api.families.updateFamilyName, { name: "" }),
+    ).rejects.toThrow();
 
-        await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          userId: "viewer_user_177",
-          email: "viewer177@example.com",
-          familyId,
-          familyRole: "viewer",
-          updatedAt: Date.now(),
-        });
+    // 空白のみ
+    await expect(
+      adminUser.mutation(api.families.updateFamilyName, { name: "    " }),
+    ).rejects.toThrow();
+
+    // 101文字（上限100文字超）
+    const longName = "あ".repeat(101);
+    await expect(
+      adminUser.mutation(api.families.updateFamilyName, { name: longName }),
+    ).rejects.toThrow();
+  });
+
+  it("一般メンバー (viewer) は家族名を変更できないこと（認可エラー）", async () => {
+    const t = convexTest(schema, modules);
+    let familyId!: Id<"families">;
+
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "閲覧者テスト家族",
+        updatedAt: Date.now(),
       });
 
-      const viewerUser = t.withIdentity({
-        subject: "viewer_user_177",
+      await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        userId: "viewer_user_177",
         email: "viewer177@example.com",
-      });
-
-      await expect(
-        viewerUser.mutation(api.families.updateFamilyName, {
-          name: "閲覧者が変えようとした名前",
-        }),
-      ).rejects.toThrow("Access denied: Admin role required");
-
-      // DB の家族名が変更されていないこと
-      await t.run(async (ctx) => {
-        const doc = await ctx.db.get(familyId);
-        expect(doc?.name).toBe("閲覧者テスト家族");
+        familyId,
+        familyRole: "viewer",
+        updatedAt: Date.now(),
       });
     });
 
-    it("未認証ユーザーおよび家族未所属ユーザーは変更できないこと", async () => {
-      const t = convexTest(schema, modules);
+    const viewerUser = t.withIdentity({
+      subject: "viewer_user_177",
+      email: "viewer177@example.com",
+    });
 
-      await t.run(async (ctx) => {
-        await ctx.db.insert("users", {
-          createdAt: Date.now(),
-          userId: "no_family_user_177",
-          email: "nofamily@example.com",
-          familyRole: "admin",
-          updatedAt: Date.now(),
-        });
-      });
+    await expect(
+      viewerUser.mutation(api.families.updateFamilyName, {
+        name: "閲覧者が変えようとした名前",
+      }),
+    ).rejects.toThrow("Access denied: Admin role required");
 
-      // 未認証ユーザー
-      await expect(
-        t.mutation(api.families.updateFamilyName, { name: "名前" }),
-      ).rejects.toThrow("Unauthenticated");
+    // DB の家族名が変更されていないこと
+    await t.run(async (ctx) => {
+      const doc = await ctx.db.get(familyId);
+      expect(doc?.name).toBe("閲覧者テスト家族");
+    });
+  });
 
-      // 家族未所属ユーザー
-      const noFamilyUser = t.withIdentity({
-        subject: "no_family_user_177",
+  it("未認証ユーザーおよび家族未所属ユーザーは変更できないこと", async () => {
+    const t = convexTest(schema, modules);
+
+    await t.run(async (ctx) => {
+      await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        userId: "no_family_user_177",
         email: "nofamily@example.com",
+        familyRole: "admin",
+        updatedAt: Date.now(),
       });
-
-      await expect(
-        noFamilyUser.mutation(api.families.updateFamilyName, { name: "名前" }),
-      ).rejects.toThrow("User does not belong to a family");
     });
+
+    // 未認証ユーザー
+    await expect(
+      t.mutation(api.families.updateFamilyName, { name: "名前" }),
+    ).rejects.toThrow("Unauthenticated");
+
+    // 家族未所属ユーザー
+    const noFamilyUser = t.withIdentity({
+      subject: "no_family_user_177",
+      email: "nofamily@example.com",
+    });
+
+    await expect(
+      noFamilyUser.mutation(api.families.updateFamilyName, { name: "名前" }),
+    ).rejects.toThrow("User does not belong to a family");
   });
 });

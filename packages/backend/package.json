@@ -20,8 +20,7 @@
       "import": "./convex/_generated/api.js"
     },
     "./dataModel": {
-      "types": "./convex/_generated/dataModel.d.ts",
-      "import": "./convex/_generated/dataModel.js"
+      "types": "./convex/_generated/dataModel.d.ts"
     },
     "./server": {
       "types": "./convex/_generated/server.d.ts",
