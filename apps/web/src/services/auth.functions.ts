@@ -1,3 +1,4 @@
+import { api } from "@poohma/backend/api";
 import { createServerFn } from "@tanstack/react-start";
 import {
   deleteCookie,
@@ -6,7 +7,6 @@ import {
   setResponseHeader,
 } from "@tanstack/react-start/server";
 import { ConvexHttpClient } from "convex/browser";
-import { api } from "@/../convex/_generated/api";
 import type { Account } from "@/components/AccountProvider";
 import { env } from "@/env/client";
 import { env as serverEnv } from "@/env/server";

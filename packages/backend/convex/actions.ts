@@ -1,0 +1,329 @@
+"use node";
+
+import http from "node:http";
+import https from "node:https";
+import { URL } from "node:url";
+import { resolveEmail } from "@poohma/shared/emails";
+import { emailPayload } from "@poohma/shared/emails/registry";
+import { validateUrlSafety } from "@poohma/shared/utils/url-safety";
+import { render } from "@react-email/render";
+import * as cheerio from "cheerio";
+import { v } from "convex/values";
+import { Resend } from "resend";
+import { action, internalAction } from "./_generated/server";
+
+async function fetchSafeBuffer(
+  urlString: string,
+  maxRedirects = 5,
+): Promise<Buffer> {
+  let currentUrl = urlString;
+  const visited = new Set<string>([currentUrl]);
+  const safeMaxRedirects = Math.min(Math.max(maxRedirects, 1), 10);
+
+  for (let i = 0; i < safeMaxRedirects; i++) {
+    const parsed = new URL(currentUrl);
+    // 1. 安全性の検証とIPアドレス解決
+    const ip = await validateUrlSafety(currentUrl);
+
+    // 2. リクエストの構築
+    const isHttps = parsed.protocol === "https:";
+    const lib = isHttps ? https : http;
+
+    const result = await new Promise<
+      { type: "data"; data: Buffer } | { type: "redirect"; url: string }
+    >((resolve, reject) => {
+      const options: https.RequestOptions = {
+        hostname: ip, // 直接IPへ接続
+        port: parsed.port ? parseInt(parsed.port, 10) : isHttps ? 443 : 80,
+        path: parsed.pathname + parsed.search,
+        method: "GET",
+        headers: {
+          "User-Agent": "PoohMa-OGP-Bot/1.0",
+          Accept: "text/html,application/xhtml+xml",
+          Host: parsed.hostname, // Hostヘッダーには元のドメインを指定
+        },
+        timeout: 5000,
+      };
+
+      if (isHttps) {
+        options.servername = parsed.hostname; // SNI 送信用
+      }
+
+      const req = lib.request(options, (res) => {
+        // リダイレクト判定
+        if (
+          res.statusCode &&
+          res.statusCode >= 300 &&
+          res.statusCode < 400 &&
+          res.headers.location
+        ) {
+          const nextUrl = new URL(res.headers.location, currentUrl).toString();
+          resolve({ type: "redirect", url: nextUrl });
+          return;
+        }
+
+        if (res.statusCode !== 200) {
+          reject(new Error(`HTTP error status ${res.statusCode}`));
+          return;
+        }
+
+        const chunks: Buffer[] = [];
+        let totalSize = 0;
+        const maxResponseSize = 5 * 1024 * 1024; // 5MB
+
+        res.on("data", (chunk) => {
+          totalSize += chunk.length;
+          if (totalSize > maxResponseSize) {
+            req.destroy();
+            reject(new Error("Response size limit exceeded"));
+            return;
+          }
+          chunks.push(chunk);
+        });
+
+        res.on("end", () => {
+          resolve({ type: "data", data: Buffer.concat(chunks) });
+        });
+      });
+
+      req.on("error", reject);
+      req.on("timeout", () => {
+        req.destroy();
+        reject(new Error("Request timeout"));
+      });
+      req.end();
+    });
+
+    if (result.type === "redirect") {
+      if (visited.has(result.url)) {
+        throw new Error("Redirect cycle detected");
+      }
+      visited.add(result.url);
+      currentUrl = result.url;
+      continue;
+    }
+
+    return result.data;
+  }
+  throw new Error("Too many redirects");
+}
+
+export const getOgpInfo = action({
+  args: { url: v.string() },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthenticated call to getOgpInfo");
+    }
+
+    try {
+      // 1. 安全に HTML データを Buffer としてフェッチ（DNS Rebinding 対策）
+      const buffer = await fetchSafeBuffer(args.url);
+
+      // 2. 文字エンコーディングの検出とデコード（一時的に utf-8 でパースして charset メタタグを探す）
+      let html = buffer.toString("utf-8");
+      const metaCharsetMatch =
+        html.match(/<meta[^>]*charset=["']?([\w-]+)/i) ||
+        html.match(
+          /<meta[^>]*http-equiv=["']?content-type["']?[^>]*content=["']?[^"']*charset=([\w-]+)/i,
+        );
+
+      if (metaCharsetMatch?.[1]) {
+        const detectedCharset = metaCharsetMatch[1].toLowerCase();
+        if (detectedCharset !== "utf-8" && detectedCharset !== "utf8") {
+          try {
+            html = new TextDecoder(detectedCharset).decode(
+              new Uint8Array(buffer),
+            );
+          } catch (e) {
+            console.warn(
+              `Failed to decode with charset: ${detectedCharset}`,
+              e,
+            );
+          }
+        }
+      }
+
+      // 3. cheerio による OGP 情報抽出（ReDoS 対策）
+      const $ = cheerio.load(html);
+
+      const title = (
+        $('meta[property="og:title"]').attr("content") ||
+        $('meta[name="og:title"]').attr("content") ||
+        $("title").text() ||
+        ""
+      ).trim();
+
+      let image = (
+        $('meta[property="og:image"]').attr("content") ||
+        $('meta[name="og:image"]').attr("content") ||
+        ""
+      ).trim();
+
+      const description = (
+        $('meta[property="og:description"]').attr("content") ||
+        $('meta[name="og:description"]').attr("content") ||
+        $('meta[name="description"]').attr("content") ||
+        ""
+      ).trim();
+
+      // 4. OGP 画像の相対パスを解決
+      if (
+        image &&
+        !image.startsWith("http://") &&
+        !image.startsWith("https://")
+      ) {
+        try {
+          image = new URL(image, args.url).toString();
+        } catch (e) {
+          console.warn("Failed to resolve absolute image URL", e);
+        }
+      }
+
+      return {
+        title,
+        image,
+        description,
+      };
+    } catch (error) {
+      console.error("OGP fetch failed:", error);
+      return { title: "", image: "", description: "" };
+    }
+  },
+});
+
+export const getFurigana = action({
+  args: { text: v.string() },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthenticated call to getFurigana");
+    }
+
+    const textToConvert = args.text.trim();
+    if (!textToConvert) return "";
+
+    const appId = process.env.YAHOO_CLIENT_ID;
+    if (!appId) {
+      console.warn("YAHOO_CLIENT_ID is not set in environment variables.");
+      return textToConvert;
+    }
+
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const controller = new AbortController();
+      timeoutId = setTimeout(() => controller.abort(), 3000);
+
+      const response = await fetch("https://jlp.yahooapis.jp/jsonrpc", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": `Yahoo AppID: ${appId}`,
+        },
+        body: JSON.stringify({
+          id: "1",
+          jsonrpc: "2.0",
+          method: "jlp.furiganaservice.furigana",
+          params: {
+            q: textToConvert,
+          },
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        console.error("Yahoo Furigana API HTTP error:", response.statusText);
+        return textToConvert;
+      }
+
+      const data = (await response.json()) as {
+        result?: {
+          word?: Array<{
+            surface: string;
+            furigana?: string;
+          }>;
+        };
+      };
+
+      const words = data.result?.word;
+      if (!words || !Array.isArray(words)) {
+        return textToConvert;
+      }
+
+      const reading = words.map((w) => w.furigana || w.surface).join("");
+
+      return reading || textToConvert;
+    } catch (error) {
+      console.error("Failed to fetch furigana from Yahoo API:", error);
+      return textToConvert;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  },
+});
+
+export const sendEmailReq = async ({
+  email,
+  subject,
+  html,
+  text,
+  replyTo,
+}: {
+  email: string;
+  subject: string;
+  html: string;
+  text: string;
+  replyTo?: string;
+}): Promise<boolean> => {
+  try {
+    if (process.env.DISABLE_EMAIL_DELIVERY === "true") {
+      console.info("Email delivery skipped: DISABLE_EMAIL_DELIVERY=true");
+      return true;
+    }
+
+    const mailApiKey = process.env.RESEND_API_KEY;
+    const mailFrom = process.env.RESEND_MAIL_FROM;
+    if (!mailApiKey || !mailFrom) {
+      throw new Error("Mail access token or API base URL is not defined");
+    }
+    const resend = new Resend(mailApiKey);
+
+    const response = await resend.emails.send({
+      from: `PoohMa <${mailFrom}>`,
+      to: [...email.split(/,\s*/g)].map((e) => e.trim()).filter(Boolean),
+      subject: subject,
+      html: html,
+      text: text,
+      replyTo: replyTo,
+    });
+    if (response.error != null) {
+      throw Error(response.error.message);
+    }
+    return true;
+  } catch (error) {
+    console.error("Email send failed:", error);
+    return false;
+  }
+};
+
+export const sendTemplatedEmailInternal = internalAction({
+  args: {
+    email: v.string(),
+    payload: emailPayload,
+    replyTo: v.optional(v.string()),
+  },
+  handler: async (_ctx, args): Promise<boolean> => {
+    const { subject, element } = resolveEmail(args.payload);
+    const [html, text] = await Promise.all([
+      render(element),
+      render(element, { plainText: true }),
+    ]);
+    return sendEmailReq({
+      email: args.email,
+      subject,
+      html,
+      text,
+      replyTo: args.replyTo,
+    });
+  },
+});

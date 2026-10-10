@@ -1,10 +1,10 @@
+import { api } from "@poohma/backend/api";
+import type { Id } from "@poohma/backend/dataModel";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { api } from "@/../convex/_generated/api";
-import type { Id } from "@/../convex/_generated/dataModel";
 import { usePasscode } from "@/components/PasscodeProvider";
 import { useAccount } from "@/hooks/useAccount";
 import {

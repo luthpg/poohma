@@ -1,3 +1,4 @@
+import { MAX_CREDENTIALS_PER_RECORD } from "@poohma/shared/schemas";
 import { Download, FileText, Info, ShieldCheck } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef } from "react";
@@ -11,7 +12,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { MAX_CREDENTIALS_PER_RECORD } from "@/utils/schemas";
 
 interface CsvHelpDialogProps {
   trigger?: React.ReactNode;

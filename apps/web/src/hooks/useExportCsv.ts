@@ -1,12 +1,12 @@
+import { api } from "@poohma/backend/api";
+import { MAX_CREDENTIALS_PER_RECORD } from "@poohma/shared/schemas";
 import { useMutation } from "convex/react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { api } from "@/../convex/_generated/api";
 import { usePasscode } from "@/components/PasscodeProvider";
 import { useAccount } from "@/hooks/useAccount";
 import { getClientRequestContext } from "@/services/security.functions";
 import { sanitizeCsvValue } from "@/utils/csv-sanitize";
-import { MAX_CREDENTIALS_PER_RECORD } from "@/utils/schemas";
 
 export function useExportCsv() {
   const [isExporting, setIsExporting] = useState(false);

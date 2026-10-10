@@ -1,3 +1,5 @@
+import { api } from "@poohma/backend/api";
+import type { Id } from "@poohma/backend/dataModel";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import {
@@ -13,8 +15,6 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { api } from "@/../convex/_generated/api";
-import type { Id } from "@/../convex/_generated/dataModel";
 import { SubHeader } from "@/components/common/SubHeader";
 import { Button } from "@/components/ui/button";
 import { useAccount } from "@/hooks/useAccount";

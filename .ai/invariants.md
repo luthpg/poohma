@@ -169,6 +169,11 @@
 - **内部シークレット送信時の HTTPS 検証**:
   - `CONVEX_INTERNAL_SECRET` などの高権限シークレットを送信する際は、送信先 URL が `https://` で始まっていることを事前に検証し、誤設定による平文送信（CWE-319）を防止すること。
 
+### パッケージ分離・スクリプト移管時のワークフロー参照整合性
+
+- モノレポ内のパッケージ分離やスクリプト移管時、`.github/workflows/*.yml` 内で旧パッケージのスクリプト（`pnpm --filter <old-pkg> run <old-script>`）を参照したまま放置してはならない。
+- 必ずワークフロー定義内のコマンドも新パッケージ（例: `pnpm --filter @poohma/backend run preview:setup`）へ即時追従させ、未定義スクリプトによる CI ジョブ即死を防止すること。
+
 ### CI での Knowledge・ドキュメント同期（Doc-Sync Gate）の強制
 
 - **完全履歴チェックアウト（`fetch-depth: 0`）**:
@@ -177,3 +182,13 @@
   - `check-and-test` ジョブ内で `pnpm check:knowledge` および `pnpm check:doc-sync -- --base "origin/$GITHUB_BASE_REF" --ci` を実行し、参照切れや REQUIRED レベルのドキュメント未更新が残存する状態でのマージを CI 側で厳格にブロックする。
 - **CI 実行コマンドのスクリプト集約（Single Source of Truth）**:
   - CI ワークフローで実行する検証・デプロイコマンド（Convex dry-run 等）は、個別の生コマンドではなくルート `package.json` のスクリプト（`pnpm run <script-name>`）に集約し、ローカル開発と CI での実行オプションの Single Source of Truth を維持する。
+
+### デプロイキーと環境選択の厳格な分離（フォールバック排除）
+
+- **環境間シークレットの完全分離**:
+  - 本番ワークフロー（`deploy-production.yml`）とステージングワークフロー（`deploy-staging.yml`）で同一の `CONVEX_DEPLOY_KEY` を共有してはならない。
+  - 本番環境は `CONVEX_DEPLOY_KEY`、ステージング環境および CI ワークフロー（`ci.yml` の `convex-dry-run`）は `CONVEX_STAGING_DEPLOY_KEY` をそれぞれ専用にバインドする（ジョブレベル `env:` およびステップレベルの双方で徹底し、PR 時の本番キー露出を防止）。
+- **デプロイキーの曖昧なフォールバックの禁止（fail-fast 原則）**:
+  - ステージングデプロイにおいて、「キーが未設定なら開発用や本番用キーを流用する」といったフォールバックコードを記述してはならない。環境の混同や本番への誤爆を防ぐため、未設定時は即座に失敗（fail-fast）させる。
+- **本番デプロイワークフローの main ブランチ厳格制限**:
+  - 本番デプロイジョブは手動実行（workflow_dispatch）を含め、必ず `github.ref == 'refs/heads/main'` かつリポジトリオーナーの一致を検証する実行条件を課し、未マージブランチからの本番反映を構造的に遮断する。

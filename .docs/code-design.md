@@ -13,6 +13,15 @@
 ## 1. システムアーキテクチャ概要
 
 PoohMaは、フロントエンドとサーバーサイド処理を単一のTanStack Startアプリケーションで統合しつつ、データベース・ビジネスロジックの大部分をConvex（BaaS）に委譲する構成である。
+リポジトリは Turborepo によるモノレポ構成をとっており、責務に応じて以下のパッケージに分離されている：
+- `apps/web`: フロントエンド & SSR（TanStack Start, Vite）およびブラウザ E2E テスト（Playwright）
+- `packages/backend`: Convex バックエンド（Schema, Functions, RLS, 結合テスト、Preview 環境プロビジョニング、シードエクスポート）
+- `packages/shared`: 共通モジュール（Zod スキーマ, React Email テンプレート, ユーティリティ）
+- `packages/knowledge-tools`: 知見運用・AI 開発基盤ツール
+- `workers/backup`: Cloudflare Workers バックアップワーカー
+
+システム全体の E2E テストは、モノレポルートのオーケストレーション（`pnpm test:e2e`）により「バックエンドの Preview 環境プロビジョニング（`@poohma/backend`）」→「ブラウザブリッジのビルド（`@poohma/web`）」→「Playwright 実行（`@poohma/web`）」の順で責務境界を保って実行される。
+
 認証はFirebase Authenticationを用い、コンテンツ管理はmicroCMS、メール送信はResendを利用する。
 
 ```txt
@@ -632,7 +641,7 @@ ConvexReactClient / TanStack Query の Mutation実行を共通ラッパーでイ
 
 2. **デモデータの更新・最新化フロー**:
    - 管理者アカウントでデモファミリーにログインし、新規レコードの登録や CSV インポート（`apps/web/e2e/fixtures/demo_seed_records.csv`）を実行してブラウザ側で正常に E2EE 暗号化された状態を作成。
-   - ローカルターミナルで `pnpm demo:export` を実行。Convex から暗号化済み共有レコードを抽出し、`apps/web/convex/demoRecords.json` を最新化。
+   - ローカルターミナルで `pnpm demo:export` を実行。Convex から暗号化済み共有レコードを抽出し、`packages/backend/convex/demoRecords.json` を最新化。
    - 変更された `demoRecords.json` をコミット・デプロイすることで、次回リセット以降の初期投入データとして永続化。
 
 3. **リセット実行（定期 & 手動）**:

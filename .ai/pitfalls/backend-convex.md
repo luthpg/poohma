@@ -11,7 +11,7 @@ Convex バックエンド開発における落とし穴と回避法です。
   - 一方で `pnpm convex:codegen` だけを実行すると、ローカルの型定義は更新されるが **Convex 開発クラウドインスタンス（`dev:...`）には関数やスキーマがプッシュされない**。そのため、実バックエンドと通信する E2E テスト（Playwright）を実行した際に `Could not find public function for '...'` でテストが全滅する罠に陥る。
   - また、`pnpm convex:deploy` / `pnpm convex:sync` は本番（production）デプロイまたは `CONVEX_DEPLOY_KEY` 設定環境向けであり、ローカル開発環境（`dev:...`）への反映には使えない。
 - **回避法**: 
-  - 開発環境（`dev:...`）に関数・スキーマの変更をワンショットで安全に反映し、型定義を生成するには **`convex dev --once`**（`pnpm -F @poohma/web exec convex dev --once`）を使用する。常駐せずにデプロイとコード生成を完了できる。
+  - 開発環境（`dev:...`）に関数・スキーマの変更をワンショットで安全に反映し、型定義を生成するには **`convex dev --once`**（`pnpm convex:dev:once` または `pnpm -F @poohma/backend exec convex dev --once`）を使用する。常駐せずにデプロイとコード生成を完了できる。
   - E2E テスト実行前やローカル検証前にバックエンドのスキーマ・関数を変更した場合は、必ず事前に `convex dev --once` を実行すること。
 
 ---
@@ -78,7 +78,7 @@ Convex バックエンド開発における落とし穴と回避法です。
   - Convex の Action は `"use node;"` ディレクティブにより Node.js ランタイムを利用できるが、**Mutation および Query は Convex 独自の分離サンドボックス（V8ベース）でのみ実行可能**であり、Node.js 組み込みモジュール（`node:crypto`）をインポートできない。
   - そのため、Mutation 内でシークレットやハッシュ値のタイミング攻撃対策（定数時間比較）を行う際、`crypto.timingSafeEqual` は使用できず、またブラウザ用の Web Crypto API にも同期的な定数時間比較 API は存在しない。
 - **回避法**:
-  - `apps/web/convex/cryptoUtils.ts` に純粋な TypeScript 実装（XOR およびビット演算による定数時間比較ヘルパー `timingSafeEqual`）を用意する。
+  - `packages/backend/convex/cryptoUtils.ts` に純粋な TypeScript 実装（XOR およびビット演算による定数時間比較ヘルパー `timingSafeEqual`）を用意する。
   - ループ回数を `Math.max(a.length, b.length)` のように入力や秘密値の長さに依存させると、外部から長さを変えて送信された際に時間差変曲点から秘密値長が推測されるリスク（CWE-208）や巨大入力による CPU 枯渇 DoS（CWE-400）が生じるため、**走査ステップ数を固定上限（`FIXED_COMPARE_LENGTH = 256`）に完全固定**し、長さ不一致ビットを蓄積して比較する。
 
 ---
@@ -114,16 +114,16 @@ Convex バックエンド開発における落とし穴と回避法です。
   - ワンショットマイグレーション手順において、本番デプロイ手順には「ユーザーへ対話ターミナルでの実行を依頼する」ステップを明記する。
 - **関連実装 (Related Code References)**:
   - `.ai/workflows/one-shot-migration.md`
-  - `apps/web/convex/schema.ts`
+  - `packages/backend/convex/schema.ts`
 
 ---
 
 ### Monorepo における `convex export` のパス解決（二重ディレクトリ ENOENT 回避）
 
 - **問題 (Problem)**:
-  - ルートから `pnpm -F @poohma/web exec convex export --path apps/web/.local/migrations/backup.zip` を実行すると、`ENOENT: no such file or directory` エラーでエクスポートに失敗する。
+  - ルートから `pnpm -F @poohma/backend exec convex export --path packages/backend/.local/migrations/backup.zip` を実行すると、`ENOENT: no such file or directory` エラーでエクスポートに失敗する。
 - **原因 (Root Cause)**:
-  - `pnpm -F @poohma/web exec` は作業ディレクトリ（Cwd）をパッケージルート（`apps/web`）に変更してコマンドを実行するため、引数に `apps/web/...` を含めると `apps/web/apps/web/.local/...` と解釈されて二重ディレクトリパスになり、出力先ディレクトリが存在せず失敗する。
+  - `pnpm -F @poohma/backend exec` は作業ディレクトリ（Cwd）をパッケージルート（`packages/backend`）に変更してコマンドを実行するため、引数に `packages/backend/...` を含めると `packages/backend/packages/backend/.local/...` と解釈されて二重ディレクトリパスになり、出力先ディレクトリが存在せず失敗する。
 - **誤ったアプローチ (Anti-Pattern)**:
   - 失敗した際に無理に絶対パスを構築したり、ディレクトリ構成の変更を試みること。
 - **正しいアプローチ (Correct Pattern)**:
@@ -154,5 +154,41 @@ Convex バックエンド開発における落とし穴と回避法です。
   - ワンショットマイグレーションでは必ずこの突合スクリプトをワンショット実行して「全件一致・差分は指定フィールドのみ」を保証してから完了とする。
 - **関連実装 (Related Code References)**:
   - `.ai/workflows/one-shot-migration.md`
-  - `apps/web/convex/schema.ts`
+  - `packages/backend/convex/schema.ts`
+
+---
+
+### Monorepo 移行後のビルドコマンドにおける Convex パッケージ指定漏れ（関数全削除・`no providers configured` 罠）
+
+- **問題 (Problem)**:
+  - Convex バックエンドを旧配置（`apps/web` 配下の `convex` ディレクトリ）から `packages/backend/convex` などの独立パッケージへ分離したモノレポ構成において、Vercel の Build Command やデプロイスクリプトが移行前のディレクトリ（例: `cd apps/web && convex deploy` やリポジトリルート）のまま実行されると、デプロイ自体はエラーなく成功（終了コード 0）するが、Convex サーバー上の関数がすべて空（0件）になり、`auth.config.ts` も認識されず認証プロバイダが 0 件としてプッシュされてしまう。
+  - その結果、ステージングや本番でログインしようとするとブラウザ側で `Failed to authenticate: "No auth provider found matching the given token (no providers configured). Check convex/auth.config.ts."` エラーが発生し、全機能が動作不能になる。
+- **原因 (Root Cause)**:
+  - Convex CLI は実行ディレクトリ直下に `convex/` が見つからない場合、関数が 0 件でもエラーとせず「0件の関数」としてデプロイを正常終了する。
+  - これにより、サーバー側の全関数および `auth.config.ts` が空で上書き（削除）されてしまう。
+- **回避法 (Correct Pattern)**:
+  - ルートや他パッケージから無理に動かそうとせず、Vercel や CI のビルドコマンドでは必ずモノレポのパッケージフィルタリング（`pnpm --filter @poohma/backend run deploy` や `pnpm server deploy`）を使用して、正しいバックエンドパッケージを対象に実行する。
+- **関連実装 (Related Code References)**:
+  - `packages/backend/package.json`
+  - `package.json`
+  - `packages/backend/convex/auth.config.ts`
+
+---
+
+### `convex-test` における非同期予約タスク（`scheduler.runAfter`）の漏洩と `EnvironmentTeardownError`
+
+- **問題 (Problem)**:
+  - `deleteAccount` 等のように、関数内部で `ctx.scheduler.runAfter(0, internal.actions.sendTemplatedEmailInternal, ...)` を呼び出す Mutation を `convex-test` でテストする際、テスト側で予約タスクを待機しないままテストブロックが終了すると、Vitest のテスト環境 teardown 後に非同期タスクが遅延実行され、`EnvironmentTeardownError`（モジュールロード失敗）がログに多発・蓄積する。
+- **原因 (Root Cause)**:
+  - `convex-test` のインメモリキューに残ったタスクが Vitest のコンテキスト破棄後に実行されるため。
+  - メール処理（React Email 等）は動的インポートを伴うため、認可・DB操作の検証を目的とするテストでは本来実行不要なオーバーヘッドとなる。
+- **回避法 (Correct Pattern)**:
+  - 認可・DB操作の検証テストでは、`createTestModules` ヘルパーを用いて `sendTemplatedEmailInternal` をテスト用のダミーアクションにモック置換する。
+  - テストの末尾で必ず `await t.finishInProgressScheduledFunctions()` を呼び出し、予約された非同期タスクがテスト終了前に確実に完了するように管理する。
+- **関連実装 (Related Code References)**:
+  - `packages/backend/tests/test-helpers.ts`
+  - `packages/backend/tests/convex-users-auth.spec.ts`
+
+
+
 

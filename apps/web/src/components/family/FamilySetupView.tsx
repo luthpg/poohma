@@ -1,11 +1,11 @@
+import { api } from "@poohma/backend/api";
+import type { Id } from "@poohma/backend/dataModel";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery_experimental } from "convex/react";
 import { Ban, Check, Eye, EyeOff } from "lucide-react";
 import { lazy, Suspense, useState } from "react";
 import { toast } from "sonner";
-import { api } from "@/../convex/_generated/api";
-import type { Id } from "@/../convex/_generated/dataModel";
 import { AccountSwitcher } from "@/components/AccountSwitcher";
 import { Spinner } from "@/components/ui/spinner";
 import { MIN_PASSCODE_LENGTH } from "@/constants/passcode";

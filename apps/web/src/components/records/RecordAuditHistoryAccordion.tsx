@@ -1,7 +1,7 @@
+import { api } from "@poohma/backend/api";
+import type { Id } from "@poohma/backend/dataModel";
 import { useQuery } from "convex/react";
 import { History } from "lucide-react";
-import { api } from "@/../convex/_generated/api";
-import type { Id } from "@/../convex/_generated/dataModel";
 import {
   Accordion,
   AccordionContent,

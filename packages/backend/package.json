@@ -1,0 +1,50 @@
+{
+  "name": "@poohma/backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "convex dev",
+    "deploy": "convex deploy",
+    "deploy:dry-run": "convex deploy --dry-run",
+    "codegen": "convex codegen",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --coverage",
+    "preview:setup": "tsx scripts/setup-preview.ts",
+    "preview:setup:clean": "tsx scripts/setup-preview.ts --clean",
+    "demo:export": "tsx scripts/export-demo-records.ts"
+  },
+  "exports": {
+    "./api": {
+      "types": "./convex/_generated/api.d.ts",
+      "import": "./convex/_generated/api.js"
+    },
+    "./dataModel": {
+      "types": "./convex/_generated/dataModel.d.ts"
+    },
+    "./server": {
+      "types": "./convex/_generated/server.d.ts",
+      "import": "./convex/_generated/server.js"
+    }
+  },
+  "dependencies": {
+    "@convex-dev/rate-limiter": "^0.4.0",
+    "@poohma/shared": "workspace:*",
+    "@react-email/render": "^2.1.0",
+    "cheerio": "^1.2.0",
+    "convex": "^1.46.0",
+    "convex-helpers": "^0.1.124",
+    "dotenv": "^17.4.2",
+    "resend": "^6.31.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.15",
+    "@types/node": "^26.6.3",
+    "@vitest/coverage-v8": "^5.0.3",
+    "convex-test": "^0.0.60",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  }
+}

@@ -7,10 +7,18 @@
 ```text
 poohma/
 ├── apps/
-│   └── web/               # @poohma/web (TanStack Start + Convex)
-│       ├── convex/        # Convex バックエンド (schema, functions, RLS, customBuilders)
-│       ├── src/           # フロントエンドおよび Server Functions
-│       └── tests/         # テスト群 (Vitest / convex-test)
+│   └── web/               # @poohma/web (TanStack Start フロントエンド & ブラウザE2E)
+│       ├── src/           # UI, Routes, Hooks, Server Functions
+│       ├── e2e/           # Playwright E2E シナリオ
+│       └── tests/         # フロントエンド単体・ブラウザ暗号テスト
+├── packages/
+│   ├── backend/           # @poohma/backend (Convex BaaS バックエンド)
+│   │   ├── convex/        # schema, functions, RLS, customBuilders
+│   │   ├── scripts/       # setup-preview, export-demo-records
+│   │   └── tests/         # バックエンド結合テスト (convex-test)
+│   ├── shared/            # @poohma/shared (共通モジュール・部品)
+│   │   └── src/           # schemas, url-safety, index-group, emails
+│   └── knowledge-tools/   # @poohma/knowledge-tools (AI運用・品質ゲート)
 ├── workers/
 │   └── backup/            # @poohma/backup (Cloudflare Workers + R2 定期自動バックアップ)
 ├── .docs/                 # 人間向けの正規仕様・設計書
@@ -18,14 +26,17 @@ poohma/
 ├── GEMINI.md              # 実行環境ルール・QA・Git・.ai/利用規約
 ├── biome.json             # 統一 Lint / Format 設定
 ├── turbo.json             # Turborepo パイプライン設定
-└── package.json           # ルートスクリプト
+└── package.json           # ルートスクリプト & オーケストレーション
 ```
 
 ### Workspaceの責務
 
 | Workspace | 責務 | 主要技術 |
 | --- | --- | --- |
-| `apps/web` | メインWebアプリケーション（フロントエンド、SSR、Server Functions、Convex BaaSバックエンド） | React 19, TanStack Start, TanStack Router, Convex, Tailwind CSS v4, shadcn/ui, Web Crypto API |
+| `apps/web` | メインWebアプリケーション（フロントエンド、SSR、Server Functions） | React 19, TanStack Start, TanStack Router, Tailwind CSS v4, shadcn/ui, Web Crypto API |
+| `packages/backend` | Convex BaaS バックエンド（スキーマ、関数、RLS、プレビュー構築） | Convex, convex-helpers, convex-test, TypeScript |
+| `packages/shared` | 共通バリデーションスキーマ、URL検証（SSRF対策）、メール定義 | Zod, React Email, ipaddr.js, TypeScript |
+| `packages/knowledge-tools` | AI開発支援、Doc-Sync、参照整合性検証ツール | TypeScript, simple-git |
 | `workers/backup` | Convex Cloud からの定期データエクスポートおよび Cloudflare R2 へのアーカイブ保存 | Cloudflare Workers, Cloudflare R2, Wrangler, Fetch |
 
 ---
@@ -56,7 +67,7 @@ poohma/
   - `biometric.ts`: WebAuthn PRF 拡張による生体認証連携
   - `recovery-kit.ts`: リカバリーキット発行・PDF 生成・2段階復元
 
-### Backend (`apps/web/convex`)
+### Backend (`packages/backend/convex`)
 
 - `schema.ts`: データベーススキーマおよびインデックス定義
 - `customBuilders.ts`: 認可レベル別 Convex クエリ/ミューテーションビルダー（`identityVerified*`, `authenticated*`, `familyBound*`, `familyAdmin*`, `recordAdmin*`, `resolveAccount`。複数アカウント所持ユーザーにおいて `accountId` 未指定時はデータ越境防止のため厳格にエラー送出）
@@ -158,9 +169,9 @@ flowchart TD
 
 | 領域 | Source of Truth |
 | --- | --- |
-| DB スキーマ・インデックス | `apps/web/convex/schema.ts` |
-| Convex 認証・認可基盤 | `apps/web/convex/customBuilders.ts` |
-| レコード単位アクセス制御 (RLS) | `apps/web/convex/rls.ts` |
+| DB スキーマ・インデックス | `packages/backend/convex/schema.ts` |
+| Convex 認証・認可基盤 | `packages/backend/convex/customBuilders.ts` |
+| レコード単位アクセス制御 (RLS) | `packages/backend/convex/rls.ts` |
 | E2EE 暗号化・鍵導出アルゴリズム | `apps/web/src/lib/crypto.ts` |
 | 脅威モデル・セキュリティ境界 | `.docs/security/threat-model.md` |
 | 人間向け正規仕様・詳細設計 | `.docs/requirements.md`, `.docs/code-design.md` |
@@ -170,11 +181,11 @@ flowchart TD
 ## 6. 変更時に関連確認が必要な領域
 
 - **DB スキーマ変更時**:
-  - `apps/web/convex/schema.ts` 変更後、必ず `pnpm convex:sync`（または `pnpm convex:codegen`）を実行して `_generated/` を最新化した後、 `pnpm check` でフォーマット
+  - `packages/backend/convex/schema.ts` 変更後、必ず `pnpm convex:sync`（または `pnpm convex:codegen`）を実行して `_generated/` を最新化した後、 `pnpm check` でフォーマット
   - 影響を受ける Convex 関数（`records.ts`, `families.ts`, `users.ts` 等）およびフロントエンドの型参照
   - `.docs/code-design.md` の DB スキーマ表の更新要否
 - **所有権・アクセス制御変更時**:
-  - `apps/web/convex/rls.ts`, `apps/web/convex/customBuilders.ts`, `apps/web/convex/records.ts`
+  - `packages/backend/convex/rls.ts`, `packages/backend/convex/customBuilders.ts`, `packages/backend/convex/records.ts`
   - `.docs/security/threat-model.md` の脅威シナリオ（T6, T8）との整合性確認
 - **E2EE / 暗号パラメータ変更時**:
   - `apps/web/src/lib/crypto.ts`（`KDF_VERSIONS` への追記、既存パラメータの不変性維持）

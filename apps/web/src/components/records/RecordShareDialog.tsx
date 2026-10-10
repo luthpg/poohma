@@ -1,9 +1,9 @@
+import { api } from "@poohma/backend/api";
+import type { Doc, Id } from "@poohma/backend/dataModel";
 import { useMutation } from "convex/react";
 import { Users } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { api } from "@/../convex/_generated/api";
-import type { Doc, Id } from "@/../convex/_generated/dataModel";
 import {
   Dialog,
   DialogContent,

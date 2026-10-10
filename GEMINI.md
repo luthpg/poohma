@@ -6,7 +6,7 @@
   - `main` ブランチで直接コミット（`git commit`）したり、直接プッシュ（`git push origin main`）することは固く禁ずる。
   - すべての作業（機能開発・バグ修正・リファクタリング・ドキュメント更新など）は、必ず `origin/main` から切った専用のトピックブランチ（例: `feat/issue-151-...`、`fix/issue-...`）で作業を進め、GitHub Pull Request（PR）を作成してレビュー・CI通過を経てマージすること。
 - **テスト・CI失敗時のプロダクションコード改変禁止**:
-  - CI やテスト（E2E、ユニットテスト等）が失敗した際、**テストを通すためだけにプロダクションコード（`apps/web/src/` や `apps/web/convex/` 等）のタグ、DOM構造、挙動を独断で改変することは固く禁ずる**。
+  - CI やテスト（E2E、ユニットテスト等）が失敗した際、**テストを通すためだけにプロダクションコード（`apps/web/src/` や `packages/backend/convex/` 等）のタグ、DOM構造、挙動を独断で改変することは固く禁ずる**。
   - テストが失敗した場合は、まずテスト自体のセレクタ、待機処理、前提データ（家族所属状態、認証状態など）の不備を疑い、テストコード側の改善で解決を試みること。
   - テスト失敗の根本原因がプロダクションコード側の不具合であり修正が必要と判断した場合（アクセシビリティ対応や `data-testid` 付与などを含む）でも、**手を動かす前に必ずユーザーへ「事象・原因・修正案」を報告し、合意を得てから変更する**こと。
   - ※ ユーザーから明示的に依頼された新機能実装や機能改善、仕様変更等に伴うプロダクションコード変更は通常通り進めて良い。
@@ -73,7 +73,7 @@
 ## 3. Convex Workflow & Code Generation
 
 - **開発環境へのワンショット反映（ローカル開発・E2Eテスト前）**:
-  `pnpm convex:dev:once`（または `pnpm -F @poohma/web exec convex dev --once`）
+  `pnpm convex:dev:once`（または `pnpm -F @poohma/backend exec convex dev --once`）
   - 常駐プロセス化（watch モード）を回避し、開発環境への反映と型生成をワンショットで実行。
 - **本番・プレビュー環境への一括同期**: `pnpm convex:sync`
 - **個別に実行する場合**: `pnpm convex:deploy` / `pnpm convex:codegen`
@@ -102,13 +102,14 @@
 
 ```text
 poohma/                    # ルート（Turborepo）
-├── apps/web/              # TanStack Start + Convex（@poohma/web）
-│   ├── convex/            # Convex バックエンド（schema, functions, _generated）
+├── apps/web/              # Web フロントエンド（TanStack Start, Vite）
 │   ├── src/               # フロントエンド（@/* エイリアス）
-│   └── tests/             # ユニット / 結合 / E2E テスト
-├── workers/backup/        # Cloudflare Workers バックアップ（@poohma/backup）
+│   └── tests/             # UI / ブラウザ / E2E テスト
 ├── packages/              # 共通パッケージ
+│   ├── backend/           # Convex バックエンド（@poohma/backend: schema, functions, RLS, 結合テスト）
+│   ├── shared/            # 共通モジュール・部品（@poohma/shared: schemas, emails, utils）
 │   └── knowledge-tools/   # AI開発基盤・Knowledge運用ツール（@poohma/knowledge-tools）
+├── workers/backup/        # Cloudflare Workers バックアップ（@poohma/backup）
 ├── .ai/                   # AI Knowledge Base（ドメイン、不変条件、落とし穴）
 └── .agents/skills/        # Antigravity 専門スキル
 ```

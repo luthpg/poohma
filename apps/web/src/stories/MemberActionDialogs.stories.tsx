@@ -1,5 +1,5 @@
+import type { Id } from "@poohma/backend/dataModel";
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import type { Id } from "../../convex/_generated/dataModel";
 import { MemberActionDialogs } from "../components/family/MemberActionDialogs";
 
 const meta: Meta<typeof MemberActionDialogs> = {

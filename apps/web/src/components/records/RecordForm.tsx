@@ -1,3 +1,4 @@
+import { MAX_CREDENTIALS_PER_RECORD } from "@poohma/shared/schemas";
 import {
   AlertCircle,
   Check,
@@ -12,7 +13,6 @@ import { Spinner } from "@/components/ui/spinner";
 import { TagInput } from "@/components/ui/tag-input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { UseRecordFormReturn } from "@/hooks/useRecordForm";
-import { MAX_CREDENTIALS_PER_RECORD } from "@/utils/schemas";
 import { CredentialFieldsCard } from "./CredentialFieldsCard";
 
 export interface RecordFormProps {

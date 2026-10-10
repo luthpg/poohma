@@ -87,7 +87,7 @@ Playwright E2E テストおよびフロントエンド遷移における落と�
   1. 通常の開発反復時は高速な再利用モード（`test:e2e`）で良いが、**セッション切断やデータ不整合による連鎖失敗が発生した際、およびコミット前・PR提出前の最終フル検証時は `pnpm test:e2e:clean`（`--preview-create`）を実行**して Preview DB を完全に初期化・地ならしする。
   2. これにより、`e2e/.auth` の古いストレージも破棄され、`auth.setup.ts` で完全に新規の Firebase ID トークンとセッション Cookie からクリーンにテストが開始される。
 - **関連実装**:
-  - `apps/web/scripts/setup-e2e-preview.ts`
+  - `packages/backend/scripts/setup-preview.ts`
   - `apps/web/e2e/auth.setup.ts`
 
 

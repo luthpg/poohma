@@ -1,3 +1,4 @@
+import { api } from "@poohma/backend/api";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import {
@@ -35,7 +36,6 @@ import {
   wrapMasterKey,
 } from "@/lib/crypto";
 import { extractRecoveryCodeFromFile } from "@/lib/recovery-kit";
-import { api } from "../../../convex/_generated/api";
 
 const PasscodeStrengthMeter = lazy(() =>
   import("@/components/PasscodeStrengthMeter").then((m) => ({

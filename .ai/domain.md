@@ -1,6 +1,7 @@
 # PoohMa Domain Models & Status Transitions
 
 PoohMa における主要ドメインエンティティの関係性、ライフサイクル、状態遷移ルールを整理する。
+※ DB スキーマおよびテーブル定義の実装（Source of Truth）は `packages/backend/convex/schema.ts` に配置されています。
 
 ---
 

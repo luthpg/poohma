@@ -34,11 +34,7 @@ export default defineConfig({
         ".storybook/**",
         "src/stories/**",
         "src/components/ui/**",
-        "src/utils/schemas.ts",
-        "convex/_generated/**",
-        "convex/schema.ts",
         "routeTree.gen.ts",
-        "src/emails/**",
         "**/*.d.ts",
         "**/*.config.ts",
         "**/*.css",
@@ -49,30 +45,6 @@ export default defineConfig({
         functions: 50,
         lines: 50,
         "src/lib/crypto.ts": {
-          statements: 80,
-          branches: 80,
-          functions: 80,
-          lines: 80,
-        },
-        "convex/rls.ts": {
-          statements: 80,
-          branches: 80,
-          functions: 80,
-          lines: 80,
-        },
-        "convex/customBuilders.ts": {
-          statements: 80,
-          branches: 80,
-          functions: 80,
-          lines: 80,
-        },
-        "convex/users.ts": {
-          statements: 80,
-          branches: 80,
-          functions: 80,
-          lines: 80,
-        },
-        "src/utils/url-safety.ts": {
           statements: 80,
           branches: 80,
           functions: 80,
@@ -92,11 +64,6 @@ export default defineConfig({
             "e2e/**",
             "tests/browser-e2e/**",
           ],
-          server: {
-            deps: {
-              inline: ["convex-test"],
-            },
-          },
         },
       },
       {

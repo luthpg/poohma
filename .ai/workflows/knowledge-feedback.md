@@ -41,7 +41,7 @@ AI Agent が独断で知識ファイルを勝手に書き換えることはせ�
 - **再発防止 (Prevention)**:
   今後同様の作業をする際に何を確認・実行すべきか（チェックコマンドや不変条件）。
 - **関連実装 (Related Code References)**:
-  実在するファイルパス（例: `apps/web/src/lib/crypto.ts`, `apps/web/convex/customBuilders.ts` 等）。
+  実在するファイルパス（例: `apps/web/src/lib/crypto.ts`, `packages/backend/convex/customBuilders.ts` 等）。
 ```
 
 > **注意**: 「関連実装」に記載するファイルパスは必ず実在するパスを記述してください。`pnpm check:knowledge` で参照の整合性が機械検証されます。

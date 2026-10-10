@@ -1,10 +1,10 @@
+import { api } from "@poohma/backend/api";
+import type { Doc, Id } from "@poohma/backend/dataModel";
 import { useMutation } from "convex/react";
 import { Ban, Check, Clock, Copy, Plus, QrCode, Share2 } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { api } from "@/../convex/_generated/api";
-import type { Doc, Id } from "@/../convex/_generated/dataModel";
 import { AdminRestrictedSection } from "@/components/common/AdminRestrictedSection";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";

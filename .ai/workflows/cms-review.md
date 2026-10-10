@@ -62,7 +62,7 @@ CMS の評価前に、以下のソースで「最新の実装状態」を確定�
 | 機能の実装状況（✅/⏳） | `.docs/features.md` |
 | 設計上の不変条件 | `.ai/invariants.md` |
 | 要件の詳細 | `.docs/requirements.md` |
-| 実装コードの直接確認 | `apps/web/src/`, `apps/web/convex/` |
+| 実装コードの直接確認 | `apps/web/src/`, `packages/backend/convex/` |
 | 最近の変更 | `git log --oneline -20` |
 
 **注意点:**

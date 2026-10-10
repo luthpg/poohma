@@ -1,3 +1,5 @@
+import { api } from "@poohma/backend/api";
+import type { Id } from "@poohma/backend/dataModel";
 import {
   createFileRoute,
   Link,
@@ -25,8 +27,6 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { api } from "@/../convex/_generated/api";
-import type { Id } from "@/../convex/_generated/dataModel";
 import { AccountSwitcher } from "@/components/AccountSwitcher";
 import { FamilyAuditLogsSection } from "@/components/family/FamilyAuditLogsSection";
 import { FamilyInviteSection } from "@/components/family/FamilyInviteSection";

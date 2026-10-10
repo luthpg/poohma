@@ -1,3 +1,5 @@
+import { api } from "@poohma/backend/api";
+import type { Id } from "@poohma/backend/dataModel";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
@@ -10,8 +12,6 @@ import {
   useState,
 } from "react";
 import { toast } from "sonner";
-import { api } from "@/../convex/_generated/api";
-import type { Id } from "@/../convex/_generated/dataModel";
 import { useAuth } from "@/components/AuthProvider";
 import { clearQueryCache } from "@/hooks/usePersistentQuery";
 import { auth } from "@/utils/firebase";

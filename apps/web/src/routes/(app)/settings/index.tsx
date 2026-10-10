@@ -1,3 +1,4 @@
+import { api } from "@poohma/backend/api";
 import {
   createFileRoute,
   getRouteApi,
@@ -22,7 +23,6 @@ import {
 } from "lucide-react";
 import { type SubmitEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { api } from "@/../convex/_generated/api";
 import { SubHeader } from "@/components/common/SubHeader";
 import { usePasscode } from "@/components/PasscodeProvider";
 import {

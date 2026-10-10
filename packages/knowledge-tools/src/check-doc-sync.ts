@@ -14,7 +14,7 @@ interface Rule {
 const RULES: Rule[] = [
   {
     name: "スキーマ・テーブル構成",
-    pattern: /^apps\/web\/convex\/(schema\.ts|.*schema.*\.ts)$/,
+    pattern: /^packages\/backend\/convex\/(schema\.ts|.*schema.*\.ts)$/,
     level: "REQUIRED",
     docs: [".docs/code-design.md", ".ai/domain.md"],
     description: "テーブル定義、フィールド追加、型変更、インデックス変更",
@@ -22,7 +22,7 @@ const RULES: Rule[] = [
   {
     name: "Convex 関数 / Server Functions",
     pattern:
-      /^(apps\/web\/convex\/(?!schema\.ts).*\.ts|apps\/web\/src\/.*\.function\.ts)$/,
+      /^(packages\/backend\/convex\/(?!schema\.ts).*\.ts|apps\/web\/src\/.*\.function\.ts)$/,
     level: "RECOMMENDED",
     docs: [".docs/code-design.md", ".ai/architecture.md"],
     description: "API/関数の追加・改名、認可ビルダー、クエリ変更",
@@ -45,7 +45,7 @@ const RULES: Rule[] = [
   {
     name: "認証イベント・セッション・ログイン",
     pattern:
-      /^(apps\/web\/src\/features\/auth\/.*|apps\/web\/convex\/auth\/.*|apps\/web\/src\/routes\/\(auth\)\/.*)$/,
+      /^(apps\/web\/src\/features\/auth\/.*|packages\/backend\/convex\/auth\/.*|apps\/web\/src\/routes\/\(auth\)\/.*)$/,
     level: "REQUIRED",
     docs: [
       ".docs/code-design.md",
@@ -77,7 +77,8 @@ const RULES: Rule[] = [
   },
   {
     name: "テスト・E2E",
-    pattern: /^(apps\/web\/(tests|e2e)\/.*|.*vitest.*|.*playwright.*)$/,
+    pattern:
+      /^(apps\/web\/(tests|e2e)\/.*|packages\/backend\/tests\/.*|.*vitest.*|.*playwright.*)$/,
     level: "CHECK_IF_SPEC_CHANGED",
     docs: [".ai/testing.md", ".ai/pitfalls/e2e-testing.md"],
     description: "テスト構造、E2Eテストケース、テストハーネス",
