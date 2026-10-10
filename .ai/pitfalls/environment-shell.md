@@ -31,3 +31,17 @@ PowerShell 7 (pwsh / Windows) 環境における落とし穴と回避法です�
   ```
   - 詳細は [`.ai/workflows/git-workflow.md`](../workflows/git-workflow.md) を参照。
 
+---
+
+### Playwright `open` CLI と Web サーバーのライフサイクル分離
+
+- **問題**: `playwright open` は単なるブラウザ起動ツールの実体であり、`playwright.config.ts` の `webServer` 設定を解釈してサーバーを起動する機能を持たない。また `playwright test` で起動した `webServer` はテスト完了とともに自動破棄されるため、テスト直後に連続して `playwright open` を実行すると接続拒否エラー（`Could not connect to server`）となる。
+- **回避法**: 対話的プレビューを行う際は、Web サーバーの起動・ヘルスチェック待機、ブラウザ起動、終了時のプロセスツリー終了（Windows の `taskkill /pid <pid> /T /F` 等）をオーケストレーションする専用スクリプトを用意する。
+
+---
+
+### Windows (Node.js) における `spawn` (`shell: true`) とスペースを含む引数
+
+- **問題**: Windows 上の Node.js 22 で `spawn` に `shell: true` を指定して引数を配列渡し（例: `['--device=iPhone 17']`）すると、引数の単純文字列連結によりスペースで分割（`iPhone` と `17`）されて構文エラーとなり、`DEP0190` 警告が発生する。
+- **回避法**: `shell: true` を使う場合は引数を配列ではなく単一コマンド文字列として明示的にダブルクォートで括って渡すか、シェルを介さない実行構成にする。
+
