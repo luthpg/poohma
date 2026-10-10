@@ -18,7 +18,8 @@
     "fonts:download": "tsx scripts/download-fonts.ts",
     "test:e2e": "pnpm build:e2e-bridge && playwright test",
     "test:e2e:show": "pnpm build:e2e-bridge && playwright test --headed",
-    "test:e2e:ui": "pnpm build:e2e-bridge && playwright test --ui"
+    "test:e2e:ui": "pnpm build:e2e-bridge && playwright test --ui",
+    "preview:browser": "tsx scripts/preview.ts"
   },
   "dependencies": {
     "@cantoo/fontkit": "^2.0.12",
