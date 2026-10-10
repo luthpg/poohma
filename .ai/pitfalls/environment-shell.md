@@ -45,3 +45,10 @@ PowerShell 7 (pwsh / Windows) 環境における落とし穴と回避法です�
 - **問題**: Windows 上の Node.js 22 で `spawn` に `shell: true` を指定して引数を配列渡し（例: `['--device=iPhone 17']`）すると、引数の単純文字列連結によりスペースで分割（`iPhone` と `17`）されて構文エラーとなり、`DEP0190` 警告が発生する。
 - **回避法**: `shell: true` を使う場合は引数を配列ではなく単一コマンド文字列として明示的にダブルクォートで括って渡すか、シェルを介さない実行構成にする。
 
+---
+
+### ローカル HTTPS 開発サーバーのヘルスチェックと証明書検証無効化（CodeQL CWE-295 回避）
+
+- **問題**: 自己署名証明書（`basic-ssl` 等）を使う開発サーバーの起動待機に `https.get` を利用すると、自己署名エラーを回避するために `rejectUnauthorized: false` を指定しがちになる。しかしこれは CodeQL の `Disabling certificate validation (CWE-295)` で重大セキュリティ指摘となる。
+- **回避法**: ローカルサーバーのリッスン待機（ヘルスチェック）には TLS 層を通さない `net.Socket` による TCP ポート疎通確認（`socket.connect(port, 'localhost')`）を採用する。TLS/HTTPS の証明書検証ロジックをバイパスすることなく安全かつシンプルに起動判定できる。
+

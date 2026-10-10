@@ -5,7 +5,7 @@ import {
   spawnSync,
 } from "node:child_process";
 import fs from "node:fs";
-import https from "node:https";
+import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
@@ -34,6 +34,7 @@ for (const envFile of envFiles) {
 const args = process.argv.slice(2);
 const isFresh = args.includes("--fresh") || args.includes("--clean");
 const port = process.env.PORT ?? "3100";
+const portNumber = Number.parseInt(port, 10);
 const targetUrl =
   process.env.PREVIEW_URL ?? `https://localhost:${port}/dashboard`;
 const device = process.env.PREVIEW_DEVICE ?? "iPhone 17";
@@ -79,24 +80,40 @@ process.on("SIGTERM", () => {
   process.exit(0);
 });
 
-async function isServerRunning(url: string): Promise<boolean> {
-  const agent = new https.Agent({ rejectUnauthorized: false });
+async function isPortOpen(
+  targetPort: number,
+  timeoutMs = 1500,
+): Promise<boolean> {
   return new Promise((resolve) => {
-    const req = https.get(url, { agent, timeout: 1500 }, () => {
+    const socket = new net.Socket();
+    socket.setTimeout(timeoutMs);
+
+    socket.once("connect", () => {
+      socket.destroy();
       resolve(true);
     });
-    req.on("error", () => resolve(false));
-    req.on("timeout", () => {
-      req.destroy();
+
+    socket.once("error", () => {
+      socket.destroy();
       resolve(false);
     });
+
+    socket.once("timeout", () => {
+      socket.destroy();
+      resolve(false);
+    });
+
+    socket.connect(targetPort, "localhost");
   });
 }
 
-async function waitForServer(url: string, timeoutMs = 60000): Promise<boolean> {
+async function waitForPort(
+  targetPort: number,
+  timeoutMs = 60000,
+): Promise<boolean> {
   const startTime = Date.now();
   while (Date.now() - startTime < timeoutMs) {
-    if (await isServerRunning(url)) {
+    if (await isPortOpen(targetPort)) {
       return true;
     }
     await new Promise((r) => setTimeout(r, 500));
@@ -131,13 +148,12 @@ async function main() {
     );
   }
 
-  // 2. Web サーバー（https://localhost:${port}）の確認および起動
-  const serverBaseUrl = `https://localhost:${port}`;
-  const alreadyRunning = await isServerRunning(serverBaseUrl);
+  // 2. Web サーバー（ポート ${port}）の確認および起動
+  const alreadyRunning = await isPortOpen(portNumber);
 
   if (alreadyRunning) {
     console.log(
-      `⚡ [preview] Web server is already running on ${serverBaseUrl}. Reusing existing server.`,
+      `⚡ [preview] Web server is already running on port ${port}. Reusing existing server.`,
     );
   } else {
     console.log(`🚀 [preview] Starting Web server on port ${port}...`);
@@ -164,15 +180,15 @@ async function main() {
       }
     });
 
-    const isReady = await waitForServer(serverBaseUrl);
+    const isReady = await waitForPort(portNumber);
     if (!isReady) {
       console.error(
-        `❌ [preview] Web server failed to respond within 60s on ${serverBaseUrl}.`,
+        `❌ [preview] Web server failed to respond within 60s on port ${port}.`,
       );
       cleanup();
       process.exit(1);
     }
-    console.log(`✅ [preview] Web server is ready at ${serverBaseUrl}`);
+    console.log(`✅ [preview] Web server is ready on port ${port}`);
   }
 
   // 3. Playwright Open の実行（ブラウザ起動）
