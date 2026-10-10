@@ -106,7 +106,7 @@ jobs:
     # forkや外部PRはスキップ（リポジトリオーナーで判定）
     if: ${{ github.repository_owner == github.event.repository.owner.login && !github.event.pull_request.head.repo.fork }}
     env:
-      CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+      CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_STAGING_DEPLOY_KEY }}
 
     steps:
       - name: Checkout code

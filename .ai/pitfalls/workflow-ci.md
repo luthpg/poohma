@@ -165,7 +165,7 @@ CI 内で実行するコマンド群は、可能な限りルート `package.json
 
 - **フォールバックの完全排除（Single Source of Truth & KISS原則）**:
   - 本番用（`CONVEX_DEPLOY_KEY`）とステージング用（`CONVEX_STAGING_DEPLOY_KEY`）のシークレット名を厳格に分離する。
-  - ステージング側ではフォールバックコード（`|| secrets.CONVEX_DEPLOY_KEY` 等）を一切置かず、ジョブレベル（`env:`）およびステップレベルの双方で確実に `CONVEX_STAGING_DEPLOY_KEY` をバインドし、キー未設定時は直ちに fail-fast させて他環境への誤爆を遮断する。
+  - ステージング側および CI ワークフロー（`ci.yml` の `convex-dry-run`）ではフォールバックコード（`|| secrets.CONVEX_DEPLOY_KEY` 等）を一切置かず、ジョブレベル（`env:`）およびステップレベルの双方で確実に `CONVEX_STAGING_DEPLOY_KEY` をバインドし、キー未設定時は直ちに fail-fast させて他環境への誤爆を遮断する。また、PR 時の CI に本番用キーを渡さないことで権限最小化（Least Privilege）を保つ。
 
 ---
 
