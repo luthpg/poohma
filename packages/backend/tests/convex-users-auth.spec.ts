@@ -4,9 +4,10 @@ import { api, internal } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import { resolveAccount } from "../convex/customBuilders";
 import schema from "../convex/schema";
-import { mockCryptoMaterials } from "./test-helpers";
+import { createTestModules, mockCryptoMaterials } from "./test-helpers";
 
-const modules = import.meta.glob("../convex/**/*.ts");
+const rawModules = import.meta.glob("../convex/**/*.ts");
+const modules = createTestModules(rawModules);
 
 describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境界の検証", () => {
   describe("未認証アクセスの拒否", () => {
@@ -591,6 +592,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
         expect(await ctx.db.get(familyRecId)).toBeNull();
         expect(await ctx.db.get(joinReqId)).toBeNull();
       });
+      await t.finishInProgressScheduledFunctions();
     });
 
     it("deleteAccount: 他メンバーが同居する家族所属アカウントの削除時に個人レコードのみ削除され共有レコードが保護されること", async () => {
@@ -671,6 +673,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
         expect(await ctx.db.get(remainingAccId)).not.toBeNull();
         expect(await ctx.db.get(familyId)).not.toBeNull();
       });
+      await t.finishInProgressScheduledFunctions();
     });
 
     it("deleteAccount: 家族未所属のアカウント削除時に作成した個人レコードのみ削除されること", async () => {
@@ -739,6 +742,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
         // 家族ID付きレコードは残る
         expect(await ctx.db.get(famRecId)).not.toBeNull();
       });
+      await t.finishInProgressScheduledFunctions();
     });
 
     it("deleteAllAccounts: 複数メンバー家族所属アカウントと家族なしアカウントを含む全アカウント削除", async () => {
@@ -860,6 +864,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
         );
         expect(deleteLogs).toHaveLength(2);
       });
+      await t.finishInProgressScheduledFunctions();
     });
   });
 

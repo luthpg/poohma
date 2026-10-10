@@ -145,10 +145,11 @@ Node.js 環境の `globalThis.crypto.subtle` を用いて、ブラウザと同�
  
 - **単体・統合・Browser E2E テスト一括実行**: `pnpm test`（Nodeユニット、Storybook、`browser-e2ee` プロジェクトが全件実行される）
 - **Browser E2E 単体実行**: `pnpm --filter @poohma/web test:browser`（Chromium 上で Web Crypto / WebAuthn PRF / PasscodeProvider / 再暗号化を高速実行）
-- **Full-Stack E2E 実行 (Playwright on Staging)**: `pnpm --filter @poohma/web test:e2e`（`build:e2e-bridge` 後に Playwright 実行）
+- **Full-Stack E2E 実行 (Playwright on Staging)**: `pnpm test:e2e`（ルートオーケストレーションで `preview:setup` → `build:e2e-bridge` → Playwright 実行）
 - **一括品質パイプライン**: `pnpm verify`（Typecheck → Lint/Format → Test → Build）
 - **ファイル配置規則**:
-  - 単体・サーバー統合テスト: `apps/web/tests/*.spec.ts` または `*.test.tsx`
+  - Web 単体・UI 統合テスト: `apps/web/tests/*.spec.ts` または `*.test.tsx`
+  - Backend 単体・結合テスト: `packages/backend/tests/*.spec.ts`
   - Browser E2E サブシステムテスト: `apps/web/tests/browser-e2e/*.browser.test.{ts,tsx}`
   - Full-Stack E2E テスト: `apps/web/e2e/*.spec.ts`
   - E2E 共通フィクスチャ・補助スクリプト: `apps/web/e2e/support/`
@@ -225,19 +226,21 @@ export const test = base.extend({
 Playwright E2E テストは、環境汚染とメールクォータ消費を防止するため、**E2E 専用の Convex Preview Deployment（`preview/e2e-test`）を動的に構築・再利用**して実行する。
 
 - **自動セットアップフロー (`pnpm test:e2e`)**:
-  1. `pnpm setup:e2e-preview`:
+  1. `pnpm server preview:setup`:
+     - `packages/backend/scripts/setup-preview.ts` が実行される。
      - `CONVEX_PREVIEW_DEPLOY_KEY` を用いて Preview Deployment `e2e-test` を作成・再利用（差分高速デプロイ）。
      - `--cmd` ヘルパーにより `apps/web/e2e/.env.e2e-preview` へ `VITE_CONVEX_URL` と `VITE_CONVEX_SITE_URL` を自動出力。
      - `.env.e2e.local` の設定（`DISABLE_EMAIL_DELIVERY=true` 等）を Preview Deployment へ自動反映。
      - ※ `CONVEX_PREVIEW_DEPLOY_KEY` 未設定時は警告を出力し、通常の dev 環境へ安全にフォールバック。
-  2. `pnpm build:e2e-bridge`: Firebase Custom Token 用ブラウザブリッジをビルド。
+  2. `pnpm web test:e2e`:
+     - 内部で `build:e2e-bridge`（Firebase Custom Token 用ブラウザブリッジのビルド）を実行後、Playwright を起動。
   3. `playwright test`:
       - ローカルではポート 3100（`reuseExistingServer: false`）で専用 Vite サーバーを起動し、通常の開発サーバー（ポート 3000）を起動したままでも衝突・混同なく独立テスト。
       - CI（`deploy-staging.yml`）では `deploy-staging`（通常 Convex URL → 固定 alias 割り当て）と `deploy-e2e`（Convex Preview URL → E2E 専用デプロイ）を**並列ジョブ**として実行。E2E テストは `deploy-e2e` が発行する動的 `DEPLOY_URL` に対してのみ実行され、ステージング固定 alias に E2E 用環境変数が混入しない。
 - **Preview 環境の完全初期化 (`pnpm test:e2e:clean`)**:
-  - テストデータを完全にゼロクリアしたい場合は、`pnpm test:e2e:clean`（または `setup:e2e-preview:clean`）を実行すると、Preview Deployment が一旦削除・再作成される。
+  - テストデータを完全にゼロクリアしたい場合は、`pnpm test:e2e:clean`（または `pnpm server preview:setup:clean`）を実行すると、Preview Deployment が一旦削除・再作成される。
 - **スキーマや関数の変更時の注意**:
-  - `setup:e2e-preview` は内部で `convex deploy` を実行するため、コード変更は自動的に Preview Deployment へ反映される。手動での `convex dev --once` は不要。
+  - `preview:setup` は内部で `convex deploy` を実行するため、コード変更は自動的に Preview Deployment へ反映される。手動での `convex dev --once` は不要。
 
 ---
 
@@ -274,7 +277,7 @@ AI Agent がコード変更を行う際、静的検証（`pnpm check` や `pnpm 
   - Convex バックエンド関数（Mutation / Query）の追加・変更
   - データインポート・エクスポート・マイグレーション処理
 - **必須検証手順**:
-  1. バックエンド変更がある場合: `pnpm convex:dev:once`（または `pnpm -F @poohma/web exec convex dev --once`）で最新コードを開発環境へ反映。
+  1. バックエンド変更がある場合: `pnpm convex:dev:once`（または `pnpm -F @poohma/backend exec convex dev --once`）で最新コードを開発環境へ反映。
   2. ローカル動的テストの実行: `pnpm test:e2e` を実行し、全テストケースが合格することを確認。
   3. テストが失敗した場合は、プロダクションコードを独断で改変せず、原因を精査して合意を得て修正すること（第7節参照）。
   4. 全テスト合格を確認した後に限り、コミット・プッシュを行う。

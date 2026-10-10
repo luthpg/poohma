@@ -11,7 +11,7 @@ Convex バックエンド開発における落とし穴と回避法です。
   - 一方で `pnpm convex:codegen` だけを実行すると、ローカルの型定義は更新されるが **Convex 開発クラウドインスタンス（`dev:...`）には関数やスキーマがプッシュされない**。そのため、実バックエンドと通信する E2E テスト（Playwright）を実行した際に `Could not find public function for '...'` でテストが全滅する罠に陥る。
   - また、`pnpm convex:deploy` / `pnpm convex:sync` は本番（production）デプロイまたは `CONVEX_DEPLOY_KEY` 設定環境向けであり、ローカル開発環境（`dev:...`）への反映には使えない。
 - **回避法**: 
-  - 開発環境（`dev:...`）に関数・スキーマの変更をワンショットで安全に反映し、型定義を生成するには **`convex dev --once`**（`pnpm -F @poohma/web exec convex dev --once`）を使用する。常駐せずにデプロイとコード生成を完了できる。
+  - 開発環境（`dev:...`）に関数・スキーマの変更をワンショットで安全に反映し、型定義を生成するには **`convex dev --once`**（`pnpm convex:dev:once` または `pnpm -F @poohma/backend exec convex dev --once`）を使用する。常駐せずにデプロイとコード生成を完了できる。
   - E2E テスト実行前やローカル検証前にバックエンドのスキーマ・関数を変更した場合は、必ず事前に `convex dev --once` を実行すること。
 
 ---
@@ -172,6 +172,23 @@ Convex バックエンド開発における落とし穴と回避法です。
   - `packages/backend/package.json`
   - `package.json`
   - `packages/backend/convex/auth.config.ts`
+
+---
+
+### `convex-test` における非同期予約タスク（`scheduler.runAfter`）の漏洩と `EnvironmentTeardownError`
+
+- **問題 (Problem)**:
+  - `deleteAccount` 等のように、関数内部で `ctx.scheduler.runAfter(0, internal.actions.sendTemplatedEmailInternal, ...)` を呼び出す Mutation を `convex-test` でテストする際、テスト側で予約タスクを待機しないままテストブロックが終了すると、Vitest のテスト環境 teardown 後に非同期タスクが遅延実行され、`EnvironmentTeardownError`（モジュールロード失敗）がログに多発・蓄積する。
+- **原因 (Root Cause)**:
+  - `convex-test` のインメモリキューに残ったタスクが Vitest のコンテキスト破棄後に実行されるため。
+  - メール処理（React Email 等）は動的インポートを伴うため、認可・DB操作の検証を目的とするテストでは本来実行不要なオーバーヘッドとなる。
+- **回避法 (Correct Pattern)**:
+  - 認可・DB操作の検証テストでは、`createTestModules` ヘルパーを用いて `sendTemplatedEmailInternal` をテスト用のダミーアクションにモック置換する。
+  - テストの末尾で必ず `await t.finishInProgressScheduledFunctions()` を呼び出し、予約された非同期タスクがテスト終了前に確実に完了するように管理する。
+- **関連実装 (Related Code References)**:
+  - `packages/backend/tests/test-helpers.ts`
+  - `packages/backend/tests/convex-users-auth.spec.ts`
+
 
 
 

@@ -59,8 +59,8 @@ flowchart TD
 
 ### Step 4: 開発環境の全体バックアップを作成
 
-- `pnpm -F @poohma/web exec convex export --path .local/migrations/dev-backup-before.zip` 等で全体バックアップを取得する。
-- **注意**: `pnpm -F @poohma/web exec` では Cwd が `apps/web` となるため、パスに `apps/web/` を含めると二重ディレクトリ（ENOENT）になる。必ずパッケージ相対パス（`.local/...`）を指定する。
+- `pnpm -F @poohma/backend exec convex export --path ../../.local/migrations/dev-backup-before.zip` 等で全体バックアップを取得する。
+- **注意**: `pnpm -F @poohma/backend exec` では Cwd が `packages/backend` となるため、リポジトリルートの `.local/` を指定する場合は `../../.local/...` を指定する。
 
 ### Step 5: 開発環境の対象テーブルを JSON で取得（実行前）
 
@@ -68,7 +68,7 @@ flowchart TD
 
 ### Step 6: 開発環境で Convex のデプロイ
 
-- `pnpm convex:dev:once`（または `pnpm -F @poohma/web exec convex dev --once`）を実行し、マイグレーション関数を開発環境へ反映する。
+- `pnpm convex:dev:once`（または `pnpm -F @poohma/backend exec convex dev --once`）を実行し、マイグレーション関数を開発環境へ反映する。
 
 ### Step 7: 開発環境でワンショットマイグレ実行
 
@@ -98,10 +98,10 @@ flowchart TD
 - 開発環境での完全合格をユーザーに報告し、本番適用の合意を得る。
 - **本番環境でも開発環境と全く同じステップ**を順に実行する：
   1. 移行前後の突合検証で不要な差分混入を防ぐため、対象テーブルへの通常書き込みを行わない（事後バックアップ完了まで維持する）
-  2. 本番環境の全体バックアップ作成（`pnpm -F @poohma/web exec convex export --prod --path .local/migrations/prod-backup-before.zip`）
+  2. 本番環境の全体バックアップ作成（`pnpm -F @poohma/backend exec convex export --prod --path ../../.local/migrations/prod-backup-before.zip`）
   3. ユーザーに対話ターミナルで `pnpm convex:deploy` の実行を依頼（非対話環境でのプロンプト停止を回避）
-  4. 本番環境でワンショットマイグレ実行（`pnpm -F @poohma/web exec convex run --prod migrations:xxx`）
-  5. 本番環境の事後バックアップ作成（`pnpm -F @poohma/web exec convex export --prod --path .local/migrations/prod-backup-after.zip`）
+  4. 本番環境でワンショットマイグレ実行（`pnpm -F @poohma/backend exec convex run --prod migrations:xxx`）
+  5. 本番環境の事後バックアップ作成（`pnpm -F @poohma/backend exec convex export --prod --path ../../.local/migrations/prod-backup-after.zip`）
   6. 実施前後のデータ機械突合チェック（全件検証・暗号化含む他フィールドの無改変・欠損 0 件の確認）
   7. ユーザーへの完了報告
 

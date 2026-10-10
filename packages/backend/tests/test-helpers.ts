@@ -1,4 +1,34 @@
+import { v } from "convex/values";
 import type { Id } from "../convex/_generated/dataModel";
+import { internalAction } from "../convex/_generated/server";
+
+/**
+ * テスト実行時に非同期メール送信タスクが Teardown 後に漏洩するのを防止するテスト用モジュールマップ
+ */
+export function createTestModules(
+  modules: Record<string, () => Promise<unknown>>,
+): Record<string, () => Promise<unknown>> {
+  return {
+    ...modules,
+    "../convex/actions.ts": async () => {
+      const loader = modules["../convex/actions.ts"];
+      const actual = loader
+        ? ((await loader()) as Record<string, unknown>)
+        : {};
+      return {
+        ...actual,
+        sendTemplatedEmailInternal: internalAction({
+          args: {
+            email: v.string(),
+            payload: v.any(),
+            replyTo: v.optional(v.string()),
+          },
+          handler: async () => true,
+        }),
+      };
+    },
+  };
+}
 
 export const mockCryptoMaterials = {
   masterKeyEncrypted: "mockMasterKeyEncryptedBase64==",

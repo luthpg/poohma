@@ -2,7 +2,7 @@
 
 ## 概要
 
-`apps/web/convex/schema.ts` に定義された Convex スキーマをもとに、主要エンティティとリレーションを整理したものである。Convex はスキーマレスに近い柔軟な構造を許容するが、本書は現行の `schema.ts` の定義に忠実に記載する。
+`packages/backend/convex/schema.ts` に定義された Convex スキーマをもとに、主要エンティティとリレーションを整理したものである。Convex はスキーマレスに近い柔軟な構造を許容するが、本書は現行の `schema.ts` の定義に忠実に記載する。
 
 ## ER Diagram
 

@@ -66,7 +66,7 @@
 
 - 監査ログ（`auditLogs` テーブル）は完全な追記専用（Append-Only）であり、一般ユーザー・管理者向けのログ変更・削除 API は一切公開されていない。
 - アカウント一括退会処理（`deleteAllAccounts`）および個別削除（`deleteAccount`）のいずれにおいても、各アカウントレコードの物理削除直前に `ACCOUNT_DELETE` の監査ログ（操作者・表示名・解散/脱退家族ID等）が原子的に記録され、事後追跡証跡が欠落しない。
-- 監査ログは `apps/web/convex/crons.ts` の日次バッチ（`cleanupOldAuditLogsInternal`）により、180日間の保持ポリシーに基づいて管理される。
+- 監査ログは `packages/backend/convex/crons.ts` の日次バッチ（`cleanupOldAuditLogsInternal`）により、180日間の保持ポリシーに基づいて管理される。
 - また、Cloudflare Workers によるバックアップ基盤（`workers/backup`）が Convex の全テーブルZIPスナップショットを日次で Cloudflare R2（`BACKUP_BUCKET`）に自動保管しており、主DBとは物理的・インフラ境界的に隔離されたイミュータブルな長期保全が行われる。
 
 ## CI/CD & Production Build Guardrails
