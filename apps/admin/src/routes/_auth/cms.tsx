@@ -17,6 +17,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { BottomSheet } from "../../components/ui/BottomSheet";
 import { CopyableBadge } from "../../components/ui/CopyableBadge";
+import { stripHtmlTags } from "../../lib/utils";
 
 // 型定義
 interface InfoItem {
@@ -524,7 +525,7 @@ function CmsPage() {
                         {item.question}
                       </td>
                       <td className="py-3 px-4 text-zinc-400 max-w-md truncate text-[11px]">
-                        {item.answer.replace(/<[^>]+>/g, "")}
+                        {stripHtmlTags(item.answer)}
                       </td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
@@ -602,7 +603,7 @@ function CmsPage() {
                 </div>
                 <div className="font-semibold text-white">{item.question}</div>
                 <div className="text-[11px] text-zinc-400 line-clamp-2">
-                  {item.answer.replace(/<[^>]+>/g, "")}
+                  {stripHtmlTags(item.answer)}
                 </div>
               </div>
             ))}
