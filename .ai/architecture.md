@@ -7,13 +7,15 @@
 ```text
 poohma/
 ├── apps/
-│   └── web/               # @poohma/web (TanStack Start フロントエンド & ブラウザE2E)
-│       ├── src/           # UI, Routes, Hooks, Server Functions
-│       ├── e2e/           # Playwright E2E シナリオ
-│       └── tests/         # フロントエンド単体・ブラウザ暗号テスト
+│   ├── web/               # @poohma/web (TanStack Start フロントエンド & ブラウザE2E)
+│   │   ├── src/           # UI, Routes, Hooks, Server Functions
+│   │   ├── e2e/           # Playwright E2E シナリオ
+│   │   └── tests/         # フロントエンド単体・ブラウザ暗号テスト
+│   └── admin/             # @poohma/admin (管理者コンソール: TanStack Start + Cloudflare)
+│       └── src/           # 管理画面 UI (漆黒 Obsidian テーマ, cmdk, KPI, お問い合わせ)
 ├── packages/
 │   ├── backend/           # @poohma/backend (Convex BaaS バックエンド)
-│   │   ├── convex/        # schema, functions, RLS, customBuilders
+│   │   ├── convex/        # schema, functions, RLS, customBuilders, admin/
 │   │   ├── scripts/       # setup-preview, export-demo-records
 │   │   └── tests/         # バックエンド結合テスト (convex-test)
 │   ├── shared/            # @poohma/shared (共通モジュール・部品)
@@ -34,7 +36,8 @@ poohma/
 | Workspace | 責務 | 主要技術 |
 | --- | --- | --- |
 | `apps/web` | メインWebアプリケーション（フロントエンド、SSR、Server Functions） | React 19, TanStack Start, TanStack Router, Tailwind CSS v4, shadcn/ui, Web Crypto API |
-| `packages/backend` | Convex BaaS バックエンド（スキーマ、関数、RLS、プレビュー構築） | Convex, convex-helpers, convex-test, TypeScript |
+| `apps/admin` | 管理者コンソール（お問い合わせ対応、統計KPI、ユーザー/ファミリー照会、システム監査） | React 19, TanStack Start, Cloudflare Workers/Vite Plugin, cmdk, Geist Fonts |
+| `packages/backend` | Convex BaaS バックエンド（スキーマ、関数、RLS、admin API、プレビュー構築） | Convex, convex-helpers, convex-test, TypeScript |
 | `packages/shared` | 共通バリデーションスキーマ、URL検証（SSRF対策）、メール定義 | Zod, React Email, ipaddr.js, TypeScript |
 | `packages/knowledge-tools` | AI開発支援、Doc-Sync、参照整合性検証ツール | TypeScript, simple-git |
 | `workers/backup` | Convex Cloud からの定期データエクスポートおよび Cloudflare R2 へのアーカイブ保存 | Cloudflare Workers, Cloudflare R2, Wrangler, Fetch |
@@ -129,6 +132,7 @@ flowchart TD
 3. `familyBoundQuery / Mutation`: 上記 + 対象アカウントが家族グループ（`familyId`）に所属していることを強制
 4. `familyAdminQuery / Mutation`: 上記 + 対象アカウントがファミリー管理者（`familyRole === "admin"`）であることを強制（家族設定・招待管理・パスコード変更・リカバリーキット・キック・監査ログ等の管理者専権保護）
 5. `recordAdminMutation`: `familyBound` + 対象レコードが存在し管理者アクセス権（`requireAdminAccess`）を満たすことを検証
+6. `systemAdminQuery / Mutation / Action`: システム管理者専権保護。Firebase 認証済み + メール確認済み（`emailVerified === true`） + `ADMIN_EMAILS` ホワイトリスト合致を厳格検証（お問い合わせ管理、全体KPI、ユーザー/ファミリー照会、microCMS管理、デモ環境手動リセット等。※E2EE不変条件によりパスワードヒント等の秘密情報はシステム管理者でも復号・閲覧不可）
 
 ---
 

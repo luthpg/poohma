@@ -10,13 +10,23 @@ import {
   registerBiometricUnlock,
 } from "@/lib/biometric";
 
+interface CustomBrowserCommands {
+  setupVirtualAuthenticator: (options?: {
+    prfSupported?: boolean;
+  }) => Promise<string>;
+  removeVirtualAuthenticator: (authenticatorId: string) => Promise<void>;
+  setPlatformAuthenticatorAvailable: (available: boolean) => Promise<void>;
+}
+
+const cdp = commands as unknown as CustomBrowserCommands;
+
 describe("WebAuthn / Passkey (Virtual Authenticator in Chromium)", () => {
   let authenticatorId: string | null = null;
 
   afterEach(async () => {
     if (authenticatorId) {
       try {
-        await commands.removeVirtualAuthenticator(authenticatorId);
+        await cdp.removeVirtualAuthenticator(authenticatorId);
       } catch {
         // ignore cleanup error
       }
@@ -26,7 +36,7 @@ describe("WebAuthn / Passkey (Virtual Authenticator in Chromium)", () => {
 
   test("Virtual AuthenticatorでPasskey登録〜PRF暗号化〜IndexedDB保存〜Passkey復号のラウンドトリップが成功する", async () => {
     // 1. CDP 経由で CTAP2 / residentKey / userVerification / PRF 対応の Virtual Authenticator を作成
-    authenticatorId = await commands.setupVirtualAuthenticator({
+    authenticatorId = await cdp.setupVirtualAuthenticator({
       prfSupported: true,
     });
     expect(authenticatorId).toBeTruthy();
@@ -61,7 +71,7 @@ describe("WebAuthn / Passkey (Virtual Authenticator in Chromium)", () => {
 
   test("生体認証非対応環境（isUserVerifyingPlatformAuthenticatorAvailable = false）時のフォールバック", async () => {
     // プラットフォーム認証器非対応を設定
-    await commands.setPlatformAuthenticatorAvailable(false);
+    await cdp.setPlatformAuthenticatorAvailable(false);
 
     const isSupported = await isBiometricSupported();
     expect(isSupported).toBe(false);

@@ -120,6 +120,35 @@ it("異常系: 対象家族に未所属のユーザーによる共有レコー�
 });
 ```
 
+### システム管理者 API（`customBuilders.systemAdmin*`）のテストパターン
+
+システム管理者専用 API（`api.admin.*`）は `customBuilders.ts` の `assertSystemAdmin`（メール確認済 & `ADMIN_EMAILS` 検証）で保護される。
+
+```typescript
+it("一般ユーザーによるアクセス拒否と管理者によるアクセス許可", async () => {
+  const t = setupTest();
+
+  // 1. 一般ユーザー（拒否）
+  const normalUser = t.withIdentity({
+    subject: "user_normal",
+    email: "normal@example.com",
+    emailVerified: true,
+  });
+  await expect(
+    normalUser.query(api.admin.stats.getStatsSummary, {}),
+  ).rejects.toThrow("Unauthorized: Admin privileges required");
+
+  // 2. 許可された管理者（許可）
+  const adminUser = t.withIdentity({
+    subject: "admin_uid",
+    email: "admin@poohma.app",
+    emailVerified: true,
+  });
+  const stats = await adminUser.query(api.admin.stats.getStatsSummary, {});
+  expect(stats.totalUsers).toBeGreaterThanOrEqual(0);
+});
+```
+
 ---
 
 ## 3. 暗号化 (E2EE) のテストパターン

@@ -15,7 +15,8 @@
 PoohMaは、フロントエンドとサーバーサイド処理を単一のTanStack Startアプリケーションで統合しつつ、データベース・ビジネスロジックの大部分をConvex（BaaS）に委譲する構成である。
 リポジトリは Turborepo によるモノレポ構成をとっており、責務に応じて以下のパッケージに分離されている：
 - `apps/web`: フロントエンド & SSR（TanStack Start, Vite）およびブラウザ E2E テスト（Playwright）
-- `packages/backend`: Convex バックエンド（Schema, Functions, RLS, 結合テスト、Preview 環境プロビジョニング、シードエクスポート）
+- `apps/admin`: 管理者コンソール（TanStack Start, Cloudflare Workers / Vite Plugin, cmdk, Geist Fonts）
+- `packages/backend`: Convex バックエンド（Schema, Functions, RLS, customBuilders, admin API, 結合テスト、Preview 環境プロビジョニング、シードエクスポート）
 - `packages/shared`: 共通モジュール（Zod スキーマ, React Email テンプレート, ユーティリティ）
 - `packages/knowledge-tools`: 知見運用・AI 開発基盤ツール
 - `workers/backup`: Cloudflare Workers バックアップワーカー
@@ -113,21 +114,25 @@ Service Worker (Workbox等):
 ```txt
 poohma/                    … プロジェクトルート（Turborepo / pnpm workspace）
 ├── apps/
-│   └── web/               … @poohma/web（TanStack Start + Convex）
-│       ├── convex/         … Convexのスキーマ・Query/Mutation/Action定義
-│       │   ├── _generated/ … Convexが自動生成する型・APIクライアント
-│       │   ├── actions.ts  … OGP取得・ふりがな取得・メール送信 (Node runtime)
-│       │   ├── auth.config.ts … Firebase IDトークンの信頼プロバイダ設定
-│       │   ├── auditLogs.ts … 監査ログ書き込みヘルパー (logAuditEvent)
-│       │   ├── viewLogs.ts  … 閲覧ログ書き込み・取得・パージヘルパー (logViewEvent)
-│       │   ├── crons.ts    … 定期バッチ定義
-│       │   ├── customBuilders.ts … 認証・認可レベル別のQuery/Mutationビルダー
-│       │   ├── families.ts … 家族グループ・参加申請・家族移行ロジック
-│       │   ├── http.ts     … 内部HTTPエンドポイント (getUserByFirebaseUid)
-│       │   ├── records.ts  … サービスレコードCRUD・検索・タグ・一括操作・監査ログ記録
-│       │   ├── rls.ts      … レコード単位アクセス制御 (requireRecordAccess)
-│       │   ├── schema.ts   … DBスキーマ定義
-│       │   └── users.ts    … ユーザー同期・プロフィール・退会
+│   ├── web/               … @poohma/web（TanStack Start + Convex）
+│   │   ├── src/           … フロントエンド (routes, components, hooks, lib, services)
+│   │   ├── e2e/           … Playwright E2E シナリオ
+│   │   └── tests/         … 単体・結合・ブラウザ暗号テスト
+│   └── admin/             … @poohma/admin（管理者コンソール: TanStack Start + Cloudflare）
+│       └── src/           … 管理画面 UI (Obsidianテーマ, cmdk, contacts, stats, users, system, cms)
+├── packages/
+│   ├── backend/           … @poohma/backend（Convex BaaS バックエンド）
+│   │   ├── convex/        … スキーマ・Query/Mutation/Action定義
+│   │   │   ├── admin/     … 管理者専用API (contacts, stats, users, system, cms)
+│   │   │   ├── customBuilders.ts … 認証・認可ビルダー (systemAdminQuery/Mutation/Action 追加)
+│   │   │   ├── schema.ts  … DBスキーマ定義 (contacts, users, families, records 等)
+│   │   │   ├── rls.ts     … レコード単位アクセス制御
+│   │   │   └── actions.ts … 外部連携アクション
+│   │   └── tests/         … バックエンド結合テスト (convex-test)
+│   ├── shared/            … @poohma/shared（共通バリデーションスキーマ、メール定義、ユーティリティ）
+│   └── knowledge-tools/   … @poohma/knowledge-tools（知見運用・Doc-Sync検証）
+├── workers/
+│   └── backup/            … @poohma/backup（定期自動バックアップ）
 │       ├── src/
 │       │   ├── components/ … 共通UIコンポーネント (AppHeader, PasscodeProvider 等)
 │       │   ├── emails/     … メールテンプレート定義・配信レジストリ (React Email / Resend)

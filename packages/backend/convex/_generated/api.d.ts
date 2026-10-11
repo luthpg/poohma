@@ -9,6 +9,11 @@
  */
 
 import type * as actions from "../actions.js";
+import type * as admin_cms from "../admin/cms.js";
+import type * as admin_contacts from "../admin/contacts.js";
+import type * as admin_stats from "../admin/stats.js";
+import type * as admin_system from "../admin/system.js";
+import type * as admin_users from "../admin/users.js";
 import type * as auditLogs from "../auditLogs.js";
 import type * as contacts from "../contacts.js";
 import type * as crons from "../crons.js";
@@ -32,6 +37,11 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   actions: typeof actions;
+  "admin/cms": typeof admin_cms;
+  "admin/contacts": typeof admin_contacts;
+  "admin/stats": typeof admin_stats;
+  "admin/system": typeof admin_system;
+  "admin/users": typeof admin_users;
   auditLogs: typeof auditLogs;
   contacts: typeof contacts;
   crons: typeof crons;
