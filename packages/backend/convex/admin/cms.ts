@@ -121,7 +121,7 @@ export const updateCmsInfo = systemAdminAction({
   handler: async (_ctx, args) => {
     const config = getMicroCmsConfig();
     const query = args.isDraft ? "?status=draft" : "";
-    const url = `${config.baseUrl}/info/${args.id}${query}`;
+    const url = `${config.baseUrl}/info/${encodeURIComponent(args.id)}${query}`;
 
     const res = await fetch(url, {
       method: "PATCH",
@@ -149,7 +149,7 @@ export const deleteCmsInfo = systemAdminAction({
   },
   handler: async (_ctx, args) => {
     const config = getMicroCmsConfig();
-    const url = `${config.baseUrl}/info/${args.id}`;
+    const url = `${config.baseUrl}/info/${encodeURIComponent(args.id)}`;
 
     const res = await fetch(url, {
       method: "DELETE",
@@ -267,7 +267,7 @@ export const updateCmsFaq = systemAdminAction({
   },
   handler: async (_ctx, args) => {
     const config = getMicroCmsConfig();
-    const url = `${config.baseUrl}/faq/${args.id}`;
+    const url = `${config.baseUrl}/faq/${encodeURIComponent(args.id)}`;
 
     const res = await fetch(url, {
       method: "PATCH",
@@ -296,7 +296,7 @@ export const deleteCmsFaq = systemAdminAction({
   },
   handler: async (_ctx, args) => {
     const config = getMicroCmsConfig();
-    const url = `${config.baseUrl}/faq/${args.id}`;
+    const url = `${config.baseUrl}/faq/${encodeURIComponent(args.id)}`;
 
     const res = await fetch(url, {
       method: "DELETE",

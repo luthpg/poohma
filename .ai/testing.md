@@ -135,8 +135,8 @@ it("一般ユーザーによるアクセス拒否と管理者によるアクセ�
     emailVerified: true,
   });
   await expect(
-    normalUser.query(api.admin.stats.getStatsSummary, {}),
-  ).rejects.toThrow("Unauthorized: Admin privileges required");
+    normalUser.query(api.admin.stats.getSystemStats, {}),
+  ).rejects.toThrow("Forbidden: System admin permission required");
 
   // 2. 許可された管理者（許可）
   const adminUser = t.withIdentity({
@@ -144,7 +144,7 @@ it("一般ユーザーによるアクセス拒否と管理者によるアクセ�
     email: "admin@poohma.app",
     emailVerified: true,
   });
-  const stats = await adminUser.query(api.admin.stats.getStatsSummary, {});
+  const stats = await adminUser.query(api.admin.stats.getSystemStats, {});
   expect(stats.totalUsers).toBeGreaterThanOrEqual(0);
 });
 ```

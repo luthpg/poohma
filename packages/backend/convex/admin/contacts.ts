@@ -12,19 +12,14 @@ export const getContacts = systemAdminQuery({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const limit = args.limit ?? 50;
+    const limit = Math.min(Math.max(args.limit ?? 50, 1), 200);
+    const status = args.status;
+    const q = ctx.db.query("contacts").withIndex("by_createdAt").order("desc");
 
-    let contacts = await ctx.db
-      .query("contacts")
-      .withIndex("by_createdAt")
-      .order("desc")
-      .take(limit * 2);
-
-    if (args.status != null) {
-      contacts = contacts.filter((c) => c.status === args.status);
-    }
-
-    return contacts.slice(0, limit);
+    return await (status != null
+      ? q.filter((f) => f.eq(f.field("status"), status))
+      : q
+    ).take(limit);
   },
 });
 

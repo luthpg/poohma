@@ -360,7 +360,9 @@ function ContactsPage() {
 
               {/* メール返信用リンク */}
               <a
-                href={`mailto:${selectedContact.email}?subject=【PoohMaサポート】お問い合わせについて&body=${encodeURIComponent(
+                href={`mailto:${encodeURIComponent(selectedContact.email).replace("%40", "@")}?subject=${encodeURIComponent(
+                  "【PoohMaサポート】お問い合わせについて",
+                )}&body=${encodeURIComponent(
                   `\n\n--- お問い合わせ内容 ---\n${selectedContact.message}`,
                 )}`}
                 className="w-full h-11 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer"

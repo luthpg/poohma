@@ -116,8 +116,22 @@ poohma/                    … プロジェクトルート（Turborepo / pnpm wo
 ├── apps/
 │   ├── web/               … @poohma/web（TanStack Start + Convex）
 │   │   ├── src/           … フロントエンド (routes, components, hooks, lib, services)
+│   │   │   ├── components/ … 共通UIコンポーネント (AppHeader, PasscodeProvider 等)
+│   │   │   ├── env/        … クライアント/サーバー環境変数スキーマ (t3-env)
+│   │   │   ├── hooks/      … usePersistentQuery, useConvexFirebaseAuth, use-export-csv 等
+│   │   │   ├── lib/        … crypto.ts (E2EE), biometric.ts (WebAuthn), cms.server.ts
+│   │   │   ├── routes/
+│   │   │   │   ├── (app)/  … 認証必須ルート群 (dashboard, records, family, settings)
+│   │   │   │   ├── (public)/ … 公開ルート群 (LP, usage, faq, login, 規約等)
+│   │   │   │   └── __root.tsx … 全体レイアウト・グローバルProvider
+│   │   │   ├── services/   … サーバー関数 (auth.functions.ts, cms.functions.ts, prefs.functions.ts,
+│   │   │   │                   security.functions.ts, firebase-admin.server.ts)
+│   │   │   └── utils/      … schemas.ts (zod), geo-ip.server.ts (位置情報取得),
+│   │   │                       request-context.server.ts (リクエストメタデータ解析),
+│   │   │                       url-safety.ts (SSRF対策), csv-sanitize.ts,
+│   │   │                       index-group.ts (五十音インデックス), chunk-processor.ts
 │   │   ├── e2e/           … Playwright E2E シナリオ
-│   │   └── tests/         … 単体・結合・ブラウザ暗号テスト
+│   │   └── tests/         … 単体・結合・ブラウザ暗号テスト (Vitest / convex-test)
 │   └── admin/             … @poohma/admin（管理者コンソール: TanStack Start + Cloudflare）
 │       └── src/           … 管理画面 UI (Obsidianテーマ, cmdk, contacts, stats, users, system, cms)
 ├── packages/
@@ -130,30 +144,8 @@ poohma/                    … プロジェクトルート（Turborepo / pnpm wo
 │   │   │   └── actions.ts … 外部連携アクション
 │   │   └── tests/         … バックエンド結合テスト (convex-test)
 │   ├── shared/            … @poohma/shared（共通バリデーションスキーマ、メール定義、ユーティリティ）
+│   │   └── emails/        … メールテンプレート定義・配信レジストリ (React Email / Resend)
 │   └── knowledge-tools/   … @poohma/knowledge-tools（知見運用・Doc-Sync検証）
-├── workers/
-│   └── backup/            … @poohma/backup（定期自動バックアップ）
-│       ├── src/
-│       │   ├── components/ … 共通UIコンポーネント (AppHeader, PasscodeProvider 等)
-│       │   ├── emails/     … メールテンプレート定義・配信レジストリ (React Email / Resend)
-│       │   │   ├── _components/ … メール共通コンポーネント (EmailLayout, EmailButton 等)
-│       │   │   ├── templates/   … 用途別テンプレート (account/, family/, security/)
-│       │   │   ├── dispatch.ts  … メール送信ディスパッチャ
-│       │   │   └── registry.ts  … テンプレートレジストリ・Convex Payloadスキーマ
-│       │   ├── env/        … クライアント/サーバー環境変数スキーマ (t3-env)
-│       │   ├── hooks/      … usePersistentQuery, useConvexFirebaseAuth, use-export-csv 等
-│       │   ├── lib/        … crypto.ts (E2EE), biometric.ts (WebAuthn), cms.server.ts
-│       │   ├── routes/
-│       │   │   ├── (app)/  … 認証必須ルート群 (dashboard, records, family, settings)
-│       │   │   ├── (public)/ … 公開ルート群 (LP, usage, faq, login, 規約等)
-│       │   │   └── __root.tsx … 全体レイアウト・グローバルProvider
-│       │   ├── services/   … サーバー関数 (auth.functions.ts, cms.functions.ts, prefs.functions.ts,
-│       │   │                   security.functions.ts, firebase-admin.server.ts)
-│       │   └── utils/      … schemas.ts (zod), geo-ip.server.ts (位置情報取得),
-│       │                       request-context.server.ts (リクエストメタデータ解析),
-│       │                       url-safety.ts (SSRF対策), csv-sanitize.ts,
-│       │                       index-group.ts (五十音インデックス), chunk-processor.ts
-│       └── tests/          … 単体・結合テスト群 (Vitest / convex-test)
 ├── workers/
 │   └── backup/            … @poohma/backup（定期自動バックアップ用Cloudflare Worker）
 ├── pnpm-workspace.yaml    … ワークスペース定義

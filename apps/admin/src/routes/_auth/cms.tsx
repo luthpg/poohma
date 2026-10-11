@@ -95,6 +95,7 @@ function CmsPage() {
   const [legalTerms, setLegalTerms] = useState("");
   const [legalPrivacy, setLegalPrivacy] = useState("");
   const [isSavingLegal, setIsSavingLegal] = useState(false);
+  const [legalLoaded, setLegalLoaded] = useState(false);
 
   // データ読み込み
   const loadData = useCallback(async () => {
@@ -109,11 +110,15 @@ function CmsPage() {
         setFaqList(res.contents);
         setIsConfigured(res.configured);
       } else if (activeTab === "legal") {
+        setLegalLoaded(false);
         const res = await fetchLegal();
         if (res.data) {
           setLegalData(res.data);
           setLegalTerms(res.data.terms);
           setLegalPrivacy(res.data.privacy);
+          setLegalLoaded(true);
+        } else {
+          toast.error("microCMS からのデータ取得に失敗しました");
         }
         setIsConfigured(res.configured);
       }
@@ -626,7 +631,7 @@ function CmsPage() {
             <button
               type="button"
               onClick={handleSaveLegal}
-              disabled={isSavingLegal}
+              disabled={isSavingLegal || !legalLoaded}
               className="px-4 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-mono font-medium transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 min-h-[44px]"
             >
               <Save className="w-4 h-4" />

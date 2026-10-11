@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import type { Doc } from "../_generated/dataModel";
 import { systemAdminQuery } from "../customBuilders";
 
 /**
@@ -11,23 +12,45 @@ export const getUsersList = systemAdminQuery({
     search: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const limit = args.limit ?? 50;
-    const users = await ctx.db
-      .query("users")
-      .order("desc")
-      .take(limit * 2);
+    const limit = Math.min(Math.max(args.limit ?? 50, 1), 200);
+    const search = args.search?.trim();
 
-    let filtered = users;
-    if (args.search && args.search.trim().length > 0) {
-      const q = args.search.trim().toLowerCase();
-      filtered = filtered.filter(
-        (u) =>
-          u.email.toLowerCase().includes(q) ||
-          u.displayName?.toLowerCase().includes(q),
-      );
+    let sliced: Doc<"users">[];
+
+    if (search && search.length > 0) {
+      // メール完全一致の場合は by_email インデックスで高速解決
+      if (search.includes("@")) {
+        const exactUser = await ctx.db
+          .query("users")
+          .withIndex("by_email", (q) => q.eq("email", search))
+          .first();
+        if (exactUser) {
+          sliced = [exactUser];
+        } else {
+          const q = search.toLowerCase();
+          const users = await ctx.db.query("users").order("desc").take(200);
+          sliced = users
+            .filter(
+              (u) =>
+                u.email.toLowerCase().includes(q) ||
+                u.displayName?.toLowerCase().includes(q),
+            )
+            .slice(0, limit);
+        }
+      } else {
+        const q = search.toLowerCase();
+        const users = await ctx.db.query("users").order("desc").take(200);
+        sliced = users
+          .filter(
+            (u) =>
+              u.email.toLowerCase().includes(q) ||
+              u.displayName?.toLowerCase().includes(q),
+          )
+          .slice(0, limit);
+      }
+    } else {
+      sliced = await ctx.db.query("users").order("desc").take(limit);
     }
-
-    const sliced = filtered.slice(0, limit);
 
     // 所属ファミリー名を並列解決
     const usersWithFamily = await Promise.all(
