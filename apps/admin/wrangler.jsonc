@@ -3,7 +3,5 @@
   "name": "poohma-admin",
   "compatibility_date": "2025-09-02",
   "compatibility_flags": ["nodejs_compat"],
-  "main": "@tanstack/react-start/server-entry",
-  "keep_vars": true,
-  "previews": {}
+  "main": "@tanstack/react-start/server-entry"
 }
