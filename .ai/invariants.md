@@ -35,7 +35,13 @@
 ### Convex カスタムビルダーの強制
 
 - 生の Convex `query` / `mutation` を直接 export してはならない。
-- 必ず `convex/customBuilders.ts` のビルダー（`authenticatedQuery/Mutation`, `familyBoundQuery/Mutation`, `identityVerifiedQuery/Mutation`）を経由する。
+- 必ず `convex/customBuilders.ts` のビルダー（`authenticatedQuery/Mutation`, `familyBoundQuery/Mutation`, `identityVerifiedQuery/Mutation`, `systemAdminQuery/Mutation/Action`）を経由する。
+
+### システム管理者権限（System Admin）のフェイルセーフ保護
+
+- システム管理者向け操作（お問い合わせ閲覧/更新、システム統計、ユーザー/ファミリー照会、microCMS管理、デモ環境リセット等）は、必ず `assertSystemAdmin`（`systemAdminQuery/Mutation/Action`）を経由する。
+- 認可判定は「Firebase 認証済み」かつ「確認済みメールアドレス（`emailVerified: true`）」かつ「環境変数 `ADMIN_EMAILS` ホワイトリストに含まれること」を必須とする。`ADMIN_EMAILS` が未設定または空の場合はフェイルセーフとして全アクセスを拒否する。
+- **E2EE 不変条件の維持**: システム管理者であっても、ユーザーの E2EE 暗号化ヒント（`passwordHint`）やマスターキー（`masterKeyEncrypted`）の復号鍵は保持しておらず、一切閲覧・復号できない。運営者権限によるプライバシー侵害を技術的に不可能とする。
 
 ### IDOR（Insecure Direct Object Reference）の完全防止
 

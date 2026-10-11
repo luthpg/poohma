@@ -1,11 +1,13 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import {
+  customAction,
   customMutation,
   customQuery,
 } from "convex-helpers/server/customFunctions";
 import type { Doc, Id } from "./_generated/dataModel";
-import type { MutationCtx, QueryCtx } from "./_generated/server";
+import type { ActionCtx, MutationCtx, QueryCtx } from "./_generated/server";
 import {
+  action as baseAction,
   mutation as baseMutation,
   query as baseQuery,
 } from "./_generated/server";
@@ -188,5 +190,68 @@ export const recordAdminMutation = customMutation(baseMutation, {
       ctx: { ...ctx, identity, user, record, familyId: user.familyId },
       args,
     };
+  },
+});
+
+/**
+ * システム管理者の認証・認可検証
+ */
+export async function assertSystemAdmin(ctx: {
+  auth: QueryCtx["auth"] | MutationCtx["auth"] | ActionCtx["auth"];
+}): Promise<{
+  identity: NonNullable<
+    Awaited<ReturnType<QueryCtx["auth"]["getUserIdentity"]>>
+  >;
+  adminEmail: string;
+}> {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity?.email || !identity.emailVerified) {
+    throw new ConvexError("Unauthenticated: Valid verified email required");
+  }
+
+  const rawAdminEmails = process.env.ADMIN_EMAILS ?? "";
+  const adminEmails = rawAdminEmails
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+
+  const userEmail = identity.email.toLowerCase();
+  if (adminEmails.length === 0 || !adminEmails.includes(userEmail)) {
+    throw new ConvexError("Forbidden: System admin permission required");
+  }
+
+  return { identity, adminEmail: identity.email };
+}
+
+/**
+ * システム管理者向けクエリビルダー
+ */
+export const systemAdminQuery = customQuery(baseQuery, {
+  args: {},
+  input: async (ctx, args) => {
+    const { identity, adminEmail } = await assertSystemAdmin(ctx);
+    return { ctx: { ...ctx, identity, adminEmail }, args };
+  },
+});
+
+/**
+ * システム管理者向けミューテーションビルダー
+ */
+export const systemAdminMutation = customMutation(baseMutation, {
+  args: {},
+  input: async (ctx, args) => {
+    const { identity, adminEmail } = await assertSystemAdmin(ctx);
+    return { ctx: { ...ctx, identity, adminEmail }, args };
+  },
+});
+
+/**
+ * システム管理者向けアクションビルダー
+ */
+export const systemAdminAction = customAction(baseAction, {
+  args: {},
+  input: async (ctx, args) => {
+    const { identity, adminEmail } = await assertSystemAdmin(ctx);
+    return { ctx: { ...ctx, identity, adminEmail }, args };
   },
 });
