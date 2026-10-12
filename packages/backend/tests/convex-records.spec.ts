@@ -3352,7 +3352,7 @@ describe("レコードのアーカイブ・復元機能テスト (Issue #154)", 
         memberClient.mutation(api.records.bulkArchiveRecords, {
           ids: [memberPersonalRecordId, adminSharedRecordId],
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(/Access denied: admin rights required/);
 
       // All or Nothing 検証: 一部のみアーカイブされることなく、両レコードとも isArchived: false のまま残ること
       await t.run(async (ctx) => {
@@ -3441,7 +3441,7 @@ describe("レコードのアーカイブ・復元機能テスト (Issue #154)", 
         memberClient.mutation(api.records.bulkUnarchiveRecords, {
           ids: [memberPersonalRecordId, adminSharedRecordId],
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(/Access denied: admin rights required/);
 
       // All or Nothing 検証: 両レコードとも isArchived: true のまま変更されない
       await t.run(async (ctx) => {
@@ -3530,7 +3530,7 @@ describe("レコードのアーカイブ・復元機能テスト (Issue #154)", 
         memberClient.mutation(api.records.deleteRecords, {
           ids: [memberPersonalRecordId, adminSharedRecordId],
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(/Access denied: admin rights required/);
 
       // All or Nothing 検証: 削除権限のあった個人レコードも含めて一切削除されず、両方DBに存続すること
       await t.run(async (ctx) => {

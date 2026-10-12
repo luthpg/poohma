@@ -572,7 +572,7 @@ TanStack Start / ConvexReactClient の Mutation 実行時、認証トークン�
   1. 入力中のフォームコンポーネントをアンマウントせず、React State 上に入力値（ドラフト）を保持したまま再認証モーダルを表示する。
   2. 再ログイン（Firebase再認証 → syncUser → セッションCookie再発行）が完了した時点で、保持していた入力値で Mutation を再実行する。
   3. 復帰・再実行が成功した時点でモーダルを閉じ、完了通知（トースト）を表示する。
-  （※ 独自 idempotency key の引き回しは行わず、Convex の WebSocket 接続単位での自律的重複排除モデルを活用する。詳細は ADR-008 参照）
+  （※ 独自 idempotency key の引き回しは行わず、暗号化ドラフト退避（FR-REC-28）による入力保護と Convex の単一トランザクション実行モデルを活用する。詳細は ADR-008 参照）
 ```
 
 ### 5.6 ログアウトとセッション復元制御（FR-AUTH-04）
