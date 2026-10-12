@@ -443,7 +443,7 @@ function DashboardPage() {
             )}
           </div>
 
-          <div className="pt-2 border-t border-zinc-800">
+          <div className="my-2 pt-2 border-t border-zinc-800">
             <Link
               to="/system"
               className="w-full h-10 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-mono text-zinc-300 flex items-center justify-center gap-2 transition-all cursor-pointer"

@@ -132,6 +132,7 @@ export function TagInput({
                 </span>
                 <button
                   type="button"
+                  aria-label={`タグ「${tag}」を削除`}
                   className="ml-1 shrink-0 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
@@ -208,37 +209,38 @@ export function TagInput({
         </div>
       )}
 
-      <div className="relative mt-2">
-        {showSuggestions ? (
-          <div className="absolute w-full z-10 top-0 rounded-md border bg-popover text-popover-foreground shadow-md outline-none animate-in fade-in-0 zoom-in-95">
-            <CommandList>
-              <CommandGroup className="h-full overflow-auto max-h-[200px]">
-                {selectables.map((tag) => {
-                  return (
-                    <CommandItem
-                      key={tag}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                      }}
-                      onSelect={() => {
-                        if (value.length >= maxTags) {
-                          toast.error(`タグは${maxTags}個まで登録できます`);
-                          return;
-                        }
-                        setInputValue("");
-                        onChange([...value, tag]);
-                      }}
-                      className={"cursor-pointer"}
-                    >
-                      {tag}
-                    </CommandItem>
-                  );
-                })}
-              </CommandGroup>
-            </CommandList>
-          </div>
-        ) : null}
+      <div
+        className={cn("relative mt-2", !showSuggestions && "hidden")}
+        hidden={!showSuggestions}
+      >
+        <div className="absolute w-full z-10 top-0 rounded-md border bg-popover text-popover-foreground shadow-md outline-none animate-in fade-in-0 zoom-in-95">
+          <CommandList>
+            <CommandGroup className="h-full overflow-auto max-h-[200px]">
+              {selectables.map((tag) => {
+                return (
+                  <CommandItem
+                    key={tag}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onSelect={() => {
+                      if (value.length >= maxTags) {
+                        toast.error(`タグは${maxTags}個まで登録できます`);
+                        return;
+                      }
+                      setInputValue("");
+                      onChange([...value, tag]);
+                    }}
+                    className={"cursor-pointer"}
+                  >
+                    {tag}
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </div>
       </div>
     </Command>
   );

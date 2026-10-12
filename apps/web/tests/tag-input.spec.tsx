@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { TagInput } from "@/components/ui/tag-input";
 
 vi.mock("sonner", () => ({
@@ -9,6 +9,19 @@ vi.mock("sonner", () => ({
     success: vi.fn(),
   },
 }));
+
+// cmdk (CommandList) が jsdom 環境でマウントされた際の ResizeObserver をモック
+class ResizeObserverMock {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+beforeAll(() => {
+  global.ResizeObserver =
+    ResizeObserverMock as unknown as typeof ResizeObserver;
+  window.HTMLElement.prototype.scrollIntoView = vi.fn();
+});
 
 describe("TagInput Component", () => {
   afterEach(() => {
@@ -84,7 +97,7 @@ describe("TagInput Component", () => {
   });
 
   it("選択されているタグが候補チップの前方にソートされること", () => {
-    render(
+    const { container } = render(
       <TagInput
         value={["仕事"]}
         onChange={vi.fn()}
@@ -92,8 +105,10 @@ describe("TagInput Component", () => {
       />,
     );
 
-    const chips = screen.getAllByRole("button", { name: /SNS|仕事|エンタメ/ });
-    // 先頭のチップが選択済みの「仕事」になっていること
-    expect(chips[0]?.textContent).toContain("仕事");
+    const suggestChips = container.querySelectorAll(
+      '[data-testid^="suggest-tag-"]',
+    );
+    // 先頭の候補チップが選択済みの「仕事」になっていること
+    expect(suggestChips[0]?.textContent).toContain("仕事");
   });
 });

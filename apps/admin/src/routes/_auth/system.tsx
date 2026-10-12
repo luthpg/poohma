@@ -350,8 +350,8 @@ function SystemPage() {
                       key={log._id}
                       className="hover:bg-zinc-800/40 transition-colors"
                     >
-                      <td className="py-3 px-4 font-mono text-zinc-400 whitespace-nowrap">
-                        {new Date(log.createdAt).toLocaleTimeString("ja-JP")}
+                      <td className="py-3 px-4 font-mono text-zinc-400 whitespace-nowrap text-[11px]">
+                        {new Date(log.createdAt).toLocaleString("ja-JP")}
                       </td>
                       <td className="py-3 px-4">
                         <span className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700/60 text-[10px] font-mono text-zinc-300">
@@ -385,9 +385,10 @@ function SystemPage() {
                     {log.action}
                   </span>
                   <span className="font-mono text-[11px] text-zinc-500">
-                    {new Date(log.createdAt).toLocaleTimeString("ja-JP")}
+                    {new Date(log.createdAt).toLocaleString("ja-JP")}
                   </span>
                 </div>
+
                 <div className="flex items-center justify-between text-zinc-300">
                   <span>{log.actorDisplayName}</span>
                   <span className="font-mono text-zinc-500 text-[10px]">
