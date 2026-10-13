@@ -389,7 +389,7 @@ export const checkSystemHealth = systemAdminAction({
         const timer = setTimeout(() => controller.abort(), 4000);
         // パブリックDNS IPで疎通確認
         const res = await fetch(
-          `https://ipgeolocation.abstractapi.com/v1/?api_key=${apiKey}&ip=1.1.1.1`,
+          `https://ip-intelligence.abstractapi.com/v1/?api_key=${apiKey}&ip_address=1.1.1.1`,
           { signal: controller.signal },
         );
         clearTimeout(timer);

@@ -13,17 +13,36 @@
     "SERVER_URL",
     "RESEND_*"
   ],
-  "globalPassThroughEnv": ["CI", "VERCEL"],
+  "globalPassThroughEnv": [
+    "CI",
+    "VERCEL",
+    "GITHUB_ACTIONS",
+    "GITHUB_REF",
+    "GITHUB_SHA"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".vercel/**", ".output/**", "storybook-static/**"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!**/*.md",
+        "!tests/**",
+        "!**/*.spec.*",
+        "!**/*.test.*"
+      ],
+      "outputs": ["dist/**", ".vercel/**", ".output/**"]
+    },
+    "build-storybook": {
+      "dependsOn": ["^build"],
+      "outputs": ["storybook-static/**"]
     },
     "typecheck": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^typecheck"],
+      "inputs": ["**/*.ts", "**/*.tsx", "tsconfig*.json"]
     },
     "test": {
-      "dependsOn": ["^build"]
+      "inputs": ["$TURBO_DEFAULT$", "!**/*.md", "!storybook-static/**"],
+      "outputs": ["coverage/**"]
     },
     "test:e2e": {
       "dependsOn": ["^build"],

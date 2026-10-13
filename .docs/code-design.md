@@ -29,7 +29,7 @@ PoohMaは、フロントエンドとサーバーサイド処理を単一のTanSt
 [ブラウザ]
   │  E2EE暗号化/復号 (Web Crypto API)
   │  WebAuthn (生体認証)
-  │  Service Worker / IndexedDB (オフラインキャッシュ)
+  │  Web App Manifest (PWAスタンドアロン起動)
   ▼
 [TanStack Start アプリ (Vercel)]
   ├─ SSR / ルーティング (TanStack Router)
@@ -56,28 +56,20 @@ PoohMaは、フロントエンドとサーバーサイド処理を単一のTanSt
      クライアントから渡るFirebase IDトークンをConvex側でも直接検証する。
 ```
 
-### 1.1 オフライン対応（PWA, FR-PWA-03）
+### 1.1 PWA 対応方針（FR-PWA-01, FR-PWA-02）
+
+PoohMa はモバイル端末やデスクトップでの快適な操作性を実現するため、Progressive Web Apps (PWA) 技術を採用する。
 
 ```txt
-Service Worker (Workbox等):
-  - 静的アセット（JS/CSS/フォント）はCache Firstで配信
-  - Convexへの getRecords / getRecordDetail 等の読み取り系レスポンスは、
-    取得成功のたびにIndexedDB（暗号化済みのまま）へミラーリング保存する
-    （passwordHintはE2EE暗号化済み、サービス名・URL・メモ・タグ・ログインID等のメタデータは
-    平文としてIndexedDBへ永続化される。復号処理はブラウザメモリ上でのみ行う。6章の鍵階層は据え置き）
-
-オフライン時の閲覧フロー:
-  1. ネットワーク不通を検知（Network First失敗 or navigator.onLine）
-  2. IndexedDBにミラーリングされた暗号化済みレコード一覧・詳細を表示
-  3. パスコード入力 or 生体認証によりマスターキーをブラウザメモリ上に展開
-     （オフライン中もPBKDF2/WebAuthn処理はローカルで完結するため実行可能）
-  4. 復号したヒントを表示（新規登録・編集・共有範囲変更等の書き込み系操作は
-     オフライン中は無効化し、オンライン復帰まで待機する）
-
-オンライン復帰時:
-  - Convexの最新データで IndexedDBミラーを差分更新
-  - 復帰前にオフライン専用の書き込みキューは持たない（Read-onlyキャッシュとして
-    設計し、書き込み競合の複雑化を避ける）
+PWA 構成要素と責務:
+  - Web App Manifest:
+    ホーム画面への追加、アプリアイコン、スタンドアロン表示（UI枠非表示）、テーマカラーの定義（manifest.json）。
+  - iOS standalone 判定ロジック:
+    Safari / ホーム画面追加環境の識別と、専用の UI 最適化・案内表示。
+  - データ取得とセキュリティ原則:
+    データ閲覧はすべて Convex のリアルタイムリアクティブ購読（WebSocket / RLS）に一本化する。
+    暗号化レコードのローカルストレージ（IndexedDB等）への永続キャッシュは、家族除名時における
+    「暗号学的アクセス取り消し不能リスク」を防ぐため行わない（詳細は ADR-008 参照）。
 ```
 
 ## 2. 技術スタック一覧
@@ -97,13 +89,13 @@ Service Worker (Workbox等):
 | 外部API          | Yahoo!テキスト解析API（ふりがな）、任意サイトのOGPスクレイピング（cheerio）、Abstract IP Geolocation API（位置情報取得）、ipaddr.js（IPアドレス検証・SSRF/プライベートIP除外） |
 | CSV処理          | papaparse                                                                                                                    |
 | QRコード          | qrcode.react                                                                                                                 |
-| PWA            | Web App Manifest、iOS standalone判定ロジック（自前実装）、Service Worker（Workbox等）＋IndexedDB（オフラインキャッシュ、FR-PWA-03）                         |
+| PWA            | Web App Manifest（`public/manifest.json`）、iOS standalone判定ロジック（自前実装）                                            |
 | PDF生成          | @cantoo/pdf-lib, @cantoo/fontkit（Noto Sans JP サブセット埋め込みによる日本語ベクターPDF生成）＋qrcode（リカバリーキット印刷用、FR-CRYPT-06）                   |
 | 暗号             | Web Crypto API（AES-GCM, PBKDF2）、WebAuthn（PRF拡張）                                                                              |
 | バリデーション        | zod, convex-helpers（customQuery/customMutation）                                                                              |
 | 監視             | Vercel Analytics, Vercel Speed Insights                                                                                      |
 | テスト            | Vitest, @testing-library/react, convex-test, Playwright（ブラウザモード）                                                             |
-| コンポーネントカタログ    | Storybook                                                                                                                    |
+| コンポーネントカタログ    | Storybook（Storybook Test Runner + axe-core による a11y 自動テスト連携）                                                            |
 | Lint／フォーマット    | Biome                                                                                                                        |
 | デプロイ           | Vercel（フロントエンド）、Convex Cloud（バックエンド）                                                                                         |
 
@@ -490,6 +482,8 @@ Convex 側は auth.config.ts の Issuer 設定 (securetoken.google.com/poohma) �
 | familyBoundQuery / Mutation | 上記 + 対象アカウントの `user.familyId` が設定されていること | 家族所属が前提の機能（招待承認、家族固有クエリ等） |
 | familyAdminQuery / Mutation | 上記 + 対象アカウントの `familyRole === "admin"` であること | 家族設定・メンバーロール変更・キック・暗号再暗号化準備・監査ログ取得等の管理者限定機能 |
 | recordAdminMutation | familyBound + 対象レコード（`args.id`）が存在し `requireAdminAccess` を満たすこと（`ctx.record` 注入） | レコード個別管理者追加・解除等のレコード管理者限定機能 |
+| systemAdminQuery / Mutation / Action | Identity検証 + `identity.email` が `ADMIN_EMAILS` に含まれること | システム管理者コンソール（@poohma/admin）専用API（統計・問い合わせ・お知らせ・ユーザー管理） |
+
 
 #### アカウント解決（resolveAccount）の仕組み
 
@@ -552,27 +546,33 @@ requireAdminAccess(user, record):
       Access denied エラーを送出
 
 サーバー側の getRecordDetail は requireContentAccess、
-updateRecord / deleteRecord / deleteRecords / unshareRecord / addRecordAdmin / removeRecordAdmin は requireAdminAccess を必ず経由する。
+updateRecord / deleteRecord / deleteRecords / bulkArchiveRecords / bulkUnarchiveRecords / unshareRecord / addRecordAdmin / removeRecordAdmin は requireAdminAccess を必ず経由する。
+```
+
+#### 5.4.1 レコード一括操作（アーカイブ・再開・完全削除）における多層防護（FR-REC-12）
+
+ダッシュボードにおけるレコード一括操作（一括アーカイブ、一括利用再開、一括完全削除）では、多層防御の原則に基づきクライアントとサーバーの双方で認可制御を徹底する。
+
+```txt
+1. クライアント側（UI事前除外）:
+   - ユーザーが管理権限を持たないレコード（他メンバー所有の個人レコードや、管理者権限のない家族共有レコード）は、チェックボックスを無効化（disabled）して選択不能とする。
+   - 一括操作バーおよび確認モーダルでは、操作可能レコード（manageableRecords）と除外レコード（excludedManageRecords）を明確に区別し、権限外レコードの誤操作をUIレベルで遮断する。
+
+2. バックエンド側（Convex Mutation: All or Nothing ロールバック保証）:
+   - bulkArchiveRecords, bulkUnarchiveRecords, deleteRecords などの一括変更 Mutation において、
+     指定された対象 ID 配列（ids）の各レコードに対して requireAdminAccess(ctx.user, record) を厳格に検証する。
+   - 検証対象の中に 1 件でも権限外レコード、あるいは存在しないレコードが含まれていた場合は、即座に例外（Access denied / Record not found）を送出する。
+   - Convex の単一 Mutation トランザクション保証により、一部のみが処理される中間状態を完全に排除し、全件変更または全件ロールバック（All or Nothing）を死守する。
 ```
 
 ### 5.5 セッション失効時の入力保護（FR-AUTH-07）
 
 ```txt
-ConvexReactClient / TanStack Query の Mutation実行を共通ラッパーでインターセプトし、
-認証エラー（セッションCookie失効・IDトークン失効）を検知した場合：
-  1. 実行しようとしていたMutationの引数（フォーム入力内容）とクライアント生成の
-     idempotency key（UUID等）をReact State上に保持したまま、
-     画面を覆う再ログインモーダルを表示する（入力欄はアンマウントしない）
-  2. 再ログイン（Firebase再認証 → syncUser → セッションCookie再発行）が完了した時点で、
-     保持しておいた引数と同一のidempotency keyを用いて元のMutationを自動的に再実行する
-  3. サーバー側は、createRecord / updateRecord / importRecords 等の書き込みMutationに対して
-     idempotency keyを受け取り、既に同一キーで処理済みの場合は再実行せず既存結果を返却する
-     （初回リクエストがサーバー到達前にタイムアウトした場合のみ再実行し、
-     サーバー処理済み・レスポンス欠落の場合は既存結果を再利用して重複作成・通知を防ぐ）
-  4. 再実行が成功した時点でモーダルを閉じ、通常のフィードバック（トースト等）を表示する
-
-本フローはフォーム保存系Mutation（createRecord / updateRecord / importRecords 等）に対して
-共通的に適用できるよう、Mutation呼び出しの共通フックとして実装する。
+TanStack Start / ConvexReactClient の Mutation 実行時、認証トークン失効やセッションCookie切れを検知した場合：
+  1. 入力中のフォームコンポーネントをアンマウントせず、React State 上に入力値（ドラフト）を保持したまま再認証モーダルを表示する。
+  2. 再ログイン（Firebase再認証 → syncUser → セッションCookie再発行）が完了した時点で、保持していた入力値で Mutation を再実行する。
+  3. 復帰・再実行が成功した時点でモーダルを閉じ、完了通知（トースト）を表示する。
+  （※ 独自 idempotency key の引き回しは行わず、暗号化ドラフト退避（FR-REC-28）による入力保護と Convex の単一トランザクション実行モデルを活用する。詳細は ADR-008 参照）
 ```
 
 ### 5.6 ログアウトとセッション復元制御（FR-AUTH-04）
@@ -1417,12 +1417,12 @@ convex/crons.ts に登録されている定期ジョブ一覧:
 
 - **単体・結合テスト** ：Vitest ＋ @testing-library/react（UIコンポーネント）、convex-test（Convex関数のテスト）。
 - **ブラウザテスト** ：@vitest/browser-playwright によるブラウザ実行モードのテスト。
-- **コンポーネントカタログ** ：Storybook（a11yアドオン、テーマ切替アドオン等を含む）。
+- **コンポーネントカタログ** ：Storybook（Storybook Test Runner + axe-core による `a11y: { test: "error" }` 自動検証、テーマ切替アドオン等を含む）。
 - **静的解析／フォーマット** ：Biome（ `check` / `check:ci` スクリプト）。
 - **型チェック** ： `tsc --noEmit` 。
 
 ## 18. 今後の課題（技術的観点）
 
-- 家族移行のPREPARED状態が複数端末から同時実行された場合の競合制御（同一ユーザーの既存PREPAREDを都度EXPIRED化する方式に加え、`commitFamilyMigration` での楽観的ロック検証がIssue #190で対応済み。Web Worker + IndexedDB による耐障害性向上はIssue #111として計画中）。
-- オフラインキャッシュ（1.1）は読み取り専用として設計しているため、オフライン中の書き込み操作（新規登録・編集等）に対応する場合は、書き込みキューイングと競合解決（9.6の楽観的ロックとの整合）の設計が別途必要になる。
+- 家族移行のPREPARED状態が複数端末から同時実行された場合の競合制御（同一ユーザーの既存PREPAREDを都度EXPIRED化する方式に加え、`commitFamilyMigration` での楽観的ロック検証がIssue #190で対応済み。Web Worker + IndexedDB による耐障害性向上は計画中）。
 - 複数家族（マルチ・ワークスペース）対応：要件定義書10章の検討課題のとおり、現行は1ユーザー1家族グループ（users.familyIdが単一値）を前提としたスキーマ・認可設計（5.3のfamilyBoundQuery/Mutation等）となっている。対応する場合はusersテーブルの家族所属を配列化し、家族切替時にどのfamilyIdをコンテキストとして扱うか（アクティブ家族の概念）を含めた設計見直しが必要。
+

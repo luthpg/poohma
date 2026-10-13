@@ -3270,4 +3270,275 @@ describe("レコードのアーカイブ・復元機能テスト (Issue #154)", 
       });
     });
   });
+
+  describe("一括操作の権限制御と防御性 (Issue #355)", () => {
+    it("権限外レコード混在時の一括アーカイブ（bulkArchiveRecords）で All or Nothing ロールバックが保証されること", async () => {
+      const t = convexTest(schema, modules);
+
+      let familyId!: Id<"families">;
+      let adminAccountId!: Id<"users">;
+      let memberAccountId!: Id<"users">;
+      let memberPersonalRecordId!: Id<"serviceRecords">;
+      let adminSharedRecordId!: Id<"serviceRecords">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
+          name: "Bulk Auth Family",
+          updatedAt: Date.now(),
+        });
+
+        adminAccountId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
+          familyRole: "admin",
+          userId: "admin_user_auth",
+          email: "admin_auth@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+
+        memberAccountId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
+          familyRole: "viewer",
+          userId: "member_user_auth",
+          email: "member_auth@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+
+        // 一般メンバー個人のレコード（memberがアーカイブ可能）
+        memberPersonalRecordId = await ctx.db.insert("serviceRecords", {
+          title: "メンバー個人のレコード",
+          userId: "member_user_auth",
+          accountId: memberAccountId,
+          familyId,
+          sortKey: "M001",
+          ownerType: "user",
+          admins: [],
+          updatedByAccountId: memberAccountId,
+          tags: ["個人"],
+          stableId: crypto.randomUUID(),
+          revision: 0,
+          isArchived: false,
+          updatedAt: Date.now(),
+        });
+
+        // 家族管理者のみが管理できる共有レコード（memberは閲覧のみでアーカイブ不可）
+        adminSharedRecordId = await ctx.db.insert("serviceRecords", {
+          title: "管理者共有レコード",
+          userId: "admin_user_auth",
+          accountId: adminAccountId,
+          familyId,
+          sortKey: "A001",
+          ownerType: "family",
+          ownerFamilyId: familyId,
+          admins: [adminAccountId],
+          updatedByAccountId: adminAccountId,
+          tags: ["共有"],
+          stableId: crypto.randomUUID(),
+          revision: 0,
+          isArchived: false,
+          updatedAt: Date.now(),
+        });
+      });
+
+      const memberClient = t.withIdentity({
+        subject: "member_user_auth",
+        email: "member_auth@example.com",
+      });
+
+      // member が両方を一括アーカイブしようとすると、権限不足で失敗する
+      await expect(
+        memberClient.mutation(api.records.bulkArchiveRecords, {
+          ids: [memberPersonalRecordId, adminSharedRecordId],
+        }),
+      ).rejects.toThrow(/Access denied: admin rights required/);
+
+      // All or Nothing 検証: 一部のみアーカイブされることなく、両レコードとも isArchived: false のまま残ること
+      await t.run(async (ctx) => {
+        const personalRec = await ctx.db.get(memberPersonalRecordId);
+        const sharedRec = await ctx.db.get(adminSharedRecordId);
+        expect(personalRec?.isArchived).toBe(false);
+        expect(sharedRec?.isArchived).toBe(false);
+      });
+    });
+
+    it("権限外レコード混在時の一括利用再開（bulkUnarchiveRecords）で All or Nothing ロールバックが保証されること", async () => {
+      const t = convexTest(schema, modules);
+
+      let familyId!: Id<"families">;
+      let adminAccountId!: Id<"users">;
+      let memberAccountId!: Id<"users">;
+      let memberPersonalRecordId!: Id<"serviceRecords">;
+      let adminSharedRecordId!: Id<"serviceRecords">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
+          name: "Bulk Auth Family 2",
+          updatedAt: Date.now(),
+        });
+
+        adminAccountId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
+          familyRole: "admin",
+          userId: "admin_user_auth2",
+          email: "admin_auth2@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+
+        memberAccountId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
+          familyRole: "viewer",
+          userId: "member_user_auth2",
+          email: "member_auth2@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+
+        memberPersonalRecordId = await ctx.db.insert("serviceRecords", {
+          title: "メンバーアーカイブ済み個人レコード",
+          userId: "member_user_auth2",
+          accountId: memberAccountId,
+          familyId,
+          sortKey: "M002",
+          ownerType: "user",
+          admins: [],
+          updatedByAccountId: memberAccountId,
+          tags: [],
+          stableId: crypto.randomUUID(),
+          revision: 0,
+          isArchived: true,
+          updatedAt: Date.now(),
+        });
+
+        adminSharedRecordId = await ctx.db.insert("serviceRecords", {
+          title: "管理者アーカイブ済み共有レコード",
+          userId: "admin_user_auth2",
+          accountId: adminAccountId,
+          familyId,
+          sortKey: "A002",
+          ownerType: "family",
+          ownerFamilyId: familyId,
+          admins: [adminAccountId],
+          updatedByAccountId: adminAccountId,
+          tags: [],
+          stableId: crypto.randomUUID(),
+          revision: 0,
+          isArchived: true,
+          updatedAt: Date.now(),
+        });
+      });
+
+      const memberClient = t.withIdentity({
+        subject: "member_user_auth2",
+        email: "member_auth2@example.com",
+      });
+
+      // member が両方を一括利用再開しようとすると失敗
+      await expect(
+        memberClient.mutation(api.records.bulkUnarchiveRecords, {
+          ids: [memberPersonalRecordId, adminSharedRecordId],
+        }),
+      ).rejects.toThrow(/Access denied: admin rights required/);
+
+      // All or Nothing 検証: 両レコードとも isArchived: true のまま変更されない
+      await t.run(async (ctx) => {
+        const personalRec = await ctx.db.get(memberPersonalRecordId);
+        const sharedRec = await ctx.db.get(adminSharedRecordId);
+        expect(personalRec?.isArchived).toBe(true);
+        expect(sharedRec?.isArchived).toBe(true);
+      });
+    });
+
+    it("権限外レコード混在時の一括削除（deleteRecords）で All or Nothing ロールバックが保証されること", async () => {
+      const t = convexTest(schema, modules);
+
+      let familyId!: Id<"families">;
+      let adminAccountId!: Id<"users">;
+      let memberAccountId!: Id<"users">;
+      let memberPersonalRecordId!: Id<"serviceRecords">;
+      let adminSharedRecordId!: Id<"serviceRecords">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
+          name: "Bulk Auth Family 3",
+          updatedAt: Date.now(),
+        });
+
+        adminAccountId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
+          familyRole: "admin",
+          userId: "admin_user_auth3",
+          email: "admin_auth3@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+
+        memberAccountId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
+          familyRole: "viewer",
+          userId: "member_user_auth3",
+          email: "member_auth3@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+
+        memberPersonalRecordId = await ctx.db.insert("serviceRecords", {
+          title: "削除予定個人レコード",
+          userId: "member_user_auth3",
+          accountId: memberAccountId,
+          familyId,
+          sortKey: "M003",
+          ownerType: "user",
+          admins: [],
+          updatedByAccountId: memberAccountId,
+          tags: [],
+          stableId: crypto.randomUUID(),
+          revision: 0,
+          isArchived: false,
+          updatedAt: Date.now(),
+        });
+
+        adminSharedRecordId = await ctx.db.insert("serviceRecords", {
+          title: "削除不可管理者共有レコード",
+          userId: "admin_user_auth3",
+          accountId: adminAccountId,
+          familyId,
+          sortKey: "A003",
+          ownerType: "family",
+          ownerFamilyId: familyId,
+          admins: [adminAccountId],
+          updatedByAccountId: adminAccountId,
+          tags: [],
+          stableId: crypto.randomUUID(),
+          revision: 0,
+          isArchived: false,
+          updatedAt: Date.now(),
+        });
+      });
+
+      const memberClient = t.withIdentity({
+        subject: "member_user_auth3",
+        email: "member_auth3@example.com",
+      });
+
+      // member が両方を一括削除しようとすると失敗
+      await expect(
+        memberClient.mutation(api.records.deleteRecords, {
+          ids: [memberPersonalRecordId, adminSharedRecordId],
+        }),
+      ).rejects.toThrow(/Access denied: admin rights required/);
+
+      // All or Nothing 検証: 削除権限のあった個人レコードも含めて一切削除されず、両方DBに存続すること
+      await t.run(async (ctx) => {
+        const personalRec = await ctx.db.get(memberPersonalRecordId);
+        const sharedRec = await ctx.db.get(adminSharedRecordId);
+        expect(personalRec).not.toBeNull();
+        expect(sharedRec).not.toBeNull();
+      });
+    });
+  });
 });
