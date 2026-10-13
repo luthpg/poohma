@@ -25,6 +25,9 @@ export function IndexScrollBar({
   // --- rAF ベース smooth scroll（WebKit ネイティブ smooth の連打暴走を回避） ---
   const scrollRafRef = useRef<number | null>(null);
   const scrollTargetRef = useRef<number | null>(null);
+  const scrollStartTimeRef = useRef<number>(0);
+  const scrollLastYRef = useRef<number>(0);
+  const scrollStallCountRef = useRef<number>(0);
 
   const cancelSmoothScroll = useCallback(() => {
     if (scrollRafRef.current != null) {
@@ -32,45 +35,74 @@ export function IndexScrollBar({
       scrollRafRef.current = null;
     }
     scrollTargetRef.current = null;
+    scrollStallCountRef.current = 0;
   }, []);
 
   /** rAF lerp スクロール: ターゲットを差し替えるだけで滑らかに追従する */
-  const rafSmoothScrollTo = useCallback((targetTop: number) => {
-    const maxScrollTop = Math.max(
-      0,
-      document.documentElement.scrollHeight - window.innerHeight,
-    );
-    scrollTargetRef.current = Math.min(maxScrollTop, Math.max(0, targetTop));
+  const rafSmoothScrollTo = useCallback(
+    (targetTop: number) => {
+      const maxScrollTop = Math.max(
+        0,
+        document.documentElement.scrollHeight - window.innerHeight,
+      );
+      scrollTargetRef.current = Math.min(maxScrollTop, Math.max(0, targetTop));
+      scrollStartTimeRef.current = performance.now();
+      scrollStallCountRef.current = 0;
+      scrollLastYRef.current = window.scrollY;
 
-    // 既にアニメーションループが動いていれば、ターゲット更新だけで十分
-    if (scrollRafRef.current != null) return;
+      // 既にアニメーションループが動いていれば、ターゲットとタイムスタンプの更新だけで十分
+      if (scrollRafRef.current != null) return;
 
-    const animate = () => {
-      const target = scrollTargetRef.current;
-      if (target == null) {
-        scrollRafRef.current = null;
-        return;
-      }
+      const animate = (now: number) => {
+        const target = scrollTargetRef.current;
+        if (target == null) {
+          scrollRafRef.current = null;
+          return;
+        }
 
-      const current = window.scrollY;
-      const diff = target - current;
+        // 時間上限（800ms）チェック: 到達できなくても時間上限で確実に終了
+        if (now - scrollStartTimeRef.current > 800) {
+          window.scrollTo({ top: target, behavior: "instant" });
+          cancelSmoothScroll();
+          return;
+        }
 
-      // 十分近づいたら即座にスナップして完了
-      if (Math.abs(diff) < 1) {
-        window.scrollTo({ top: target, behavior: "instant" });
-        scrollRafRef.current = null;
-        scrollTargetRef.current = null;
-        return;
-      }
+        const current = window.scrollY;
+        const diff = target - current;
 
-      // 毎フレーム残り距離の 18% ずつ進む（ease-out 減速カーブ）
-      const next = current + diff * 0.18;
-      window.scrollTo({ top: next, behavior: "instant" });
+        // 十分近づいたら即座にスナップして完了
+        if (Math.abs(diff) <= 1) {
+          window.scrollTo({ top: target, behavior: "instant" });
+          cancelSmoothScroll();
+          return;
+        }
+
+        // 進行停止（スタック）検知: 前フレームから位置が変わっていない場合
+        if (Math.abs(current - scrollLastYRef.current) < 0.5) {
+          scrollStallCountRef.current += 1;
+          if (scrollStallCountRef.current >= 3) {
+            // 3フレーム連続で進行しなければ即座に目標にスナップして終了
+            window.scrollTo({ top: target, behavior: "instant" });
+            cancelSmoothScroll();
+            return;
+          }
+        } else {
+          scrollStallCountRef.current = 0;
+        }
+        scrollLastYRef.current = current;
+
+        // 毎フレーム残り距離の 18% ずつ進む（最小ステップ 1px 保証で丸めスタック防止）
+        const step = Math.sign(diff) * Math.max(1, Math.abs(diff * 0.18));
+        const next = Math.abs(step) >= Math.abs(diff) ? target : current + step;
+
+        window.scrollTo({ top: next, behavior: "instant" });
+        scrollRafRef.current = requestAnimationFrame(animate);
+      };
+
       scrollRafRef.current = requestAnimationFrame(animate);
-    };
-
-    scrollRafRef.current = requestAnimationFrame(animate);
-  }, []);
+    },
+    [cancelSmoothScroll],
+  );
 
   // --- スクロール関数（タップ用: ネイティブ smooth / ドラッグ用: rAF lerp） ---
   const scrollToGroup = useCallback(
@@ -115,14 +147,14 @@ export function IndexScrollBar({
     [cancelSmoothScroll, rafSmoothScrollTo],
   );
 
-  const updateIndexFromCoords = useCallback(
-    (clientY: number, clientX: number) => {
+  const getKeyFromCoords = useCallback(
+    (clientY: number, clientX: number): string | null => {
       const rect =
         containerRectRef.current ??
         containerRef.current?.getBoundingClientRect();
-      if (!rect) return;
+      if (!rect) return null;
 
-      // バーの左右80px以内であればドラッグ追従
+      // バーの左右80px以内であれば有効
       if (clientX >= rect.left - 80 && clientX <= rect.right + 80) {
         const relativeY = Math.max(
           0,
@@ -133,23 +165,51 @@ export function IndexScrollBar({
           allKeys.length - 1,
           Math.floor(relativeY * allKeys.length),
         );
-        const groupKey = allKeys[index];
+        return allKeys[index] ?? null;
+      }
+      return null;
+    },
+    [availableGroups],
+  );
 
-        if (groupKey && groupKey !== lastGroupKeyRef.current) {
-          lastGroupKeyRef.current = groupKey;
-          // ドラッグ中は rAF lerp smooth scroll（ネイティブ smooth の暴走を回避）
-          if (groupKey === "BOTTOM") {
-            scrollToBottom(false);
-          } else {
-            scrollToGroup(groupKey as IndexGroupKey, false);
-          }
+  const updateIndexFromCoords = useCallback(
+    (clientY: number, clientX: number) => {
+      const groupKey = getKeyFromCoords(clientY, clientX);
+      if (groupKey && groupKey !== lastGroupKeyRef.current) {
+        lastGroupKeyRef.current = groupKey;
+        // ドラッグ中は rAF lerp smooth scroll（ネイティブ smooth の暴走を回避）
+        if (groupKey === "BOTTOM") {
+          scrollToBottom(false);
+        } else {
+          scrollToGroup(groupKey as IndexGroupKey, false);
         }
       }
     },
-    [availableGroups, scrollToBottom, scrollToGroup],
+    [getKeyFromCoords, scrollToBottom, scrollToGroup],
   );
 
+  // --- 外部ユーザー操作（ホイール、スワイプ等）によるアニメーションの自動中断 ---
+  useEffect(() => {
+    const handleUserInterrupt = () => {
+      if (!isDraggingRef.current && scrollRafRef.current != null) {
+        cancelSmoothScroll();
+      }
+    };
+
+    window.addEventListener("wheel", handleUserInterrupt, { passive: true });
+    window.addEventListener("touchmove", handleUserInterrupt, {
+      passive: true,
+    });
+    return () => {
+      window.removeEventListener("wheel", handleUserInterrupt);
+      window.removeEventListener("touchmove", handleUserInterrupt);
+    };
+  }, [cancelSmoothScroll]);
+
   // --- タッチ操作（iOS PWA / モバイル向け） ---
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const isTouchDraggingRef = useRef(false);
+
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -159,29 +219,51 @@ export function IndexScrollBar({
       const touch = e.touches[0];
       if (!touch) return;
 
-      setIsDragging(true);
-      isDraggingRef.current = true;
-      lastGroupKeyRef.current = null;
       containerRectRef.current = el.getBoundingClientRect();
-      updateIndexFromCoords(touch.clientY, touch.clientX);
+      touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+      isTouchDraggingRef.current = false;
+      lastGroupKeyRef.current = null;
+
+      // 触れた瞬間にどのキーか視覚フィードバック（ポップアップバブル表示）
+      const key = getKeyFromCoords(touch.clientY, touch.clientX);
+      if (key) {
+        setActiveBubble(key);
+      }
     };
 
     const onTouchMove = (e: TouchEvent) => {
-      if (!isDraggingRef.current) return;
-      // OS のスクロール横取りを完全に阻止（PWA standalone で必須）
-      if (e.cancelable) {
-        e.preventDefault();
-      }
       const touch = e.touches[0];
-      if (!touch) return;
-      updateIndexFromCoords(touch.clientY, touch.clientX);
+      if (!touch || !touchStartPosRef.current) return;
+
+      const deltaY = Math.abs(touch.clientY - touchStartPosRef.current.y);
+      const deltaX = Math.abs(touch.clientX - touchStartPosRef.current.x);
+
+      // 一定以上の移動（6px）でドラッグ追従を開始
+      if (!isTouchDraggingRef.current && (deltaY > 6 || deltaX > 6)) {
+        isTouchDraggingRef.current = true;
+        setIsDragging(true);
+        isDraggingRef.current = true;
+      }
+
+      if (isTouchDraggingRef.current) {
+        // OS のスクロール横取りを完全に阻止（PWA standalone で必須）
+        if (e.cancelable) {
+          e.preventDefault();
+        }
+        updateIndexFromCoords(touch.clientY, touch.clientX);
+      }
     };
 
     const onTouchEnd = () => {
-      if (!isDraggingRef.current) return;
-      setIsDragging(false);
-      isDraggingRef.current = false;
+      touchStartPosRef.current = null;
       containerRectRef.current = null;
+
+      if (isTouchDraggingRef.current) {
+        isTouchDraggingRef.current = false;
+        setIsDragging(false);
+        isDraggingRef.current = false;
+      }
+
       if (activeBubbleTimerRef.current) {
         clearTimeout(activeBubbleTimerRef.current);
       }
@@ -201,33 +283,56 @@ export function IndexScrollBar({
       el.removeEventListener("touchend", onTouchEnd);
       el.removeEventListener("touchcancel", onTouchEnd);
     };
-  }, [updateIndexFromCoords]);
+  }, [getKeyFromCoords, updateIndexFromCoords]);
 
   // --- マウス操作（PC Windows Chrome等） ---
+  const pointerStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const isPointerDraggingRef = useRef(false);
+
   const handlePointerDown = (e: React.PointerEvent) => {
     if (e.pointerType === "touch") return; // タッチは Native TouchEvent 側で処理
-    setIsDragging(true);
-    isDraggingRef.current = true;
-    lastGroupKeyRef.current = null;
     if (containerRef.current) {
       containerRectRef.current = containerRef.current.getBoundingClientRect();
     }
-    try {
-      (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-    } catch (_err) {
-      // ignore
+    pointerStartPosRef.current = { x: e.clientX, y: e.clientY };
+    isPointerDraggingRef.current = false;
+    lastGroupKeyRef.current = null;
+    const key = getKeyFromCoords(e.clientY, e.clientX);
+    if (key) {
+      setActiveBubble(key);
     }
-    updateIndexFromCoords(e.clientY, e.clientX);
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
     if (e.pointerType === "touch") return;
-    if (!isDraggingRef.current && e.buttons === 0) return;
-    updateIndexFromCoords(e.clientY, e.clientX);
+    if (!pointerStartPosRef.current && e.buttons === 0) return;
+
+    if (pointerStartPosRef.current) {
+      const deltaY = Math.abs(e.clientY - pointerStartPosRef.current.y);
+      const deltaX = Math.abs(e.clientX - pointerStartPosRef.current.x);
+      if (!isPointerDraggingRef.current && (deltaY > 4 || deltaX > 4)) {
+        isPointerDraggingRef.current = true;
+        setIsDragging(true);
+        isDraggingRef.current = true;
+        // ドラッグ操作確定時にのみポインタをキャプチャ（単体クリックの click イベント抑制を防止）
+        try {
+          (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+        } catch (_err) {
+          // ignore
+        }
+      }
+    }
+
+    if (isPointerDraggingRef.current || isDraggingRef.current) {
+      updateIndexFromCoords(e.clientY, e.clientX);
+    }
   };
 
   const handlePointerUp = (e?: React.PointerEvent) => {
     if (e?.pointerType === "touch") return;
+    const wasDragging = isPointerDraggingRef.current;
+    pointerStartPosRef.current = null;
+    isPointerDraggingRef.current = false;
     setIsDragging(false);
     isDraggingRef.current = false;
     containerRectRef.current = null;
@@ -236,6 +341,20 @@ export function IndexScrollBar({
         (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
       } catch (_err) {
         // ignore
+      }
+    }
+    // 単体クリック（移動なし）で、ボタン以外の余白で pointerup された場合のフォールバック
+    if (!wasDragging && e) {
+      const target = e.target as HTMLElement | null;
+      if (!target?.closest("button")) {
+        const key = getKeyFromCoords(e.clientY, e.clientX);
+        if (key) {
+          if (key === "BOTTOM") {
+            scrollToBottom();
+          } else {
+            scrollToGroup(key as IndexGroupKey);
+          }
+        }
       }
     }
     if (activeBubbleTimerRef.current) {
@@ -250,6 +369,8 @@ export function IndexScrollBar({
     const handleGlobalUp = (e: PointerEvent) => {
       if (e.pointerType === "touch") return;
       if (isDraggingRef.current) {
+        pointerStartPosRef.current = null;
+        isPointerDraggingRef.current = false;
         setIsDragging(false);
         isDraggingRef.current = false;
         containerRectRef.current = null;
