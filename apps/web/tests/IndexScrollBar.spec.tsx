@@ -283,19 +283,21 @@ describe("IndexScrollBar Component", () => {
     });
     expect(container.setPointerCapture).not.toHaveBeenCalled();
 
-    // 微小移動 (2px)
+    // 微小移動 (2px, 左ボタン押下中)
     fireEvent.pointerMove(container, {
       pointerType: "mouse",
       pointerId: 1,
+      buttons: 1,
       clientX: 320,
       clientY: 122,
     });
     expect(container.setPointerCapture).not.toHaveBeenCalled();
 
-    // 4px 超移動 -> ドラッグ確定
+    // 4px 超移動 -> ドラッグ確定 (左ボタン押下中)
     fireEvent.pointerMove(container, {
       pointerType: "mouse",
       pointerId: 1,
+      buttons: 1,
       clientX: 320,
       clientY: 130,
     });
@@ -303,6 +305,71 @@ describe("IndexScrollBar Component", () => {
 
     document.body.removeChild(dummyEl);
     vi.useRealTimers();
+  });
+
+  it("PCでマウスボタン未押下（e.buttons === 0）のホバー移動では、ドラッグやスクロールが開始されないこと", () => {
+    const dummyEl = document.createElement("div");
+    dummyEl.id = "index-group-た";
+    dummyEl.getBoundingClientRect = vi.fn(() => ({
+      top: 1000,
+      bottom: 1050,
+      left: 0,
+      right: 100,
+      width: 100,
+      height: 50,
+      x: 0,
+      y: 1000,
+      toJSON: () => {},
+    }));
+    document.body.appendChild(dummyEl);
+
+    render(<IndexScrollBar availableGroups={groups} />);
+
+    const container = document.querySelector(
+      "div[class*='fixed']",
+    ) as HTMLElement;
+    container.getBoundingClientRect = vi.fn(() => ({
+      top: 100,
+      bottom: 700,
+      left: 300,
+      right: 340,
+      width: 40,
+      height: 600,
+      x: 300,
+      y: 100,
+      toJSON: () => {},
+    }));
+
+    container.setPointerCapture = vi.fn();
+
+    // 1. pointerdown で開始
+    fireEvent.pointerDown(container, {
+      pointerType: "mouse",
+      pointerId: 1,
+      clientX: 320,
+      clientY: 120,
+    });
+
+    // 2. バー外でボタンを離した想定で window pointerup を発火
+    fireEvent.pointerUp(window, {
+      pointerType: "mouse",
+      pointerId: 1,
+    });
+
+    // 3. マウスボタンを押さずに（buttons: 0）バー上をホバー移動
+    fireEvent.pointerMove(container, {
+      pointerType: "mouse",
+      pointerId: 1,
+      buttons: 0,
+      clientX: 320,
+      clientY: 200,
+    });
+
+    // ドラッグやキャプチャ、スクロールが一切開始されないこと
+    expect(container.setPointerCapture).not.toHaveBeenCalled();
+    expect(window.scrollTo).not.toHaveBeenCalled();
+
+    document.body.removeChild(dummyEl);
   });
 
   it("タッチ移動（ドラッグ）が一定閾値（6px）を超えた場合にドラッグ追従スクロールが開始されること", () => {

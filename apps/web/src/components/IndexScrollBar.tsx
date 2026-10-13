@@ -305,7 +305,12 @@ export function IndexScrollBar({
 
   const handlePointerMove = (e: React.PointerEvent) => {
     if (e.pointerType === "touch") return;
-    if (!pointerStartPosRef.current && e.buttons === 0) return;
+    if (e.buttons === 0) {
+      // ボタン未押下: 残留した開始位置を破棄してホバー移動を無視
+      pointerStartPosRef.current = null;
+      isPointerDraggingRef.current = false;
+      return;
+    }
 
     if (pointerStartPosRef.current) {
       const deltaY = Math.abs(e.clientY - pointerStartPosRef.current.y);
@@ -368,9 +373,9 @@ export function IndexScrollBar({
   useEffect(() => {
     const handleGlobalUp = (e: PointerEvent) => {
       if (e.pointerType === "touch") return;
+      pointerStartPosRef.current = null;
+      isPointerDraggingRef.current = false;
       if (isDraggingRef.current) {
-        pointerStartPosRef.current = null;
-        isPointerDraggingRef.current = false;
         setIsDragging(false);
         isDraggingRef.current = false;
         containerRectRef.current = null;
