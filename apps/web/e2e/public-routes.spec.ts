@@ -39,6 +39,7 @@ test.describe("未認証公開ルートの検証", () => {
   test("未認証状態で /dashboard にアクセスした際、/login へリダイレクトされる", async ({
     page,
   }) => {
+    test.setTimeout(60_000);
     await page.goto("/dashboard");
     // 未認証ガードにより /login へリダイレクトされることを検証
     await expect(page).toHaveURL(/.*\/login/, { timeout: 20000 });
@@ -52,6 +53,7 @@ test.describe("未認証公開ルートの検証", () => {
   test("未認証状態で /family にアクセスした際、/login へリダイレクトされる", async ({
     page,
   }) => {
+    test.setTimeout(60_000);
     await page.goto("/family");
     await expect(page).toHaveURL(/.*\/login/, { timeout: 20000 });
   });

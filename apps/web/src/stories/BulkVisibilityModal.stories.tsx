@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
-import { fn } from "@storybook/test";
+import { fn, screen, userEvent } from "@storybook/test";
 import { BulkVisibilityModal } from "../components/records/BulkVisibilityModal";
 
 const meta: Meta<typeof BulkVisibilityModal> = {
@@ -51,5 +51,9 @@ export const WithExcludedRecordsAlert: Story = {
       { id: "rec-1", title: "家族共有WiFiパスワード (編集権限なし)" },
       { id: "rec-2", title: "Netflix家族アカウント (閲覧専用)" },
     ],
+  },
+  play: async () => {
+    const unshareOption = await screen.findByTestId("select-unshare-option");
+    await userEvent.click(unshareOption);
   },
 };

@@ -1,10 +1,29 @@
 import type { Meta, StoryObj } from "@storybook/tanstack-react";
 import { fn } from "@storybook/test";
+import type { ComponentProps } from "react";
+import { useState } from "react";
 import { TagInput } from "../components/ui/tag-input";
+
+type TagInputProps = ComponentProps<typeof TagInput>;
+
+function TagInputInteractive(props: TagInputProps) {
+  const [tags, setTags] = useState<string[]>(props.value ?? []);
+  return (
+    <TagInput
+      {...props}
+      value={tags}
+      onChange={(newTags) => {
+        setTags(newTags);
+        props.onChange?.(newTags);
+      }}
+    />
+  );
+}
 
 const meta: Meta<typeof TagInput> = {
   title: "UI/TagInput",
   component: TagInput,
+  render: (args) => <TagInputInteractive {...args} />,
   tags: ["autodocs"],
   args: {
     onChange: fn(),
