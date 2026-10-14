@@ -6,6 +6,8 @@
     "./schemas": "./src/schemas/index.ts",
     "./utils/index-group": "./src/utils/index-group.ts",
     "./utils/url-safety": "./src/utils/url-safety.ts",
+    "./utils/url-matcher": "./src/utils/url-matcher.ts",
+    "./schemas/extension-messages": "./src/schemas/extension-messages.ts",
     "./constants/contacts": "./src/constants/contacts.ts",
     "./emails": "./src/emails/dispatch.ts",
     "./emails/registry": "./src/emails/registry.ts",
@@ -24,6 +26,7 @@
     "ipaddr.js": "^2.5.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "tldts": "^7.4.18",
     "zod": "^4.6.5"
   },
   "devDependencies": {

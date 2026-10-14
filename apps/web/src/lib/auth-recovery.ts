@@ -1,12 +1,12 @@
-import { signInWithCustomToken } from "firebase/auth";
-import type { RecordFormValues } from "@/hooks/useRecordForm";
 import {
   decrypt,
   encrypt,
   generateDEK,
   unwrapDEK,
   wrapDEK,
-} from "@/lib/crypto";
+} from "@poohma/crypto";
+import { signInWithCustomToken } from "firebase/auth";
+import type { RecordFormValues } from "@/hooks/useRecordForm";
 import { getCustomTokenFromSession } from "@/services/auth.functions";
 import { auth } from "@/utils/firebase";
 

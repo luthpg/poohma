@@ -1,4 +1,16 @@
 import { api } from "@poohma/backend/api";
+import {
+  decrypt,
+  deriveKeyFromPasscode,
+  encrypt,
+  generateDEK,
+  type KdfVersion,
+  LEGACY_KDF_VERSION,
+  LEGACY_PBKDF2_ITERATIONS,
+  unwrapDEK,
+  unwrapMasterKey,
+  wrapDEK,
+} from "@poohma/crypto";
 import { Link, useRouteContext } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { Eye, EyeOff, Fingerprint, RotateCcw } from "lucide-react";
@@ -35,18 +47,6 @@ import {
   isBiometricSupported,
   registerBiometricUnlock,
 } from "@/lib/biometric";
-import {
-  decrypt,
-  deriveKeyFromPasscode,
-  encrypt,
-  generateDEK,
-  type KdfVersion,
-  LEGACY_KDF_VERSION,
-  LEGACY_PBKDF2_ITERATIONS,
-  unwrapDEK,
-  unwrapMasterKey,
-  wrapDEK,
-} from "@/lib/crypto";
 import { getClientRequestContext } from "@/services/security.functions";
 
 interface PasscodeContextType {

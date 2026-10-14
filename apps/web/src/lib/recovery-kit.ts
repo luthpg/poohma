@@ -5,9 +5,9 @@ import {
   rgb,
   StandardFonts,
 } from "@cantoo/pdf-lib";
+import { isValidRecoveryCode, normalizeRecoveryCode } from "@poohma/crypto";
 import jsQR from "jsqr";
 import QRCode from "qrcode";
-import { isValidRecoveryCode, normalizeRecoveryCode } from "./crypto";
 
 export interface RecoveryKitPdfParams {
   familyName: string;

@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import {
   CURRENT_KDF_ITERATIONS,
   CURRENT_KDF_VERSION,
@@ -20,7 +19,8 @@ import {
   wrapDEK,
   wrapMasterKey,
   wrapMasterKeyWithRecovery,
-} from "@/lib/crypto";
+} from "@poohma/crypto";
+import { describe, expect, it } from "vitest";
 
 describe("1.1 暗号化コアロジックの単体テスト (src/lib/crypto.ts)", () => {
   // テスト共通のダミーデータ定義

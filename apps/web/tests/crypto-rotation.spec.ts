@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import {
   decrypt,
   deriveKeyFromPasscode,
@@ -7,7 +6,8 @@ import {
   generateDEK,
   unwrapDEK,
   wrapDEK,
-} from "../src/lib/crypto";
+} from "@poohma/crypto";
+import { describe, expect, it } from "vitest";
 
 describe("Family Passcode Rotation - Envelope Re-wrapping Integration", () => {
   it("旧パスコードでラップされたDEKが、新しいパスコードのマスターキーで正しく再ラップされ、データが復号可能な状態を維持できること", async () => {

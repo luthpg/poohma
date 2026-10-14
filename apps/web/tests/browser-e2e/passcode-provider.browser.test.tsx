@@ -1,3 +1,8 @@
+import {
+  deriveKeyFromPasscode,
+  generateMasterKey,
+  wrapMasterKey,
+} from "@poohma/crypto";
 import { useRouteContext } from "@tanstack/react-router";
 import {
   cleanup,
@@ -16,11 +21,6 @@ import {
   vi,
 } from "vitest";
 import { PasscodeProvider, usePasscode } from "@/components/PasscodeProvider";
-import {
-  deriveKeyFromPasscode,
-  generateMasterKey,
-  wrapMasterKey,
-} from "@/lib/crypto";
 
 vi.mock("@tanstack/react-router", () => ({
   useRouteContext: vi.fn(),

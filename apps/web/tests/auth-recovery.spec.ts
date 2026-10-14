@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+
+import { generateMasterKey } from "@poohma/crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearRecordDraft,
@@ -9,7 +11,6 @@ import {
   loadRecordDraft,
   saveRecordDraft,
 } from "@/lib/auth-recovery";
-import { generateMasterKey } from "@/lib/crypto";
 
 describe("auth-recovery", () => {
   const store: Record<string, string> = {};

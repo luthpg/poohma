@@ -10,6 +10,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import "react";
+import * as cryptoLib from "@poohma/crypto";
 import { toast } from "sonner";
 import {
   afterEach,
@@ -22,7 +23,6 @@ import {
 } from "vitest";
 import { PasscodeProvider, usePasscode } from "@/components/PasscodeProvider";
 import * as biometricLib from "@/lib/biometric";
-import * as cryptoLib from "@/lib/crypto";
 
 vi.mock("@tanstack/react-router", () => ({
   useRouteContext: vi.fn(),
@@ -60,8 +60,8 @@ vi.mock("@/lib/biometric", async (importOriginal) => {
   };
 });
 
-vi.mock("@/lib/crypto", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/crypto")>();
+vi.mock("@poohma/crypto", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@poohma/crypto")>();
   return {
     ...actual,
     deriveKeyFromPasscode: vi.fn(),

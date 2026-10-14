@@ -176,7 +176,7 @@ flowchart TD
 | DB スキーマ・インデックス | `packages/backend/convex/schema.ts` |
 | Convex 認証・認可基盤 | `packages/backend/convex/customBuilders.ts` |
 | レコード単位アクセス制御 (RLS) | `packages/backend/convex/rls.ts` |
-| E2EE 暗号化・鍵導出アルゴリズム | `apps/web/src/lib/crypto.ts` |
+| E2EE 暗号化・鍵導出アルゴリズム | `packages/crypto/src/index.ts` |
 | 脅威モデル・セキュリティ境界 | `.docs/security/threat-model.md` |
 | 人間向け正規仕様・詳細設計 | `.docs/requirements.md`, `.docs/code-design.md` |
 
@@ -192,7 +192,7 @@ flowchart TD
   - `packages/backend/convex/rls.ts`, `packages/backend/convex/customBuilders.ts`, `packages/backend/convex/records.ts`
   - `.docs/security/threat-model.md` の脅威シナリオ（T6, T8）との整合性確認
 - **E2EE / 暗号パラメータ変更時**:
-  - `apps/web/src/lib/crypto.ts`（`KDF_VERSIONS` への追記、既存パラメータの不変性維持）
+  - `packages/crypto/src/index.ts`（`KDF_VERSIONS` への追記、既存パラメータの不変性維持）
   - リカバリーキット（`recovery-kit.ts`, `recovery.ts`）への波及確認
 - **認証・セッション変更時**:
   - `apps/web/src/services/auth.functions.ts`, `firebase-admin.server.ts`, `useConvexFirebaseAuth.ts`, `AccountProvider.tsx`

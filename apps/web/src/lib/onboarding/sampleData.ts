@@ -1,4 +1,4 @@
-import { encrypt, generateDEK, wrapDEK } from "@/lib/crypto";
+import { encrypt, generateDEK, wrapDEK } from "@poohma/crypto";
 import type {
   EncryptedSampleRecordInput,
   SampleRecordDefinition,

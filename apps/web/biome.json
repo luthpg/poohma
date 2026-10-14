@@ -11,18 +11,14 @@
     "ignoreUnknown": false,
     "includes": [
       "**/src/**/*",
-      "convex/**/*",
       ".storybook/**/*",
       "*.config.*",
       ".*",
       "tests/**/*",
       "e2e/**/*",
       "scripts/**/*",
-      "**/.vscode/**/*",
-      "**/index.html",
       "**/vite.config.ts",
       "!**/src/routeTree.gen.ts",
-      "!**/src/styles.css",
       "!**/coverage/**/*"
     ]
   },
