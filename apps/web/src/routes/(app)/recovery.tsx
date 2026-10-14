@@ -1,4 +1,15 @@
 import { api } from "@poohma/backend/api";
+import {
+  CURRENT_KDF_ITERATIONS,
+  CURRENT_KDF_VERSION,
+  deriveKeyFromPasscode,
+  deriveKeyFromRecoveryCode,
+  generateSalt,
+  isValidRecoveryCode,
+  normalizeRecoveryCode,
+  unwrapMasterKeyWithRecovery,
+  wrapMasterKey,
+} from "@poohma/crypto";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import {
@@ -24,17 +35,6 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { MIN_PASSCODE_LENGTH } from "@/constants/passcode";
 import { useAccount } from "@/hooks/useAccount";
-import {
-  CURRENT_KDF_ITERATIONS,
-  CURRENT_KDF_VERSION,
-  deriveKeyFromPasscode,
-  deriveKeyFromRecoveryCode,
-  generateSalt,
-  isValidRecoveryCode,
-  normalizeRecoveryCode,
-  unwrapMasterKeyWithRecovery,
-  wrapMasterKey,
-} from "@/lib/crypto";
 import { extractRecoveryCodeFromFile } from "@/lib/recovery-kit";
 
 const PasscodeStrengthMeter = lazy(() =>

@@ -1,5 +1,5 @@
+import { generateRecoveryCode } from "@poohma/crypto";
 import { describe, expect, it } from "vitest";
-import { generateRecoveryCode } from "@/lib/crypto";
 import {
   extractRecoveryCodeFromFile,
   generateRecoveryKitPdf,

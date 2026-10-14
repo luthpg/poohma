@@ -1,5 +1,13 @@
 import { api } from "@poohma/backend/api";
 import type { Id } from "@poohma/backend/dataModel";
+import {
+  CURRENT_KDF_ITERATIONS,
+  CURRENT_KDF_VERSION,
+  deriveKeyFromPasscode,
+  generateSalt,
+  unwrapMasterKey,
+  wrapMasterKey,
+} from "@poohma/crypto";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
@@ -14,14 +22,6 @@ import {
   isBiometricEnabledForUser,
   updateBiometricPasscode,
 } from "@/lib/biometric";
-import {
-  CURRENT_KDF_ITERATIONS,
-  CURRENT_KDF_VERSION,
-  deriveKeyFromPasscode,
-  generateSalt,
-  unwrapMasterKey,
-  wrapMasterKey,
-} from "@/lib/crypto";
 import { auth } from "@/utils/firebase";
 
 const PasscodeStrengthMeter = lazy(() =>

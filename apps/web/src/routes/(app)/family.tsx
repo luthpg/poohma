@@ -1,6 +1,19 @@
 import { api } from "@poohma/backend/api";
 import type { Id } from "@poohma/backend/dataModel";
 import {
+  CURRENT_KDF_ITERATIONS,
+  CURRENT_KDF_VERSION,
+  deriveKeyFromPasscode,
+  generateMasterKey,
+  generateSalt,
+  type KdfVersion,
+  LEGACY_KDF_VERSION,
+  LEGACY_PBKDF2_ITERATIONS,
+  reEncryptCredentials,
+  unwrapMasterKey,
+  wrapMasterKey,
+} from "@poohma/crypto";
+import {
   createFileRoute,
   Link,
   useNavigate,
@@ -55,19 +68,6 @@ import { useAccount } from "@/hooks/useAccount";
 import { LOGOUT_FLAG_KEY } from "@/hooks/useConvexFirebaseAuth";
 import { useExportCsv } from "@/hooks/useExportCsv";
 import { clearQueryCache } from "@/hooks/usePersistentQuery";
-import {
-  CURRENT_KDF_ITERATIONS,
-  CURRENT_KDF_VERSION,
-  deriveKeyFromPasscode,
-  generateMasterKey,
-  generateSalt,
-  type KdfVersion,
-  LEGACY_KDF_VERSION,
-  LEGACY_PBKDF2_ITERATIONS,
-  reEncryptCredentials,
-  unwrapMasterKey,
-  wrapMasterKey,
-} from "@/lib/crypto";
 import { familyCreatedSteps } from "@/lib/onboarding/tours";
 import { logout } from "@/services/auth.functions";
 import { auth } from "@/utils/firebase";

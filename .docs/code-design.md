@@ -17,7 +17,8 @@ PoohMaは、フロントエンドとサーバーサイド処理を単一のTanSt
 - `apps/web`: フロントエンド & SSR（TanStack Start, Vite）およびブラウザ E2E テスト（Playwright）
 - `apps/admin`: 管理者コンソール（TanStack Start, Cloudflare Workers / Vite Plugin, cmdk, Geist Fonts）
 - `packages/backend`: Convex バックエンド（Schema, Functions, RLS, customBuilders, admin API, 結合テスト、Preview 環境プロビジョニング、シードエクスポート）
-- `packages/shared`: 共通モジュール（Zod スキーマ, React Email テンプレート, ユーティリティ）
+- `packages/crypto`: 暗号化コアモジュール（`@poohma/crypto`: Web Crypto API, マスターキー/DEKエンベロープ暗号化, 鍵導出, extractable制御）
+- `packages/shared`: 共通モジュール（`@poohma/shared`: Zod スキーマ, React Email テンプレート, URLドメイン照合, 拡張機能メッセージプロトコル, ユーティリティ）
 - `packages/knowledge-tools`: 知見運用・AI 開発基盤ツール
 - `workers/backup`: Cloudflare Workers バックアップワーカー
 
@@ -111,7 +112,7 @@ poohma/                    … プロジェクトルート（Turborepo / pnpm wo
 │   │   │   ├── components/ … 共通UIコンポーネント (AppHeader, PasscodeProvider 等)
 │   │   │   ├── env/        … クライアント/サーバー環境変数スキーマ (t3-env)
 │   │   │   ├── hooks/      … usePersistentQuery, useConvexFirebaseAuth, use-export-csv 等
-│   │   │   ├── lib/        … crypto.ts (E2EE), biometric.ts (WebAuthn), cms.server.ts
+│   │   │   ├── lib/        … biometric.ts (WebAuthn), cms.server.ts, recovery-kit.ts 等
 │   │   │   ├── routes/
 │   │   │   │   ├── (app)/  … 認証必須ルート群 (dashboard, records, family, settings)
 │   │   │   │   ├── (public)/ … 公開ルート群 (LP, usage, faq, login, 規約等)
@@ -135,8 +136,13 @@ poohma/                    … プロジェクトルート（Turborepo / pnpm wo
 │   │   │   ├── rls.ts     … レコード単位アクセス制御
 │   │   │   └── actions.ts … 外部連携アクション
 │   │   └── tests/         … バックエンド結合テスト (convex-test)
-│   ├── shared/            … @poohma/shared（共通バリデーションスキーマ、メール定義、ユーティリティ）
-│   │   └── emails/        … メールテンプレート定義・配信レジストリ (React Email / Resend)
+│   ├── crypto/            … @poohma/crypto（E2EE暗号処理コア: Web Crypto API, エンベロープ暗号化, 鍵導出, extractable制御）
+│   │   ├── src/           … 暗号化/復号、マスターキー/DEKラップ、ソルト生成、KDF
+│   │   └── tests/         … 暗号コア単体テスト (Vitest)
+│   ├── shared/            … @poohma/shared（共通バリデーションスキーマ、URLドメイン照合、拡張機能メッセージ定義、メール定義、ユーティリティ）
+│   │   ├── emails/        … メールテンプレート定義・配信レジストリ (React Email / Resend)
+│   │   ├── src/schemas/   … 拡張機能メッセージ (extension-messages.ts) 等の型安全スキーマ
+│   │   └── src/utils/     … url-matcher.ts (Public Suffix List準拠ドメイン判定) 等
 │   └── knowledge-tools/   … @poohma/knowledge-tools（知見運用・Doc-Sync検証）
 ├── workers/
 │   └── backup/            … @poohma/backup（定期自動バックアップ用Cloudflare Worker）
@@ -327,6 +333,11 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 #### credentials
 
 認証情報の正式な保存先。`recordId` で `serviceRecords` を参照し、1レコードあたり最大10件の上限は作成・更新Mutationで検証する。
+
+`createCredential` / `updateCredential` Mutation では以下の整合性と安全性を保証する：
+- **楽観的ロック（`expectedRevision`）**: 呼び出し時に親 `serviceRecords` の `revision` と `expectedRevision` を突合し、不一致時は `Optimistic lock conflict` 例外を送出。更新成功時は親レコードの `revision` を +1 インクリメントして同時編集の競合を防ぐ（Issue #270）。
+- **ヒント暗号化4フィールドの不可分整合性検証**: 暗号化パスワードヒントを登録・更新する際、エンベロープ暗号化の4要素（`passwordHint`, `passwordHintIv`, `passwordHintDekEncrypted`, `passwordHintDekIv`）が「すべて指定されている」または「すべて未指定である」ことを検証し、不整合なリクエスト（IV欠落やDEK欠落等）を拒否する。
+- **安全な部分更新（Partial Patch）**: `updateCredential` において平文フィールド（label, loginId 等）のみを更新する場合でも、既存の暗号化ヒント4フィールドを保持し、誤って消去される事故を防止する。
 
 | フィールド | 型 | 説明 |
 | ------------------------ | ---------------------- | ----------------------------------------- |
@@ -715,13 +726,15 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 
 備考：エンベロープ暗号化は全レコードで必須であり、暗号化（encryptHint）・復号（decryptHint）・家族移行時の再ラップ（reWrapCredential）のいずれにおいても DEK を必須とする（マスターキー直接暗号化・復号へのフォールバックは行わない）。
 
-### 6.2 実装関数（src/lib/crypto.ts, src/utils/passcode-strength.ts）
+### 6.2 実装関数（@poohma/crypto: packages/crypto/src/index.ts, apps/web/src/utils/passcode-strength.ts）
+
+暗号化コア処理は `@poohma/crypto` パッケージに集約され、Web フロントエンド（`apps/web`）および Chrome 拡張機能（`apps/extension`）で共通利用される。
 
 | 関数 / コンポーネント                               | 役割                                                                                  |
 | ------------------------------------------- | ----------------------------------------------------------------------------------- |
 | deriveKeyFromPasscode(passcode, salt)       | PBKDF2でパスコード導出鍵を生成                                                                    |
 | generateMasterKey() / generateDEK()         | AES-GCM鍵の新規生成                                                                         |
-| wrapMasterKey / unwrapMasterKey             | マスターキーのラップ／アンラップ                                                                    |
+| wrapMasterKey / unwrapMasterKey             | マスターキーのラップ／アンラップ。`unwrapMasterKey` は第4引数 `extractable?: boolean`（デフォルト true、拡張機能の非展開保護時は false）をサポート |
 | wrapDEK / unwrapDEK                         | DEKのラップ／アンラップ（マスターキーで）                                                                |
 | reWrapCredential / reEncryptCredentials     | 移行時のDEK再暗号化（旧マスターキーでアンラップし、新マスターキーで再ラップ）                                            |
 | encrypt / decrypt                           | AES-GCMによる汎用の暗号化／復号（IV自動生成）                                                           |

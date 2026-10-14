@@ -1,5 +1,5 @@
+import { decrypt, generateMasterKey, unwrapDEK } from "@poohma/crypto";
 import { describe, expect, it } from "vitest";
-import { decrypt, generateMasterKey, unwrapDEK } from "@/lib/crypto";
 import {
   encryptSampleRecords,
   SAMPLE_RECORDS,

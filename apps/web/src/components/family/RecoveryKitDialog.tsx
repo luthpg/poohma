@@ -1,4 +1,13 @@
 import { api } from "@poohma/backend/api";
+import {
+  deriveKeyFromRecoveryCode,
+  generateRecoveryCode,
+  generateSalt,
+  hashRecoveryCode,
+  RECOVERY_KDF_ITERATIONS,
+  RECOVERY_KDF_VERSION,
+  wrapMasterKeyWithRecovery,
+} from "@poohma/crypto";
 import { useMutation } from "convex/react";
 import {
   AlertTriangle,
@@ -37,15 +46,6 @@ import {
   getGoogleDriveAccessToken,
   hasCachedDriveAccessToken,
 } from "@/utils/firebase";
-import {
-  deriveKeyFromRecoveryCode,
-  generateRecoveryCode,
-  generateSalt,
-  hashRecoveryCode,
-  RECOVERY_KDF_ITERATIONS,
-  RECOVERY_KDF_VERSION,
-  wrapMasterKeyWithRecovery,
-} from "../../lib/crypto";
 import {
   createGoogleDriveFolder,
   loadGooglePickerScript,

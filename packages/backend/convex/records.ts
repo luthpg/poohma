@@ -842,7 +842,7 @@ export const updateRecord = familyBoundMutation({
 // === クレデンシャル単位の個別CRUD ===
 
 /**
- * テスト用
+ * レコードへの単一クレデンシャル追加
  */
 export const createCredential = familyBoundMutation({
   args: {
@@ -854,11 +854,32 @@ export const createCredential = familyBoundMutation({
     passwordHintDekEncrypted: v.optional(v.string()),
     passwordHintDekIv: v.optional(v.string()),
     order: v.optional(v.number()),
+    expectedRevision: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const record = await ctx.db.get(args.recordId);
     if (!record) throw new Error("Record not found");
     requireAdminAccess(ctx.user, record);
+
+    if (
+      args.expectedRevision !== undefined &&
+      record.revision !== args.expectedRevision
+    ) {
+      throw new Error("ConflictError: Record revision mismatch");
+    }
+
+    const hintFields = [
+      args.passwordHint,
+      args.passwordHintIv,
+      args.passwordHintDekEncrypted,
+      args.passwordHintDekIv,
+    ];
+    const hintProvidedCount = hintFields.filter((f) => f !== undefined).length;
+    if (hintProvidedCount > 0 && hintProvidedCount < 4) {
+      throw new Error(
+        "InvalidCredentialError: All 4 password hint fields must be provided together",
+      );
+    }
 
     const existingCreds = await ctx.db
       .query("credentials")
@@ -917,7 +938,7 @@ export const createCredential = familyBoundMutation({
 });
 
 /**
- * テスト用
+ * 単一クレデンシャルの部分更新
  */
 export const updateCredential = familyBoundMutation({
   args: {
@@ -929,6 +950,7 @@ export const updateCredential = familyBoundMutation({
     passwordHintDekEncrypted: v.optional(v.string()),
     passwordHintDekIv: v.optional(v.string()),
     order: v.optional(v.number()),
+    expectedRevision: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const cred = await ctx.db.get(args.id);
@@ -938,17 +960,41 @@ export const updateCredential = familyBoundMutation({
     if (!record) throw new Error("Record not found");
     requireAdminAccess(ctx.user, record);
 
+    if (
+      args.expectedRevision !== undefined &&
+      record.revision !== args.expectedRevision
+    ) {
+      throw new Error("ConflictError: Record revision mismatch");
+    }
+
+    const hintFields = [
+      args.passwordHint,
+      args.passwordHintIv,
+      args.passwordHintDekEncrypted,
+      args.passwordHintDekIv,
+    ];
+    const hintProvidedCount = hintFields.filter((f) => f !== undefined).length;
+    if (hintProvidedCount > 0 && hintProvidedCount < 4) {
+      throw new Error(
+        "InvalidCredentialError: All 4 password hint fields must be provided together",
+      );
+    }
+
     const now = Date.now();
-    await ctx.db.patch(args.id, {
-      label: args.label,
-      loginId: args.loginId,
-      passwordHint: args.passwordHint,
-      passwordHintIv: args.passwordHintIv,
-      passwordHintDekEncrypted: args.passwordHintDekEncrypted,
-      passwordHintDekIv: args.passwordHintDekIv,
-      order: args.order !== undefined ? args.order : cred.order,
+    const patch: Partial<Doc<"credentials">> = {
       updatedAt: now,
-    });
+    };
+    if (args.label !== undefined) patch.label = args.label;
+    if (args.loginId !== undefined) patch.loginId = args.loginId;
+    if (hintProvidedCount === 4) {
+      patch.passwordHint = args.passwordHint;
+      patch.passwordHintIv = args.passwordHintIv;
+      patch.passwordHintDekEncrypted = args.passwordHintDekEncrypted;
+      patch.passwordHintDekIv = args.passwordHintDekIv;
+    }
+    if (args.order !== undefined) patch.order = args.order;
+
+    await ctx.db.patch(args.id, patch);
 
     await ctx.db.patch(record._id, {
       revision: record.revision + 1,

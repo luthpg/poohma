@@ -14,7 +14,7 @@ E2EE 暗号化および WebAuthn 実装における落とし穴と回避法で�
 ### CryptoKey の `extractable` と `keyUsages` の不整合
 
 - **問題**: `generateDEK()` や `unwrapMasterKey()` で `extractable: false` に設定すると、後の再ラップ（`wrapKey`）や家族移行処理でエクスポートできずランタイムエラーになる。また DEK の usages に不要な `wrapKey` を含めると暗号化仕様の整合性を欠く。
-- **回避法**: `apps/web/src/lib/crypto.ts` の既存関数（`generateDEK`, `wrapMasterKey`, `unwrapDEK`）のパラメータ設計を厳守し、独自に `crypto.subtle.generateKey` を呼ばない。
+- **回避法**: `packages/crypto/src/index.ts` の既存関数（`generateDEK`, `wrapMasterKey`, `unwrapDEK`, `unwrapMasterKey`）のパラメータ設計を厳守し、独自に `crypto.subtle.generateKey` を呼ばない（※ `unwrapMasterKey` の `extractable` はデフォルト `true` であり、再ラップ不要な拡張機能の揮発メモリ等でのみ `false` を指定可能）。
 
 ---
 

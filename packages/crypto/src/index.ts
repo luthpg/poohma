@@ -170,11 +170,13 @@ export async function wrapMasterKey(
 
 /**
  * ラップされたマスターキーを復号
+ * @param extractable マスターキーをエクスポート可能にするか。Web版（再ラップ・ローテーション等）はtrue、拡張機能（揮発メモリ保持のみ）はfalse推奨。
  */
 export async function unwrapMasterKey(
   encryptedBase64: string,
   ivBase64: string,
   unwrappingKey: CryptoKey,
+  extractable = true,
 ): Promise<CryptoKey> {
   const wrapped = base64ToBuffer(encryptedBase64);
   const iv = base64ToBuffer(ivBase64);
@@ -185,7 +187,7 @@ export async function unwrapMasterKey(
     unwrappingKey,
     { name: ALGORITHM, iv },
     { name: ALGORITHM, length: KEY_LENGTH },
-    true, // エクスポート可能 (再ラップ・ローテーション等のため)
+    extractable,
     ["encrypt", "decrypt", "wrapKey", "unwrapKey"],
   );
 }

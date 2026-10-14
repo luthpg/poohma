@@ -1,5 +1,5 @@
+import { bufferToBase64 } from "@poohma/crypto";
 import { del, get, set } from "idb-keyval";
-import { bufferToBase64 } from "@/lib/crypto";
 
 // ユーザーIDに基づいてIndexedDBのキーを一意に決定する
 const getBiometricKey = (userId: string) => `poohma_biometric_${userId}`;

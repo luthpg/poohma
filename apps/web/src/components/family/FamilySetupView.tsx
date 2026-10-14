@@ -1,5 +1,13 @@
 import { api } from "@poohma/backend/api";
 import type { Id } from "@poohma/backend/dataModel";
+import {
+  CURRENT_KDF_ITERATIONS,
+  CURRENT_KDF_VERSION,
+  deriveKeyFromPasscode,
+  generateMasterKey,
+  generateSalt,
+  wrapMasterKey,
+} from "@poohma/crypto";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery_experimental } from "convex/react";
@@ -9,14 +17,6 @@ import { toast } from "sonner";
 import { AccountSwitcher } from "@/components/AccountSwitcher";
 import { Spinner } from "@/components/ui/spinner";
 import { MIN_PASSCODE_LENGTH } from "@/constants/passcode";
-import {
-  CURRENT_KDF_ITERATIONS,
-  CURRENT_KDF_VERSION,
-  deriveKeyFromPasscode,
-  generateMasterKey,
-  generateSalt,
-  wrapMasterKey,
-} from "@/lib/crypto";
 
 const PasscodeStrengthMeter = lazy(() =>
   import("@/components/PasscodeStrengthMeter").then((m) => ({

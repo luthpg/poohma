@@ -55,7 +55,7 @@ requireAdminAccess(ctx.user, record);
 
 ---
 
-## 3. E2EE エンベロープ暗号化・再暗号化パターン (`apps/web/src/lib/crypto.ts`)
+## 3. E2EE エンベロープ暗号化・再暗号化パターン (`packages/crypto/src/index.ts`)
 
 ### 新規暗号化
 
