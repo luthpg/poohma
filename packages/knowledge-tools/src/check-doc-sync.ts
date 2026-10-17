@@ -32,7 +32,7 @@ const RULES: Rule[] = [
   {
     name: "暗号化・鍵階層・E2EE",
     pattern:
-      /^(packages\/crypto\/.*|apps\/web\/src\/(lib\/crypto|features\/e2ee)\/.*|apps\/web\/src\/components\/Passcode.*)$/,
+      /^(packages\/crypto\/src\/.*|apps\/web\/src\/(lib\/crypto|features\/e2ee)\/.*|apps\/web\/src\/components\/Passcode.*)$/,
     level: "REQUIRED",
     docs: [
       ".docs/code-design.md",

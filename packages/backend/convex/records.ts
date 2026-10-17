@@ -2078,6 +2078,10 @@ export const bulkUpdateRecords = familyBoundMutation({
           }
         }
 
+        if (args.data.tags.every((tag) => record.tags.includes(tag))) {
+          continue;
+        }
+
         const newTags = Array.from(
           new Set([...record.tags, ...args.data.tags]),
         );

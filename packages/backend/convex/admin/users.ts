@@ -15,7 +15,7 @@ export const getUsersList = systemAdminQuery({
     const limit = Math.min(Math.max(args.limit ?? 50, 1), 200);
     const search = args.search?.trim();
 
-    let sliced: Doc<"users">[];
+    let sliced: Doc<"users">[] | null = null;
 
     if (search && search.length > 0) {
       // メール完全一致の場合は by_email インデックスで高速解決
@@ -26,32 +26,11 @@ export const getUsersList = systemAdminQuery({
           .first();
         if (exactUser) {
           sliced = [exactUser];
-        } else {
-          // Search Index で全件から検索
-          const [emailMatches, displayNameMatches] = await Promise.all([
-            ctx.db
-              .query("users")
-              .withSearchIndex("search_email", (q) => q.search("email", search))
-              .take(limit),
-            ctx.db
-              .query("users")
-              .withSearchIndex("search_displayName", (q) =>
-                q.search("displayName", search),
-              )
-              .take(limit),
-          ]);
-          const seen = new Set<string>();
-          const merged: Doc<"users">[] = [];
-          for (const u of [...emailMatches, ...displayNameMatches]) {
-            if (!seen.has(u._id)) {
-              seen.add(u._id);
-              merged.push(u);
-            }
-          }
-          sliced = merged.slice(0, limit);
         }
-      } else {
-        // Search Index で全件から検索
+      }
+
+      if (!sliced) {
+        // Search Index で全件から検索し、表示名とメールの一致をインターリーブマージ
         const [emailMatches, displayNameMatches] = await Promise.all([
           ctx.db
             .query("users")
@@ -66,10 +45,17 @@ export const getUsersList = systemAdminQuery({
         ]);
         const seen = new Set<string>();
         const merged: Doc<"users">[] = [];
-        for (const u of [...emailMatches, ...displayNameMatches]) {
-          if (!seen.has(u._id)) {
-            seen.add(u._id);
-            merged.push(u);
+        const maxLen = Math.max(displayNameMatches.length, emailMatches.length);
+        for (let i = 0; i < maxLen; i++) {
+          const displayUser = displayNameMatches[i];
+          if (displayUser && !seen.has(displayUser._id)) {
+            seen.add(displayUser._id);
+            merged.push(displayUser);
+          }
+          const emailUser = emailMatches[i];
+          if (emailUser && !seen.has(emailUser._id)) {
+            seen.add(emailUser._id);
+            merged.push(emailUser);
           }
         }
         sliced = merged.slice(0, limit);

@@ -57,33 +57,35 @@ async function runBackup(env: Env): Promise<{ fileName: string }> {
 
   // リクエスト送信前に既存の最新エクスポート start_ts を確認（直前の完了エクスポート誤取得防止）
   let initialExportTs: string | undefined;
-  try {
-    const initialQueryRes = await fetch(`${baseUrl}/api/query`, {
-      method: "POST",
-      headers: authHeaders,
-      body: JSON.stringify({
-        path: "_system/cli/exports:getLatest",
-        args: [{}],
-        format: "json",
-      }),
-    });
-    if (initialQueryRes.ok) {
-      const initialQueryText = await initialQueryRes.text();
-      const initialData = JSON.parse(initialQueryText) as {
-        value?: ExportStatus | null;
-      };
-      if (initialData.value?.start_ts != null) {
-        initialExportTs = String(initialData.value.start_ts);
-        console.log(
-          `[Backup] Found previous export start_ts: ${initialExportTs}`,
-        );
-      }
-    }
-  } catch (err) {
-    console.warn(
-      "[Backup] Could not query initial export state, proceeding:",
-      err,
+  const initialQueryRes = await fetch(`${baseUrl}/api/query`, {
+    method: "POST",
+    headers: authHeaders,
+    body: JSON.stringify({
+      path: "_system/cli/exports:getLatest",
+      args: [{}],
+      format: "json",
+    }),
+  });
+  if (!initialQueryRes.ok) {
+    const errorText = await initialQueryRes.text();
+    throw new Error(
+      `[Backup] Failed to check initial export state (${initialQueryRes.status}): ${errorText}`,
     );
+  }
+  const initialQueryText = await initialQueryRes.text();
+  const initialData = JSON.parse(initialQueryText) as {
+    value?: ExportStatus | null;
+    status?: string;
+    errorMessage?: string;
+  };
+  if (initialData.status === "error") {
+    throw new Error(
+      `[Backup] Query returned error on initial check: ${initialData.errorMessage}`,
+    );
+  }
+  if (initialData.value?.start_ts != null) {
+    initialExportTs = String(initialData.value.start_ts);
+    console.log(`[Backup] Found previous export start_ts: ${initialExportTs}`);
   }
 
   console.log(
