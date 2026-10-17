@@ -3,7 +3,6 @@ import {
   MAX_CREDENTIALS_PER_RECORD,
   MAX_TAG_LENGTH,
   MAX_TAGS_PER_RECORD,
-  OwnerType,
   RecordInputSchema,
 } from "@poohma/shared/schemas";
 import { computeSortKey } from "@poohma/shared/utils/index-group";
@@ -57,41 +56,24 @@ const ConvexDiffUpdateCredentialSchema = CredentialInputSchema.extend({
   stableId: z.string().optional(),
 });
 
-export const ConvexDiffUpdateRecordSchema = z.object({
-  stableId: z.string().min(1, "stableIdは必須です"),
-  title: z
-    .string()
-    .min(1, "タイトルは必須です")
-    .max(255, "タイトルは255文字以内で入力してください")
-    .optional(),
-  titleReading: z
-    .string()
-    .max(255, "読み仮名は255文字以内で入力してください")
-    .optional(),
-  url: z.url().optional().or(z.literal("")).optional(),
-  memo: z
-    .string()
-    .max(10000, "メモは10,000文字以内で入力してください")
-    .optional(),
-  ownerType: z.enum(OwnerType).optional(),
-  tags: z
-    .array(
-      z
-        .string()
-        .max(
-          MAX_TAG_LENGTH,
-          `タグは${MAX_TAG_LENGTH}文字以内で入力してください`,
-        ),
-    )
-    .max(MAX_TAGS_PER_RECORD, `タグは${MAX_TAGS_PER_RECORD}個まで登録できます`)
-    .optional(),
-  credentials: z
-    .array(ConvexDiffUpdateCredentialSchema)
-    .max(
-      MAX_CREDENTIALS_PER_RECORD,
-      `アカウント情報は${MAX_CREDENTIALS_PER_RECORD}件まで登録できます`,
-    ),
-});
+export const ConvexDiffUpdateRecordSchema = RecordInputSchema.pick({
+  title: true,
+  titleReading: true,
+  url: true,
+  memo: true,
+  ownerType: true,
+  tags: true,
+})
+  .partial()
+  .extend({
+    stableId: z.string().min(1, "stableIdは必須です"),
+    credentials: z
+      .array(ConvexDiffUpdateCredentialSchema)
+      .max(
+        MAX_CREDENTIALS_PER_RECORD,
+        `アカウント情報は${MAX_CREDENTIALS_PER_RECORD}件まで登録できます`,
+      ),
+  });
 
 /**
  * レコードに紐づくクレデンシャル一覧を取得するヘルパー

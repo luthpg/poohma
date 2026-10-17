@@ -797,7 +797,7 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
    - commit 時点でユーザーの個人レコード全件を再取得し、以下を検証（楽観的ロック）：
      - prepare 時点のスナップショット（serviceRecordIds）と件数・ID集合が完全一致すること
      - 各レコードおよび各クレデンシャルの updatedAt が migration.createdAt より新しくないこと（`updatedAt > migration.createdAt` の場合、移行中の競合更新と判定してトランザクションをロールバック・拒否）
-   - 競合がなければ全レコードの credentials を新マスターキーでラップされた DEK / パスワードヒントへ一括更新
+   - 競合がなければ各 credential の DEK を新マスターキーで再ラップして更新（暗号化済みパスワードヒント本体は変更しない）
    - ユーザーの familyId を更新、参加申請があれば削除
    - 移行元家族が空（メンバー0・レコード0）になった場合は家族・孤立データを削除
    - familyMigrations の status を COMPLETED に更新
@@ -923,7 +923,7 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 | dismissRejectedRequest | Mutation | authenticated | 却下された申請の削除（確認） |
 | getPendingRequests | Query | familyBound | 自家族への保留中申請一覧 |
 | approveJoinRequest / rejectJoinRequest | Mutation | familyAdmin | 申請の承認／却下＋通知メール（ファミリー管理者のみ実行可能） |
-| prepareFamilyMigration | Mutation | authenticated | 家族移行の準備（PREPARED状態の作成とレコード更新スナップショットの保持） |
+| prepareFamilyMigration | Mutation | authenticated | 家族移行の準備（PREPARED状態の作成とレコードIDスナップショットの保持） |
 | getMigrationForEncryption | Query | authenticated | 移行対象データ（暗号化済みDEK等）の取得 |
 | commitFamilyMigration | Mutation | authenticated | 移行の確定（再暗号化データの反映）。prepare時点とcommit時点のレコード一覧を照合する楽観的ロック（競合検知）を適用 |
 | abortFamilyMigration | Mutation | authenticated | 移行の中断 |

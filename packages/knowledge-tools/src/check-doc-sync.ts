@@ -47,7 +47,7 @@ const RULES: Rule[] = [
   {
     name: "認証イベント・セッション・ログイン",
     pattern:
-      /^(apps\/web\/src\/(features\/auth|services\/auth.*)|packages\/backend\/convex\/auth\/.*|apps\/web\/src\/routes\/\(auth\)\/.*)$/,
+      /^(apps\/web\/src\/(features\/auth\/.*|services\/auth.*)|packages\/backend\/convex\/auth\/.*|apps\/web\/src\/routes\/\(auth\)\/.*)$/,
     level: "REQUIRED",
     docs: [
       ".docs/code-design.md",

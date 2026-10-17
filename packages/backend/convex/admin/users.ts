@@ -43,16 +43,31 @@ export const getUsersList = systemAdminQuery({
             )
             .take(limit),
         ]);
+        // @ を含む検索の場合、Search Index のトークン分割による誤一致（別ユーザーの同一ドメイン一致等）を防ぐため検証
+        const candidateEmails = search.includes("@")
+          ? emailMatches.filter((u) =>
+              u.email.toLowerCase().includes(search.toLowerCase()),
+            )
+          : emailMatches;
+        const candidateDisplays = search.includes("@")
+          ? displayNameMatches.filter((u) =>
+              u.displayName?.toLowerCase().includes(search.toLowerCase()),
+            )
+          : displayNameMatches;
+
         const seen = new Set<string>();
         const merged: Doc<"users">[] = [];
-        const maxLen = Math.max(displayNameMatches.length, emailMatches.length);
+        const maxLen = Math.max(
+          candidateDisplays.length,
+          candidateEmails.length,
+        );
         for (let i = 0; i < maxLen; i++) {
-          const displayUser = displayNameMatches[i];
+          const displayUser = candidateDisplays[i];
           if (displayUser && !seen.has(displayUser._id)) {
             seen.add(displayUser._id);
             merged.push(displayUser);
           }
-          const emailUser = emailMatches[i];
+          const emailUser = candidateEmails[i];
           if (emailUser && !seen.has(emailUser._id)) {
             seen.add(emailUser._id);
             merged.push(emailUser);

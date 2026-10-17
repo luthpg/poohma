@@ -196,7 +196,7 @@ describe("Convex Admin API & System Admin Authorization", () => {
         });
       });
 
-      // ユーザー一覧
+      // ユーザー一覧（キーワード検索）
       const users = await adminT.query(api.admin.users.getUsersList, {
         search: "sato",
       });
@@ -204,6 +204,19 @@ describe("Convex Admin API & System Admin Authorization", () => {
       expect(users[0]?.email).toBe("sato@example.com");
       expect(users[0]?.displayName).toBe("佐藤 次郎");
       expect(users[0]?.familyName).toBe("佐藤家");
+
+      // ユーザー一覧（メール完全一致）
+      const exactEmailUsers = await adminT.query(api.admin.users.getUsersList, {
+        search: "sato@example.com",
+      });
+      expect(exactEmailUsers.length).toBe(1);
+      expect(exactEmailUsers[0]?.email).toBe("sato@example.com");
+
+      // ユーザー一覧（同一ドメインの存在しないメアドで誤一致しないこと）
+      const noMatchUsers = await adminT.query(api.admin.users.getUsersList, {
+        search: "nonexistent@example.com",
+      });
+      expect(noMatchUsers.length).toBe(0);
 
       // ファミリー一覧
       const families = await adminT.query(api.admin.users.getFamiliesList, {});
