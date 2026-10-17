@@ -15,6 +15,9 @@ export const MAX_CREDENTIALS_PER_RECORD = 10;
 /** 1レコードあたりの最大タグ数 */
 export const MAX_TAGS_PER_RECORD = 20;
 
+/** タグ1個あたりの最大文字数 */
+export const MAX_TAG_LENGTH = 50;
+
 /** AEAD (AES-GCM) データのスキーマ */
 export const AeadDataSchema = z.object({
   iv: z.string().regex(IV_REGEX, "IVは16文字のBase64形式である必要があります"),
@@ -152,7 +155,14 @@ export const RecordInputSchema = z.object({
       `アカウント情報は${MAX_CREDENTIALS_PER_RECORD}件まで登録できます`,
     ), // IDペアの配列
   tags: z
-    .array(z.string().max(50, "タグは50文字以内で入力してください"))
+    .array(
+      z
+        .string()
+        .max(
+          MAX_TAG_LENGTH,
+          `タグは${MAX_TAG_LENGTH}文字以内で入力してください`,
+        ),
+    )
     .max(MAX_TAGS_PER_RECORD, `タグは${MAX_TAGS_PER_RECORD}個まで登録できます`), // タグ文字列の配列
 });
 

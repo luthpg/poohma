@@ -11,10 +11,13 @@ E2EE 暗号化および WebAuthn 実装における落とし穴と回避法で�
 
 ---
 
-### CryptoKey の `extractable` と `keyUsages` の不整合
+### CryptoKey の `extractable` と `keyUsages` の不整合（最小権限化の原則）
 
-- **問題**: `generateDEK()` や `unwrapMasterKey()` で `extractable: false` に設定すると、後の再ラップ（`wrapKey`）や家族移行処理でエクスポートできずランタイムエラーになる。また DEK の usages に不要な `wrapKey` を含めると暗号化仕様の整合性を欠く。
-- **回避法**: `packages/crypto/src/index.ts` の既存関数（`generateDEK`, `wrapMasterKey`, `unwrapDEK`, `unwrapMasterKey`）のパラメータ設計を厳守し、独自に `crypto.subtle.generateKey` を呼ばない（※ `unwrapMasterKey` の `extractable` はデフォルト `true` であり、再ラップ不要な拡張機能の揮発メモリ等でのみ `false` を指定可能）。
+- **問題**: `generateDEK()` や `unwrapMasterKey()` で一律に `extractable: false` に設定すると、後の再ラップ（`wrapKey`）や家族移行処理でエクスポートできずランタイムエラーになる。一方、すべてを `extractable: true` に固定すると、復号専用コンテキストで万が一メモリ侵害やXSSが発生した際に鍵材料（raw bytes）が直接抽出されるリスクが高まる。
+- **回避法**:
+  - `packages/crypto/src/index.ts` の既存関数のパラメータ設計（デフォルト引数）を活用する。
+  - `unwrapDEK(encrypted, iv, masterKey, extractable = true)` はデフォルトで `extractable: true` を維持し、再ラップが必要なコンテキスト（新規作成、更新、マイグレーション等）の互換性を壊さない。
+  - 通常のヒント復号処理（`PasscodeProvider.decryptHint` 等）など、鍵の再エクスポートを要しない読み取り専用コンテキストでは明示的に `unwrapDEK(..., false)` を指定し、鍵抽出耐性を最大化する。
 
 ---
 

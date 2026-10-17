@@ -58,7 +58,7 @@ export const getContactStats = systemAdminQuery({
     const allContacts = await ctx.db
       .query("contacts")
       .withIndex("by_createdAt")
-      .take(500);
+      .collect();
 
     let unreadCount = 0;
     let readCount = 0;

@@ -1,7 +1,9 @@
 import {
   CredentialInputSchema,
   MAX_CREDENTIALS_PER_RECORD,
+  MAX_TAG_LENGTH,
   MAX_TAGS_PER_RECORD,
+  OwnerType,
   RecordInputSchema,
 } from "@poohma/shared/schemas";
 import { computeSortKey } from "@poohma/shared/utils/index-group";
@@ -42,9 +44,49 @@ const ConvexCredentialInputSchema = CredentialInputSchema.extend({
 export const EDIT_SESSION_TTL_MS = 5 * 60 * 1000; // 5分
 export const EDIT_HEARTBEAT_INTERVAL_MS = 30 * 1000; // 30秒
 
-const ConvexRecordInputSchema = RecordInputSchema.extend({
+export const ConvexRecordInputSchema = RecordInputSchema.extend({
   credentials: z
     .array(ConvexCredentialInputSchema)
+    .max(
+      MAX_CREDENTIALS_PER_RECORD,
+      `アカウント情報は${MAX_CREDENTIALS_PER_RECORD}件まで登録できます`,
+    ),
+});
+
+const ConvexDiffUpdateCredentialSchema = CredentialInputSchema.extend({
+  stableId: z.string().optional(),
+});
+
+export const ConvexDiffUpdateRecordSchema = z.object({
+  stableId: z.string().min(1, "stableIdは必須です"),
+  title: z
+    .string()
+    .min(1, "タイトルは必須です")
+    .max(255, "タイトルは255文字以内で入力してください")
+    .optional(),
+  titleReading: z
+    .string()
+    .max(255, "読み仮名は255文字以内で入力してください")
+    .optional(),
+  url: z.url().optional().or(z.literal("")).optional(),
+  memo: z
+    .string()
+    .max(10000, "メモは10,000文字以内で入力してください")
+    .optional(),
+  ownerType: z.enum(OwnerType).optional(),
+  tags: z
+    .array(
+      z
+        .string()
+        .max(
+          MAX_TAG_LENGTH,
+          `タグは${MAX_TAG_LENGTH}文字以内で入力してください`,
+        ),
+    )
+    .max(MAX_TAGS_PER_RECORD, `タグは${MAX_TAGS_PER_RECORD}個まで登録できます`)
+    .optional(),
+  credentials: z
+    .array(ConvexDiffUpdateCredentialSchema)
     .max(
       MAX_CREDENTIALS_PER_RECORD,
       `アカウント情報は${MAX_CREDENTIALS_PER_RECORD}件まで登録できます`,
@@ -79,6 +121,38 @@ export async function deleteCredentialsForRecord(
   for (const c of creds) {
     await ctx.db.delete(c._id);
   }
+}
+
+/**
+ * レコードに紐づくすべての従属エンティティ（credentials, recordEditingSessions, viewLogs）をカスケード削除する共通ヘルパー
+ */
+export async function cascadeDeleteRecord(
+  ctx: { db: MutationCtx["db"] },
+  recordId: Id<"serviceRecords">,
+) {
+  // 1. credentials
+  await deleteCredentialsForRecord(ctx, recordId);
+
+  // 2. recordEditingSessions
+  const sessions = await ctx.db
+    .query("recordEditingSessions")
+    .withIndex("by_recordId", (q) => q.eq("recordId", recordId))
+    .collect();
+  for (const s of sessions) {
+    await ctx.db.delete(s._id);
+  }
+
+  // 3. viewLogs
+  const viewLogs = await ctx.db
+    .query("viewLogs")
+    .withIndex("by_recordId_createdAt", (q) => q.eq("recordId", recordId))
+    .collect();
+  for (const vl of viewLogs) {
+    await ctx.db.delete(vl._id);
+  }
+
+  // 4. serviceRecords
+  await ctx.db.delete(recordId);
 }
 
 /**
@@ -1234,8 +1308,7 @@ export const deleteRecord = familyBoundMutation({
     const targetAccountId = ownerType === "user" ? record.accountId : undefined;
 
     // カスケード削除
-    await deleteCredentialsForRecord(ctx, args.id);
-    await ctx.db.delete(args.id);
+    await cascadeDeleteRecord(ctx, args.id);
 
     //ログ記録
     await logAuditEvent(ctx, {
@@ -1267,8 +1340,7 @@ export const deleteRecords = familyBoundMutation({
         ownerType === "user" ? record.accountId : undefined;
 
       requireAdminAccess(ctx.user, record);
-      await deleteCredentialsForRecord(ctx, id);
-      await ctx.db.delete(id);
+      await cascadeDeleteRecord(ctx, id);
 
       //ログ記録
       await logAuditEvent(ctx, {
@@ -1995,9 +2067,17 @@ export const bulkUpdateRecords = familyBoundMutation({
       const record = await ctx.db.get(id);
       if (!record) continue;
 
-      requireContentAccess(ctx.user, record);
+      requireAdminAccess(ctx.user, record);
 
       if (args.data.tags !== undefined) {
+        for (const tag of args.data.tags) {
+          if (tag.length > MAX_TAG_LENGTH) {
+            throw new Error(
+              `タグは${MAX_TAG_LENGTH}文字以内で入力してください (レコード「${record.title}」で超過)`,
+            );
+          }
+        }
+
         const newTags = Array.from(
           new Set([...record.tags, ...args.data.tags]),
         );
@@ -2006,9 +2086,30 @@ export const bulkUpdateRecords = familyBoundMutation({
             `タグは${MAX_TAGS_PER_RECORD}個まで登録できます (レコード「${record.title}」で超過)`,
           );
         }
+
+        const now = Date.now();
         await ctx.db.patch(id, {
           tags: newTags,
-          updatedAt: Date.now(),
+          revision: record.revision + 1,
+          updatedByAccountId: ctx.user._id,
+          updatedAt: now,
+        });
+
+        const ownerType = getEffectiveOwnerType(record);
+        await logAuditEvent(ctx, {
+          actor: ctx.user,
+          record,
+          recordId: record._id,
+          ownerType,
+          ownerFamilyId:
+            ownerType === "family" ? record.ownerFamilyId : undefined,
+          targetAccountId:
+            ownerType === "family" ? undefined : record.accountId,
+          action: "RECORD_UPDATE",
+          metadata: {
+            targetTitle: record.title,
+            changedFields: ["tags"],
+          },
         });
       }
     }
@@ -2025,7 +2126,7 @@ export const startEditingSession = familyBoundMutation({
     const record = await ctx.db.get(args.recordId);
     if (!record) throw new Error("Record not found");
 
-    requireContentAccess(ctx.user, record);
+    requireAdminAccess(ctx.user, record);
 
     const now = Date.now();
     const existingSession = await ctx.db
@@ -2055,7 +2156,7 @@ export const heartbeatEditingSession = familyBoundMutation({
     const record = await ctx.db.get(args.recordId);
     if (!record) throw new Error("Record not found");
 
-    requireContentAccess(ctx.user, record);
+    requireAdminAccess(ctx.user, record);
 
     const now = Date.now();
     const existingSession = await ctx.db
@@ -2563,6 +2664,25 @@ export const applyImportDiff = familyBoundMutation({
       throw new Error(
         "一度に反映できるデータは最大500件までです。ファイルを分割して再度お試しください。",
       );
+    }
+
+    // サーバー側 Zod スキーマ検証
+    for (const [i, item] of args.creates.entries()) {
+      const parsed = ConvexRecordInputSchema.safeParse(item);
+      if (!parsed.success) {
+        throw new Error(
+          `新規作成データの検証に失敗しました (行 ${i + 1}: ${parsed.error.issues.map((issue) => issue.message).join(", ")})`,
+        );
+      }
+    }
+
+    for (const [i, item] of args.updates.entries()) {
+      const parsed = ConvexDiffUpdateRecordSchema.safeParse(item);
+      if (!parsed.success) {
+        throw new Error(
+          `更新データの検証に失敗しました (行 ${i + 1}: ${parsed.error.issues.map((issue) => issue.message).join(", ")})`,
+        );
+      }
     }
 
     // 家族内メンバーの解決マップ構築

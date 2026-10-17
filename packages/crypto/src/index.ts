@@ -251,11 +251,13 @@ export async function wrapDEK(
 
 /**
  * ラップされたDEKをマスターキーで復号
+ * @param extractable DEKをエクスポート可能にするか。再暗号化（再ラップ）時はtrue、通常の閲覧・復号のみではfalse推奨。
  */
 export async function unwrapDEK(
   encryptedBase64: string,
   ivBase64: string,
   masterKey: CryptoKey,
+  extractable = true,
 ): Promise<CryptoKey> {
   const wrapped = base64ToBuffer(encryptedBase64);
   const iv = base64ToBuffer(ivBase64);
@@ -266,7 +268,7 @@ export async function unwrapDEK(
     masterKey,
     { name: ALGORITHM, iv },
     { name: ALGORITHM, length: KEY_LENGTH },
-    true, // マスターキーローテーション（再暗号化）時に再ラップするためエクスポート可能にする
+    extractable,
     ["encrypt", "decrypt"],
   );
 }

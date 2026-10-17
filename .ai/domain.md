@@ -20,6 +20,8 @@ flowchart TD
     RecFamily -->|"1:N"| CredsFamily["credentials (by_recordId)"]
     RecUser -->|"1:N"| EditSession
     RecFamily -->|"1:N"| EditSession
+    RecUser -->|"1:N"| ViewLogsUser["viewLogs (by_recordId_createdAt)"]
+    RecFamily -->|"1:N"| ViewLogsFamily["viewLogs (by_recordId_createdAt)"]
     
     Family -->|"1:N scope"| RecFamily
     Family -->|"1:N"| Invites["familyInvites"]
@@ -29,6 +31,8 @@ flowchart TD
     RecUser -.->|"optional ref"| AuditLog
     RecFamily -.->|"optional ref"| AuditLog
 ```
+
+> **カスケード削除の完全性**: レコード削除（単一・一括・退会・孤立共有レコード掃除）の際は、共通ヘルパー `cascadeDeleteRecord` により、`serviceRecords` と共に紐づく `credentials`, `recordEditingSessions`, `viewLogs` が完全に一括削除されます。
 
 ---
 

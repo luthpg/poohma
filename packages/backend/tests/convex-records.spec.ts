@@ -2565,7 +2565,7 @@ describe("2.2.14 CSV差分インポート・安定ID（stableId）検証", () =>
         ],
         updates: [],
       }),
-    ).rejects.toThrow("アカウント情報は最大10件まで登録できます");
+    ).rejects.toThrow("アカウント情報は10件まで登録できます");
 
     // 2. 存在しないクレデンシャル stableId エラー
     await expect(
@@ -3538,6 +3538,335 @@ describe("レコードのアーカイブ・復元機能テスト (Issue #154)", 
         const sharedRec = await ctx.db.get(adminSharedRecordId);
         expect(personalRec).not.toBeNull();
         expect(sharedRec).not.toBeNull();
+      });
+    });
+  });
+
+  describe("Issue #370 是正項目テスト（認可・バリデーション・カスケード削除）", () => {
+    it("bulkUpdateRecords: viewer は家族共有レコードを更新できず、admin 更新時に revision・updatedByAccountId・auditLog が記録されること", async () => {
+      const t = convexTest(schema, modules);
+
+      let familyId!: Id<"families">;
+      let adminAccountId!: Id<"users">;
+      let sharedRecordId!: Id<"serviceRecords">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
+          name: "Issue370 Family",
+          updatedAt: Date.now(),
+        });
+        adminAccountId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
+          familyRole: "admin",
+          userId: "admin_370",
+          email: "admin370@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("users", {
+          createdAt: Date.now(),
+          familyRole: "viewer",
+          userId: "viewer_370",
+          email: "viewer370@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        sharedRecordId = await ctx.db.insert("serviceRecords", {
+          title: "共有レコード370",
+          userId: "admin_370",
+          accountId: adminAccountId,
+          familyId,
+          sortKey: "S370",
+          ownerType: "family",
+          ownerFamilyId: familyId,
+          admins: [adminAccountId],
+          updatedByAccountId: adminAccountId,
+          tags: ["original"],
+          stableId: crypto.randomUUID(),
+          revision: 0,
+          isArchived: false,
+          updatedAt: 1000,
+        });
+      });
+
+      const viewerClient = t.withIdentity({
+        subject: "viewer_370",
+        email: "viewer370@example.com",
+      });
+      const adminClient = t.withIdentity({
+        subject: "admin_370",
+        email: "admin370@example.com",
+      });
+
+      // 1. viewer の更新試行は Access denied
+      await expect(
+        viewerClient.mutation(api.records.bulkUpdateRecords, {
+          ids: [sharedRecordId],
+          data: { tags: ["viewer-tag"] },
+        }),
+      ).rejects.toThrow(/Access denied/);
+
+      // 2. 51文字のタグ追加はバリデーションエラー
+      await expect(
+        adminClient.mutation(api.records.bulkUpdateRecords, {
+          ids: [sharedRecordId],
+          data: { tags: ["a".repeat(51)] },
+        }),
+      ).rejects.toThrow(/タグは50文字以内で入力してください/);
+
+      // 3. admin の更新成功時、revision / updatedByAccountId / auditLog が更新される
+      await adminClient.mutation(api.records.bulkUpdateRecords, {
+        ids: [sharedRecordId],
+        data: { tags: ["new-tag"] },
+      });
+
+      await t.run(async (ctx) => {
+        const record = await ctx.db.get(sharedRecordId);
+        expect(record?.tags).toContain("new-tag");
+        expect(record?.revision).toBe(1);
+        expect(record?.updatedByAccountId).toEqual(adminAccountId);
+
+        // auditLog が記録されていること
+        const logs = await ctx.db
+          .query("auditLogs")
+          .withIndex("by_family_createdAt", (q) => q.eq("familyId", familyId))
+          .collect();
+        const updateLog = logs.find(
+          (l) => l.action === "RECORD_UPDATE" && l.recordId === sharedRecordId,
+        );
+        expect(updateLog).toBeDefined();
+        expect(updateLog?.actorDisplayName).toBe("admin370@example.com");
+      });
+    });
+
+    it("applyImportDiff: creates および updates で 50文字超過のタグを含むデータが Zod safeParse で拒否されること", async () => {
+      const t = convexTest(schema, modules);
+
+      let existingRecStableId = "";
+      await t.run(async (ctx) => {
+        const familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
+          name: "DiffVal Family",
+          updatedAt: Date.now(),
+        });
+        const userId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
+          familyRole: "admin",
+          userId: "diffval_user",
+          email: "diffval@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        existingRecStableId = crypto.randomUUID();
+        await ctx.db.insert("serviceRecords", {
+          title: "DiffVal Existing",
+          userId: "diffval_user",
+          accountId: userId,
+          familyId,
+          sortKey: "diffval",
+          ownerType: "user",
+          admins: [],
+          tags: [],
+          stableId: existingRecStableId,
+          revision: 0,
+          updatedByAccountId: userId,
+          isArchived: false,
+          updatedAt: Date.now(),
+        });
+      });
+
+      const client = t.withIdentity({
+        subject: "diffval_user",
+        email: "diffval@example.com",
+      });
+
+      // creates でタグ51文字
+      await expect(
+        client.mutation(api.records.applyImportDiff, {
+          creates: [
+            {
+              title: "Invalid Tag Record",
+              tags: ["t".repeat(51)],
+              credentials: [],
+            },
+          ],
+          updates: [],
+        }),
+      ).rejects.toThrow(/タグは50文字以内で入力してください/);
+
+      // updates でタグ51文字
+      await expect(
+        client.mutation(api.records.applyImportDiff, {
+          creates: [],
+          updates: [
+            {
+              stableId: existingRecStableId,
+              tags: ["u".repeat(51)],
+              credentials: [],
+            },
+          ],
+        }),
+      ).rejects.toThrow(/タグは50文字以内で入力してください/);
+    });
+
+    it("startEditingSession & heartbeatEditingSession: viewer は共有レコードの編集セッションを開始・更新できないこと", async () => {
+      const t = convexTest(schema, modules);
+
+      let familyId!: Id<"families">;
+      let adminAccountId!: Id<"users">;
+      let sharedRecordId!: Id<"serviceRecords">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
+          name: "Session Family",
+          updatedAt: Date.now(),
+        });
+        adminAccountId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
+          familyRole: "admin",
+          userId: "session_admin",
+          email: "session_admin@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("users", {
+          createdAt: Date.now(),
+          familyRole: "viewer",
+          userId: "session_viewer",
+          email: "session_viewer@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        sharedRecordId = await ctx.db.insert("serviceRecords", {
+          title: "Session Record",
+          userId: "session_admin",
+          accountId: adminAccountId,
+          familyId,
+          sortKey: "SESS",
+          ownerType: "family",
+          ownerFamilyId: familyId,
+          admins: [adminAccountId],
+          updatedByAccountId: adminAccountId,
+          tags: [],
+          stableId: crypto.randomUUID(),
+          revision: 0,
+          isArchived: false,
+          updatedAt: Date.now(),
+        });
+      });
+
+      const viewerClient = t.withIdentity({
+        subject: "session_viewer",
+        email: "session_viewer@example.com",
+      });
+
+      // viewer は startEditingSession 拒否
+      await expect(
+        viewerClient.mutation(api.records.startEditingSession, {
+          recordId: sharedRecordId,
+        }),
+      ).rejects.toThrow(/Access denied: admin rights required/);
+
+      // viewer は heartbeatEditingSession 拒否
+      await expect(
+        viewerClient.mutation(api.records.heartbeatEditingSession, {
+          recordId: sharedRecordId,
+        }),
+      ).rejects.toThrow(/Access denied: admin rights required/);
+    });
+
+    it("cascadeDeleteRecord: レコード削除時に紐づく recordEditingSessions と viewLogs も同時に削除されること", async () => {
+      const t = convexTest(schema, modules);
+
+      let adminAccountId!: Id<"users">;
+      let recordId!: Id<"serviceRecords">;
+
+      await t.run(async (ctx) => {
+        const familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
+          name: "Cascade Family",
+          updatedAt: Date.now(),
+        });
+        adminAccountId = await ctx.db.insert("users", {
+          createdAt: Date.now(),
+          familyRole: "admin",
+          userId: "cascade_admin",
+          email: "cascade_admin@example.com",
+          familyId,
+          updatedAt: Date.now(),
+        });
+        recordId = await ctx.db.insert("serviceRecords", {
+          title: "Cascade Target",
+          userId: "cascade_admin",
+          accountId: adminAccountId,
+          familyId,
+          sortKey: "CASC",
+          ownerType: "user",
+          admins: [],
+          updatedByAccountId: adminAccountId,
+          tags: [],
+          stableId: crypto.randomUUID(),
+          revision: 0,
+          isArchived: false,
+          updatedAt: Date.now(),
+        });
+
+        // 紐づく credentials, recordEditingSessions, viewLogs を挿入
+        await ctx.db.insert("credentials", {
+          recordId,
+          stableId: crypto.randomUUID(),
+          label: "Test Cred",
+          loginId: "test@example.com",
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("recordEditingSessions", {
+          recordId,
+          accountId: adminAccountId,
+          updatedAt: Date.now(),
+        });
+        await ctx.db.insert("viewLogs", {
+          recordId,
+          accountId: adminAccountId,
+          userId: "cascade_admin",
+          actorDisplayName: "cascade_admin",
+          createdAt: Date.now(),
+        });
+      });
+
+      const client = t.withIdentity({
+        subject: "cascade_admin",
+        email: "cascade_admin@example.com",
+      });
+
+      // 単一レコード削除を実行
+      await client.mutation(api.records.deleteRecord, {
+        id: recordId,
+      });
+
+      // DB 内の全関連テーブルから削除されていることを検証
+      await t.run(async (ctx) => {
+        const rec = await ctx.db.get(recordId);
+        expect(rec).toBeNull();
+
+        const creds = await ctx.db
+          .query("credentials")
+          .withIndex("by_recordId", (q) => q.eq("recordId", recordId))
+          .collect();
+        expect(creds.length).toBe(0);
+
+        const sessions = await ctx.db
+          .query("recordEditingSessions")
+          .withIndex("by_recordId", (q) => q.eq("recordId", recordId))
+          .collect();
+        expect(sessions.length).toBe(0);
+
+        const logs = await ctx.db
+          .query("viewLogs")
+          .withIndex("by_recordId_createdAt", (q) => q.eq("recordId", recordId))
+          .collect();
+        expect(logs.length).toBe(0);
       });
     });
   });

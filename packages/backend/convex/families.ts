@@ -18,7 +18,7 @@ import {
   familyAdminMutation,
   familyAdminQuery,
 } from "./customBuilders";
-import { deleteCredentialsForRecord, getCredentialsForRecord } from "./records";
+import { cascadeDeleteRecord, getCredentialsForRecord } from "./records";
 import { getEffectiveFamilyRole, getEffectiveOwnerType } from "./rls";
 
 /**
@@ -48,8 +48,7 @@ export async function reconcileAdminsOnLeave(
   // 残存メンバーがいない場合、管理者不在・メンバー不在となった孤立共有レコード、招待、参加申請をクリーンアップ
   if (remainingAccountIds.length === 0) {
     for (const record of sharedRecords) {
-      await deleteCredentialsForRecord(ctx, record._id);
-      await ctx.db.delete(record._id);
+      await cascadeDeleteRecord(ctx, record._id);
     }
     await deleteFamilyInvites(ctx, familyId);
     const reqs = await ctx.db

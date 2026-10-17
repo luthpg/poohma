@@ -27,26 +27,52 @@ export const getUsersList = systemAdminQuery({
         if (exactUser) {
           sliced = [exactUser];
         } else {
-          const q = search.toLowerCase();
-          const users = await ctx.db.query("users").order("desc").take(200);
-          sliced = users
-            .filter(
-              (u) =>
-                u.email.toLowerCase().includes(q) ||
-                u.displayName?.toLowerCase().includes(q),
-            )
-            .slice(0, limit);
+          // Search Index で全件から検索
+          const [emailMatches, displayNameMatches] = await Promise.all([
+            ctx.db
+              .query("users")
+              .withSearchIndex("search_email", (q) => q.search("email", search))
+              .take(limit),
+            ctx.db
+              .query("users")
+              .withSearchIndex("search_displayName", (q) =>
+                q.search("displayName", search),
+              )
+              .take(limit),
+          ]);
+          const seen = new Set<string>();
+          const merged: Doc<"users">[] = [];
+          for (const u of [...emailMatches, ...displayNameMatches]) {
+            if (!seen.has(u._id)) {
+              seen.add(u._id);
+              merged.push(u);
+            }
+          }
+          sliced = merged.slice(0, limit);
         }
       } else {
-        const q = search.toLowerCase();
-        const users = await ctx.db.query("users").order("desc").take(200);
-        sliced = users
-          .filter(
-            (u) =>
-              u.email.toLowerCase().includes(q) ||
-              u.displayName?.toLowerCase().includes(q),
-          )
-          .slice(0, limit);
+        // Search Index で全件から検索
+        const [emailMatches, displayNameMatches] = await Promise.all([
+          ctx.db
+            .query("users")
+            .withSearchIndex("search_email", (q) => q.search("email", search))
+            .take(limit),
+          ctx.db
+            .query("users")
+            .withSearchIndex("search_displayName", (q) =>
+              q.search("displayName", search),
+            )
+            .take(limit),
+        ]);
+        const seen = new Set<string>();
+        const merged: Doc<"users">[] = [];
+        for (const u of [...emailMatches, ...displayNameMatches]) {
+          if (!seen.has(u._id)) {
+            seen.add(u._id);
+            merged.push(u);
+          }
+        }
+        sliced = merged.slice(0, limit);
       }
     } else {
       sliced = await ctx.db.query("users").order("desc").take(limit);

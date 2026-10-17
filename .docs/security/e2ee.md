@@ -26,7 +26,7 @@ flowchart TB
 
     subgraph RecoveryFlow["🆘 緊急復元経路（リカバリーキット）"]
         RecoveryCode["<b>リカバリーコード</b><br/>(高エントロピー文字列 / サーバー非保存)"]:::inputNode
-        RK["<b>リカバリー導出鍵</b><br/>AES-GCM 256<br/>HKDF-SHA256"]:::derivedNode
+        RK["<b>リカバリー導出鍵</b><br/>AES-GCM 256<br/>PBKDF2-SHA256 (300k iter)"]:::derivedNode
     end
 
     subgraph MasterKeyLayer["🏛️ 家族マスターキー層"]
@@ -41,7 +41,7 @@ flowchart TB
     Passcode -->|PBKDF2 導出| KEK
     KEK -->|unwrapKey| MK
 
-    RecoveryCode -->|HKDF 導出 + OTP検証| RK
+    RecoveryCode -->|PBKDF2 導出 + OTP検証| RK
     RK -->|unwrapKey| MK
 
     MK -->|wrapKey / unwrapKey<br/>クレデンシャル毎に生成| DEK
@@ -121,7 +121,7 @@ sequenceDiagram
 ### Recovery
 
 - パスコードとは別に、リカバリーコード（高エントロピーなランダム文字列、平文はサーバーに保存せず発行時に一度だけ提示、Issue #134「致命的なデータ喪失を防ぐ『リカバリーキット（復元コード）』の発行」、closed）経由の入口を用意する。復元時には平文コードを照合のためサーバーへ送信し、サーバーでそのハッシュを `recoveryCodeHash` と比較する。
-- リカバリーコードから HKDF-SHA256 で導出した鍵で `families.recoveryMasterKeyEncrypted` / `recoveryMasterKeyIv` を unwrap すると、パスコード経路と同一のマスターキーに到達する。
+- リカバリーコードから PBKDF2-SHA256（300,000回）で導出した鍵で `families.recoveryMasterKeyEncrypted` / `recoveryMasterKeyIv` を unwrap すると、パスコード経路と同一のマスターキーに到達する。
 - 復元時はリカバリーコード単体では成立せず、登録メールアドレスへの6桁 Email OTP（SHA-256ハッシュ保存、有効期限10分、最大5回試行、60秒レート制限）の検証が必須の2要素構成になっている。
 - 再発行のたびに旧リカバリー暗号情報は完全上書き・破棄され、旧コードは即座に無効化される。
 

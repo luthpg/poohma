@@ -237,17 +237,17 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 
 | フィールド | 型 | 説明 |
 | ----------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| userId | string | 移行を実行したユーザー |
+| userId | string | 移行を実行したユーザーの Firebase UID |
+| accountId | Id<users> | 作成元 PoohMa アカウント ID |
+| action | "create" \| "join"(optional) | 移行アクション種別 |
 | sourceFamilyId | Id<families>(optional) | 移行元家族（未所属からの移行時はnull） |
 | targetFamilyId | Id<families> | 移行先家族 |
 | serviceRecordIds | Id<serviceRecords>\[] | 移行対象レコードIDのスナップショット |
-| recordUpdatedAtSnapshot | {recordId, updatedAt}\[](optional) | 各レコードのfetch時点のupdatedAtを保持する配列（楽観的ロック用のバージョンスナップショット。要素は{recordId: Id<serviceRecords>, updatedAt: number}） |
-| processedRecordIds | Id<serviceRecords>\[](optional) | 処理済みレコードIDの配列（バッチ失敗時の再開カーソル。未処理レコードはserviceRecordIds差分で特定し、レジューム可能にする） |
 | status | "PREPARED" \| "COMPLETED" \| "EXPIRED" \| "ABORTED" | 移行処理の状態 |
 | createdAt | number | 作成日時 |
 | expiresAt | number | 有効期限（作成から30分後） |
 
-インデックス: by\_userId, by\_status
+インデックス: by\_userId, by\_accountId, by\_status
 
 #### pendingExportVaults
 
@@ -702,11 +702,11 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 【リカバリー経路（FR-CRYPT-06）】
 同じマスターキーに対して、パスコード経路とは別に、リカバリーキー由来鍵でラップした
 もう一つの入口を用意する（6.6参照）。
-  リカバリーキー（高エントロピーなランダム文字列。サーバー保存なし・発行時に一度だけ提示） 
-    │  HKDF-SHA256（高エントロピーなためPBKDF2の重い反復は不要）
+  リカバリーコード（高エントロピーなランダム文字列。サーバー保存なし・発行時に一度だけ提示） 
+    │  PBKDF2-SHA256 (300,000回)
     ▼
   リカバリーキー導出鍵
-    │  unwrapKey（families.masterKeyRecoveryEncrypted / masterKeyRecoveryIv を復号）
+    │  unwrapKey（families.recoveryMasterKeyEncrypted / recoveryMasterKeyIv を復号）
     ▼
   マスターキー（パスコード経路と同一のものに到達する）
 
@@ -780,10 +780,8 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 ```txt
 1. prepareFamilyMigration Mutation
    - 移行先家族ID (targetFamilyId) を確定 (新規作成 or 承認済み参加申請の家族)
-   - 呼び出しユーザーの既存 serviceRecords ID一覧・各レコードの updatedAt をスナップショットし、
+   - 呼び出しユーザーの既存 serviceRecords ID一覧をスナップショットし、
      familyMigrations レコードを status=PREPARED, expiresAt=作成+30分 で作成
-     （recordUpdatedAtSnapshot フィールドに各レコードIDをキーとしたupdatedAtマッピングを保存し、
-     後続のcommit時に楽観的ロックの前提条件として検証する）
    - 呼び出し時点で残っている自分の他のPREPARED移行は先にEXPIRED化しクリーンアップ
 
 2. getMigrationForEncryption Query
@@ -794,24 +792,17 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
      （パスワードヒント本体は再暗号化不要、DEKの付け替えのみ）
    - DEK情報がない場合は reWrapCredential がエラーとし、マスターキー直接暗号化にはフォールバックしない
 
-4. commitFamilyMigration Mutation（NFR-AVAIL-03/04対応：バッチ分割・楽観的ロック）
-   - 再暗号化済みcredentialsを、1回あたり20〜50件程度のバッチに分割して複数回のMutation呼び出しで送信する
-     （通信断・Convexのペイロード／実行時間制限に対する耐性を確保。familyMigrationsに
-      processedRecordIds を保持し、失敗時は未処理分から再送してレジューム可能にする）
-   - 各バッチのレコード更新時、対象レコードの updatedAt が 1. のrecordUpdatedAtSnapshotで
-     スナップショットされた値と一致することを前提条件として検証する（楽観的ロック）。
-     不一致の場合は当該レコードの更新を拒否し、「移行中に他メンバーが更新したため再取得が必要」として
-     呼び出し元へ返す
-   - 各バッチ成功時、処理済みレコードIDを processedRecordIds へ追記し、
-     次回レジューム時はserviceRecordIds との差分を未処理レコードとして特定する
-   - 全バッチ成功後、ユーザーのfamilyIdを更新、参加申請があれば削除
-   - 移行元家族が空（メンバー0・レコード0）になった場合は削除
-   - familyMigrationsのstatusをCOMPLETEDに更新
+4. commitFamilyMigration Mutation（単一トランザクション一括コミット・楽観的ロック）
+   - 再暗号化済み credentials を単一の Mutation 呼び出しで一括コミットする（Convex のトランザクション整合性を活用）
+   - commit 時点でユーザーの個人レコード全件を再取得し、以下を検証（楽観的ロック）：
+     - prepare 時点のスナップショット（serviceRecordIds）と件数・ID集合が完全一致すること
+     - 各レコードおよび各クレデンシャルの updatedAt が migration.createdAt より新しくないこと（`updatedAt > migration.createdAt` の場合、移行中の競合更新と判定してトランザクションをロールバック・拒否）
+   - 競合がなければ全レコードの credentials を新マスターキーでラップされた DEK / パスワードヒントへ一括更新
+   - ユーザーの familyId を更新、参加申請があれば削除
+   - 移行元家族が空（メンバー0・レコード0）になった場合は家族・孤立データを削除
+   - familyMigrations の status を COMPLETED に更新
 
-5. 失敗時：abortFamilyMigration Mutationで明示的中断、または放置時はCronで自動EXPIRED化
-   （バッチ途中で中断した場合、processedRecordIdsを参照し、serviceRecordIdsとの差分を
-    未処理レコードとして再開する。未処理のレコードは旧familyId・旧鍵のまま残るため、
-    レジューム時は差分のみを再暗号化・送信する）
+5. 失敗時：abortFamilyMigration Mutationで明示的中断、または有効期限（30分）経過時は自動EXPIRED化
 ```
 
 ### 6.5 パスコードのみのローテーション（FR-FAM-10）

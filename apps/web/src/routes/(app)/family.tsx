@@ -64,6 +64,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { MIN_PASSCODE_LENGTH } from "@/constants/passcode";
 import { useAccount } from "@/hooks/useAccount";
 import { LOGOUT_FLAG_KEY } from "@/hooks/useConvexFirebaseAuth";
 import { useExportCsv } from "@/hooks/useExportCsv";
@@ -461,8 +462,10 @@ function FamilyComponent() {
   const handleVerifyVaultPasscode = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pendingExportVault) return;
-    if (!vaultPasscode || vaultPasscode.length < 8) {
-      toast.error("旧家族のパスコードを入力してください（8文字以上）");
+    if (!vaultPasscode || vaultPasscode.length < MIN_PASSCODE_LENGTH) {
+      toast.error(
+        `旧家族のパスコードを入力してください（${MIN_PASSCODE_LENGTH}文字以上）`,
+      );
       return;
     }
 
@@ -546,8 +549,10 @@ function FamilyComponent() {
   const handleCompleteTransfer = useCallback(async () => {
     if (myJoinRequest?.status !== "approved") return;
 
-    if (!joinPasscode || joinPasscode.length < 8) {
-      toast.error("新しい家族のパスコードを入力してください（8文字以上）");
+    if (!joinPasscode || joinPasscode.length < MIN_PASSCODE_LENGTH) {
+      toast.error(
+        `新しい家族のパスコードを入力してください（${MIN_PASSCODE_LENGTH}文字以上）`,
+      );
       return;
     }
 
@@ -874,10 +879,10 @@ function FamilyComponent() {
                     id="vault-passcode-input"
                     type={showVaultPasscode ? "text" : "password"}
                     required
-                    minLength={8}
+                    minLength={MIN_PASSCODE_LENGTH}
                     value={vaultPasscode}
                     onChange={(e) => setVaultPasscode(e.target.value)}
-                    placeholder="8文字以上"
+                    placeholder={`${MIN_PASSCODE_LENGTH}文字以上`}
                     className="w-full rounded-md bg-background p-2.5 text-base md:text-[14px] pr-10 shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
                   />
                   <button
@@ -1105,13 +1110,13 @@ function FamilyComponent() {
                     id="join-passcode-approved-input"
                     type={showJoinPasscode ? "text" : "password"}
                     required
-                    minLength={8}
+                    minLength={MIN_PASSCODE_LENGTH}
                     autoCapitalize="off"
                     autoCorrect="off"
                     spellCheck={false}
                     value={joinPasscode}
                     onChange={(e) => setJoinPasscode(e.target.value)}
-                    placeholder="8文字以上"
+                    placeholder={`${MIN_PASSCODE_LENGTH}文字以上`}
                     className="w-full rounded-md bg-card p-2.5 text-base md:text-[14px] pr-10 shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
                   />
                   <button
@@ -1200,13 +1205,13 @@ function FamilyComponent() {
                   type={showJoinPasscode ? "text" : "password"}
                   id="transfer-passcode-input"
                   required
-                  minLength={8}
+                  minLength={MIN_PASSCODE_LENGTH}
                   autoCapitalize="off"
                   autoCorrect="off"
                   spellCheck={false}
                   value={joinPasscode}
                   onChange={(e) => setJoinPasscode(e.target.value)}
-                  placeholder="8文字以上"
+                  placeholder={`${MIN_PASSCODE_LENGTH}文字以上`}
                   className="w-full rounded-md bg-card p-2.5 text-base md:text-[14px] pr-10 shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50"
                 />
                 <button
