@@ -296,4 +296,13 @@ export default defineSchema({
     .index("by_family_createdAt", ["familyId", "createdAt"])
     .index("by_recordId_createdAt", ["recordId", "createdAt"])
     .index("by_createdAt", ["createdAt"]), // 定期パージ用
+
+  extensionSyncCodes: defineTable({
+    accountId: v.id("users"),
+    nonce: v.string(),
+    code: v.string(),
+    expiresAt: v.number(),
+  })
+    .index("by_code_nonce", ["code", "nonce"])
+    .index("by_expiresAt", ["expiresAt"]),
 });

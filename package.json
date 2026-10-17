@@ -4,7 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "turbo run dev --filter=@poohma/web",
+    "dev": "turbo run dev --filter=@poohma/web --filter=@poohma/backend",
+    "dev:admin": "turbo run dev --filter=@poohma/admin --filter=@poohma/backend",
+    "dev:extension": "turbo run dev --filter=@poohma/web --filter=@poohma/extension",
+    "dev:email": "pnpm shared email:dev",
     "build": "turbo run build",
     "test": "turbo run test",
     "test:e2e": "pnpm server preview:setup && pnpm web test:e2e",
@@ -18,10 +21,12 @@
     "check:doc-sync": "pnpm knowledge check:doc-sync",
     "lint:workflows": "docker run --rm --entrypoint actionlint -v .:/repo -w /repo ghcr.io/reviewdog/action-actionlint:v1.77.0",
     "verify": "pnpm typecheck && pnpm check && pnpm test && pnpm build",
-    "admin": "pnpm -F admin",
+    "admin": "pnpm -F @poohma/admin",
     "web": "pnpm -F @poohma/web",
+    "extension": "pnpm -F @poohma/extension",
     "server": "pnpm -F @poohma/backend",
     "knowledge": "pnpm -F @poohma/knowledge-tools",
+    "shared": "pnpm -F @poohma/shared",
     "convex:dev": "pnpm server exec convex dev",
     "convex:dev:once": "pnpm server exec convex dev --once && pnpm check",
     "convex:sync": "pnpm server exec convex deploy && pnpm server exec convex codegen && pnpm check",
@@ -38,11 +43,11 @@
     "turbo": "^2.10.12",
     "typescript": "^7.0.2"
   },
-  "packageManager": "pnpm@11.24.0",
+  "packageManager": "pnpm@12.14.0",
   "devEngines": {
     "packageManager": {
       "name": "pnpm",
-      "version": "11.24.0",
+      "version": "12.14.0",
       "onFail": "download"
     }
   }

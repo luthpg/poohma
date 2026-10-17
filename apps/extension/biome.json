@@ -1,0 +1,33 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.13/schema.json",
+  "root": false,
+  "extends": ["../../biome.json"],
+  "files": {
+    "ignoreUnknown": false,
+    "includes": [
+      "components/**/*",
+      "entrypoints/**/*",
+      "lib/**/*",
+      "scripts/**/*",
+      "styles/**/*",
+      "tests/**/*",
+      "*.ts",
+      "*.json",
+      "!**/coverage/**/*",
+      "!.output/**/*",
+      "!.wxt/**/*"
+    ]
+  },
+  "overrides": [
+    {
+      "includes": ["**/*.spec.{ts,tsx}", "**/*.test.{ts,tsx}"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noNonNullAssertion": "off"
+          }
+        }
+      }
+    }
+  ]
+}

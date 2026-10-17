@@ -16,6 +16,7 @@ PoohMaは、フロントエンドとサーバーサイド処理を単一のTanSt
 リポジトリは Turborepo によるモノレポ構成をとっており、責務に応じて以下のパッケージに分離されている：
 - `apps/web`: フロントエンド & SSR（TanStack Start, Vite）およびブラウザ E2E テスト（Playwright）
 - `apps/admin`: 管理者コンソール（TanStack Start, Cloudflare Workers / Vite Plugin, cmdk, Geist Fonts）
+- `apps/extension`: Chrome 拡張機能（Manifest V3, WXT, React 19, Tailwind v4, Side Panel, Offscreen Document, Content Script）
 - `packages/backend`: Convex バックエンド（Schema, Functions, RLS, customBuilders, admin API, 結合テスト、Preview 環境プロビジョニング、シードエクスポート）
 - `packages/crypto`: 暗号化コアモジュール（`@poohma/crypto`: Web Crypto API, マスターキー/DEKエンベロープ暗号化, 鍵導出, extractable制御）
 - `packages/shared`: 共通モジュール（`@poohma/shared`: Zod スキーマ, React Email テンプレート, URLドメイン照合, 拡張機能メッセージプロトコル, ユーティリティ）

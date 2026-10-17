@@ -872,4 +872,31 @@ describe("useRecordForm", () => {
       expect(mockRequireUnlock).toHaveBeenCalled();
     });
   });
+
+  describe("初期値（initialValues）のクレデンシャル引き継ぎ", () => {
+    it("拡張機能等から loginId を含む credentials が渡された場合、自動で一意なIDが付与され1件目に設定されること", () => {
+      const initialValues = {
+        title: "GitHub",
+        url: "https://github.com/login",
+        credentials: [
+          {
+            label: "",
+            loginId: "developer@example.com",
+            passwordHint: "",
+          },
+        ],
+      };
+
+      const { result } = renderHook(() => useRecordForm(initialValues));
+
+      expect(result.current.values.title).toBe("GitHub");
+      expect(result.current.values.url).toBe("https://github.com/login");
+      expect(result.current.values.credentials).toHaveLength(1);
+      expect(result.current.values.credentials[0]!.loginId).toBe(
+        "developer@example.com",
+      );
+      expect(result.current.values.credentials[0]!.id).toBeDefined();
+      expect(typeof result.current.values.credentials[0]!.id).toBe("string");
+    });
+  });
 });

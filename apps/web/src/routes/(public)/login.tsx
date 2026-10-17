@@ -106,6 +106,13 @@ function LoginPage() {
           try {
             const url = new URL(target, window.location.origin);
             const hash = url.hash.replace(/^#/, "") || undefined;
+
+            // 拡張機能連携ページの場合は、セッションCookieとConvex接続状態を完全同期するためフルリロードで遷移
+            if (url.pathname.includes("/auth/extension-sync")) {
+              window.location.replace(target);
+              return;
+            }
+
             await router.navigate({
               to: url.pathname,
               search: Object.fromEntries(url.searchParams),

@@ -45,4 +45,10 @@ crons.interval(
   internal.records.cleanupOldViewLogsInternal,
 );
 
+crons.interval(
+  "cleanup expired extension sync codes",
+  { hours: 1 },
+  internal.extensionAuth.cleanupExpiredSyncCodes,
+);
+
 export default crons;

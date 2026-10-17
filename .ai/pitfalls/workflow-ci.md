@@ -210,4 +210,20 @@ execFileSync(
 ```
 `process.execPath`（Node.js バイナリ）から `pnpmExecPath` を引数配列として直接起動することで、シェル展開の介在余地を根本から排除する。
 
+---
+
+## 12. 配布用成果物（Release）ビルドワークフローへの CI/テスト用ダミー環境変数の流用
+
+### 事象
+
+Chrome 拡張機能などの配布用 ZIP パッケージを生成・GitHub Releases に添付するリリースワークフロー（`release-extension.yml` 等）において、CI のユニットテスト用設定を流用し、`VITE_FIREBASE_API_KEY: "dummy_key"` やステージング用 URL などの仮値をハードコードしてビルドしてしまう。
+この成果物がそのまま Release に添付・配布されると、ユーザーがインストールした拡張機能で Firebase 認証（ログイン）が必ず失敗し、実運用不能な ZIP が公開されてしまう。
+
+### 対策
+
+1. **CI ジョブとリリース（配布物生成）ジョブの明確な分離**:
+   - 単なる構文・型・テスト検査（`ci.yml`）ではダミー値で十分だが、配布用パッケージを生成するワークフローでは実環境用の環境変数を注入する。
+2. **GitHub Secrets / Variables からの本番環境変数注入**:
+   - `VITE_FIREBASE_API_KEY`、`VITE_FIREBASE_PROJECT_ID`、`VITE_CONVEX_URL` 等はハードコードせず、GitHub Secrets または Variables（`${{ secrets.VITE_FIREBASE_API_KEY }}`）から安全に注入してビルドする。
+
 

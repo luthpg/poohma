@@ -11,6 +11,10 @@ poohma/
 │   │   ├── src/           # UI, Routes, Hooks, Server Functions
 │   │   ├── e2e/           # Playwright E2E シナリオ
 │   │   └── tests/         # フロントエンド単体・ブラウザ暗号テスト
+│   ├── extension/         # @poohma/extension (Chrome 拡張機能 Manifest V3: WXT + React 19)
+│   │   ├── entrypoints/   # background, content, sidepanel, offscreen, popup
+│   │   ├── components/    # UIコンポーネント (Geist デザインシステム, Tailwind CSS v4)
+│   │   └── lib/           # auth, messaging, passcode (共通暗号処理)
 │   └── admin/             # @poohma/admin (管理者コンソール: TanStack Start + Cloudflare)
 │       └── src/           # 管理画面 UI (漆黒 Obsidian テーマ, cmdk, KPI, お問い合わせ)
 ├── packages/
@@ -36,6 +40,7 @@ poohma/
 | Workspace | 責務 | 主要技術 |
 | --- | --- | --- |
 | `apps/web` | メインWebアプリケーション（フロントエンド、SSR、Server Functions） | React 19, TanStack Start, TanStack Router, Tailwind CSS v4, shadcn/ui, Web Crypto API |
+| `apps/extension` | Chrome 拡張機能（閲覧中サイトのアカウント参照・パスコード解除・ヒント復号・自動入力支援） | WXT, Manifest V3, React 19, Tailwind CSS v4, Web Crypto API |
 | `apps/admin` | 管理者コンソール（お問い合わせ対応、統計KPI、ユーザー/ファミリー照会、システム監査） | React 19, TanStack Start, Cloudflare Workers/Vite Plugin, cmdk, Geist Fonts |
 | `packages/backend` | Convex BaaS バックエンド（スキーマ、関数、RLS、admin API、プレビュー構築） | Convex, convex-helpers, convex-test, TypeScript |
 | `packages/shared` | 共通バリデーションスキーマ、URL検証（SSRF対策）、メール定義 | Zod, React Email, ipaddr.js, TypeScript |

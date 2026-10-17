@@ -2,15 +2,18 @@ import { api } from "@poohma/backend/api";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { RecordForm } from "@/components/records/RecordForm";
 import { useAccount } from "@/hooks/useAccount";
-import { useRecordForm } from "@/hooks/useRecordForm";
+import { type RecordFormValues, useRecordForm } from "@/hooks/useRecordForm";
 
 const newRecordSearchSchema = z.object({
   draftId: z.string().optional(),
+  url: z.string().optional(),
+  title: z.string().optional(),
+  loginId: z.string().optional(),
 });
 
 export const Route = createFileRoute("/(app)/records/new")({
@@ -129,7 +132,24 @@ function NewRecordComponent() {
     ) || [];
   const createRecord = useMutation(api.records.createRecord);
 
-  const form = useRecordForm(undefined, undefined, draftId);
+  const { url, title, loginId } = Route.useSearch();
+  const initialValues = useMemo(() => {
+    const init: Partial<RecordFormValues> = {};
+    if (url) init.url = url;
+    if (title) init.title = title;
+    if (loginId) {
+      init.credentials = [
+        {
+          label: "",
+          loginId,
+          passwordHint: "",
+        },
+      ];
+    }
+    return Object.keys(init).length > 0 ? init : undefined;
+  }, [url, title, loginId]);
+
+  const form = useRecordForm(initialValues, undefined, draftId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

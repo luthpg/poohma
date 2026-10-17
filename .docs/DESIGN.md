@@ -421,3 +421,24 @@ PoohMa のブランドカラー本体（`#f97316` / orange-500：ロゴや変更
 4. Color is functional, never decorative — workflow colors (Red/Pink/Blue) mark pipeline stages only
 5. The inner `#fafafa` ring in card shadows is what gives Vercel cards their subtle inner glow
 6. Geist Mono uppercase for technical labels, Geist Sans for everything else
+
+---
+
+## 10. Chrome 拡張機能 & 連携画面デザイン仕様 (Side Panel & Web Sync)
+
+### 10.1 Side Panel UI (`apps/extension/entrypoints/sidepanel`)
+- **世界観とトーン**: Web アプリと 100% 同一の Geist デザインシステム、PoohMa Orange、Vercel 哲学の shadow-as-border を採用。
+- **絵文字の完全排除**: 🐻 などの装飾的絵文字は生成 AI 臭さを防ぐため全廃。Lucide アイコン（`<ShieldCheck />`, `<KeyRound />`, `<Lock />`, `<Sparkles />` 等）を使用。
+- **未認証ステート**: 簡潔で親しみやすいカードレイアウト、シンプルな「ログイン」ボタン（クリックで nonce 採番・Web 同期タブ起動）。
+- **パスコードロック解除**: パスコード表示/非表示トグル、指数バックオフ試行制限カウントダウン（「試行制限中です。残り X 秒お待ちください」）。
+- **解除済み通常画面**:
+  - ヘッダー: PoohMa ロゴ、家族名バッジ、再ロック/更新/ログアウトのアクション群。
+  - インクリメンタル検索バー: 即座に他サイトのアカウントも絞り込み可能。
+  - サイト一致カード: 閲覧中 URL と一致するレコードを最上部に表示。ID コピー、ページ自動入力（`<Sparkles />`）、ヒント復号トグル。
+  - 未登録サイト対応: 「このサイトを PoohMa に追加」導線（`/records/new?url=...` 起動）。
+
+### 10.2 Web 同期画面 (`apps/web/src/routes/(public)/auth.extension-sync.tsx`)
+- **ユーザー主導の信頼性**: 勝手にタブを閉じる（`window.close()`）動作を廃止し、明示的な「このタブを閉じる」ボタンおよび「ダッシュボードへ移動」リンクを提供。
+- **平穏な通知文言**: 恐怖を煽る「不正な」を廃止し、「無効な連携リクエストです」などの平穏で安全な表現に統一。
+- **同期インジケーター**: `<ShieldCheck />` と HoneyPotLoader による滑らかな認証セッション確立体験。
+

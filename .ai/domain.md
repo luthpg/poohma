@@ -28,6 +28,8 @@ flowchart TD
     PoohMaAccount -.->|"actor"| AuditLog
     RecUser -.->|"optional ref"| AuditLog
     RecFamily -.->|"optional ref"| AuditLog
+
+    PoohMaAccount -->|"1:N"| SyncCodes["extensionSyncCodes (TTL 30s)"]
 ```
 
 ---
@@ -419,5 +421,24 @@ PoohMa では、過去の機能拡張に伴い暫定的に `v.optional()` とさ
 ### 13.2 整合性保証の原則
 1. **アプリ側フォールバックの排除**: スキーマで必須化されたフィールドに対して、ビジネスロジック内で `field ?? fallback` や `if (!field)` のような不要な防御コードを記述しない（KISS 原則）。
 2. **監査ログ・更新者追跡の同期**: `serviceRecords` を変更する全 mutation（`shareRecord`, `unshareRecord`, `addRecordAdmin`, `removeRecordAdmin`, `createCredential`, `updateCredential`, `deleteCredential`, `reorderCredentials` 等）において、`updatedAt` のみならず `revision: record.revision + 1` および `updatedByAccountId: ctx.user._id` を漏れなく同期更新する。
+
+---
+
+## 14. 拡張機能連携（短命同期コード `extensionSyncCodes`）のライフサイクル
+
+```mermaid
+flowchart TD
+    Ext["拡張機能 Side Panel<br/>ログインボタン押下"] -->|"nonce (UUID) 生成 & 保存<br/>/auth/extension-sync?nonce=... を新規タブ起動"| Web["PoohMa Web<br/>同期画面 (/auth/extension-sync)"]
+    Web -->|"1. nonce ガード検証<br/>2. 未認証時 /login リダイレクト<br/>3. issueSyncToken(nonce)"| ConvexIssue["Convex DB (extensionSyncCodes)<br/>短命同期コード (UUID, TTL 30s) 発行"]
+    ConvexIssue -->|"window.postMessage<br/>(nonce, code, customToken)"| ContentScript["拡張機能 Content Script<br/>(同一オリジン検証 & 受信)"]
+    ContentScript -->|"chrome.runtime.sendMessage<br/>(AUTH_SYNC_TOKEN)"| Offscreen["拡張機能 Offscreen Document"]
+    Offscreen -->|"signInWithCustomToken(customToken)<br/>& redeemSyncToken(nonce, code)"| ConvexRedeem["Convex DB<br/>即時物理削除 (Single-Use) & ユーザー・家族情報返却"]
+    ConvexRedeem -->|"chrome.storage.local 保存<br/>Convex Client setAuth 有効化"| Ready["連携完了・利用可能"]
+```
+
+- **短命 TTL（30秒）**: 不正傍受や放置による悪用を防ぐため、発行から30秒で自動失効（Crons による定期パージ対象）。
+- **Single-Use（使い捨て・即時物理削除）**: `redeemSyncToken` で検証成功した瞬間にレコードを物理削除し、リプレイ攻撃や横取りを完全排除。
+- **nonce バインディング**: 拡張機能が生成した `nonce` と同期コードをペアで検証することで、第三者画面からの不正な連携リクエストを遮断。
+
 
 
