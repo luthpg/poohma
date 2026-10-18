@@ -31,11 +31,6 @@ export function isTrustedPoohmaOrigin(origin: string): boolean {
       return true;
     }
 
-    // Cloudflare Workers（poohma プレフィックスを強制）
-    if (host.startsWith("poohma-") && host.endsWith(".workers.dev")) {
-      return true;
-    }
-
     return false;
   } catch {
     return false;

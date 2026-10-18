@@ -25,12 +25,6 @@ describe("Extension URL & Origin Verification", () => {
       ).toBe(true);
     });
 
-    it("allows Cloudflare Workers domains", () => {
-      expect(
-        isTrustedPoohmaOrigin("https://poohma-backup.user.workers.dev"),
-      ).toBe(true);
-    });
-
     it("rejects non-HTTPS remote origins even if domain matches", () => {
       expect(isTrustedPoohmaOrigin("http://poohma.ciderlabs.link")).toBe(false);
       expect(isTrustedPoohmaOrigin("http://poohma-start.vercel.app")).toBe(
@@ -38,10 +32,13 @@ describe("Extension URL & Origin Verification", () => {
       );
     });
 
-    it("rejects untrusted third-party and attacker origins", () => {
+    it("rejects untrusted third-party, attacker, and non-web origins", () => {
       expect(isTrustedPoohmaOrigin("https://evil.com")).toBe(false);
       expect(isTrustedPoohmaOrigin("https://attacker.vercel.app")).toBe(false);
       expect(isTrustedPoohmaOrigin("https://attacker.workers.dev")).toBe(false);
+      expect(
+        isTrustedPoohmaOrigin("https://poohma-backup.user.workers.dev"),
+      ).toBe(false);
       expect(isTrustedPoohmaOrigin("https://attacker.com/ciderlabs.link")).toBe(
         false,
       );

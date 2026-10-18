@@ -250,6 +250,9 @@ function ExtensionSyncPage() {
 
           // 拡張機能からの同期完了 ACK（POOHMA_AUTH_SYNC_ACK）を待機
           let retryTimer: ReturnType<typeof setInterval> | null = null;
+          let ackTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
+          let acknowledged = false;
+
           const handleAck = (event: MessageEvent) => {
             if (event.origin !== window.location.origin) return;
             if (
@@ -258,7 +261,9 @@ function ExtensionSyncPage() {
               event.data.type === "POOHMA_AUTH_SYNC_ACK" &&
               event.data.nonce === cleanNonce
             ) {
+              acknowledged = true;
               if (retryTimer) clearInterval(retryTimer);
+              if (ackTimeoutTimer) clearTimeout(ackTimeoutTimer);
               window.removeEventListener("message", handleAck);
               try {
                 sessionStorage.setItem(
@@ -288,14 +293,9 @@ function ExtensionSyncPage() {
             retryCount += 1;
             if (retryCount >= 8) {
               if (retryTimer) clearInterval(retryTimer);
-              setTimeout(() => {
-                window.removeEventListener("message", handleAck);
-                syncIssuedRef.current = false;
-                setStatus("error");
-                setErrorMessage(
-                  "拡張機能からの応答を確認できませんでした。拡張機能が有効か確認してください。",
-                );
-              }, 500);
+              debugSyncLog(
+                "[PoohMa Sync] Max retries reached, waiting for background ACK...",
+              );
               return;
             }
             window.postMessage(syncPayload, window.location.origin);
@@ -303,6 +303,18 @@ function ExtensionSyncPage() {
               `[PoohMa Sync] Retried window.postMessage (${retryCount}/8)`,
             );
           }, 300);
+
+          // Background の非同期 Convex 通信完了まで十分な猶予（10秒）をもって ACK 待機
+          ackTimeoutTimer = setTimeout(() => {
+            if (acknowledged) return;
+            if (retryTimer) clearInterval(retryTimer);
+            window.removeEventListener("message", handleAck);
+            syncIssuedRef.current = false;
+            setStatus("error");
+            setErrorMessage(
+              "拡張機能からの応答を確認できませんでした。拡張機能が有効か確認してください。",
+            );
+          }, 10000);
         } else {
           syncIssuedRef.current = false;
           setStatus("error");

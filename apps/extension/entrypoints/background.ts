@@ -63,22 +63,20 @@ export async function getRecordsCached(force = false): Promise<CachedRecord[]> {
     return [];
   }
 
-  convex.setAuth(token);
-  try {
-    const records = await convex.query(api.records.getRecords, {
-      accountId: currentUser._id as Id<"users">,
-      includeHints: true,
-    });
+  // 共有クライアントの認証状態汚染を防ぐため、認証付き専用クライアントでクエリを実行
+  const authedConvex = new ConvexHttpClient(env.VITE_CONVEX_URL);
+  authedConvex.setAuth(token);
+  const records = await authedConvex.query(api.records.getRecords, {
+    accountId: currentUser._id as Id<"users">,
+    includeHints: true,
+  });
 
-    recordsCache = {
-      records: records || [],
-      timestamp: now,
-      accountId: currentUser._id,
-    };
-    return recordsCache.records;
-  } finally {
-    convex.clearAuth();
-  }
+  recordsCache = {
+    records: records || [],
+    timestamp: now,
+    accountId: currentUser._id,
+  };
+  return recordsCache.records;
 }
 
 // Offscreen Document のシングルトン起動管理（排他制御・コンテキスト存在保証付き）
@@ -182,22 +180,25 @@ export default defineBackground(() => {
             return;
           }
 
-          // 送信元タブのオリジンおよびパス検証
+          // 送信元コンテキストの厳格な検証（自拡張機能の Content Script かつ正規パスのみ許可）
           const senderUrl = sender.tab?.url;
-          if (senderUrl) {
-            try {
-              const parsed = new URL(senderUrl);
-              if (
-                !isTrustedPoohmaOrigin(parsed.origin) ||
-                parsed.pathname !== "/auth/extension-sync"
-              ) {
-                sendResponse({ success: false, error: "Untrusted sender" });
-                return;
-              }
-            } catch {
-              sendResponse({ success: false, error: "Invalid sender url" });
+          if (!sender.id || sender.id !== chrome.runtime.id || !senderUrl) {
+            sendResponse({ success: false, error: "Untrusted sender context" });
+            return;
+          }
+
+          try {
+            const parsed = new URL(senderUrl);
+            if (
+              !isTrustedPoohmaOrigin(parsed.origin) ||
+              parsed.pathname !== "/auth/extension-sync"
+            ) {
+              sendResponse({ success: false, error: "Untrusted sender" });
               return;
             }
+          } catch {
+            sendResponse({ success: false, error: "Invalid sender url" });
+            return;
           }
 
           // 拡張機能側が発行した pendingSyncNonce との一致検証（未設定または不一致時は拒否）
@@ -213,10 +214,7 @@ export default defineBackground(() => {
           // リプレイ・二重引き換え防止のため、引き換え前にストレージ上の nonce を即時消費
           await setPendingSyncNonce("");
 
-          // 未認証 mutation を呼ぶ前に、古い期限切れトークンが付与されないようクリア
-          convex.clearAuth();
-
-          // Convex から短命コードを検証・消費してアカウント情報を取得
+          // Convex から短命コードを検証・消費してアカウント情報を取得（共有クライアントは常に未認証）
           const res = await convex.mutation(api.extensionAuth.redeemSyncToken, {
             nonce: nonce.trim(),
             code: code.trim(),

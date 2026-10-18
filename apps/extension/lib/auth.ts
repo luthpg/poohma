@@ -99,8 +99,14 @@ export async function setAuthSession(
  */
 export async function switchActiveAccount(accountId: string): Promise<void> {
   const storage = await getAuthStorage();
+  if (!storage.user) return;
   const targetUser = storage.accounts.find((a) => a._id === accountId);
   if (!targetUser) return;
+
+  // レースコンディション対策: 書き戻し直前に最新ストレージを確認（ログアウト等との競合防止）
+  const latest = await getAuthStorage();
+  if (!latest.user) return;
+
   await chrome.storage.local.set({
     user: targetUser,
     activeAccountId: accountId,
