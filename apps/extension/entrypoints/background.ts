@@ -390,13 +390,17 @@ export default defineBackground(() => {
       (async () => {
         try {
           const token = await getValidIdToken(env.VITE_FIREBASE_API_KEY);
-          if (token) {
-            convex.setAuth(token);
-            await convex.mutation(api.records.logRecordHintView, {
-              recordId: message.recordId as Id<"serviceRecords">,
-            });
-            convex.clearAuth();
+          if (!token) {
+            sendResponse({ success: false });
+            return;
           }
+
+          // 共有クライアントの認証状態汚染を防ぐため、認証付き専用クライアントで mutation を実行
+          const authedConvex = new ConvexHttpClient(env.VITE_CONVEX_URL);
+          authedConvex.setAuth(token);
+          await authedConvex.mutation(api.records.logRecordHintView, {
+            recordId: message.recordId as Id<"serviceRecords">,
+          });
           sendResponse({ success: true });
         } catch {
           sendResponse({ success: false });

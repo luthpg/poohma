@@ -26,8 +26,13 @@ export function isTrustedPoohmaOrigin(origin: string): boolean {
       return true;
     }
 
-    // Vercel プレビューおよび本番（poohma プレフィックスを強制し他者の vercel.app を拒否）
-    if (host.startsWith("poohma-") && host.endsWith(".vercel.app")) {
+    // Vercel プレビューおよび本番（poohma プロジェクトおよび認証されたチームスコーププレビュー）
+    if (
+      host === "poohma.vercel.app" ||
+      (host.startsWith("poohma-") &&
+        host.endsWith("-luths-projects.vercel.app")) ||
+      (host.startsWith("poohma-git-") && host.endsWith(".vercel.app"))
+    ) {
       return true;
     }
 

@@ -15,26 +15,25 @@ describe("Extension URL & Origin Verification", () => {
     });
 
     it("allows Vercel preview and staging deployments", () => {
-      expect(isTrustedPoohmaOrigin("https://poohma-start.vercel.app")).toBe(
-        true,
-      );
+      expect(isTrustedPoohmaOrigin("https://poohma.vercel.app")).toBe(true);
       expect(
         isTrustedPoohmaOrigin(
-          "https://poohma-start-git-feat-issue-270-luths-projects.vercel.app",
+          "https://poohma-git-feat-issue-270-luths-projects.vercel.app",
         ),
       ).toBe(true);
     });
 
     it("rejects non-HTTPS remote origins even if domain matches", () => {
       expect(isTrustedPoohmaOrigin("http://poohma.ciderlabs.link")).toBe(false);
-      expect(isTrustedPoohmaOrigin("http://poohma-start.vercel.app")).toBe(
-        false,
-      );
+      expect(isTrustedPoohmaOrigin("http://poohma.vercel.app")).toBe(false);
     });
 
     it("rejects untrusted third-party, attacker, and non-web origins", () => {
       expect(isTrustedPoohmaOrigin("https://evil.com")).toBe(false);
       expect(isTrustedPoohmaOrigin("https://attacker.vercel.app")).toBe(false);
+      expect(isTrustedPoohmaOrigin("https://poohma-attacker.vercel.app")).toBe(
+        false,
+      );
       expect(isTrustedPoohmaOrigin("https://attacker.workers.dev")).toBe(false);
       expect(
         isTrustedPoohmaOrigin("https://poohma-backup.user.workers.dev"),
