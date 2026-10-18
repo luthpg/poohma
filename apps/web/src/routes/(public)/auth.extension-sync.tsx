@@ -234,12 +234,17 @@ function ExtensionSyncPage() {
           console.log(
             "[PoohMa Sync] Sync payload ready, dispatching window.postMessage...",
           );
+          const currentTheme =
+            typeof localStorage !== "undefined"
+              ? localStorage.getItem("theme")
+              : "system";
           const syncPayload = {
             type: "POOHMA_AUTH_SYNC",
             nonce: cleanNonce,
             code: res.code,
             idToken: idToken ?? null,
             customToken: customTokenRes?.customToken ?? null,
+            theme: currentTheme || "system",
           };
 
           // 即時送信

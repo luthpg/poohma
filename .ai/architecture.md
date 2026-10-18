@@ -86,6 +86,7 @@ poohma/
 - `families.ts`: 家族グループ、家族招待（`familyInvites`）、参加申請（`joinRequests`、保留中申請取得 `getPendingRequests`）、家族移行（`familyMigrations`）、パスコードローテーション、メンバーロール変更（`updateMemberRole`）、メンバーキック・データ持ち出し（`pendingExportVaults`）
 - `users.ts`: ユーザー同期、アカウント作成・切り替え・削除、メール通知設定更新（`updateEmailNotificationSettings`）、ログイン履歴記録、SSR用ユーザー/アカウント（family暗号化メタデータ含む）取得
 - `contacts.ts`: お問い合わせ受付（`createContact` mutation）、Honeypot スパム防御、多層レート制限（①Convex公式 `@convex-dev/rate-limiter` トークンバケット ＋ ②同一メール短時間連投制限 `by_email_createdAt`）、管理者メール通知（`sendNotificationEmail` internalAction、`ADMIN_EMAIL` 宛て Resend 送信、replyTo: 問い合わせ者メール）
+- `extensionAuth.ts`: Chrome 拡張機能連携用の短命同期コード発行（`issueSyncToken`）・検証引き換え（`redeemSyncToken`、全サブアカウント一覧 `accounts` および家族暗号メタデータ返却、Single-Use即時物理削除）、期限切れコード定期パージ（`cleanupExpiredSyncCodes`）
 - `recovery.ts`: リカバリーキット検証、2段階復元（メールOTP発行・検証、マスターキー再ラップ）
 - `actions.ts`: Node.js ランタイムでの外部連携（OGP取得、ふりがなAPI、Resend メール送信。環境変数 `DISABLE_EMAIL_DELIVERY=true` での外部配送スキップ対応）
 - `http.ts`: 内部 HTTP エンドポイント（`getUserByFirebaseUid`、内部共有シークレット認証）

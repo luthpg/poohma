@@ -1,19 +1,19 @@
 import { matchRecordUrl } from "@poohma/shared/utils/url-matcher";
 import {
   Check,
-  Copy,
+  ChevronDown,
   ExternalLink,
   Eye,
   EyeOff,
   Globe,
   KeyRound,
-  Lock,
   LogOut,
   PencilSparkles,
   Plus,
   RefreshCw,
   Search,
   ShieldCheck,
+  User,
   X,
 } from "lucide-react";
 import {
@@ -33,6 +33,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { CopyButton } from "@/components/ui/copy-button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { env } from "@/env";
@@ -42,6 +43,7 @@ import {
   type ExtensionUser,
   getAuthStorage,
   setPendingSyncNonce,
+  switchActiveAccount,
 } from "@/lib/auth";
 import { sendExtensionMessage } from "@/lib/messaging";
 import {
@@ -49,6 +51,9 @@ import {
   decryptPasswordHint,
   unlockMasterKeyWithPasscode,
 } from "@/lib/passcode";
+import { useInactivityLock } from "@/lib/useInactivityLock";
+import { useTheme } from "@/lib/useTheme";
+import packageJson from "@/package.json";
 
 interface CurrentTabInfo {
   tabId?: number;
@@ -76,10 +81,16 @@ interface ServiceRecordItem {
 }
 
 export function App() {
+  // テーマ同期（デバイス設定自動追従 ＆ Web設定同期）
+  useTheme();
+
   // 状態管理
   const [tabInfo, setTabInfo] = useState<CurrentTabInfo | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<ExtensionUser | null>(null);
+  const [accounts, setAccounts] = useState<ExtensionUser[]>([]);
+  const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState<boolean>(false);
   const [family, setFamily] = useState<ExtensionFamily | null>(null);
   const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
   const [records, setRecords] = useState<ServiceRecordItem[]>([]);
@@ -103,8 +114,8 @@ export function App() {
     null,
   );
 
-  // ヒント復号・コピー表示
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  // 入力支援フィードバック・暗号状態
+  const [filledLoginId, setFilledLoginId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [decryptedHints, setDecryptedHints] = useState<Record<string, string>>(
     {},
@@ -112,8 +123,26 @@ export function App() {
   const [visibleHints, setVisibleHints] = useState<Record<string, boolean>>({});
   const masterKeyRef = useRef<CryptoKey | null>(null);
   const isRefreshingRef = useRef<boolean>(false);
+  const accountMenuRef = useRef<HTMLDivElement | null>(null);
 
-  // 1. 全体状態のリフレッシュ（storage直接読み取りでハング完全防止・並行実行ロック付き）
+  // 1. 自動ロック（無操作15分またはサイドパネル非表示で自律ロック）
+  const handleLock = useCallback(() => {
+    masterKeyRef.current = null;
+    sendExtensionMessage({ type: "VAULT_LOCK" }).catch(() => {});
+    setIsUnlocked(false);
+    setIsPasscodePromptOpen(false);
+    setPendingRevealCred(null);
+    setDecryptedHints({});
+    setVisibleHints({});
+  }, []);
+
+  useInactivityLock({
+    onLock: handleLock,
+    enabled: isUnlocked,
+    timeoutMinutes: 15,
+  });
+
+  // 2. 全体状態のリフレッシュ（storage直接読み取りでハング完全防止・並行実行ロック付き）
   const refreshState = useCallback(async () => {
     if (isRefreshingRef.current) return;
     isRefreshingRef.current = true;
@@ -138,41 +167,31 @@ export function App() {
       // 認証状態（chrome.storage.local から直接取得）
       const storage = await getAuthStorage();
       const isAuth = !!storage.user;
-      console.log("[PoohMa Sidepanel] refreshState:", {
-        isAuth,
-        userEmail: storage.user?.email,
-        familyName: storage.family?.name,
-      });
 
       setIsAuthenticated(isAuth);
       setCurrentUser(storage.user);
+      setAccounts(storage.accounts);
+      setActiveAccountId(storage.activeAccountId);
       setFamily(storage.family);
 
       if (isAuth) {
         setIsWaitingSync(false);
 
         // Offscreen Document の起動完了を待機
-        console.log("[PoohMa Sidepanel] Calling ENSURE_OFFSCREEN...");
         await sendExtensionMessage<{ success: boolean }>({
           type: "ENSURE_OFFSCREEN",
-        }).catch((err) => {
-          console.error("[PoohMa Sidepanel] ENSURE_OFFSCREEN error:", err);
-          return { success: false };
-        });
+        }).catch(() => ({ success: false }));
+
         // ロック状態確認（メモリ上の MasterKey で即時判定）
         setIsUnlocked(masterKeyRef.current !== null);
 
-        // レコード取得（Offscreen Document 初期化・Firebaseセッション確立遅延対策としてリトライ付き）
+        // レコード取得（Offscreen Document 初期化遅延対策としてリトライ付き）
         try {
-          console.log(
-            "[PoohMa Sidepanel] Requesting GET_ALL_RECORDS from offscreen...",
-          );
           let recordsRes: {
             success: boolean;
             records: ServiceRecordItem[];
           } | null = null;
 
-          // 初回が失敗または0件の場合、最大4回まで再試行（Firebaseトークン伝播・Offscreen待機）
           for (let attempt = 1; attempt <= 4; attempt++) {
             try {
               recordsRes = await sendExtensionMessage<{
@@ -184,20 +203,13 @@ export function App() {
                 break;
               }
             } catch (_msgErr) {
-              console.log(
-                `[PoohMa Sidepanel] GET_ALL_RECORDS attempt ${attempt} waiting...`,
-              );
+              // 待機再試行
             }
 
             if (attempt < 4) {
               await new Promise((r) => setTimeout(r, 600));
             }
           }
-
-          console.log("[PoohMa Sidepanel] GET_ALL_RECORDS response:", {
-            success: recordsRes?.success,
-            recordsCount: recordsRes?.records?.length ?? 0,
-          });
 
           if (recordsRes?.success && Array.isArray(recordsRes.records)) {
             setRecords(recordsRes.records);
@@ -217,7 +229,7 @@ export function App() {
     }
   }, []);
 
-  // 2. イベントリスナー登録
+  // 3. イベントリスナー登録
   useEffect(() => {
     refreshState();
 
@@ -225,21 +237,18 @@ export function App() {
       type: string;
       isAuthenticated?: boolean;
       user?: ExtensionUser | null;
+      accounts?: ExtensionUser[];
       family?: ExtensionFamily | null;
       isUnlocked?: boolean;
     }) => {
       if (message?.type === "OFFSCREEN_PING") return;
-      console.log(
-        "[PoohMa Sidepanel] runtime.onMessage received:",
-        message.type,
-      );
+
       if (message.type === "AUTH_STATE_CHANGED") {
-        console.log("[PoohMa Sidepanel] AUTH_STATE_CHANGED received:", {
-          isAuthenticated: message.isAuthenticated,
-          email: message.user?.email,
-        });
         setIsAuthenticated(!!message.isAuthenticated);
         setCurrentUser(message.user ?? null);
+        if (message.accounts) {
+          setAccounts(message.accounts);
+        }
         setFamily(message.family ?? null);
         if (!message.isAuthenticated) {
           setIsUnlocked(false);
@@ -258,16 +267,18 @@ export function App() {
       }
     };
 
-    // ストレージ変更監視（Background でセッション保存された瞬間に即時反映）
+    // ストレージ変更監視（サブアカウント切り替えやセッション保存時に即時反映）
     const storageListener = (
       changes: { [key: string]: chrome.storage.StorageChange },
       areaName: string,
     ) => {
-      if (areaName === "local" && (changes.user || changes.family)) {
-        console.log(
-          "[PoohMa Sidepanel] storage.onChanged detected user/family change!",
-          changes,
-        );
+      if (
+        areaName === "local" &&
+        (changes.user ||
+          changes.family ||
+          changes.accounts ||
+          changes.activeAccountId)
+      ) {
         setIsWaitingSync(false);
         refreshState();
       }
@@ -284,6 +295,24 @@ export function App() {
       }
     };
   }, [refreshState]);
+
+  // アカウントドロップダウンの外側クリック検知
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        accountMenuRef.current &&
+        !accountMenuRef.current.contains(e.target as Node)
+      ) {
+        setIsAccountMenuOpen(false);
+      }
+    }
+    if (isAccountMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isAccountMenuOpen]);
 
   // 連携待機セーフティネット: storageイベント取りこぼしを防ぐため1秒ごとに確認
   useEffect(() => {
@@ -318,16 +347,14 @@ export function App() {
           });
         }
       } catch (_e) {
-        // タブ情報取得失敗時はスキップ
+        // スキップ
       }
     };
 
-    // タブのアクティブ切り替え（ユーザーが別タブを選択した時）
     const handleTabActivated = () => {
       updateActiveTab();
     };
 
-    // タブの更新（同一タブ内でのページ遷移やURL変更時）
     const handleTabUpdated = (
       tabId: number,
       changeInfo: chrome.tabs.TabChangeInfo,
@@ -347,7 +374,6 @@ export function App() {
     chrome.tabs.onActivated.addListener(handleTabActivated);
     chrome.tabs.onUpdated.addListener(handleTabUpdated);
 
-    // 初回実行
     updateActiveTab();
 
     return () => {
@@ -357,7 +383,7 @@ export function App() {
     };
   }, []);
 
-  // 3. Web 同期ログインの開始
+  // 4. Web 同期ログインの開始
   const handleStartLogin = async () => {
     try {
       const nonce = crypto.randomUUID();
@@ -371,7 +397,15 @@ export function App() {
     }
   };
 
-  // 4. ヒントの復号と表示実行（Web Crypto による直接復号）
+  // 5. サブアカウントの切り替え
+  const handleSelectAccount = async (accountId: string) => {
+    setIsAccountMenuOpen(false);
+    if (accountId === activeAccountId) return;
+    await switchActiveAccount(accountId);
+    await refreshState();
+  };
+
+  // 6. ヒントの復号と表示実行（Web Crypto による直接復号）
   const decryptAndShowHint = useCallback(
     async (cred: CredentialItem, explicitKey?: CryptoKey) => {
       const activeKey = explicitKey || masterKeyRef.current;
@@ -402,7 +436,7 @@ export function App() {
     [],
   );
 
-  // 5. パスコード解除（Web Crypto による直接 PBKDF2 導出 ＆ MasterKey 展開）
+  // 7. パスコード解除
   const handleUnlock = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!passcode || lockoutRemainingSec > 0) return;
@@ -420,10 +454,6 @@ export function App() {
           throw new Error("家族暗号情報が見つかりません");
         }
 
-        console.log(
-          "[PoohMa Sidepanel] Unlocking MasterKey with passcode for family:",
-          currentFamily.name,
-        );
         const derivedKey = await unlockMasterKeyWithPasscode(
           passcode,
           currentFamily,
@@ -436,7 +466,7 @@ export function App() {
         setUnlockError(null);
         setIsPasscodePromptOpen(false);
 
-        // Offscreen Document があれば同期（バックグラウンド保持用・エラーは握る）
+        // Offscreen Document があれば同期
         sendExtensionMessage({
           type: "VAULT_UNLOCK",
           passcode,
@@ -484,7 +514,6 @@ export function App() {
     }
   };
 
-  // パスコードモーダルのキャンセル
   const handleCancelUnlock = () => {
     setIsPasscodePromptOpen(false);
     setPendingRevealCred(null);
@@ -492,18 +521,7 @@ export function App() {
     setUnlockError(null);
   };
 
-  // 6. 手動ロック
-  const handleLock = async () => {
-    masterKeyRef.current = null;
-    sendExtensionMessage({ type: "VAULT_LOCK" }).catch(() => {});
-    setIsUnlocked(false);
-    setIsPasscodePromptOpen(false);
-    setPendingRevealCred(null);
-    setDecryptedHints({});
-    setVisibleHints({});
-  };
-
-  // 7. ログアウト（直接ストレージを削除して確実に未ログイン画面へ戻す）
+  // 8. ログアウト
   const handleSignOut = async () => {
     masterKeyRef.current = null;
     try {
@@ -514,6 +532,8 @@ export function App() {
     }
     setIsAuthenticated(false);
     setCurrentUser(null);
+    setAccounts([]);
+    setActiveAccountId(null);
     setFamily(null);
     setIsUnlocked(false);
     setIsPasscodePromptOpen(false);
@@ -523,7 +543,7 @@ export function App() {
     setVisibleHints({});
   };
 
-  // 8. パスワードヒント復号トグル（Web の requireUnlock と同様、閲覧要求時にのみロック解除を促す）
+  // 9. パスワードヒント復号トグル
   const toggleHintVisibility = async (cred: CredentialItem) => {
     const credId = cred._id;
     if (visibleHints[credId]) {
@@ -548,16 +568,7 @@ export function App() {
     await decryptAndShowHint(cred);
   };
 
-  // 8. クリップボードコピー
-  const handleCopy = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(key);
-    setTimeout(() => {
-      setCopiedKey(null);
-    }, 2000);
-  };
-
-  // 9. カレントタブへの自動入力
+  // 10. カレントタブへの自動入力
   const handleFillLoginId = async (loginId: string) => {
     if (!tabInfo?.tabId) return;
     try {
@@ -566,16 +577,17 @@ export function App() {
         tabId: tabInfo.tabId,
         loginId,
       });
-      setCopiedKey(`fill-${loginId}`);
+      setFilledLoginId(loginId);
       setTimeout(() => {
-        setCopiedKey(null);
+        setFilledLoginId(null);
       }, 2000);
     } catch (_err) {
-      handleCopy(loginId, `id-${loginId}`);
+      // 失敗時はクリップボードへフォールバック
+      navigator.clipboard.writeText(loginId).catch(() => {});
     }
   };
 
-  // 10. レコードフィルタリング（閲覧中サイト一致 ＆ 検索クエリ）
+  // 11. レコードフィルタリング（閲覧中サイト一致 ＆ 検索クエリ）
   const matchedRecords = useMemo(() => {
     const tabUrl = tabInfo?.url;
     if (!tabUrl) return [];
@@ -613,48 +625,104 @@ export function App() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground selection:bg-orange-500/20">
+    <div className="flex min-h-screen flex-col bg-background text-foreground selection:bg-orange-500/20 font-sans">
       {/* 共通ヘッダー */}
-      <header className="sticky top-0 z-20 border-b border-border/80 bg-background/95 px-3.5 py-2.5 backdrop-blur">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-orange-500 text-white shadow-xs">
-              <ShieldCheck className="h-4 w-4" />
-            </div>
-            <div>
+      <header className="sticky top-0 z-20 border-b border-border/80 bg-background/95 px-3 py-2 backdrop-blur">
+        <div className="flex items-center justify-between gap-2">
+          {/* ブランドロゴ ＆ サブアカウント切り替え */}
+          <div className="flex items-center gap-2 min-w-0">
+            <img
+              src="/poohma_icon.png"
+              alt="PoohMa"
+              className="h-6 w-6 rounded-md object-contain shrink-0 shadow-xs"
+            />
+            {isAuthenticated ? (
+              <div className="relative min-w-0" ref={accountMenuRef}>
+                {accounts.length > 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsAccountMenuOpen((prev) => !prev)}
+                    className="flex items-center gap-1 text-left rounded-md px-1.5 py-0.5 hover:bg-muted/80 transition-colors cursor-pointer group"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs font-semibold text-foreground truncate max-w-[120px]">
+                          {currentUser?.displayName || "ユーザー"}
+                        </span>
+                        <ChevronDown className="h-3 w-3 text-muted-foreground group-hover:text-foreground shrink-0 transition-transform" />
+                      </div>
+                      <span className="text-[10px] text-muted-foreground truncate block max-w-[120px]">
+                        {family?.name || "家族アカウント"}
+                      </span>
+                    </div>
+                  </button>
+                ) : (
+                  <div className="min-w-0">
+                    <span className="text-xs font-semibold text-foreground truncate block max-w-[130px]">
+                      {currentUser?.displayName || family?.name || "PoohMa"}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground truncate block max-w-[130px]">
+                      {currentUser?.email || family?.name}
+                    </span>
+                  </div>
+                )}
+
+                {/* サブアカウント切り替えドロップダウン */}
+                {isAccountMenuOpen && accounts.length > 1 && (
+                  <div className="absolute left-0 top-full mt-1.5 w-48 rounded-md bg-card p-1 shadow-lg shadow-border z-30 animate-in fade-in-50 zoom-in-95">
+                    <div className="px-2 py-1 text-[10px] font-medium text-muted-foreground border-b border-border/60">
+                      アカウント切り替え
+                    </div>
+                    <div className="py-1 space-y-0.5 max-h-48 overflow-y-auto">
+                      {accounts.map((acc) => {
+                        const isSelected = acc._id === activeAccountId;
+                        return (
+                          <button
+                            key={acc._id}
+                            type="button"
+                            onClick={() => handleSelectAccount(acc._id)}
+                            className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs text-left cursor-pointer transition-colors ${
+                              isSelected
+                                ? "bg-orange-500/10 text-orange-600 dark:text-orange-400 font-medium"
+                                : "text-foreground hover:bg-muted"
+                            }`}
+                          >
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <div className="h-4 w-4 rounded-full bg-muted flex items-center justify-center text-[10px] shrink-0 font-medium text-muted-foreground">
+                                {acc.displayName?.[0] || (
+                                  <User className="h-2.5 w-2.5" />
+                                )}
+                              </div>
+                              <span className="truncate">
+                                {acc.displayName || acc.email}
+                              </span>
+                            </div>
+                            {isSelected && (
+                              <Check className="h-3 w-3 shrink-0" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
               <span className="text-xs font-bold tracking-tight text-foreground">
                 PoohMa
               </span>
-              {(family?.name || currentUser?.displayName) && (
-                <span
-                  className="ml-1.5 inline-block text-[10px] text-muted-foreground truncate max-w-[110px]"
-                  title={currentUser?.email}
-                >
-                  {family?.name || currentUser?.displayName}
-                </span>
-              )}
-            </div>
+            )}
           </div>
 
-          <div className="flex items-center gap-0.5">
-            {isAuthenticated && isUnlocked && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleLock}
-                title="パスコードで再ロック"
-                className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-accent"
-              >
-                <Lock className="h-3.5 w-3.5" />
-              </Button>
-            )}
+          {/* 右側アクション（手動ロックボタンは撤廃・無操作オートロックで自律防衛） */}
+          <div className="flex items-center gap-0.5 shrink-0">
             {isAuthenticated && (
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={refreshState}
-                title="再読み込み"
-                className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-accent"
+                title="最新情報に更新"
+                className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted"
               >
                 <RefreshCw className="h-3.5 w-3.5" />
               </Button>
@@ -678,7 +746,7 @@ export function App() {
       <main className="flex-1 p-3 space-y-3">
         {/* A. 未認証ビュー */}
         {!isAuthenticated ? (
-          <Card className="border border-border/80 bg-card shadow-xs">
+          <Card className="shadow-border bg-card">
             <CardHeader className="text-center p-5 space-y-3">
               <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400">
                 <ShieldCheck className="h-6 w-6" />
@@ -725,13 +793,13 @@ export function App() {
                 placeholder="サービス名・URL・アカウント名で検索"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8 text-xs h-8 bg-card border-border/80"
+                className="pl-8 text-xs h-8 bg-card shadow-border border-0"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground hover:text-foreground"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground hover:text-foreground cursor-pointer"
                 >
                   クリア
                 </button>
@@ -740,9 +808,9 @@ export function App() {
 
             {/* 閲覧中サイト情報（検索クエリ未入力時のみ表示） */}
             {!searchQuery && tabInfo?.url && (
-              <div className="flex items-center justify-between rounded-lg border border-border/80 bg-muted/30 px-2.5 py-1.5 text-xs">
+              <div className="flex items-center justify-between rounded-md bg-muted/40 px-2.5 py-1.5 text-xs shadow-border">
                 <div className="flex items-center gap-1.5 overflow-hidden">
-                  <Globe className="h-3 w-3 shrink-0 text-orange-500" />
+                  <Globe className="h-3.5 w-3.5 shrink-0 text-orange-500" />
                   <span className="truncate font-medium text-[11px] text-foreground">
                     {(() => {
                       try {
@@ -769,9 +837,9 @@ export function App() {
                 {searchedRecords.map((record) => (
                   <Card
                     key={record._id}
-                    className="overflow-hidden border border-border/80 bg-card shadow-xs"
+                    className="overflow-hidden shadow-border bg-card rounded-md border-0"
                   >
-                    <CardHeader className="p-3 pb-2 bg-muted/20 border-b border-border/60">
+                    <CardHeader className="p-3 pb-2 bg-muted/30 border-b border-border/40">
                       <div className="flex items-center justify-between gap-2">
                         <CardTitle className="text-xs font-bold truncate text-foreground">
                           {record.title}
@@ -794,7 +862,7 @@ export function App() {
                             <Badge
                               key={t}
                               variant="outline"
-                              className="text-[9px] px-1 py-0 h-3.5 border-border text-muted-foreground"
+                              className="text-[9px] px-1.5 py-0 h-4 border-border text-muted-foreground rounded"
                             >
                               {t}
                             </Badge>
@@ -807,7 +875,7 @@ export function App() {
                         record.credentials.map((cred) => (
                           <div
                             key={cred._id}
-                            className="rounded border border-border/60 p-2 space-y-1.5 bg-background/50"
+                            className="rounded-md border border-border/60 p-2 space-y-1.5 bg-background/50 shadow-xs"
                           >
                             {cred.label && (
                               <div className="text-[10px] font-medium text-muted-foreground">
@@ -815,109 +883,88 @@ export function App() {
                               </div>
                             )}
 
-                            {/* ログインID行 */}
+                            {/* ログインID行（Web互換 CopyButton ＋ 入力支援ボタン） */}
                             {cred.loginId && (
-                              <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center justify-between text-xs gap-1.5">
                                 <span className="text-[10px] text-muted-foreground shrink-0 w-8">
                                   ID
                                 </span>
-                                <span className="font-mono text-xs text-foreground truncate mx-1.5 select-all">
+                                <span className="font-mono text-xs text-foreground truncate flex-1 select-all">
                                   {cred.loginId}
                                 </span>
-                                <div className="flex items-center gap-0.5 shrink-0">
+                                <div className="flex items-center gap-1 shrink-0">
                                   <Button
                                     variant="ghost"
-                                    size="icon"
+                                    size="sm"
                                     onClick={() => {
                                       if (cred.loginId) {
                                         handleFillLoginId(cred.loginId);
                                       }
                                     }}
                                     title="ページに入力"
-                                    className="h-6 w-6 text-orange-600 dark:text-orange-400 hover:bg-orange-500/10"
+                                    className="h-7 px-2 text-[11px] text-orange-600 dark:text-orange-400 hover:bg-orange-500/10 font-medium"
                                   >
-                                    {copiedKey === `fill-${cred.loginId}` ? (
-                                      <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                                    {filledLoginId === cred.loginId ? (
+                                      <>
+                                        <Check className="mr-1 h-3 w-3 text-emerald-500" />
+                                        入力済
+                                      </>
                                     ) : (
-                                      <PencilSparkles className="h-3 w-3" />
+                                      <>
+                                        <PencilSparkles className="mr-1 h-3 w-3" />
+                                        入力
+                                      </>
                                     )}
                                   </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => {
-                                      if (cred.loginId) {
-                                        handleCopy(
-                                          cred.loginId,
-                                          `id-${cred._id}`,
-                                        );
-                                      }
-                                    }}
-                                    title="コピー"
-                                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                                  >
-                                    {copiedKey === `id-${cred._id}` ? (
-                                      <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-                                    ) : (
-                                      <Copy className="h-3 w-3" />
-                                    )}
-                                  </Button>
+                                  <CopyButton
+                                    text={cred.loginId}
+                                    label="ログインID"
+                                  />
                                 </div>
                               </div>
                             )}
 
-                            {/* パスワードヒント行 */}
+                            {/* パスワードヒント行（Web互換伏字 ＋ トグル ＋ CopyButton） */}
                             {cred.passwordHint && (
-                              <div className="flex items-center justify-between text-xs pt-1 border-t border-border/40">
+                              <div className="flex items-center justify-between text-xs pt-1.5 border-t border-border/40 gap-1.5">
                                 <span className="text-[10px] text-muted-foreground shrink-0 w-8">
                                   ヒント
                                 </span>
-                                <span className="font-mono text-xs text-foreground truncate mx-1.5 select-all">
+                                <span className="font-mono text-xs text-foreground truncate flex-1 select-all">
                                   {visibleHints[cred._id]
                                     ? decryptedHints[cred._id] || "..."
                                     : "••••••••"}
                                 </span>
-                                <div className="flex items-center gap-0.5 shrink-0">
+                                <div className="flex items-center gap-1 shrink-0">
                                   <Button
                                     variant="ghost"
-                                    size="icon"
+                                    size="sm"
                                     onClick={() => toggleHintVisibility(cred)}
                                     title={
                                       visibleHints[cred._id] ? "隠す" : "表示"
                                     }
-                                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                                    className="h-7 px-2 text-[11px] text-muted-foreground hover:text-foreground font-medium"
                                   >
                                     {visibleHints[cred._id] ? (
-                                      <EyeOff className="h-3 w-3" />
+                                      <>
+                                        <EyeOff className="mr-1 h-3 w-3" />
+                                        隠す
+                                      </>
                                     ) : (
-                                      <Eye className="h-3 w-3" />
+                                      <>
+                                        <Eye className="mr-1 h-3 w-3" />
+                                        表示
+                                      </>
                                     )}
                                   </Button>
-                                  {visibleHints[cred._id] &&
-                                    decryptedHints[cred._id] && (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => {
-                                          const hintText =
-                                            decryptedHints[cred._id];
-                                          if (hintText) {
-                                            handleCopy(
-                                              hintText,
-                                              `hint-${cred._id}`,
-                                            );
-                                          }
-                                        }}
-                                        title="ヒントをコピー"
-                                        className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                                      >
-                                        {copiedKey === `hint-${cred._id}` ? (
-                                          <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-                                        ) : (
-                                          <Copy className="h-3 w-3" />
-                                        )}
-                                      </Button>
-                                    )}
+                                  <CopyButton
+                                    text={
+                                      visibleHints[cred._id]
+                                        ? (decryptedHints[cred._id] ?? "")
+                                        : ""
+                                    }
+                                    label="パスワードヒント"
+                                  />
                                 </div>
                               </div>
                             )}
@@ -934,7 +981,7 @@ export function App() {
               </div>
             ) : (
               /* 一致レコードなし */
-              <Card className="border-dashed border-border/80 bg-transparent p-5 text-center">
+              <Card className="border-dashed border-border/80 bg-transparent p-5 text-center rounded-md">
                 <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground">
                   <Globe className="h-4 w-4" />
                 </div>
@@ -953,7 +1000,7 @@ export function App() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="w-full text-xs font-medium"
+                      className="w-full text-xs font-medium shadow-xs"
                       onClick={() => {
                         const newUrl = `${env.VITE_SITE_URL}/records/new?url=${encodeURIComponent(
                           tabInfo?.url || "",
@@ -972,7 +1019,7 @@ export function App() {
         )}
       </main>
 
-      {/* 家族パスコード入力モーダル（ヒント閲覧要求時にのみ表示されるWeb互換仕様） */}
+      {/* 家族パスコード入力モーダル */}
       {isAuthenticated && isPasscodePromptOpen && (
         <div
           role="dialog"
@@ -980,7 +1027,7 @@ export function App() {
           aria-labelledby="passcode-dialog-title"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 animate-in fade-in"
         >
-          <Card className="w-full max-w-sm border border-border/80 bg-card shadow-lg">
+          <Card className="w-full max-w-sm shadow-border bg-card border-0 rounded-md shadow-lg">
             <CardHeader className="p-4 pb-2 space-y-1.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -1020,12 +1067,12 @@ export function App() {
                     disabled={lockoutRemainingSec > 0 || isPending}
                     aria-invalid={!!unlockError}
                     autoFocus
-                    className="pr-9 font-mono text-xs"
+                    className="pr-9 font-mono text-xs shadow-border border-0"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPasscode((v) => !v)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
                     title={showPasscode ? "隠す" : "表示"}
                   >
                     {showPasscode ? (
@@ -1076,14 +1123,14 @@ export function App() {
 
       {/* フッター */}
       <footer className="border-t border-border/80 bg-background/50 px-3 py-2 text-center text-[10px] text-muted-foreground flex items-center justify-between">
-        <span>PoohMa Extension v0.1.0</span>
+        <span>PoohMa Extension v{packageJson.version}</span>
         <a
           href={env.VITE_SITE_URL}
           target="_blank"
           rel="noreferrer"
           className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
         >
-          Webアプリを開く
+          PoohMaをタブで開く
           <ExternalLink className="h-2.5 w-2.5" />
         </a>
       </footer>

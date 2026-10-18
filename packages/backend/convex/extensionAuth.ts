@@ -103,6 +103,22 @@ export const redeemSyncToken = mutation({
       }
     }
 
+    // 同一 Firebase UID に属する全サブアカウント一覧を取得
+    const userDocs = await ctx.db
+      .query("users")
+      .withIndex("by_userId", (q) => q.eq("userId", user.userId))
+      .collect();
+
+    const accounts = userDocs.map((u) => ({
+      _id: u._id,
+      userId: u.userId,
+      displayName: u.displayName,
+      email: u.email,
+      photoURL: u.photoURL,
+      familyId: u.familyId,
+      familyRole: u.familyRole,
+    }));
+
     return {
       success: true,
       user: {
@@ -114,6 +130,7 @@ export const redeemSyncToken = mutation({
         familyId: user.familyId,
         familyRole: user.familyRole,
       },
+      accounts,
       family,
     };
   },

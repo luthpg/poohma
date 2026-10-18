@@ -59,6 +59,9 @@ describe("拡張機能連携認証 API (extensionAuth: issueSyncToken / redeemSy
     expect(redeemRes.user.displayName).toBe("テストユーザー");
     expect(redeemRes.user.email).toBe("test@example.com");
     expect(redeemRes.user.familyId).toBe(familyId);
+    expect(Array.isArray(redeemRes.accounts)).toBe(true);
+    expect(redeemRes.accounts.length).toBe(1);
+    expect(redeemRes.accounts[0]?._id).toBe(userId);
     expect(redeemRes.family).not.toBeNull();
     expect(redeemRes.family?.masterKeyEncrypted).toBe(
       mockCryptoMaterials.masterKeyEncrypted,

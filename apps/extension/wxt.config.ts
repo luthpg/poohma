@@ -8,7 +8,6 @@ export default defineConfig({
     name: "PoohMa - 家族向けアカウント・パスワードヒント管理",
     description:
       "家族アカウントのパスワードヒントを安全に参照・登録・自動入力支援する拡張機能",
-    version: "0.1.0",
     permissions: [
       "storage",
       "activeTab",
@@ -19,8 +18,20 @@ export default defineConfig({
       "scripting",
     ],
     host_permissions: ["<all_urls>"],
+    icons: {
+      "16": "icon/16.png",
+      "32": "icon/32.png",
+      "48": "icon/48.png",
+      "96": "icon/96.png",
+      "128": "icon/128.png",
+    },
     action: {
       default_title: "PoohMa を開く",
+      default_icon: {
+        "16": "icon/16.png",
+        "32": "icon/32.png",
+        "48": "icon/48.png",
+      },
     },
     side_panel: {
       default_path: "sidepanel.html",

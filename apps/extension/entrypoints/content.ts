@@ -85,7 +85,7 @@ export default defineContentScript({
           hasCustomToken: !!event.data.customToken,
         });
 
-        const { nonce, code, customToken, idToken } = event.data;
+        const { nonce, code, customToken, idToken, theme } = event.data;
         if (
           typeof nonce === "string" &&
           typeof code === "string" &&
@@ -112,6 +112,7 @@ export default defineContentScript({
               code,
               customToken,
               idToken,
+              theme,
             });
 
             console.log("[PoohMa Content] Background response received:", res);

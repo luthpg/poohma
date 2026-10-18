@@ -249,6 +249,38 @@ export default defineBackground(() => {
             }
           }
 
+          const extensionAccounts =
+            Array.isArray(res.accounts) && res.accounts.length > 0
+              ? res.accounts.map(
+                  (a: {
+                    _id: string;
+                    userId: string;
+                    displayName?: string;
+                    email: string;
+                    photoURL?: string;
+                    familyId?: string;
+                    familyRole?: string;
+                  }) => ({
+                    _id: a._id,
+                    userId: a.userId,
+                    displayName: a.displayName,
+                    email: a.email,
+                    photoURL: a.photoURL,
+                    familyId: a.familyId,
+                    familyRole: a.familyRole as "admin" | "member" | undefined,
+                  }),
+                )
+              : [extensionUser];
+
+          if (
+            message.theme &&
+            (message.theme === "light" ||
+              message.theme === "dark" ||
+              message.theme === "system")
+          ) {
+            await chrome.storage.local.set({ theme: message.theme });
+          }
+
           console.log(
             "[PoohMa Background] Saving session to storage for user:",
             extensionUser.email,
@@ -260,6 +292,7 @@ export default defineBackground(() => {
             customToken,
             activeIdToken,
             activeRefreshToken,
+            extensionAccounts,
           );
           console.log(
             "[PoohMa Background] Session saved to chrome.storage.local",
@@ -271,6 +304,7 @@ export default defineBackground(() => {
               type: "AUTH_STATE_CHANGED",
               isAuthenticated: true,
               user: extensionUser,
+              accounts: extensionAccounts,
               family: extensionFamily,
             })
             .catch(() => {});

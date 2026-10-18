@@ -20,6 +20,8 @@ export interface ExtensionFamily {
 
 export interface AuthStorageData {
   user: ExtensionUser | null;
+  accounts: ExtensionUser[];
+  activeAccountId: string | null;
   family: ExtensionFamily | null;
   pendingSyncNonce: string | null;
   customToken: string | null;
@@ -33,14 +35,29 @@ export interface AuthStorageData {
 export async function getAuthStorage(): Promise<AuthStorageData> {
   const result = await chrome.storage.local.get([
     "user",
+    "accounts",
+    "activeAccountId",
     "family",
     "pendingSyncNonce",
     "customToken",
     "idToken",
     "refreshToken",
   ]);
+  const user = (result.user as ExtensionUser) ?? null;
+  const rawAccounts = result.accounts as ExtensionUser[] | undefined;
+  const accounts =
+    Array.isArray(rawAccounts) && rawAccounts.length > 0
+      ? rawAccounts
+      : user
+        ? [user]
+        : [];
+  const activeAccountId =
+    (result.activeAccountId as string | undefined) || user?._id || null;
+
   return {
-    user: result.user ?? null,
+    user,
+    accounts,
+    activeAccountId,
     family: result.family ?? null,
     pendingSyncNonce: result.pendingSyncNonce ?? null,
     customToken: result.customToken ?? null,
@@ -58,9 +75,13 @@ export async function setAuthSession(
   customToken?: string | null,
   idToken?: string | null,
   refreshToken?: string | null,
+  accounts?: ExtensionUser[],
 ): Promise<void> {
+  const resolvedAccounts = accounts && accounts.length > 0 ? accounts : [user];
   await chrome.storage.local.set({
     user,
+    accounts: resolvedAccounts,
+    activeAccountId: user._id,
     family,
     pendingSyncNonce: null,
     ...(customToken ? { customToken } : {}),
@@ -70,11 +91,26 @@ export async function setAuthSession(
 }
 
 /**
+ * アクティブなサブアカウントを切り替える
+ */
+export async function switchActiveAccount(accountId: string): Promise<void> {
+  const storage = await getAuthStorage();
+  const targetUser = storage.accounts.find((a) => a._id === accountId);
+  if (!targetUser) return;
+  await chrome.storage.local.set({
+    user: targetUser,
+    activeAccountId: accountId,
+  });
+}
+
+/**
  * 認証セッションを破棄（ログアウト）する
  */
 export async function clearAuthSession(): Promise<void> {
   await chrome.storage.local.remove([
     "user",
+    "accounts",
+    "activeAccountId",
     "family",
     "pendingSyncNonce",
     "customToken",

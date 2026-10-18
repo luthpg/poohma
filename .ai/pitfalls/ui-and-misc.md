@@ -277,4 +277,34 @@ UI 実装、外部 API 連携、環境変数、モノレポ設定における落
   - `packages/backend/convex/extensionAuth.ts`
   - `.docs/features.md`
 
+---
+
+### Chrome 拡張機能（Side Panel / Popup）と Web アプリケーションのデザイン・機能調和
+
+- **問題 (Problem)**:
+  拡張機能プロジェクト（WXT/Tailwind）に Shadcn を初期セットアップした際、Shadcn デフォルトの丸みを帯びたトークン（`--radius: 0.625rem` / 10px）や物理 CSS ボーダー（`border border-border`）、無彩色ダークパレットがそのまま適用され、Web アプリ（Vercel Geist 哲学の 6px 角丸、`shadow-border`、青黒ダークモード、Geist タイポグラフィ）と世界観が乖離してしまう。また、手動ロックボタンなどの不要な操作を安易に配置して画面を煩雑にしてしまう。
+- **原因 (Root Cause)**:
+  マルチパッケージ環境において、Web アプリの CSS トークンや UX 設計指針（無操作オートロックによる自律防衛）を拡張機能側に正確に同期せず、フレームワーク初期値を漫然と放置したこと。
+- **誤ったアプローチ (Anti-Pattern)**:
+  - 拡張機能側を「簡易ツール」と割り切り、角丸や影、ダークモード色相の不一致を放置する。
+  - Web 側にある「無操作オートロック（Inactivity Lock）」を省き、代わりに画面上に手動ロックボタンを置いてユーザーに手動操作を強要する。
+- **正しいアプローチ (Correct Pattern)**:
+  1. **デザインシステム・トークンの完全同期**:
+     - `--radius: 6px`、`.shadow-border`（`box-shadow: 0px 0px 0px 1px rgba(0, 0, 0, 0.08)`）、Web と同一のダークモード OKLCH パレット（`oklch(0.12 0.005 285.823)`）を `apps/extension/styles/globals.css` に移植。
+  2. **OS デバイス設定への自動追従 ＆ Web 同期**:
+     - `window.matchMedia("(prefers-color-scheme: dark)")` により OS のライト/ダーク切り替えにリアルタイム連動させ、Web 連携時に受け渡されたテーマ設定も反映。
+  3. **自律無操作オートロックによる手動ロックボタン撤廃**:
+     - ユーザー操作（キー、マウス、スクロール）およびタブ/パネル非表示復帰を監視し、15分無操作で自律的に MasterKey を破棄。不要な手動ロックボタンを画面から撤廃して UI をクリーン化。
+  4. **共通アセットの利用**:
+     - 公式アセット（`poohma_icon.png`、各種解像度 PNG、favicon）を `apps/extension/public` に配備し、統一利用する。
+- **再発防止 (Prevention)**:
+  拡張機能やサブアプリを開発する際は、デザインシステム（トークン・角丸・影・タイポグラフィ）および主要な安全機構（オートロック等）を親アプリと揃える監査・Doc-Sync チェックを必須化する。
+- **関連実装 (Related Code References)**:
+  - `apps/extension/styles/globals.css`
+  - `apps/extension/lib/useTheme.ts`
+  - `apps/extension/lib/useInactivityLock.ts`
+  - `apps/extension/entrypoints/sidepanel/App.tsx`
+  - `.docs/DESIGN.md`
+
+
 

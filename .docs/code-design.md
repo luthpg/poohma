@@ -442,6 +442,19 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 
 インデックス: by_createdAt, by_email_createdAt。同一メールアドレスによる短時間連投の抑止（レート制限）および一覧照会に使用。
 
+#### extensionSyncCodes
+
+Chrome 拡張機能連携用の短命ワンタイム同期コードテーブル。Web 側で発行され、拡張機能側で検証・消費されると即座に物理削除される（認証・セッション同期方式の選定および Chrome Web Store 審査に関する位置付けは [ADR-009](./adr/009-extension-authentication-strategy.md) 参照）。
+
+| フィールド | 型 | 説明 |
+| ---------- | --- | --- |
+| accountId | Id<users> | 発行元のアカウント ID |
+| nonce | string | 拡張機能が生成した暗号学的乱数（UUID v4） |
+| code | string | サーバー側で発行されたワンタイム短命コード（UUID v4） |
+| expiresAt | number | 有効期限（発行から 30 秒） |
+
+インデックス: by_code_nonce, by_expiresAt。検証成功時の即時物理削除に加え、定期 cron（`cleanupExpiredSyncCodes`）により期限切れレコードが自動パージされる。
+
 ## 5. 認証・認可設計
 
 ### 5.1 認証要素の責務分離（4層モデル）
