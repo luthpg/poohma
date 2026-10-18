@@ -207,3 +207,9 @@
 - **CI テスト用ダミー環境変数の流用禁止**:
   - GitHub Releases 等でエンドユーザーへ配布する成果物（Chrome 拡張機能 ZIP 等）のビルドには、CI テスト用のダミー環境変数（`dummy_key` やダミードメイン）を流用してはならない。成果物が実環境で動作しなくなるため、必ず GitHub Secrets / Variables を通じた正規の本番環境変数を注入してビルドすること。
 
+### Monorepo 内 postinstall による環境変数バリデーションと CI への環境変数供給
+
+- **`pnpm install` 実行ジョブでの環境変数供給**:
+  - Monorepo 内のパッケージ（`apps/extension` 等）の `postinstall` スクリプトで環境変数スキーマ（`@t3-oss/env-core` 等）が評価される場合、`pnpm install` を実行する全 CI/CD ジョブで必要な環境変数（テスト・ドライランジョブではダミー値、実ビルドジョブでは本番/Preview値）を確実に供給すること。未供給による `pnpm install` 異常終了を構造的に防止する。
+
+

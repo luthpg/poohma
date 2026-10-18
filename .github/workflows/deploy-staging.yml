@@ -24,6 +24,10 @@ jobs:
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_STAGING_DEPLOY_KEY }}
+      VITE_FIREBASE_API_KEY: ${{ secrets.FIREBASE_PREVIEW_API_KEY }}
+      VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_PREVIEW_AUTH_DOMAIN }}
+      VITE_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PREVIEW_PROJECT_ID }}
+      VITE_CONVEX_URL: ${{ secrets.CONVEX_PREVIEW_URL }}
       NITRO_PRESET: vercel
       VERCEL: "1"
 
@@ -118,6 +122,10 @@ jobs:
       CONVEX_PREVIEW_DEPLOY_KEY: ${{ secrets.CONVEX_PREVIEW_DEPLOY_KEY }}
       # vercel build 内の convex deploy も Preview Deployment に向かわせる
       CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_PREVIEW_DEPLOY_KEY }}
+      VITE_FIREBASE_API_KEY: ${{ secrets.FIREBASE_PREVIEW_API_KEY }}
+      VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_PREVIEW_AUTH_DOMAIN }}
+      VITE_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PREVIEW_PROJECT_ID }}
+      VITE_CONVEX_URL: ${{ secrets.CONVEX_PREVIEW_URL }}
       NITRO_PRESET: vercel
       VERCEL: "1"
 

@@ -226,4 +226,24 @@ Chrome 拡張機能などの配布用 ZIP パッケージを生成・GitHub Rele
 2. **GitHub Secrets / Variables からの本番環境変数注入**:
    - `VITE_FIREBASE_API_KEY`、`VITE_FIREBASE_PROJECT_ID`、`VITE_CONVEX_URL` 等はハードコードせず、GitHub Secrets または Variables（`${{ secrets.VITE_FIREBASE_API_KEY }}`）から安全に注入してビルドする。
 
+---
+
+## 13. Monorepo 内パッケージの `postinstall` による環境変数バリデーションと CI での `pnpm install` 失敗
+
+### 事象
+
+Monorepo 配下に新しいパッケージ（例: Chrome 拡張機能 `apps/extension`）を追加した際、`package.json` に `"postinstall": "wxt prepare"` などの型生成・初期化スクリプトが定義されていると、リポジトリルートで `pnpm install` を実行した際に自動的にこの `postinstall` がトリガーされる。
+このツール（WXT 等）がエントリーポイントを静的走査して `@t3-oss/env-core` などの環境変数スキーマを評価する場合、**必須の環境変数が未定義（または URL 形式でない）だとバリデーションエラー（ZodError）でプロセスが exit 1 で異常終了し、`pnpm install` 自体が失敗する**。
+その結果、対象パッケージとは直接関係のない CI/CD ジョブ（例: `convex-dry-run`、`deploy-staging.yml`、`deploy-production.yml`）であっても、`pnpm install` ステップでジョブ全体がクラッシュしてしまう。
+
+### 対策
+
+1. **CI ワークフロー各ジョブへの環境変数の適切な供給**:
+   - `pnpm install` を実行するジョブ（`ci.yml`、`deploy-staging.yml`、`deploy-production.yml` 等）において、ジョブレベルの `env:` で必要な環境変数を明示的に供給する。
+   - テスト・ドライラン・Convex デプロイなど、実際のフロントエンド成果物をビルドしないジョブでは、安全なダミー値（`VITE_FIREBASE_API_KEY: "dummy_key"`, `VITE_CONVEX_URL: "https://dummy.convex.cloud"` 等）を定義してバリデーションを通過させる。
+   - ステージングデプロイ等の実ビルドを伴うジョブでは、適切な Preview 用 Secrets を注入して整合性を保つ。
+2. **新パッケージ導入時の Monorepo 影響範囲チェック**:
+   - `postinstall` で実行されるコマンドが外部環境変数に依存していないかを事前に点検し、Monorepo 全体の CI/CD パイプラインへの波及影響を意識する。
+
+
 
