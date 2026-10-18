@@ -60,10 +60,20 @@ sequenceDiagram
 ```
 
 - **短命 TTL とワンショット物理削除**: 同期コードの有効期限は 30 秒とし、`redeemSyncToken` 実行時にデータベースから即座に物理削除する。これにより、ブラウザ履歴の漏洩や中間者による再送攻撃（リプレイ攻撃）を完全に遮断する。
+- **動的 Extension ID 制約と postMessage 採用根拠**: GitHub Releases から ZIP 配布（デベロッパーモードでのアンパックド読み込み）される環境では、Chrome 側で端末・プロファイルごとにランダムな Extension ID が動的に割り振られる。そのため、Web 側から固定 ID を宛先とする外部メッセージング（`chrome.runtime.sendMessage(EXTENSION_ID, ...)`）を行うことは不可能である。Web アプリケーション（同一オリジン検証済み）から Content Script への `window.postMessage`（暗号学的 Nonce ＋ ワンタイム短命コード）を経由する方式は、動的 Extension ID 制約下においてセッションを安全・確実に伝達する唯一かつ堅牢な設計である。
 - **オリジン検証**: Web アプリから Content Script への伝達は `window.postMessage` を使用し、`event.origin !== window.location.origin` の厳格なチェックを行う。
 - **マルチアカウント一覧の同時返却**: 同一の Firebase UID に紐づく全 `users` レコード（`accounts`）を返却することで、拡張機能側でのシームレスなアカウント切り替えを実現する。
 
-### 2. Offscreen Document による Firebase Auth 永続セッション管理と計算ワーカー化
+### 2. E2EE 暗号化ヒント取得と閲覧監査ログ記録の設計原則
+
+- **ゼロ知識暗号文と Query/Mutation 分離**:
+  - `getRecords`（単発 HTTP クエリ）によって取得されるパスワードヒント（`passwordHint`、`passwordHintDekEncrypted` 等）は、すべてクライアントサイドで E2EE 暗号化された Blob（暗号文）であり、サーバー側では一切平文を解読できない。
+  - レコード取得クエリ自体は安全な読み取り操作（Query）として扱い、ConvexHttpClient による単発取得とインメモリキャッシュによって拡張機能の動作を高速化・最適化する。
+- **明示操作時の不可逆な閲覧監査ログ記録**:
+  - 実際の閲覧監査ログ（`HINT_VIEW`）は、Side Panel 上でユーザーがマスターパスコードを入力して明示的に「表示」アイコンをクリックし、Web Crypto によるローカル復号が実行された瞬間（`decryptAndShowHint`）に Convex Mutation（`records:recordHintViewLog`）によって不可逆・確実に記録される。
+  - これにより、ゼロ知識暗号アーキテクチャを損なうことなく、確実な監査証跡と高い応答性を両立している。
+
+### 3. Offscreen Document による Firebase Auth 永続セッション管理と計算ワーカー化
 
 Manifest V3 Service Worker の制約（DOM API 非対応、Web Crypto 実行等の分離）を補完し、Firebase Auth SDK の認証状態維持および Web Crypto 鍵導出の安全な計算処理を行うため、`chrome.offscreen` API を用いた **Offscreen Document（`entrypoints/offscreen/main.ts`）** を採用する。
 - Web 側から渡された Firebase Custom Token を用いて、Offscreen Document 内の公式 Firebase Auth SDK で `signInWithCustomToken` を実行。
@@ -71,7 +81,7 @@ Manifest V3 Service Worker の制約（DOM API 非対応、Web Crypto 実行等�
 - Offscreen Document は `chrome.storage` に依存せず、Background Service Worker との `runtime.sendMessage` 通信による純粋な計算・認証ワーカーとして機能する。
 - レコード一覧の取得は Background Service Worker が ConvexHttpClient による単発 HTTP クエリと 1 分間のインメモリキャッシュを用いて行い、WebSocket 常時購読による過剰な常駐リソース消費を防止する。
 
-### 3. マスターパスコード（E2EE）の厳格な分離
+### 4. マスターパスコード（E2EE）の厳格な分離
 
 - Web アプリから拡張機能へ、**平文のマスターパスコードや復号済みマスターキーは一切渡さない**。
 - 拡張機能が受け取るのは、暗号化されたマスターキー（`masterKeyEncrypted`）、ソルト（`masterKeySalt`）、IV（`masterKeyIv`）、KDF反復回数（`kdfIterations`）のみとする。

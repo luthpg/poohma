@@ -9,13 +9,34 @@ export function isTrustedPoohmaOrigin(origin: string): boolean {
   try {
     const url = new URL(origin);
     const host = url.hostname.toLowerCase();
-    return (
-      host === "localhost" ||
-      host === "127.0.0.1" ||
-      host.endsWith(".ciderlabs.link") ||
-      host.endsWith(".vercel.app") ||
-      host.endsWith(".workers.dev")
-    );
+    const protocol = url.protocol;
+
+    // ローカル開発環境（http / https 両対応）
+    if (host === "localhost" || host === "127.0.0.1") {
+      return protocol === "http:" || protocol === "https:";
+    }
+
+    // 外部環境は必ず HTTPS 必須
+    if (protocol !== "https:") {
+      return false;
+    }
+
+    // 公式ドメイン（本番・ステージング）
+    if (host === "ciderlabs.link" || host.endsWith(".ciderlabs.link")) {
+      return true;
+    }
+
+    // Vercel プレビューおよび本番（poohma プレフィックスを強制し他者の vercel.app を拒否）
+    if (host.startsWith("poohma-") && host.endsWith(".vercel.app")) {
+      return true;
+    }
+
+    // Cloudflare Workers（poohma プレフィックスを強制）
+    if (host.startsWith("poohma-") && host.endsWith(".workers.dev")) {
+      return true;
+    }
+
+    return false;
   } catch {
     return false;
   }

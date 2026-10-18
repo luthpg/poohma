@@ -216,5 +216,11 @@
 - **書き込み権限（contents: write）付きワークフローでの GITHUB_TOKEN 永続化禁止（CWE-200）**:
   - `release-extension.yml` 等で `permissions: contents: write` を付与するワークフローでは、必ず `actions/checkout` に `persist-credentials: false` を明示すること。悪意ある依存関係やスクリプトがローカル `.git/config` からトークンを窃取するリスクを構造的に排除する。
 
+### CI/CD における静的検証（Lint/Format）の副作用排除とローカル快適性の両立
+
+- **ローカル `check`（`--write`）と CI `check:ci`（読み取り専用）の責務分離**:
+  - CI パイプライン内で実行するコード品質検査（Biome 等）は、自動修正によって差分改変や偽陽性通過が発生する副作用を防ぐため、必ず副作用のない読み取り専用コマンド（`check:ci` / `biome ci`）を実行すること。
+  - 一方でローカル開発環境の `check` スクリプトは、開発者の快適性とフォーマット自動適用を最大化するため `--write` を付与した構成を維持し、ローカルの開発生産性と CI の厳格な整合性検証を両立させる。
+
 
 

@@ -238,8 +238,8 @@ Monorepo 配下に新しいパッケージ（例: Chrome 拡張機能 `apps/exte
 
 ### 対策
 
-1. **CI ワークフロー各ジョブへの環境変数の適切な供給**:
-   - `pnpm install` を実行するジョブ（`ci.yml`、`deploy-staging.yml`、`deploy-production.yml` 等）において、ジョブレベルの `env:` で必要な環境変数を明示的に供給する。
+1. **CI ワークフローの依存解決ステップへの環境変数の局所供給（Scoped Env 原則）**:
+   - `pnpm install` を実行するステップ（`Install dependencies` 等）において、ステップレベルの `env:` で必要な環境変数を明示的に供給する（※ジョブ全体への安易な配置は後続の `vercel build` 等の設定値を上書きするリスクがあるため、第14節の局所スコープ配置原則を遵守する）。
    - テスト・ドライラン・Convex デプロイなど、実際のフロントエンド成果物をビルドしないジョブでは、安全なダミー値（`VITE_FIREBASE_API_KEY: "dummy_key"`, `VITE_CONVEX_URL: "https://dummy.convex.cloud"` 等）を定義してバリデーションを通過させる。
    - ステージングデプロイ等の実ビルドを伴うジョブでは、適切な Preview 用 Secrets を注入して整合性を保つ。
 2. **新パッケージ導入時の Monorepo 影響範囲チェック**:

@@ -9,6 +9,7 @@ import {
   getAuthStorage,
   getValidIdToken,
   setAuthSession,
+  setPendingSyncNonce,
 } from "@/lib/auth";
 import { isTrustedPoohmaOrigin } from "@/lib/url";
 
@@ -210,15 +211,18 @@ export default defineBackground(() => {
             }
           }
 
-          // 拡張機能側が発行した pendingSyncNonce との一致検証（存在する場合）
+          // 拡張機能側が発行した pendingSyncNonce との一致検証（未設定または不一致時は拒否）
           const currentStorage = await getAuthStorage();
           if (
-            currentStorage.pendingSyncNonce &&
+            !currentStorage.pendingSyncNonce ||
             currentStorage.pendingSyncNonce !== nonce.trim()
           ) {
             sendResponse({ success: false, error: "Nonce mismatch" });
             return;
           }
+
+          // リプレイ・二重引き換え防止のため、引き換え前にストレージ上の nonce を即時消費
+          await setPendingSyncNonce("");
 
           // 未認証 mutation を呼ぶ前に、古い期限切れトークンが付与されないようクリア
           convex.clearAuth();
@@ -554,8 +558,6 @@ export default defineBackground(() => {
           console.log(
             "[PoohMa Background] Stored pending save for origin:",
             origin,
-            "loginId:",
-            loginId,
           );
         } catch (_) {}
       }

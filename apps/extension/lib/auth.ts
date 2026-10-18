@@ -235,9 +235,12 @@ export async function getValidIdToken(apiKey: string): Promise<string | null> {
   if (storage.refreshToken) {
     const refreshed = await refreshIdToken(storage.refreshToken, apiKey);
     if (refreshed) {
-      console.log(
-        "[PoohMa Auth] ID token refreshed successfully via refreshToken!",
-      );
+      // レースコンディション対策: 書き戻し前にストレージ状態（ログアウトやアカウント切り替え）を検証
+      const latest = await getAuthStorage();
+      if (!latest.user || latest.refreshToken !== storage.refreshToken) {
+        return latest.idToken ?? null;
+      }
+
       await chrome.storage.local.set({
         idToken: refreshed.idToken,
         refreshToken: refreshed.refreshToken,
@@ -250,9 +253,12 @@ export async function getValidIdToken(apiKey: string): Promise<string | null> {
   if (storage.customToken) {
     const exchanged = await exchangeCustomToken(storage.customToken, apiKey);
     if (exchanged) {
-      console.log(
-        "[PoohMa Auth] ID token refreshed successfully via customToken!",
-      );
+      // レースコンディション対策: 書き戻し前にストレージ状態を検証
+      const latest = await getAuthStorage();
+      if (!latest.user || latest.customToken !== storage.customToken) {
+        return latest.idToken ?? null;
+      }
+
       await chrome.storage.local.set({
         idToken: exchanged.idToken,
         refreshToken: exchanged.refreshToken,

@@ -51,6 +51,7 @@ import {
   decryptPasswordHint,
   unlockMasterKeyWithPasscode,
 } from "@/lib/passcode";
+import { normalizeUrl } from "@/lib/url";
 import { useInactivityLock } from "@/lib/useInactivityLock";
 import { useTheme } from "@/lib/useTheme";
 import packageJson from "@/package.json";
@@ -153,6 +154,7 @@ export function App() {
   const refreshState = useCallback(async () => {
     if (isRefreshingRef.current) return;
     isRefreshingRef.current = true;
+    const currentGeneration = accountGenerationRef.current;
     try {
       // カレントタブ情報（Side Panel から直接取得）
       try {
@@ -219,7 +221,9 @@ export function App() {
           }
 
           if (recordsRes?.success && Array.isArray(recordsRes.records)) {
-            setRecords(recordsRes.records);
+            if (accountGenerationRef.current === currentGeneration) {
+              setRecords(recordsRes.records);
+            }
           }
         } catch (_err) {
           // レコード取得失敗時はスキップ
@@ -513,13 +517,6 @@ export function App() {
         setFailedAttempts(0);
         setUnlockError(null);
         setIsPasscodePromptOpen(false);
-
-        // Offscreen Document があれば同期
-        sendExtensionMessage({
-          type: "VAULT_UNLOCK",
-          passcode,
-          family: currentFamily,
-        }).catch(() => {});
 
         // 保留されていたヒント要求があれば直ちに復号・表示
         if (pendingRevealCred) {
@@ -1102,10 +1099,19 @@ export function App() {
                       size="sm"
                       className="w-full text-xs font-medium shadow-xs"
                       onClick={() => {
-                        const newUrl = `${env.VITE_SITE_URL}/records/new?url=${encodeURIComponent(
-                          tabInfo?.url || "",
-                        )}&title=${encodeURIComponent(tabInfo?.title || "")}`;
-                        chrome.tabs.create({ url: newUrl });
+                        const newUrl = new URL(
+                          `${env.VITE_SITE_URL}/records/new`,
+                        );
+                        if (tabInfo?.url) {
+                          newUrl.searchParams.set(
+                            "url",
+                            normalizeUrl(tabInfo.url),
+                          );
+                        }
+                        if (tabInfo?.title) {
+                          newUrl.searchParams.set("title", tabInfo.title);
+                        }
+                        chrome.tabs.create({ url: newUrl.toString() });
                       }}
                     >
                       <Plus className="mr-1.5 h-3.5 w-3.5" />

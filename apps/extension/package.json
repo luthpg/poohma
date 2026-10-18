@@ -8,6 +8,7 @@
     "dev": "wxt",
     "dev:firefox": "wxt -b firefox",
     "check": "biome check --write",
+    "check:ci": "biome check",
     "build": "wxt build",
     "build:firefox": "wxt build -b firefox",
     "zip": "wxt zip",

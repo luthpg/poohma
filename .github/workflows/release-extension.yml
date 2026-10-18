@@ -45,7 +45,7 @@ jobs:
         run: pnpm -F @poohma/extension typecheck
 
       - name: Check formatting and lint
-        run: pnpm -F @poohma/extension check
+        run: pnpm -F @poohma/extension check:ci
 
       - name: Build and Zip extension
         run: pnpm -F @poohma/extension zip

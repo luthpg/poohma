@@ -26,6 +26,12 @@ export const Route = createFileRoute("/(public)/auth/extension-sync")({
   component: ExtensionSyncPage,
 });
 
+function debugSyncLog(...args: unknown[]) {
+  if (import.meta.env.DEV) {
+    console.log(...args);
+  }
+}
+
 function ExtensionSyncPage() {
   const { nonce } = Route.useSearch();
   const navigate = useNavigate();
@@ -63,6 +69,7 @@ function ExtensionSyncPage() {
   });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isTimedOut, setIsTimedOut] = useState(false);
+  const [retryAttempt, setRetryAttempt] = useState(0);
   const syncIssuedRef = useRef(false);
 
   // 1. nonce ガード: 欠落・不正時は即時エラートースト表示してルートへリダイレクト
@@ -103,12 +110,13 @@ function ExtensionSyncPage() {
     setIsTimedOut(false);
     setStatus("processing");
     setErrorMessage(null);
+    setRetryAttempt((prev) => prev + 1);
   }, []);
 
   // 5. 認証・アカウント確定時: 短命同期コードを発行して Content Script へ伝達
   useEffect(() => {
     const targetAccountId = activeAccountId || accounts[0]?._id;
-    console.log("[PoohMa Sync] Checking conditions:", {
+    debugSyncLog("[PoohMa Sync] Checking conditions:", {
       isAuthenticated,
       isAuthLoading,
       isConvexAuth,
@@ -119,25 +127,26 @@ function ExtensionSyncPage() {
       activeAccountId,
       accountsCount: accounts.length,
       targetAccountId,
+      retryAttempt,
     });
 
     // Firebase Auth、Convex 接続認証、アカウント情報のすべてが準備完了するまで待機
     if (!isAuthenticated || isAuthLoading) {
-      console.log("[PoohMa Sync] Waiting for Firebase Auth...", {
+      debugSyncLog("[PoohMa Sync] Waiting for Firebase Auth...", {
         isAuthenticated,
         isAuthLoading,
       });
       return;
     }
     if (!isConvexAuth || isConvexLoading) {
-      console.log("[PoohMa Sync] Waiting for Convex Auth...", {
+      debugSyncLog("[PoohMa Sync] Waiting for Convex Auth...", {
         isConvexAuth,
         isConvexLoading,
       });
       return;
     }
     if (isAccountLoading || !nonce?.trim()) {
-      console.log("[PoohMa Sync] Waiting for Account / Nonce...", {
+      debugSyncLog("[PoohMa Sync] Waiting for Account / Nonce...", {
         isAccountLoading,
         hasNonce: !!nonce?.trim(),
       });
@@ -147,19 +156,21 @@ function ExtensionSyncPage() {
       return;
     }
     if (syncIssuedRef.current) {
-      console.log("[PoohMa Sync] Sync code already issued, skipping duplicate");
+      debugSyncLog(
+        "[PoohMa Sync] Sync code already issued, skipping duplicate",
+      );
       return;
     }
 
     const cleanNonce = nonce.trim();
     if (!targetAccountId) {
-      console.log(
+      debugSyncLog(
         "[PoohMa Sync] Waiting for targetAccountId (no account resolved yet)",
       );
       return;
     }
 
-    console.log(
+    debugSyncLog(
       "[PoohMa Sync] All conditions met! Starting executeSync for account:",
       targetAccountId,
     );
@@ -167,7 +178,7 @@ function ExtensionSyncPage() {
 
     async function executeSync() {
       try {
-        console.log(
+        debugSyncLog(
           "[PoohMa Sync] Issuing sync token & fetching credentials...",
         );
         // 7秒タイムアウト付きでトークン発行処理を実行（キューハング防止）
@@ -180,13 +191,10 @@ function ExtensionSyncPage() {
           forceRefreshToken: false,
         })
           .then((token) => {
-            console.log("[PoohMa Sync] fetchAccessToken succeeded:", !!token);
+            debugSyncLog("[PoohMa Sync] fetchAccessToken succeeded:", !!token);
             return token;
           })
-          .catch((e) => {
-            console.warn("[PoohMa Sync] fetchAccessToken failed:", e);
-            return null;
-          });
+          .catch(() => null);
 
         // Convex 短命同期コードの発行（Convex Mutation）
         const issuePromise = issueSyncToken({
@@ -194,14 +202,13 @@ function ExtensionSyncPage() {
           accountId: targetAccountId,
         })
           .then((res) => {
-            console.log(
+            debugSyncLog(
               "[PoohMa Sync] issueSyncToken succeeded:",
               res?.code ? "code issued" : "no code",
             );
             return res;
           })
           .catch((err) => {
-            console.error("[PoohMa Sync] issueSyncToken failed:", err);
             throw err;
           });
 
@@ -211,19 +218,13 @@ function ExtensionSyncPage() {
           new Promise<null>((r) => setTimeout(() => r(null), 1500)),
         ])
           .then((res) => {
-            console.log(
+            debugSyncLog(
               "[PoohMa Sync] getCustomTokenFromSession completed:",
               !!res?.customToken,
             );
             return res;
           })
-          .catch((e) => {
-            console.warn(
-              "[PoohMa Sync] getCustomTokenFromSession failed or timed out:",
-              e,
-            );
-            return null;
-          });
+          .catch(() => null);
 
         const [res, idToken, customTokenRes] = await Promise.race([
           Promise.all([issuePromise, idTokenPromise, customTokenPromise]),
@@ -231,7 +232,7 @@ function ExtensionSyncPage() {
         ]);
 
         if (res?.success && res.code) {
-          console.log(
+          debugSyncLog(
             "[PoohMa Sync] Sync payload ready, dispatching window.postMessage...",
           );
           const currentTheme =
@@ -270,15 +271,14 @@ function ExtensionSyncPage() {
                 );
               } catch (_) {}
               setStatus("success");
-              console.log("[PoohMa Sync] ACK received, status set to success");
+              debugSyncLog("[PoohMa Sync] ACK received, status set to success");
             }
           };
           window.addEventListener("message", handleAck);
 
           // 即時送信
           window.postMessage(syncPayload, window.location.origin);
-          console.log("[PoohMa Sync] Initial window.postMessage sent:", {
-            code: res.code,
+          debugSyncLog("[PoohMa Sync] Initial window.postMessage sent:", {
             hasIdToken: !!idToken,
           });
 
@@ -288,36 +288,27 @@ function ExtensionSyncPage() {
             retryCount += 1;
             if (retryCount >= 8) {
               if (retryTimer) clearInterval(retryTimer);
-              // 再送上限到達後のフォールバック
               setTimeout(() => {
                 window.removeEventListener("message", handleAck);
-                try {
-                  sessionStorage.setItem(
-                    `poohma_used_sync_nonce_${cleanNonce}`,
-                    "true",
-                  );
-                  localStorage.setItem(
-                    `poohma_used_sync_nonce_${cleanNonce}`,
-                    "true",
-                  );
-                } catch (_) {}
-                setStatus("success");
+                syncIssuedRef.current = false;
+                setStatus("error");
+                setErrorMessage(
+                  "拡張機能からの応答を確認できませんでした。拡張機能が有効か確認してください。",
+                );
               }, 500);
               return;
             }
             window.postMessage(syncPayload, window.location.origin);
-            console.log(
+            debugSyncLog(
               `[PoohMa Sync] Retried window.postMessage (${retryCount}/8)`,
             );
           }, 300);
         } else {
-          console.error("[PoohMa Sync] Issue response invalid:", res);
           syncIssuedRef.current = false;
           setStatus("error");
           setErrorMessage("連携コードの発行に失敗しました");
         }
-      } catch (err) {
-        console.error("[PoohMa Sync] executeSync error caught:", err);
+      } catch (_err) {
         syncIssuedRef.current = false;
         setStatus("error");
         setErrorMessage("連携処理中にエラーが発生しました");
@@ -337,6 +328,7 @@ function ExtensionSyncPage() {
     issueSyncToken,
     fetchAccessToken,
     status,
+    retryAttempt,
   ]);
 
   const handleCloseTab = () => {
