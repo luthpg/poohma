@@ -26,6 +26,13 @@ export async function unlockMasterKeyWithPasscode(
   passcode: string,
   family: ExtensionFamily,
 ): Promise<CryptoKey> {
+  if (
+    !family.masterKeySalt ||
+    !family.masterKeyEncrypted ||
+    !family.masterKeyIv
+  ) {
+    throw new Error("Family master key is not configured");
+  }
   const wrappingKey = await deriveKeyFromPasscode(
     passcode,
     family.masterKeySalt,

@@ -1,6 +1,7 @@
 import { api } from "@poohma/backend/api";
 import { createFileRoute } from "@tanstack/react-router";
 import { useAction, useQuery } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import {
   Activity,
   AlertTriangle,
@@ -19,32 +20,13 @@ import { toast } from "sonner";
 import { BottomSheet } from "../../components/ui/BottomSheet";
 import { LivePulse } from "../../components/ui/LivePulse";
 
-interface DemoResetResult {
-  success: boolean;
-  familyId?: string;
-  kickedGuestsCount?: number;
-  deletedRecordsCount?: number;
-  insertedRecordsCount?: number;
-  inviteCode?: string;
-  skipped?: boolean;
-  reason?: string;
-}
-
-interface ServiceHealth {
-  id: string;
-  name: string;
-  category: "database" | "auth" | "cms" | "email" | "nlp" | "geo";
-  description: string;
-  status: "healthy" | "degraded" | "unconfigured" | "error";
-  latencyMs: number;
-  message: string;
-}
-
-interface SystemHealthResult {
-  checkedAt: number;
-  allHealthy: boolean;
-  services: ServiceHealth[];
-}
+type DemoResetResult = FunctionReturnType<
+  typeof api.admin.system.triggerDemoReset
+>;
+type SystemHealthResult = FunctionReturnType<
+  typeof api.admin.system.checkSystemHealth
+>;
+type ServiceHealth = SystemHealthResult["services"][number];
 
 export const Route = createFileRoute("/_auth/system")({
   component: SystemPage,
@@ -121,7 +103,7 @@ function SystemPage() {
     setIsCheckingHealth(true);
     try {
       const res = await checkHealth();
-      setHealthData(res as SystemHealthResult);
+      setHealthData(res);
     } catch {
       toast.error("ヘルスチェックの実行に失敗しました");
     } finally {

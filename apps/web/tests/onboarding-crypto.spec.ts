@@ -31,14 +31,14 @@ describe("オンボーディング サンプルデータ暗号化テスト", () 
 
         // DEK のアンラップとパスワードヒントの復号
         const unwrappedDek = await unwrapDEK(
-          encCred.passwordHintDekEncrypted,
-          encCred.passwordHintDekIv,
+          encCred.passwordHintDekEncrypted!,
+          encCred.passwordHintDekIv!,
           masterKey,
         );
 
         const decryptedHint = await decrypt(
-          encCred.passwordHint,
-          encCred.passwordHintIv,
+          encCred.passwordHint!,
+          encCred.passwordHintIv!,
           unwrappedDek,
         );
 

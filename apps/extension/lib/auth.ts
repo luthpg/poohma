@@ -1,22 +1,26 @@
-export interface ExtensionUser {
-  _id: string;
-  userId: string; // Firebase UID
-  displayName?: string;
-  email: string;
-  photoURL?: string;
-  familyId?: string;
-  familyRole?: "admin" | "member";
-}
+import type { api } from "@poohma/backend/api";
+import type { FunctionReturnType } from "convex/server";
 
-export interface ExtensionFamily {
+type RedeemSyncTokenResult = FunctionReturnType<
+  typeof api.extensionAuth.redeemSyncToken
+>;
+
+export type ExtensionUser = {
   _id: string;
-  name: string;
-  masterKeyEncrypted: string;
-  masterKeyIv: string;
-  masterKeySalt: string;
-  kdfIterations: number;
-  cryptoVersion: number;
-}
+  userId: RedeemSyncTokenResult["user"]["userId"];
+  email: RedeemSyncTokenResult["user"]["email"];
+  displayName?: RedeemSyncTokenResult["user"]["displayName"];
+  photoURL?: RedeemSyncTokenResult["user"]["photoURL"];
+  familyId?: string;
+  familyRole?: RedeemSyncTokenResult["user"]["familyRole"];
+};
+
+export type ExtensionFamily = Omit<
+  NonNullable<RedeemSyncTokenResult["family"]>,
+  "_id"
+> & {
+  _id: string;
+};
 
 export interface AuthStorageData {
   user: ExtensionUser | null;

@@ -5,12 +5,15 @@ import { ConvexHttpClient } from "convex/browser";
 import { env } from "@/env";
 import {
   clearAuthSession,
+  type ExtensionFamily,
+  type ExtensionUser,
   exchangeCustomToken,
   getAuthStorage,
   getValidIdToken,
   setAuthSession,
   setPendingSyncNonce,
 } from "@/lib/auth";
+import type { MatchedRecord, ServiceRecordItem } from "@/lib/messaging";
 import { isTrustedPoohmaOrigin } from "@/lib/url";
 
 const OFFSCREEN_PATH = "offscreen.html";
@@ -18,21 +21,7 @@ const OFFSCREEN_PATH = "offscreen.html";
 let creatingOffscreen: Promise<void> | null = null;
 const convex = new ConvexHttpClient(env.VITE_CONVEX_URL);
 
-interface CachedRecord {
-  _id: string;
-  title: string;
-  url?: string;
-  credentials?: Array<{
-    _id: string;
-    label: string;
-    loginId: string;
-    hasPasswordHint?: boolean;
-    passwordHint?: string;
-    passwordHintIv?: string;
-    passwordHintDekEncrypted?: string;
-    passwordHintDekIv?: string;
-  }>;
-}
+type CachedRecord = ServiceRecordItem;
 
 interface CachedRecordsState {
   records: CachedRecord[];
@@ -76,10 +65,10 @@ export async function getRecordsCached(force = false): Promise<CachedRecord[]> {
 
   convex.setAuth(token);
   try {
-    const records = (await convex.query(api.records.getRecords, {
+    const records = await convex.query(api.records.getRecords, {
       accountId: currentUser._id as Id<"users">,
       includeHints: true,
-    })) as CachedRecord[];
+    });
 
     recordsCache = {
       records: records || [],
@@ -238,17 +227,17 @@ export default defineBackground(() => {
             return;
           }
 
-          const extensionUser = {
+          const extensionUser: ExtensionUser = {
             _id: res.user._id,
             userId: res.user.userId,
             displayName: res.user.displayName,
             email: res.user.email,
             photoURL: res.user.photoURL,
             familyId: res.user.familyId,
-            familyRole: res.user.familyRole as "admin" | "member" | undefined,
+            familyRole: res.user.familyRole,
           };
 
-          const extensionFamily = res.family
+          const extensionFamily: ExtensionFamily | null = res.family
             ? {
                 _id: res.family._id,
                 name: res.family.name,
@@ -274,27 +263,17 @@ export default defineBackground(() => {
             }
           }
 
-          const extensionAccounts =
+          const extensionAccounts: ExtensionUser[] =
             Array.isArray(res.accounts) && res.accounts.length > 0
-              ? res.accounts.map(
-                  (a: {
-                    _id: string;
-                    userId: string;
-                    displayName?: string;
-                    email: string;
-                    photoURL?: string;
-                    familyId?: string;
-                    familyRole?: string;
-                  }) => ({
-                    _id: a._id,
-                    userId: a.userId,
-                    displayName: a.displayName,
-                    email: a.email,
-                    photoURL: a.photoURL,
-                    familyId: a.familyId,
-                    familyRole: a.familyRole as "admin" | "member" | undefined,
-                  }),
-                )
+              ? res.accounts.map((a) => ({
+                  _id: a._id,
+                  userId: a.userId,
+                  displayName: a.displayName,
+                  email: a.email,
+                  photoURL: a.photoURL,
+                  familyId: a.familyId,
+                  familyRole: a.familyRole,
+                }))
               : [extensionUser];
 
           if (
@@ -506,7 +485,7 @@ export default defineBackground(() => {
           }
 
           const records = await getRecordsCached();
-          const matched = records
+          const matched: MatchedRecord[] = records
             .filter((r) => r.url && matchRecordUrl(pageUrl, r.url) !== "none")
             .map((r) => ({
               _id: r._id,
@@ -515,7 +494,7 @@ export default defineBackground(() => {
               credentials: (r.credentials || []).map((c) => ({
                 _id: c._id,
                 label: c.label,
-                loginId: c.loginId,
+                loginId: c.loginId ?? "",
                 hasPasswordHint: !!c.passwordHint,
               })),
             }));

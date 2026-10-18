@@ -45,7 +45,11 @@ import {
   setPendingSyncNonce,
   switchActiveAccount,
 } from "@/lib/auth";
-import { sendExtensionMessage } from "@/lib/messaging";
+import {
+  type CredentialItem,
+  type ServiceRecordItem,
+  sendExtensionMessage,
+} from "@/lib/messaging";
 import {
   calculateLockoutDelayMs,
   decryptPasswordHint,
@@ -60,25 +64,6 @@ interface CurrentTabInfo {
   tabId?: number;
   url?: string;
   title?: string;
-}
-
-interface CredentialItem {
-  _id: string;
-  label?: string;
-  loginId?: string;
-  passwordHint?: string;
-  passwordHintIv?: string;
-  passwordHintDekEncrypted?: string;
-  passwordHintDekIv?: string;
-}
-
-interface ServiceRecordItem {
-  _id: string;
-  title: string;
-  url?: string;
-  tags?: string[];
-  credentials?: CredentialItem[];
-  updatedAt: number;
 }
 
 export function App() {

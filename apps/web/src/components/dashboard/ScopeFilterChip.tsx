@@ -12,11 +12,7 @@ export type ScopeFilterType = "all" | "personal" | "shared";
 interface ScopeFilterChipProps {
   currentFilter: ScopeFilterType;
   onFilterChange: (filter: ScopeFilterType) => void;
-  counts?: {
-    all: number;
-    personal: number;
-    shared: number;
-  };
+  counts?: Record<ScopeFilterType, number>;
   className?: string;
 }
 

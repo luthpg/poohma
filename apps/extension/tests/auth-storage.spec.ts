@@ -55,7 +55,7 @@ describe("Extension Auth Storage & Multi-Account Management", () => {
     displayName: "User Two",
     email: "user2@example.com",
     familyId: "fam_1",
-    familyRole: "member",
+    familyRole: "viewer",
   };
 
   const dummyFamily: ExtensionFamily = {

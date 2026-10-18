@@ -2,6 +2,7 @@ import { api } from "@poohma/backend/api";
 import type { Id } from "@poohma/backend/dataModel";
 import { MAX_CREDENTIALS_PER_RECORD } from "@poohma/shared/schemas";
 import { useConvex, useMutation } from "convex/react";
+import type { FunctionArgs } from "convex/server";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { usePasscode } from "@/components/PasscodeProvider";
@@ -16,48 +17,11 @@ export interface FieldChange {
   after: string;
 }
 
-export interface RecordCreatePayload {
-  title: string;
-  titleReading?: string;
-  url?: string;
-  ogpImage?: string;
-  ogpDescription?: string;
-  memo?: string;
-  ownerType?: "user" | "family";
-  adminEmails?: string[];
-  tags: string[];
-  isArchived?: boolean;
-  credentials: Array<{
-    id?: string;
-    label?: string;
-    loginId?: string;
-    passwordHint?: string;
-    passwordHintIv?: string;
-    passwordHintDekEncrypted?: string;
-    passwordHintDekIv?: string;
-  }>;
-}
+type ApplyImportDiffArgs = FunctionArgs<typeof api.records.applyImportDiff>;
 
-export interface RecordUpdatePayload {
-  stableId: string;
-  title?: string;
-  titleReading?: string;
-  url?: string;
-  memo?: string;
-  ownerType?: "user" | "family";
-  adminEmails?: string[];
-  tags?: string[];
-  isArchived?: boolean;
-  credentials: Array<{
-    stableId?: string;
-    label?: string;
-    loginId?: string;
-    passwordHint?: string;
-    passwordHintIv?: string;
-    passwordHintDekEncrypted?: string;
-    passwordHintDekIv?: string;
-  }>;
-}
+export type RecordCreatePayload = ApplyImportDiffArgs["creates"][number];
+
+export type RecordUpdatePayload = ApplyImportDiffArgs["updates"][number];
 
 export interface DiffItem {
   index: number;

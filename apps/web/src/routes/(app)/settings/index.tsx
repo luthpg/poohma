@@ -1,4 +1,5 @@
 import { api } from "@poohma/backend/api";
+import type { Doc } from "@poohma/backend/dataModel";
 import {
   createFileRoute,
   getRouteApi,
@@ -143,11 +144,7 @@ function SettingsComponent() {
   }, [currentAccount?.emailNotificationSettings]);
 
   const handleToggleEmailSetting = async (
-    key:
-      | "notifyRecordChanges"
-      | "notifyFamilyActivity"
-      | "notifyDataExport"
-      | "notifySecuritySettings",
+    key: keyof NonNullable<Doc<"users">["emailNotificationSettings"]>,
     newValue: boolean,
   ) => {
     if (isUpdatingEmailSettings) return;

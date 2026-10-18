@@ -86,6 +86,8 @@ const searchSchema = z.object({
   onboarding: z.string().optional(),
 });
 
+export type DashboardSearchParams = z.infer<typeof searchSchema>;
+
 export const Route = createFileRoute("/(app)/dashboard")({
   validateSearch: searchSchema,
   beforeLoad: async () => {
@@ -151,15 +153,7 @@ function RecordListSkeleton() {
 
 const routeApi = getRouteApi("/(app)/dashboard");
 
-type SortParam =
-  | "name-asc"
-  | "name-desc"
-  | "url-asc"
-  | "url-desc"
-  | "date-asc"
-  | "date-desc"
-  | "updatedAt-asc"
-  | "updatedAt-desc";
+type SortParam = NonNullable<DashboardSearchParams["sort"]>;
 
 /** レコードの検索・並び替え・一括操作を提供するダッシュボード画面。 */
 function RouteComponent() {

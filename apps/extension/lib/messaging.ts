@@ -1,4 +1,28 @@
+import type { api } from "@poohma/backend/api";
 import type { ExtensionMessage } from "@poohma/shared/schemas/extension-messages";
+import type { FunctionReturnType } from "convex/server";
+
+export type ServiceRecordItem = FunctionReturnType<
+  typeof api.records.getRecords
+>[number];
+
+export type CredentialItem = NonNullable<
+  ServiceRecordItem["credentials"]
+>[number];
+
+export interface MatchedCredential {
+  _id: string;
+  label?: string;
+  loginId: string;
+  hasPasswordHint: boolean;
+}
+
+export interface MatchedRecord {
+  _id: string;
+  title: string;
+  url?: string;
+  credentials: MatchedCredential[];
+}
 
 export const DEFAULT_MESSAGE_TIMEOUT_MS = 3000;
 

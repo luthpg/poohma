@@ -1,6 +1,7 @@
 import { api } from "@poohma/backend/api";
 import type { Doc, Id } from "@poohma/backend/dataModel";
 import { useMutation } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { Users } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -13,6 +14,10 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
+export type FamilyMemberItem = NonNullable<
+  FunctionReturnType<typeof api.families.getFamilyMembers>
+>["users"][number];
+
 /** 家族共有レコードの公開範囲と個別管理者を設定するダイアログ。 */
 export function ShareSettingsDialog({
   record,
@@ -24,13 +29,7 @@ export function ShareSettingsDialog({
   record: Doc<"serviceRecords"> & {
     adminUsers?: { _id: Id<"users">; displayName?: string; email?: string }[];
   };
-  familyMembers: {
-    id: Id<"users">;
-    userId: string;
-    email?: string;
-    displayName?: string;
-    familyRole?: "admin" | "viewer";
-  }[];
+  familyMembers: FamilyMemberItem[];
   activeAccountId?: Id<"users"> | null;
   isAdmin: boolean;
   onRecordUpdated: () => Promise<void>;

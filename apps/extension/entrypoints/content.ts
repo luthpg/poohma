@@ -1,18 +1,5 @@
+import type { MatchedRecord } from "@/lib/messaging";
 import { isTrustedPoohmaOrigin, normalizeUrl } from "@/lib/url";
-
-interface MatchedCredential {
-  _id: string;
-  label?: string;
-  loginId: string;
-  hasPasswordHint: boolean;
-}
-
-interface MatchedRecord {
-  _id: string;
-  title: string;
-  url?: string;
-  credentials: MatchedCredential[];
-}
 
 export default defineContentScript({
   matches: ["<all_urls>"],

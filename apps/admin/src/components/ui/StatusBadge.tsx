@@ -1,5 +1,7 @@
+import type { Doc } from "@poohma/backend/dataModel";
+
 interface StatusBadgeProps {
-  status: "UNREAD" | "READ" | "RESOLVED" | string;
+  status: Doc<"contacts">["status"] | (string & {});
   className?: string;
 }
 

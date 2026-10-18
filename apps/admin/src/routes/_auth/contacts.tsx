@@ -13,8 +13,9 @@ export const Route = createFileRoute("/_auth/contacts")({
   component: ContactsPage,
 });
 
-type StatusFilter = "ALL" | "UNREAD" | "READ" | "RESOLVED";
 type ContactDoc = Doc<"contacts">;
+type ContactStatus = ContactDoc["status"];
+type StatusFilter = "ALL" | ContactStatus;
 
 function ContactsPage() {
   const [filter, setFilter] = useState<StatusFilter>("ALL");
@@ -32,7 +33,7 @@ function ContactsPage() {
 
   const handleUpdateStatus = async (
     id: Id<"contacts">,
-    newStatus: "UNREAD" | "READ" | "RESOLVED",
+    newStatus: ContactStatus,
   ) => {
     try {
       await updateStatus({ id, status: newStatus });

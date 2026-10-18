@@ -1,7 +1,7 @@
 import { api } from "@poohma/backend/api";
-import type { Id } from "@poohma/backend/dataModel";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import {
   AlertCircle,
   ArrowRight,
@@ -24,24 +24,11 @@ export const Route = createFileRoute("/(app)/settings/tags")({
   component: TagManagementPage,
 });
 
-interface TagStat {
-  tag: string;
-  totalRecordCount: number;
-  manageableRecordCount: number;
-  readonlyRecordCount: number;
-}
+type TagStat = FunctionReturnType<
+  typeof api.records.getTagManagementList
+>[number];
 
-interface PreviewResult {
-  totalAffectedCount: number;
-  manageableCount: number;
-  readonlyCount: number;
-  alreadyHasTargetCount: number;
-  sampleRecords: Array<{
-    id: Id<"serviceRecords">;
-    title: string;
-    canEdit: boolean;
-  }>;
-}
+type PreviewResult = FunctionReturnType<typeof api.records.previewTagOperation>;
 
 function TagManagementPage() {
   const { activeAccountId } = useAccount();
