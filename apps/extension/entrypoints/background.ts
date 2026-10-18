@@ -10,6 +10,7 @@ import {
   getValidIdToken,
   setAuthSession,
 } from "@/lib/auth";
+import { isTrustedPoohmaOrigin } from "@/lib/url";
 
 const OFFSCREEN_PATH = "offscreen.html";
 
@@ -32,10 +33,13 @@ interface CachedRecord {
   }>;
 }
 
-let recordsCache: {
+interface CachedRecordsState {
   records: CachedRecord[];
   timestamp: number;
-} | null = null;
+  accountId: string;
+}
+
+let recordsCache: CachedRecordsState | null = null;
 const CACHE_TTL_MS = 60 * 1000; // 1分キャッシュ
 
 interface PendingSaveInfo {
@@ -49,14 +53,19 @@ let pendingSave: PendingSaveInfo | null = null;
 
 export async function getRecordsCached(force = false): Promise<CachedRecord[]> {
   const now = Date.now();
-  if (!force && recordsCache && now - recordsCache.timestamp < CACHE_TTL_MS) {
-    return recordsCache.records;
-  }
-
   const storage = await getAuthStorage();
   const currentUser = storage.user;
   if (!currentUser?._id) {
     return [];
+  }
+
+  if (
+    !force &&
+    recordsCache &&
+    recordsCache.accountId === currentUser._id &&
+    now - recordsCache.timestamp < CACHE_TTL_MS
+  ) {
+    return recordsCache.records;
   }
 
   const token = await getValidIdToken(env.VITE_FIREBASE_API_KEY);
@@ -74,6 +83,7 @@ export async function getRecordsCached(force = false): Promise<CachedRecord[]> {
     recordsCache = {
       records: records || [],
       timestamp: now,
+      accountId: currentUser._id,
     };
     return recordsCache.records;
   } finally {
@@ -149,6 +159,13 @@ async function ensureOffscreenDocument(): Promise<void> {
 }
 
 export default defineBackground(() => {
+  // ストレージアクセスを TRUSTED_CONTEXTS に限定（Content Script からの直接アクセス防止）
+  if (chrome.storage?.local?.setAccessLevel) {
+    chrome.storage.local
+      .setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" })
+      .catch(() => {});
+  }
+
   // ツールバーアイコンクリック時に Side Panel を開く動作を有効化
   if (chrome.sidePanel?.setPanelBehavior) {
     chrome.sidePanel
@@ -167,27 +184,42 @@ export default defineBackground(() => {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // 1. Web 連携短命同期コード引き換え（Background で直接・確実に実行）
     if (message?.type === "AUTH_SYNC_TOKEN") {
-      console.log("[PoohMa Background] Received AUTH_SYNC_TOKEN message:", {
-        nonce: message.nonce?.slice(0, 8),
-        hasCode: !!message.code,
-        hasCustomToken: !!message.customToken,
-        hasIdToken: !!message.idToken,
-      });
-
       (async () => {
         try {
           const { nonce, code, customToken, idToken } = message;
           if (!nonce || !code) {
-            console.error(
-              "[PoohMa Background] Invalid parameters for AUTH_SYNC_TOKEN",
-            );
             sendResponse({ success: false, error: "Invalid parameters" });
             return;
           }
 
-          console.log(
-            "[PoohMa Background] Calling convex.mutation redeemSyncToken...",
-          );
+          // 送信元タブのオリジンおよびパス検証
+          const senderUrl = sender.tab?.url;
+          if (senderUrl) {
+            try {
+              const parsed = new URL(senderUrl);
+              if (
+                !isTrustedPoohmaOrigin(parsed.origin) ||
+                parsed.pathname !== "/auth/extension-sync"
+              ) {
+                sendResponse({ success: false, error: "Untrusted sender" });
+                return;
+              }
+            } catch {
+              sendResponse({ success: false, error: "Invalid sender url" });
+              return;
+            }
+          }
+
+          // 拡張機能側が発行した pendingSyncNonce との一致検証（存在する場合）
+          const currentStorage = await getAuthStorage();
+          if (
+            currentStorage.pendingSyncNonce &&
+            currentStorage.pendingSyncNonce !== nonce.trim()
+          ) {
+            sendResponse({ success: false, error: "Nonce mismatch" });
+            return;
+          }
+
           // 未認証 mutation を呼ぶ前に、古い期限切れトークンが付与されないようクリア
           convex.clearAuth();
 
@@ -196,13 +228,8 @@ export default defineBackground(() => {
             nonce: nonce.trim(),
             code: code.trim(),
           });
-          console.log("[PoohMa Background] redeemSyncToken result:", res);
 
           if (!res?.success || !res.user) {
-            console.error(
-              "[PoohMa Background] Redeem returned failure or no user:",
-              res,
-            );
             sendResponse({ success: false, error: "Redeem failed" });
             return;
           }
@@ -233,9 +260,6 @@ export default defineBackground(() => {
           let activeRefreshToken: string | null = null;
 
           if (customToken) {
-            console.log(
-              "[PoohMa Background] Exchanging customToken for refreshToken via REST API...",
-            );
             const tokenRes = await exchangeCustomToken(
               customToken,
               env.VITE_FIREBASE_API_KEY,
@@ -243,9 +267,6 @@ export default defineBackground(() => {
             if (tokenRes) {
               activeIdToken = tokenRes.idToken;
               activeRefreshToken = tokenRes.refreshToken;
-              console.log(
-                "[PoohMa Background] Obtained refreshToken successfully!",
-              );
             }
           }
 
@@ -281,10 +302,6 @@ export default defineBackground(() => {
             await chrome.storage.local.set({ theme: message.theme });
           }
 
-          console.log(
-            "[PoohMa Background] Saving session to storage for user:",
-            extensionUser.email,
-          );
           // ストレージにセッション保存（Side Panel が storage.onChanged で即座に検知）
           await setAuthSession(
             extensionUser,
@@ -293,9 +310,6 @@ export default defineBackground(() => {
             activeIdToken,
             activeRefreshToken,
             extensionAccounts,
-          );
-          console.log(
-            "[PoohMa Background] Session saved to chrome.storage.local",
           );
 
           // 全体へ認証完了をブロードキャスト
@@ -309,32 +323,27 @@ export default defineBackground(() => {
             })
             .catch(() => {});
 
-          // Offscreen が存在すれば Custom Token / ID Token で Firebase セッションも同期
-          ensureOffscreenDocument()
-            .then(() => {
-              chrome.runtime
-                .sendMessage({
-                  type: "OFFSCREEN_FIREBASE_SIGNIN",
-                  customToken,
-                  idToken,
-                })
-                .catch(() => {});
-            })
-            .catch(() => {});
+          // Offscreen へ Custom Token を渡して Firebase セッションを確立
+          if (customToken) {
+            ensureOffscreenDocument()
+              .then(() => {
+                chrome.runtime
+                  .sendMessage({
+                    type: "OFFSCREEN_SIGN_IN_CUSTOM_TOKEN",
+                    customToken,
+                    userId: extensionUser.userId,
+                  })
+                  .catch(() => {});
+              })
+              .catch(() => {});
+          }
 
-          console.log(
-            "[PoohMa Background] Sending success response back to content script",
-          );
           sendResponse({
             success: true,
             user: extensionUser,
             family: extensionFamily,
           });
-        } catch (err) {
-          console.error(
-            "[PoohMa Background] AUTH_SYNC_TOKEN error caught:",
-            err,
-          );
+        } catch (_err) {
           sendResponse({ success: false, error: "Sync failed" });
         }
       })();
@@ -374,20 +383,45 @@ export default defineBackground(() => {
 
     // 3. Side Panel オープン要求
     if (message?.type === "OPEN_SIDEPANEL") {
-      const tabId = sender.tab?.id;
-      if (tabId && chrome.sidePanel?.open) {
-        chrome.sidePanel
-          .open({ tabId })
-          .then(() => {
-            sendResponse({ success: true });
-          })
-          .catch((_err) => {
-            sendResponse({ success: false });
-          });
+      const windowId = message.windowId;
+      const tabId = message.tabId || sender.tab?.id;
+      if (chrome.sidePanel?.open) {
+        const promise = windowId
+          ? chrome.sidePanel.open({ windowId })
+          : tabId
+            ? chrome.sidePanel.open({ tabId })
+            : chrome.windows.getCurrent().then((w) => {
+                if (w?.id) return chrome.sidePanel.open({ windowId: w.id });
+                throw new Error("No active window");
+              });
+
+        promise
+          .then(() => sendResponse({ success: true }))
+          .catch(() => sendResponse({ success: false }));
         return true;
       }
       sendResponse({ success: false });
       return false;
+    }
+
+    // 3.1 パスワードヒント閲覧監査ログ記録
+    if (message?.type === "LOG_RECORD_HINT_VIEW" && message.recordId) {
+      (async () => {
+        try {
+          const token = await getValidIdToken(env.VITE_FIREBASE_API_KEY);
+          if (token) {
+            convex.setAuth(token);
+            await convex.mutation(api.records.logRecordHintView, {
+              recordId: message.recordId as Id<"serviceRecords">,
+            });
+            convex.clearAuth();
+          }
+          sendResponse({ success: true });
+        } catch {
+          sendResponse({ success: false });
+        }
+      })();
+      return true;
     }
 
     // 3. 現在のアクティブタブ情報取得
@@ -417,7 +451,7 @@ export default defineBackground(() => {
             loginId: message.loginId,
           })
           .then((res) => {
-            sendResponse(res ?? { success: true });
+            sendResponse(res ?? { success: false });
           })
           .catch((_err) => {
             sendResponse({ success: false });

@@ -143,7 +143,7 @@ function ExtensionSyncPage() {
       });
       return;
     }
-    if (status === "used") {
+    if (status !== "processing") {
       return;
     }
     if (syncIssuedRef.current) {
@@ -247,6 +247,34 @@ function ExtensionSyncPage() {
             theme: currentTheme || "system",
           };
 
+          // 拡張機能からの同期完了 ACK（POOHMA_AUTH_SYNC_ACK）を待機
+          let retryTimer: ReturnType<typeof setInterval> | null = null;
+          const handleAck = (event: MessageEvent) => {
+            if (event.origin !== window.location.origin) return;
+            if (
+              event.data &&
+              typeof event.data === "object" &&
+              event.data.type === "POOHMA_AUTH_SYNC_ACK" &&
+              event.data.nonce === cleanNonce
+            ) {
+              if (retryTimer) clearInterval(retryTimer);
+              window.removeEventListener("message", handleAck);
+              try {
+                sessionStorage.setItem(
+                  `poohma_used_sync_nonce_${cleanNonce}`,
+                  "true",
+                );
+                localStorage.setItem(
+                  `poohma_used_sync_nonce_${cleanNonce}`,
+                  "true",
+                );
+              } catch (_) {}
+              setStatus("success");
+              console.log("[PoohMa Sync] ACK received, status set to success");
+            }
+          };
+          window.addEventListener("message", handleAck);
+
           // 即時送信
           window.postMessage(syncPayload, window.location.origin);
           console.log("[PoohMa Sync] Initial window.postMessage sent:", {
@@ -256,10 +284,25 @@ function ExtensionSyncPage() {
 
           // Content Script の読み込み遅延に備えて 300ms 間隔で最大 8 回再送
           let retryCount = 0;
-          const retryTimer = setInterval(() => {
+          retryTimer = setInterval(() => {
             retryCount += 1;
             if (retryCount >= 8) {
-              clearInterval(retryTimer);
+              if (retryTimer) clearInterval(retryTimer);
+              // 再送上限到達後のフォールバック
+              setTimeout(() => {
+                window.removeEventListener("message", handleAck);
+                try {
+                  sessionStorage.setItem(
+                    `poohma_used_sync_nonce_${cleanNonce}`,
+                    "true",
+                  );
+                  localStorage.setItem(
+                    `poohma_used_sync_nonce_${cleanNonce}`,
+                    "true",
+                  );
+                } catch (_) {}
+                setStatus("success");
+              }, 500);
               return;
             }
             window.postMessage(syncPayload, window.location.origin);
@@ -267,20 +310,6 @@ function ExtensionSyncPage() {
               `[PoohMa Sync] Retried window.postMessage (${retryCount}/8)`,
             );
           }, 300);
-
-          try {
-            sessionStorage.setItem(
-              `poohma_used_sync_nonce_${cleanNonce}`,
-              "true",
-            );
-            localStorage.setItem(
-              `poohma_used_sync_nonce_${cleanNonce}`,
-              "true",
-            );
-          } catch (_) {}
-
-          setStatus("success");
-          console.log("[PoohMa Sync] Status set to success");
         } else {
           console.error("[PoohMa Sync] Issue response invalid:", res);
           syncIssuedRef.current = false;

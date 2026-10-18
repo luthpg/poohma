@@ -12,7 +12,7 @@ PoohMa におけるテストアーキテクチャ、テスト作成パターン�
 | 暗号化 / E2EE / ユーティリティ | `vitest` + Web Crypto API (Node 20+ 組み込み) | PBKDF2 鍵導出、DEK/MasterKey ラップ、ソートキー生成、バリデーション |
 | フロントエンド UI / Hooks | `@testing-library/react` + `vitest` | `PasscodeProvider`, `AccountProvider`, フォームバリデーション等のコンポーネントテスト |
 | 暗号・WebAuthn PRF サブシステム (Browser E2E) | `@vitest/browser-playwright` + Chromium (CDP) | 実ブラウザ Web Crypto API、CDP Virtual Authenticator (PRF拡張)、PasscodeProvider 実UI結合、再暗号化フロー |
-| Chrome 拡張機能 (`apps/extension`) | `vitest` + `fake-browser` | Background 通信、Content Script 保存判定ロジック、Popup の単体テスト |
+| Chrome 拡張機能 (`apps/extension`) | `vitest` (Node環境) | URL正規化・PoohMaオリジン検証、認証・マルチアカウントストレージ、パスコード誤入力バックオフ、PSL URL照合の単体テスト |
 | ユーザー導線フルスタック E2E (Staging) | `@playwright/test` + Firebase Admin SDK カスタムトークン | ステージング実環境に対するログインブートストラップ、初期設定・レコード暗号化保存〜復号の貫通検証 |
 
 ---

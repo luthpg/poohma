@@ -245,5 +245,36 @@ Monorepo 配下に新しいパッケージ（例: Chrome 拡張機能 `apps/exte
 2. **新パッケージ導入時の Monorepo 影響範囲チェック**:
    - `postinstall` で実行されるコマンドが外部環境変数に依存していないかを事前に点検し、Monorepo 全体の CI/CD パイプラインへの波及影響を意識する。
 
+---
+
+## 14. ジョブレベル `env:` での環境変数スコープ過剰によるビルド設定上書き事故
+
+### 事象
+
+`deploy-staging.yml` や `deploy-e2e` において、Monorepo 内パッケージの `postinstall` バリデーション対策としてジョブ全体（`env:`）に `VITE_CONVEX_URL: ${{ secrets.CONVEX_PREVIEW_URL }}` を配置してしまうと、後続の `vercel build` や動的 Preview 設定注入ステップ（`.vercel/.env.preview.local`）に対して OS プロセス環境変数が優先してしまい、Staging ビルドが Preview URL で固められたり、動的 Preview URL が固定値で上書きされてしまう。
+
+### 対策
+
+- **環境変数の局所スコープ配置（Scoped Env 原則）**:
+  `postinstall` 対策の環境変数はジョブ全体ではなく、必要なステップ（`Install dependencies` 等）に局所配置する。後続のビルドステップに意図しない環境変数が漏洩・上書きすることを構造的に遮断する。
+
+---
+
+## 15. リリースワークフローでの GITHUB_TOKEN 漏洩防止（`persist-credentials: false`）と成果物保存
+
+### 事象
+
+`release-extension.yml` 等で `contents: write` 権限を付与する場合、`actions/checkout` に `persist-credentials: false` を明示しないと、ローカル `.git/config` に書き込み権限付きトークンが残存し、npm スクリプト等から窃取されるリスク（CWE-200）がある。また、タグプッシュ時に GitHub Release が未作成だと `gh release upload` が失敗し、手動実行時（`workflow_dispatch`）には成果物がどこにも保存されない問題が生じる。
+
+### 対策
+
+1. **`persist-credentials: false` の徹底**:
+   `actions/checkout` には必ず `persist-credentials: false` を指定し、トークンのローカルディスク残存を防止する。
+2. **リリース自動作成フォールバック**:
+   タグリリース時は `if ! gh release view "${TAG_NAME}" >/dev/null 2>&1; then gh release create ...; else gh release upload ...; fi` で安全にフォールバックする。
+3. **成果物の一時保存（Artifact Upload）**:
+   手動実行時でも ZIP をダウンロードして動作検証できるよう、`actions/upload-artifact@v7` で成果物を Actions Artifact として保存する。
+
+
 
 

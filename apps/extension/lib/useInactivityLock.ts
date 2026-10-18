@@ -19,7 +19,12 @@ interface UseInactivityLockOptions {
 }
 
 /**
- * 無操作タイムアウトと Visibility API によるオートロックを管理するフック（拡張機能用）
+ * 無操作タイムアウトと Visibility API によるオートロックを管理するフック（Web互換版）
+ *
+ * - ユーザー操作（キーボード、マウス、スクロール等）で lastActivityRef を更新。
+ * - 非表示になった時刻（hiddenAtRef）と前回の操作時刻（lastActivityRef）の両方を考慮し、
+ *   非表示復帰時に操作時点からの総経過時間を評価。
+ * - タイムアウト超過なら即ロック、未満なら残り時間（remaining）でタイマーを再開。
  */
 export function useInactivityLock({
   onLock,
@@ -28,6 +33,7 @@ export function useInactivityLock({
 }: UseInactivityLockOptions): void {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hiddenAtRef = useRef<number | null>(null);
+  const lastActivityRef = useRef<number>(Date.now());
   const onLockRef = useRef(onLock);
 
   useEffect(() => {
@@ -51,40 +57,54 @@ export function useInactivityLock({
     }, timeoutMs);
   }, [clearTimer, enabled, timeoutMinutes]);
 
-  const handleActivity = useCallback(() => {
+  const resetTimer = useCallback(() => {
+    lastActivityRef.current = Date.now();
     startTimer();
   }, [startTimer]);
 
   useEffect(() => {
     if (!enabled || timeoutMinutes <= 0) {
       clearTimer();
+      hiddenAtRef.current = null;
       return;
     }
 
+    lastActivityRef.current = Date.now();
     startTimer();
 
-    for (const event of ACTIVITY_EVENTS) {
-      window.addEventListener(event, handleActivity, { passive: true });
-    }
+    const handleActivity = () => {
+      resetTimer();
+    };
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
         hiddenAtRef.current = Date.now();
+        clearTimer();
       } else {
-        if (hiddenAtRef.current != null) {
-          const elapsed = Date.now() - hiddenAtRef.current;
-          const timeoutMs = timeoutMinutes * 60 * 1000;
-          if (elapsed >= timeoutMs) {
+        const timeoutMs = timeoutMinutes * 60 * 1000;
+        const hiddenAt = hiddenAtRef.current;
+        hiddenAtRef.current = null;
+
+        if (hiddenAt != null) {
+          const elapsedSinceLastActivity = Date.now() - lastActivityRef.current;
+          if (elapsedSinceLastActivity >= timeoutMs) {
             onLockRef.current();
-            hiddenAtRef.current = null;
             return;
           }
+          clearTimer();
+          const remaining = timeoutMs - elapsedSinceLastActivity;
+          timerRef.current = setTimeout(() => {
+            onLockRef.current();
+          }, remaining);
+        } else {
+          resetTimer();
         }
-        hiddenAtRef.current = null;
-        startTimer();
       }
     };
 
+    for (const event of ACTIVITY_EVENTS) {
+      window.addEventListener(event, handleActivity, { passive: true });
+    }
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
@@ -94,5 +114,5 @@ export function useInactivityLock({
       }
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [clearTimer, enabled, handleActivity, startTimer, timeoutMinutes]);
+  }, [clearTimer, enabled, resetTimer, startTimer, timeoutMinutes]);
 }

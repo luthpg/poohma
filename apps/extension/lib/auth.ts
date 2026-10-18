@@ -84,9 +84,9 @@ export async function setAuthSession(
     activeAccountId: user._id,
     family,
     pendingSyncNonce: null,
-    ...(customToken ? { customToken } : {}),
-    ...(idToken ? { idToken } : {}),
-    ...(refreshToken ? { refreshToken } : {}),
+    customToken: customToken ?? null,
+    idToken: idToken ?? null,
+    refreshToken: refreshToken ?? null,
   });
 }
 

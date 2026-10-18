@@ -24,6 +24,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Install pnpm
         uses: pnpm/action-setup@v3
@@ -51,10 +53,21 @@ jobs:
       - name: Verify bundle safety (Zero-Secrets Check)
         run: pnpm -F @poohma/extension verify:bundle
 
+      - name: Upload extension zip artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: poohma-extension-${{ github.ref_name || github.sha }}
+          path: apps/extension/.output/*.zip
+          if-no-files-found: error
+
       - name: Attach zip to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ github.ref_name }}
         run: |
-          gh release upload "${TAG_NAME}" apps/extension/.output/*.zip --clobber
+          if ! gh release view "${TAG_NAME}" >/dev/null 2>&1; then
+            gh release create "${TAG_NAME}" apps/extension/.output/*.zip --title "${TAG_NAME}" --notes "Automated release for ${TAG_NAME}"
+          else
+            gh release upload "${TAG_NAME}" apps/extension/.output/*.zip --clobber
+          fi

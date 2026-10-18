@@ -63,11 +63,13 @@ sequenceDiagram
 - **オリジン検証**: Web アプリから Content Script への伝達は `window.postMessage` を使用し、`event.origin !== window.location.origin` の厳格なチェックを行う。
 - **マルチアカウント一覧の同時返却**: 同一の Firebase UID に紐づく全 `users` レコード（`accounts`）を返却することで、拡張機能側でのシームレスなアカウント切り替えを実現する。
 
-### 2. Offscreen Document による Firebase Auth 永続セッション管理
+### 2. Offscreen Document による Firebase Auth 永続セッション管理と計算ワーカー化
 
-Manifest V3 Service Worker の制約（スリープによる接続切断やメモリクリア）を回避し、Convex の WebSocket リアルタイム購読を安定稼働させるため、`chrome.offscreen` API を用いた **Offscreen Document（`entrypoints/offscreen/main.ts`）** を採用する。
+Manifest V3 Service Worker の制約（DOM API 非対応、Web Crypto 実行等の分離）を補完し、Firebase Auth SDK の認証状態維持および Web Crypto 鍵導出の安全な計算処理を行うため、`chrome.offscreen` API を用いた **Offscreen Document（`entrypoints/offscreen/main.ts`）** を採用する。
 - Web 側から渡された Firebase Custom Token を用いて、Offscreen Document 内の公式 Firebase Auth SDK で `signInWithCustomToken` を実行。
 - これにより、公式のリフレッシュトークンサイクルが確立され、ID トークンの自動更新と Convex への安定したトークン供給が可能となる。
+- Offscreen Document は `chrome.storage` に依存せず、Background Service Worker との `runtime.sendMessage` 通信による純粋な計算・認証ワーカーとして機能する。
+- レコード一覧の取得は Background Service Worker が ConvexHttpClient による単発 HTTP クエリと 1 分間のインメモリキャッシュを用いて行い、WebSocket 常時購読による過剰な常駐リソース消費を防止する。
 
 ### 3. マスターパスコード（E2EE）の厳格な分離
 
@@ -86,9 +88,9 @@ Manifest V3 Service Worker の制約（スリープによる接続切断やメ�
 ### 現行設計における審査配慮と正当化理由（Justification）
 
 1. **最小権限の追求**:
-   - `chrome.cookies` 権限（Web のセッション Cookie を覗き見する権限）を一切要求せず、Web アプリ側が明示的にワンタイムコードを発行する設計とすることで、拡張機能の要求権限を最小化している。
+   - `chrome.cookies` 権限（Web のセッション Cookie を覗き見する権限）や不要な権限（`identity`, `scripting`）を一切要求せず、Web アプリ側が明示的にワンタイムコードを発行する設計とすることで、拡張機能の要求権限を最小化している。
 2. **Offscreen Document の利用正当性**:
-   - Manifest V3 で提供される `chrome.offscreen` API の正規理由（`reasons: ["DOM_SCRAPING", "BLOBS"]`）に準拠し、Firebase Auth SDK の永続認証状態維持および Convex リアルタイム WebSocket 通信を目的として限定的に利用している。
+   - Manifest V3 で提供される `chrome.offscreen` API の正規理由（`reasons: ["DOM_SCRAPING", "BLOBS"]`）に準拠し、Firebase Auth SDK の永続認証状態維持および Web Crypto PBKDF2/AES 計算を目的として限定的に利用している。
 3. **`<all_urls>`（host_permissions）の正当性**:
    - パスワードマネージャー / ヒント管理拡張機能として、ユーザーが訪問した任意の Web サイト上でログインフォームを検出し、パスワードヒントの参照・自動入力を支援するという「単一目的（Single Purpose）」のために不可欠な権限として申請する。
 

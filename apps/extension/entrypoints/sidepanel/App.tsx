@@ -106,6 +106,9 @@ export function App() {
     useState<boolean>(false);
   const [pendingRevealCred, setPendingRevealCred] =
     useState<CredentialItem | null>(null);
+  const [pendingRevealRecordId, setPendingRevealRecordId] = useState<
+    string | null
+  >(null);
 
   // 誤入力バックオフ
   const [failedAttempts, setFailedAttempts] = useState<number>(0);
@@ -116,6 +119,7 @@ export function App() {
 
   // 入力支援フィードバック・暗号状態
   const [filledLoginId, setFilledLoginId] = useState<string | null>(null);
+  const [fillErrorMsg, setFillErrorMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [decryptedHints, setDecryptedHints] = useState<Record<string, string>>(
     {},
@@ -124,14 +128,17 @@ export function App() {
   const masterKeyRef = useRef<CryptoKey | null>(null);
   const isRefreshingRef = useRef<boolean>(false);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
+  const accountGenerationRef = useRef<number>(0);
 
   // 1. 自動ロック（無操作15分またはサイドパネル非表示で自律ロック）
   const handleLock = useCallback(() => {
+    accountGenerationRef.current += 1;
     masterKeyRef.current = null;
     sendExtensionMessage({ type: "VAULT_LOCK" }).catch(() => {});
     setIsUnlocked(false);
     setIsPasscodePromptOpen(false);
     setPendingRevealCred(null);
+    setPendingRevealRecordId(null);
     setDecryptedHints({});
     setVisibleHints({});
   }, []);
@@ -261,6 +268,8 @@ export function App() {
       if (message.type === "VAULT_LOCK_STATE_CHANGED") {
         setIsUnlocked(!!message.isUnlocked);
         if (!message.isUnlocked) {
+          accountGenerationRef.current += 1;
+          masterKeyRef.current = null;
           setDecryptedHints({});
           setVisibleHints({});
         }
@@ -329,9 +338,17 @@ export function App() {
     return () => clearInterval(timer);
   }, [isWaitingSync, refreshState]);
 
-  // タブの変化（切り替え・ページ遷移）をリアルタイムに検知してカレントタブ情報を自動更新
+  // タブの変化（切り替え・ページ遷移）をリアルタイムに検知してカレントタブ情報を自動更新（自ウィンドウに限定）
   useEffect(() => {
     let isMounted = true;
+    let panelWindowId: number | undefined;
+
+    chrome.windows
+      .getCurrent()
+      .then((w) => {
+        if (isMounted) panelWindowId = w?.id;
+      })
+      .catch(() => {});
 
     const updateActiveTab = async () => {
       try {
@@ -351,7 +368,10 @@ export function App() {
       }
     };
 
-    const handleTabActivated = () => {
+    const handleTabActivated = (activeInfo: chrome.tabs.TabActiveInfo) => {
+      if (panelWindowId && activeInfo.windowId !== panelWindowId) {
+        return;
+      }
       updateActiveTab();
     };
 
@@ -360,6 +380,9 @@ export function App() {
       changeInfo: chrome.tabs.TabChangeInfo,
       tab: chrome.tabs.Tab,
     ) => {
+      if (panelWindowId && tab.windowId !== panelWindowId) {
+        return;
+      }
       if ((changeInfo.url || changeInfo.status === "complete") && tab.active) {
         if (isMounted) {
           setTabInfo({
@@ -401,13 +424,23 @@ export function App() {
   const handleSelectAccount = async (accountId: string) => {
     setIsAccountMenuOpen(false);
     if (accountId === activeAccountId) return;
+    accountGenerationRef.current += 1;
+    masterKeyRef.current = null;
+    setIsUnlocked(false);
+    setDecryptedHints({});
+    setVisibleHints({});
+    setRecords([]);
     await switchActiveAccount(accountId);
     await refreshState();
   };
 
-  // 6. ヒントの復号と表示実行（Web Crypto による直接復号）
+  // 6. ヒントの復号と表示実行（Web Crypto による直接復号 ＆ 閲覧監査ログ記録）
   const decryptAndShowHint = useCallback(
-    async (cred: CredentialItem, explicitKey?: CryptoKey) => {
+    async (
+      cred: CredentialItem,
+      explicitKey?: CryptoKey,
+      recordId?: string,
+    ) => {
       const activeKey = explicitKey || masterKeyRef.current;
       if (!activeKey) return;
 
@@ -428,6 +461,14 @@ export function App() {
 
           setDecryptedHints((prev) => ({ ...prev, [cred._id]: hint }));
           setVisibleHints((prev) => ({ ...prev, [cred._id]: true }));
+
+          // 閲覧監査ログを記録
+          if (recordId) {
+            sendExtensionMessage({
+              type: "LOG_RECORD_HINT_VIEW",
+              recordId,
+            }).catch(() => {});
+          }
         } catch (err) {
           console.warn("[PoohMa Sidepanel] Decrypt hint failed:", err);
         }
@@ -442,6 +483,8 @@ export function App() {
     if (!passcode || lockoutRemainingSec > 0) return;
 
     setUnlockError(null);
+    const startGen = accountGenerationRef.current;
+
     startTransition(async () => {
       try {
         const storage = await getAuthStorage();
@@ -459,6 +502,11 @@ export function App() {
           currentFamily,
         );
 
+        // 処理中にアカウント切り替えやロックが行われていた場合は古い鍵を破棄
+        if (accountGenerationRef.current !== startGen) {
+          return;
+        }
+
         masterKeyRef.current = derivedKey;
         setIsUnlocked(true);
         setPasscode("");
@@ -470,16 +518,22 @@ export function App() {
         sendExtensionMessage({
           type: "VAULT_UNLOCK",
           passcode,
+          family: currentFamily,
         }).catch(() => {});
 
         // 保留されていたヒント要求があれば直ちに復号・表示
         if (pendingRevealCred) {
           const credToReveal = pendingRevealCred;
+          const recordIdToLog = pendingRevealRecordId;
           setPendingRevealCred(null);
-          await decryptAndShowHint(credToReveal, derivedKey);
+          setPendingRevealRecordId(null);
+          await decryptAndShowHint(
+            credToReveal,
+            derivedKey,
+            recordIdToLog ?? undefined,
+          );
         }
-      } catch (err) {
-        console.warn("[PoohMa Sidepanel] Unlock failed:", err);
+      } catch (_err) {
         masterKeyRef.current = null;
         handleFailedUnlock();
       }
@@ -517,12 +571,14 @@ export function App() {
   const handleCancelUnlock = () => {
     setIsPasscodePromptOpen(false);
     setPendingRevealCred(null);
+    setPendingRevealRecordId(null);
     setPasscode("");
     setUnlockError(null);
   };
 
   // 8. ログアウト
   const handleSignOut = async () => {
+    accountGenerationRef.current += 1;
     masterKeyRef.current = null;
     try {
       await clearAuthSession();
@@ -538,13 +594,17 @@ export function App() {
     setIsUnlocked(false);
     setIsPasscodePromptOpen(false);
     setPendingRevealCred(null);
+    setPendingRevealRecordId(null);
     setRecords([]);
     setDecryptedHints({});
     setVisibleHints({});
   };
 
   // 9. パスワードヒント復号トグル
-  const toggleHintVisibility = async (cred: CredentialItem) => {
+  const toggleHintVisibility = async (
+    cred: CredentialItem,
+    recordId?: string,
+  ) => {
     const credId = cred._id;
     if (visibleHints[credId]) {
       setVisibleHints((prev) => ({ ...prev, [credId]: false }));
@@ -559,31 +619,51 @@ export function App() {
     // 未アンロック状態ならパスコードモーダルを開く
     if (!isUnlocked) {
       setPendingRevealCred(cred);
+      setPendingRevealRecordId(recordId ?? null);
       setUnlockError(null);
       setPasscode("");
       setIsPasscodePromptOpen(true);
       return;
     }
 
-    await decryptAndShowHint(cred);
+    await decryptAndShowHint(cred, undefined, recordId);
   };
 
-  // 10. カレントタブへの自動入力
-  const handleFillLoginId = async (loginId: string) => {
+  // 10. カレントタブへの自動入力（ドメイン一致検証 ＆ 失敗理由の通知）
+  const handleFillLoginId = async (loginId: string, recordUrl?: string) => {
     if (!tabInfo?.tabId) return;
+
+    if (
+      recordUrl &&
+      tabInfo.url &&
+      matchRecordUrl(tabInfo.url, recordUrl) === "none"
+    ) {
+      setFillErrorMsg("現在開いているサイトと異なるため自動入力できません");
+      setTimeout(() => setFillErrorMsg(null), 3500);
+      return;
+    }
+
     try {
-      await sendExtensionMessage({
+      const res = await sendExtensionMessage<{
+        success: boolean;
+        reason?: string;
+      }>({
         type: "FORWARD_FILL_LOGIN_ID",
         tabId: tabInfo.tabId,
         loginId,
       });
-      setFilledLoginId(loginId);
-      setTimeout(() => {
-        setFilledLoginId(null);
-      }, 2000);
+      if (res?.success) {
+        setFilledLoginId(loginId);
+        setTimeout(() => {
+          setFilledLoginId(null);
+        }, 2000);
+      } else {
+        setFillErrorMsg("入力可能なID欄が見つかりませんでした");
+        setTimeout(() => setFillErrorMsg(null), 3500);
+      }
     } catch (_err) {
-      // 失敗時はクリップボードへフォールバック
-      navigator.clipboard.writeText(loginId).catch(() => {});
+      setFillErrorMsg("自動入力に失敗しました");
+      setTimeout(() => setFillErrorMsg(null), 3500);
     }
   };
 
@@ -744,6 +824,21 @@ export function App() {
 
       {/* メインビュー */}
       <main className="flex-1 p-3 space-y-3">
+        {/* 自動入力エラーバナー */}
+        {fillErrorMsg && (
+          <div className="rounded-md bg-destructive/10 border border-destructive/20 px-2.5 py-1.5 text-xs text-destructive flex items-center justify-between animate-in fade-in">
+            <span>{fillErrorMsg}</span>
+            <button
+              type="button"
+              onClick={() => setFillErrorMsg(null)}
+              className="text-destructive/70 hover:text-destructive cursor-pointer ml-2 shrink-0"
+              title="閉じる"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+
         {/* A. 未認証ビュー */}
         {!isAuthenticated ? (
           <Card className="shadow-border bg-card">
@@ -898,7 +993,10 @@ export function App() {
                                     size="sm"
                                     onClick={() => {
                                       if (cred.loginId) {
-                                        handleFillLoginId(cred.loginId);
+                                        handleFillLoginId(
+                                          cred.loginId,
+                                          record.url,
+                                        );
                                       }
                                     }}
                                     title="ページに入力"
@@ -939,7 +1037,9 @@ export function App() {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => toggleHintVisibility(cred)}
+                                    onClick={() =>
+                                      toggleHintVisibility(cred, record._id)
+                                    }
                                     title={
                                       visibleHints[cred._id] ? "隠す" : "表示"
                                     }

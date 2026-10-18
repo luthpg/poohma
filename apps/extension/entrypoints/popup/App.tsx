@@ -5,8 +5,26 @@ import { useTheme } from "@/lib/useTheme";
 
 export function App() {
   useTheme();
-  const handleOpenSidePanel = () => {
-    chrome.runtime.sendMessage({ type: "OPEN_SIDEPANEL" }).catch(() => {});
+  const handleOpenSidePanel = async () => {
+    try {
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      if (tab?.windowId && chrome.sidePanel?.open) {
+        await chrome.sidePanel.open({ windowId: tab.windowId });
+      } else if (tab?.id && chrome.sidePanel?.open) {
+        await chrome.sidePanel.open({ tabId: tab.id });
+      } else {
+        await chrome.runtime.sendMessage({
+          type: "OPEN_SIDEPANEL",
+          windowId: tab?.windowId,
+          tabId: tab?.id,
+        });
+      }
+    } catch {
+      chrome.runtime.sendMessage({ type: "OPEN_SIDEPANEL" }).catch(() => {});
+    }
     window.close();
   };
 
