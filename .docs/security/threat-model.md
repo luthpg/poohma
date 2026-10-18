@@ -59,6 +59,7 @@ PoohMaの暗号化アーキテクチャは、3つの信頼領域にまたがる�
   - リンク（a要素）のhref属性は、http/https/mailtoスキームのみを許可し、javascript:等の危険なスキームを除外
   - インラインイベントハンドラー（onclick, onerror等）を除去
   - `apps/web/src/start.ts` のサーバーミドルウェアにより、全GETリクエストに対してnonceベースの厳格なCSP（`default-src 'none'`, `script-src 'strict-dynamic' 'nonce-...'`, `frame-ancestors 'none'`）およびセキュリティヘッダー（`X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`）を適用済み（Issue #128）
+  - Web Crypto API において、ヒント復号時の DEK 展開には `extractable: false` を指定し、万が一スクリプト侵害が生じた場合でも `crypto.subtle.exportKey` による生の鍵材料抽出をブラウザ基盤レベルで拒否する多層防御を導入
 - **残存リスク**：**PoohMaのE2EEは「ブラウザのJS実行環境が健全であること」を前提としている。** XSSが成立した場合、攻撃者は展開済みのマスターキー・画面表示中の平文ヒントを直接窃取できる。E2EEはサーバー側の攻撃者からは保護するが、クライアント側のコード実行を奪われた場合は無力化される。現行のCSPおよびallowlistベースサニタイズはこのリスクを大幅に軽減するが、ブラウザ拡張機能や端末マルウェアを含む完全なクライアント環境侵害を防ぐものではない。
 
 ### T4: 端末レベルの攻撃者
@@ -73,7 +74,7 @@ PoohMaの暗号化アーキテクチャは、3つの信頼領域にまたがる�
 
 ### T6: 家族メンバーによる正規権限の濫用
 
-- **防御**：所有モデル（`ownerType: "user"` / `ownerType: "family"`）および非対称ロール・管理者権限（`familyRole: "admin" | "viewer"`, `admins`）により、個人レコードを家族内でも非公開にできるほか、一般メンバー（`viewer`）による共有レコードの誤編集・更新・勝手な削除や共有解除、他メンバーのキックが防止される。家族設定やメンバー管理・キックはファミリー管理者（`familyAdminMutation`）に限定され、共有レコードの更新・削除・共有解除・管理者変更はファミリー管理者または個別管理者（`requireAdminAccess`）に限定される。メンバーの除名（キック）時は `users.familyId` が即時に未設定（`undefined`）となり、Convex RLSにより旧家族の共有レコード（`ownerType: "family"`）へのアクセスと family-bound 操作が遮断される。個人所有レコード（`ownerType: "user"`）はT8のアカウント単位の認可を維持したまま、`pendingExportVaults` を介して本人が新家族へ持ち出せる一方、家族共有レコードは家族資産として旧家族に残存し持ち出せない。
+- **防御**：所有モデル（`ownerType: "user"` / `ownerType: "family"`）および非対称ロール・管理者権限（`familyRole: "admin" | "viewer"`, `admins`）により、個人レコードを家族内でも非公開にできるほか、一般メンバー（`viewer`）による共有レコードの誤編集・更新・勝手な削除や共有解除、他メンバーのキックが防止される。家族設定やメンバー管理・キックはファミリー管理者（`familyAdminMutation`）に限定され、共有レコードの更新・削除・共有解除・管理者変更はファミリー管理者または個別管理者（`requireAdminAccess`）に限定される。一括タグ更新（`bulkUpdateRecords`）や同時編集セッション（`startEditingSession` / `heartbeatEditingSession`）も `requireAdminAccess` を強制し、一般メンバーによる不正なタグ付与や編集排他制御の妨害を防止している。メンバーの除名（キック）時は `users.familyId` が即時に未設定（`undefined`）となり、Convex RLSにより旧家族の共有レコード（`ownerType: "family"`）へのアクセスと family-bound 操作が遮断される。個人所有レコード（`ownerType: "user"`）はT8のアカウント単位の認可を維持したまま、`pendingExportVaults` を介して本人が新家族へ持ち出せる一方、家族共有レコードは家族資産として旧家族に残存し持ち出せない。
 - **残存リスク**：PoohMaの家族グループは「相互に信頼し合う関係」を前提としたモデルであり、共有レコード（`ownerType: "family"`）の閲覧・ヒント復号は家族メンバー全員（閲覧専用メンバーを含む）に許可される。共有設定にした時点で、そのレコードは家族の誰か一人にでも閲覧されうる。また、キックされた元メンバーは頭の中に「旧家族のパスコード」を記憶している可能性がある。`pendingExportVaults` は旧 `masterKeyEncrypted`・IV・salt を30日間保持するため、T8の認可を満たす被キックユーザーはVaultが有効な間、旧パスコードで旧マスターキーを復号し、個人所有レコードを持ち出せる。したがって、残存メンバーにパスコードローテーション（`FR-FAM-10`）を強く推奨するが、ローテーション後もVaultの有効期間中は旧パスコードを完全には無効化できない。Vaultの削除・破棄・期限切れ後も、過去に取得されたローカルキャッシュ等の復号リスクは残る。
 
 ### T7: 第三者サービス自体の侵害

@@ -9,7 +9,7 @@ import {
   identityVerifiedQuery,
 } from "./customBuilders";
 import { deleteFamilyInvites, reconcileAdminsOnLeave } from "./families";
-import { deleteCredentialsForRecord } from "./records";
+import { cascadeDeleteRecord } from "./records";
 
 /**
  * ユーザー同期（ログイン時に呼ばれる）
@@ -333,8 +333,7 @@ export const deleteAllAccounts = identityVerifiedMutation({
             .withIndex("by_family_sortKey", (q) => q.eq("familyId", familyId))
             .collect();
           for (const record of familyRecords) {
-            await deleteCredentialsForRecord(ctx, record._id);
-            await ctx.db.delete(record._id);
+            await cascadeDeleteRecord(ctx, record._id);
           }
 
           const joinReqs = await ctx.db
@@ -357,8 +356,7 @@ export const deleteAllAccounts = identityVerifiedMutation({
             (r) => r.ownerType === "user",
           );
           for (const record of personalRecords) {
-            await deleteCredentialsForRecord(ctx, record._id);
-            await ctx.db.delete(record._id);
+            await cascadeDeleteRecord(ctx, record._id);
           }
 
           await reconcileAdminsOnLeave(ctx, familyId, account._id);
@@ -371,8 +369,7 @@ export const deleteAllAccounts = identityVerifiedMutation({
           .collect();
         for (const record of records) {
           if (record.ownerType === "user") {
-            await deleteCredentialsForRecord(ctx, record._id);
-            await ctx.db.delete(record._id);
+            await cascadeDeleteRecord(ctx, record._id);
           }
         }
       }
@@ -465,8 +462,7 @@ export const deleteAccount = authenticatedMutation({
           .withIndex("by_family_sortKey", (q) => q.eq("familyId", familyId))
           .collect();
         for (const record of familyRecords) {
-          await deleteCredentialsForRecord(ctx, record._id);
-          await ctx.db.delete(record._id);
+          await cascadeDeleteRecord(ctx, record._id);
         }
 
         const joinReqs = await ctx.db
@@ -489,8 +485,7 @@ export const deleteAccount = authenticatedMutation({
           (r) => r.ownerType === "user",
         );
         for (const record of personalRecords) {
-          await deleteCredentialsForRecord(ctx, record._id);
-          await ctx.db.delete(record._id);
+          await cascadeDeleteRecord(ctx, record._id);
         }
 
         await reconcileAdminsOnLeave(ctx, familyId, user._id);
@@ -514,8 +509,7 @@ export const deleteAccount = authenticatedMutation({
         .collect();
       for (const record of records) {
         if (record.ownerType === "user") {
-          await deleteCredentialsForRecord(ctx, record._id);
-          await ctx.db.delete(record._id);
+          await cascadeDeleteRecord(ctx, record._id);
         }
       }
     }

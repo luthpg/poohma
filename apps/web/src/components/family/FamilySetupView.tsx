@@ -408,7 +408,7 @@ export function FamilySetupView({
                   type={showCreatePasscodeConfirm ? "text" : "password"}
                   id="family-passcode-confirm-input"
                   required
-                  minLength={8}
+                  minLength={MIN_PASSCODE_LENGTH}
                   autoCapitalize="off"
                   autoCorrect="off"
                   spellCheck={false}

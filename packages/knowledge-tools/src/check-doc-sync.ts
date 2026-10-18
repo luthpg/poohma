@@ -14,15 +14,17 @@ interface Rule {
 const RULES: Rule[] = [
   {
     name: "スキーマ・テーブル構成",
-    pattern: /^packages\/backend\/convex\/(schema\.ts|.*schema.*\.ts)$/,
+    pattern:
+      /^(packages\/backend\/convex\/(schema\.ts|.*schema.*\.ts)|packages\/shared\/src\/schemas\/.*)$/,
     level: "REQUIRED",
     docs: [".docs/code-design.md", ".ai/domain.md"],
-    description: "テーブル定義、フィールド追加、型変更、インデックス変更",
+    description:
+      "テーブル定義、フィールド追加、型変更、インデックス変更、共有スキーマ",
   },
   {
     name: "Convex 関数 / Server Functions",
     pattern:
-      /^(packages\/backend\/convex\/(?!schema\.ts).*\.ts|apps\/web\/src\/.*\.function\.ts)$/,
+      /^(packages\/backend\/convex\/(?!schema\.ts).*\.ts|apps\/web\/src\/.*\.(function|functions)\.ts)$/,
     level: "RECOMMENDED",
     docs: [".docs/code-design.md", ".ai/architecture.md"],
     description: "API/関数の追加・改名、認可ビルダー、クエリ変更",
@@ -30,7 +32,7 @@ const RULES: Rule[] = [
   {
     name: "暗号化・鍵階層・E2EE",
     pattern:
-      /^(apps\/web\/src\/lib\/crypto\/.*|apps\/web\/src\/features\/e2ee\/.*)$/,
+      /^(packages\/crypto\/src\/.*|apps\/web\/src\/(lib\/crypto|features\/e2ee)\/.*|apps\/web\/src\/components\/Passcode.*)$/,
     level: "REQUIRED",
     docs: [
       ".docs/code-design.md",
@@ -45,7 +47,7 @@ const RULES: Rule[] = [
   {
     name: "認証イベント・セッション・ログイン",
     pattern:
-      /^(apps\/web\/src\/features\/auth\/.*|packages\/backend\/convex\/auth\/.*|apps\/web\/src\/routes\/\(auth\)\/.*)$/,
+      /^(apps\/web\/src\/(features\/auth\/.*|services\/auth.*)|packages\/backend\/convex\/auth\/.*|apps\/web\/src\/routes\/\(auth\)\/.*)$/,
     level: "REQUIRED",
     docs: [
       ".docs/code-design.md",
@@ -58,7 +60,7 @@ const RULES: Rule[] = [
   },
   {
     name: "UI体験・画面・ルーティング",
-    pattern: /^apps\/web\/src\/(routes|components)\/.*$/,
+    pattern: /^apps\/(web|admin)\/src\/(routes|components)\/.*$/,
     level: "CHECK_IF_SPEC_CHANGED",
     docs: [
       ".docs/features.md",

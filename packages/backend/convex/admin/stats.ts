@@ -2,20 +2,15 @@ import { systemAdminQuery } from "../customBuilders";
 
 /**
  * 管理コンソール向けサービス全体統計
- * ※KISS原則に基づき過剰な集計テーブル化や全件フルスキャンを避け、
- *   初期〜中規模運用に耐えうる上限サンプリング（users: 1000, families: 500, records: 2000, contacts: 500）を採用。
  */
 export const getSystemStats = systemAdminQuery({
   args: {},
   handler: async (ctx) => {
-    // ユーザー数（上限1000件サンプリング）
-    const users = await ctx.db.query("users").take(1000);
-    // ファミリー数（上限500件サンプリング）
-    const families = await ctx.db.query("families").take(500);
-    // レコード数（上限2000件サンプリング）
-    const records = await ctx.db.query("serviceRecords").take(2000);
-    // お問い合わせ数（上限500件サンプリングでステータス内訳を集計）
-    const contacts = await ctx.db.query("contacts").take(500);
+    // 全件集計
+    const users = await ctx.db.query("users").collect();
+    const families = await ctx.db.query("families").collect();
+    const records = await ctx.db.query("serviceRecords").collect();
+    const contacts = await ctx.db.query("contacts").collect();
 
     const now = Date.now();
     const oneDayMs = 24 * 60 * 60 * 1000;

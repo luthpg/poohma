@@ -5,6 +5,8 @@ dist-ssr
 *.local
 count.txt
 .env*
+.dev.vars*
+.cta.json
 .nitro
 .tanstack
 .wrangler
