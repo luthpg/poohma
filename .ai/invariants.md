@@ -17,6 +17,7 @@
 - すべてのパスワードヒント暗号化・復号において**必ず DEK（AES-GCM 256）を用いたエンベロープ暗号化**を必須とする。マスターキーによるヒントの直接暗号化・復号へのフォールバックは行わない。
 - **マスターキーは平文でサーバーに保存しない**。`families.masterKeyEncrypted`（パスコード鍵でラップ）および `families.recoveryMasterKeyEncrypted`（リカバリーキーでラップ）の暗号化状態でのみ保存される。
 - クライアント側でも、マスターキーは `PasscodeProvider` の揮発性メモリ（React State）上にのみ一時保持し、`localStorage` や `sessionStorage`、IndexedDB 等へ平文・永続化してはならない。
+- **Web Crypto API の `extractable` 最小権限化**: ヒント復号専用コンテキスト（`PasscodeProvider.decryptHint` 等）では `unwrapDEK(..., false)` を指定し、鍵の再ラップを要しない場面で `crypto.subtle.exportKey` による鍵材料の抽出を遮断する。
 
 ### 家族パスコード
 
@@ -53,9 +54,9 @@
 - レコードのコンテンツ閲覧には `requireContentAccess`（`convex/rls.ts`）を必ず経由する:
   - 個人所有（`ownerType === "user"`）: `record.accountId === user._id` の本人のみ。
   - 家族共有（`ownerType === "family"`）: 同一家族メンバー（`record.ownerFamilyId === user.familyId`）全員（閲覧専用メンバー `viewer` 含む）。ヒント復号も全メンバーに許可される。
-- レコードの管理操作および編集（レコード更新、削除、共有解除、管理者変更）には `requireAdminAccess` を必ず経由する:
+- レコードの管理操作および編集（レコード更新、削除、共有解除、管理者変更、一括タグ更新 `bulkUpdateRecords`、同時編集セッション `startEditingSession` / `heartbeatEditingSession`）には `requireAdminAccess` を必ず経由する:
   - 個人所有: `record.accountId === user._id` の本人のみ。
-  - 家族共有: 同一家族メンバーかつ「ファミリー管理者（`getEffectiveFamilyRole(user) === "admin"`）」または `admins` 配列に含まれる個別管理者（`record.admins.includes(user._id)`）のみ。一般メンバーによる誤操作・破壊的変更を確実に防止する。
+  - 家族共有: 同一家族メンバーかつ「ファミリー管理者（`getEffectiveFamilyRole(user) === "admin"`）」または `admins` 配列に含まれる個別管理者（`record.admins.includes(user._id)`）のみ。一般メンバー（`viewer`）による誤操作・破壊的変更・排他制御の妨害を確実に防止する。
 - 家族境界チェック: レコードの `familyId` とユーザーの `familyId` が不一致の場合は即座に拒否。
 
 ### マルチアカウント境界の隔離
@@ -85,9 +86,11 @@
 - 家族移行は 2 段階（`PREPARED` → クライアント側で新マスターキーによる DEK 再ラップ → `COMPLETED`）で管理する。
 - 移行完了時には、移行対象レコードの `familyId` および DEK ラップデータがすべて新家族のマスターキーに更新され、古い家族の鍵で復号不能な状態を残してはならない。
 
-### アカウント削除・退会時の整合性
+### アカウント削除・退会時の整合性とカスケード削除の完全性
 
-- 退会時は、ユーザーが個人所有する全レコード（共有設定の有無に関わらず）を削除する。
+- レコード削除時（単一削除 `deleteRecord`、一括削除 `deleteRecords`、退会時 `deleteAccount` / `deleteAllAccounts`、孤立共有レコード掃除）は必ず共通ヘルパー `cascadeDeleteRecord` を経由する。
+- 対象レコードの `serviceRecords` エンティティ本体だけでなく、紐づく `credentials`、`recordEditingSessions`（同時編集セッション）、および `viewLogs`（閲覧ログ）を漏れなく確実に物理削除し、孤立レコードや未解決ログの残存を防止する。
+- 退会時は、ユーザーが個人所有する全レコード（共有設定の有無に関わらず）を上記カスケード削除により削除する。
 - 退会ユーザーが家族の最後の 1 人であった場合、孤立した家族グループ（`families`）レコード自体も必ず削除する。
 
 ### メンバーキックと Export Vault の不変条件

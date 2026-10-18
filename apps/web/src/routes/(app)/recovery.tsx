@@ -575,7 +575,7 @@ function RecoveryPageComponent() {
                     value={newPasscode}
                     onChange={(e) => setNewPasscode(e.target.value)}
                     disabled={isSubmittingPasscode}
-                    placeholder="8文字以上の安全なパスコード"
+                    placeholder={`${MIN_PASSCODE_LENGTH}文字以上の安全なパスコード`}
                     className="w-full rounded-lg border bg-background p-3 pr-10 text-base md:text-[14px] focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                   <button

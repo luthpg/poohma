@@ -26,7 +26,7 @@ flowchart TB
 
     subgraph RecoveryFlow["🆘 緊急復元経路（リカバリーキット）"]
         RecoveryCode["<b>リカバリーコード</b><br/>(高エントロピー文字列 / サーバー非保存)"]:::inputNode
-        RK["<b>リカバリー導出鍵</b><br/>AES-GCM 256<br/>HKDF-SHA256"]:::derivedNode
+        RK["<b>リカバリー導出鍵</b><br/>AES-GCM 256<br/>PBKDF2-SHA256 (300k iter)"]:::derivedNode
     end
 
     subgraph MasterKeyLayer["🏛️ 家族マスターキー層"]
@@ -41,7 +41,7 @@ flowchart TB
     Passcode -->|PBKDF2 導出| KEK
     KEK -->|unwrapKey| MK
 
-    RecoveryCode -->|HKDF 導出 + OTP検証| RK
+    RecoveryCode -->|PBKDF2 導出 + OTP検証| RK
     RK -->|unwrapKey| MK
 
     MK -->|wrapKey / unwrapKey<br/>クレデンシャル毎に生成| DEK
@@ -115,13 +115,13 @@ sequenceDiagram
 
 - 家族グループそのものを移る（家族移行）場合はマスターキーが変わるため、DEK の再ラップが必要になる。
 - クライアント側で旧マスターキーにより各 DEK を unwrap し、新マスターキーで再 wrap する（パスワードヒント本体は再暗号化不要、DEK の付け替えのみ）。
-- 処理はチャンク（バッチ）単位に分割して送信し、各チャンクはレコードの `updatedAt` を前提条件とした楽観的ロックで検証する（Issue #174, #190、いずれもclosed）。
-- **未実装の拡張**：処理途中でのタブクローズ等からのより堅牢な中断・再開を目的とした、Web Worker + IndexedDB ベースの専用アーキテクチャ（Issue #111）は、本稿執筆時点で open（計画中）であり、まだ実装されていない。現状はメインスレッド上でのチャンク処理として動作している。
+- 再暗号化されたクレデンシャルは単一の Mutation 呼び出し（`families.commitFamilyMigration`）による一括コミットとし、レコードおよびクレデンシャルの `updatedAt` を前提条件とした楽観的ロックで検証する（`.docs/code-design.md` 6.4節 参照）。
+- **未実装の拡張**：処理途中でのタブクローズ等からのより堅牢な中断・再開を目的とした、Web Worker + IndexedDB ベースの専用アーキテクチャ（Issue #111）は、本稿執筆時点で open（計画中）であり、まだ実装されていない。
 
 ### Recovery
 
 - パスコードとは別に、リカバリーコード（高エントロピーなランダム文字列、平文はサーバーに保存せず発行時に一度だけ提示、Issue #134「致命的なデータ喪失を防ぐ『リカバリーキット（復元コード）』の発行」、closed）経由の入口を用意する。復元時には平文コードを照合のためサーバーへ送信し、サーバーでそのハッシュを `recoveryCodeHash` と比較する。
-- リカバリーコードから HKDF-SHA256 で導出した鍵で `families.recoveryMasterKeyEncrypted` / `recoveryMasterKeyIv` を unwrap すると、パスコード経路と同一のマスターキーに到達する。
+- リカバリーコードから PBKDF2-SHA256（300,000回）で導出した鍵で `families.recoveryMasterKeyEncrypted` / `recoveryMasterKeyIv` を unwrap すると、パスコード経路と同一のマスターキーに到達する。
 - 復元時はリカバリーコード単体では成立せず、登録メールアドレスへの6桁 Email OTP（SHA-256ハッシュ保存、有効期限10分、最大5回試行、60秒レート制限）の検証が必須の2要素構成になっている。
 - 再発行のたびに旧リカバリー暗号情報は完全上書き・破棄され、旧コードは即座に無効化される。
 

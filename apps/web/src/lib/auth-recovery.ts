@@ -297,6 +297,7 @@ export async function loadRecordDraft(params: {
             cred.passwordHintDekEncrypted,
             cred.passwordHintDekIv,
             masterKey,
+            false,
           );
           const plainHint = await decrypt(
             cred.passwordHintEncrypted,

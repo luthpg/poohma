@@ -78,7 +78,9 @@ export default defineSchema({
   })
     .index("by_userId", ["userId"])
     .index("by_email", ["email"])
-    .index("by_familyId", ["familyId"]),
+    .index("by_familyId", ["familyId"])
+    .searchIndex("search_email", { searchField: "email" })
+    .searchIndex("search_displayName", { searchField: "displayName" }),
 
   familyMigrations: defineTable({
     userId: v.string(), // Firebase UID

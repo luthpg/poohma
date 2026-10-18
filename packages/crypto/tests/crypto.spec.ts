@@ -103,6 +103,31 @@ describe("1.1 暗号化コアロジックの単体テスト (src/lib/crypto.ts)"
         crypto.subtle.exportKey("raw", nonExtractableKey),
       ).rejects.toThrow();
     });
+
+    it("unwrapDEK で extractable: false を指定した場合、復号には使用可能だが exportKey は拒否されること", async () => {
+      const masterKey = await generateMasterKey();
+      const dek = await generateDEK();
+      const wrappedDek = await wrapDEK(dek, masterKey);
+
+      // extractable: false で unwrapDEK
+      const nonExtractableDek = await unwrapDEK(
+        wrappedDek.encrypted,
+        wrappedDek.iv,
+        masterKey,
+        false,
+      );
+      expect(nonExtractableDek.extractable).toBe(false);
+
+      // ヒントの復号には正常に使用できること
+      const { encrypted, iv } = await encrypt(SECRET_HINT_DATA, dek);
+      const decrypted = await decrypt(encrypted, iv, nonExtractableDek);
+      expect(decrypted).toBe(SECRET_HINT_DATA);
+
+      // exportKey は失敗（鍵抽出耐性セキュリティ保証）
+      await expect(
+        crypto.subtle.exportKey("raw", nonExtractableDek),
+      ).rejects.toThrow();
+    });
   });
 
   /**

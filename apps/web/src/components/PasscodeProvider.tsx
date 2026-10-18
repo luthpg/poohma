@@ -227,7 +227,12 @@ export function PasscodeProvider({ children }: { children: React.ReactNode }) {
         throw new Error("DEK is required for hint decryption");
       }
 
-      const decryptionKey = await unwrapDEK(dekEncrypted, dekIv, masterKey);
+      const decryptionKey = await unwrapDEK(
+        dekEncrypted,
+        dekIv,
+        masterKey,
+        false,
+      );
       return await decrypt(encrypted, iv, decryptionKey);
     },
     [],

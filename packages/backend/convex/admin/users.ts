@@ -15,7 +15,7 @@ export const getUsersList = systemAdminQuery({
     const limit = Math.min(Math.max(args.limit ?? 50, 1), 200);
     const search = args.search?.trim();
 
-    let sliced: Doc<"users">[];
+    let sliced: Doc<"users">[] | null = null;
 
     if (search && search.length > 0) {
       // メール完全一致の場合は by_email インデックスで高速解決
@@ -26,27 +26,54 @@ export const getUsersList = systemAdminQuery({
           .first();
         if (exactUser) {
           sliced = [exactUser];
-        } else {
-          const q = search.toLowerCase();
-          const users = await ctx.db.query("users").order("desc").take(200);
-          sliced = users
-            .filter(
-              (u) =>
-                u.email.toLowerCase().includes(q) ||
-                u.displayName?.toLowerCase().includes(q),
-            )
-            .slice(0, limit);
         }
-      } else {
-        const q = search.toLowerCase();
-        const users = await ctx.db.query("users").order("desc").take(200);
-        sliced = users
-          .filter(
-            (u) =>
-              u.email.toLowerCase().includes(q) ||
-              u.displayName?.toLowerCase().includes(q),
-          )
-          .slice(0, limit);
+      }
+
+      if (!sliced) {
+        // Search Index で全件から検索し、表示名とメールの一致をインターリーブマージ
+        const [emailMatches, displayNameMatches] = await Promise.all([
+          ctx.db
+            .query("users")
+            .withSearchIndex("search_email", (q) => q.search("email", search))
+            .take(limit),
+          ctx.db
+            .query("users")
+            .withSearchIndex("search_displayName", (q) =>
+              q.search("displayName", search),
+            )
+            .take(limit),
+        ]);
+        // @ を含む検索の場合、Search Index のトークン分割による誤一致（別ユーザーの同一ドメイン一致等）を防ぐため検証
+        const candidateEmails = search.includes("@")
+          ? emailMatches.filter((u) =>
+              u.email.toLowerCase().includes(search.toLowerCase()),
+            )
+          : emailMatches;
+        const candidateDisplays = search.includes("@")
+          ? displayNameMatches.filter((u) =>
+              u.displayName?.toLowerCase().includes(search.toLowerCase()),
+            )
+          : displayNameMatches;
+
+        const seen = new Set<string>();
+        const merged: Doc<"users">[] = [];
+        const maxLen = Math.max(
+          candidateDisplays.length,
+          candidateEmails.length,
+        );
+        for (let i = 0; i < maxLen; i++) {
+          const displayUser = candidateDisplays[i];
+          if (displayUser && !seen.has(displayUser._id)) {
+            seen.add(displayUser._id);
+            merged.push(displayUser);
+          }
+          const emailUser = candidateEmails[i];
+          if (emailUser && !seen.has(emailUser._id)) {
+            seen.add(emailUser._id);
+            merged.push(emailUser);
+          }
+        }
+        sliced = merged.slice(0, limit);
       }
     } else {
       sliced = await ctx.db.query("users").order("desc").take(limit);

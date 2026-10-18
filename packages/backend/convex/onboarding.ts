@@ -2,7 +2,7 @@ import { computeSortKey } from "@poohma/shared/utils/index-group";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { authenticatedMutation, familyBoundMutation } from "./customBuilders";
-import { deleteCredentialsForRecord } from "./records";
+import { cascadeDeleteRecord } from "./records";
 
 /**
  * オンボーディング完了状態を記録
@@ -101,8 +101,7 @@ export const insertSampleRecords = familyBoundMutation({
     );
 
     for (const record of recordsToDelete) {
-      await deleteCredentialsForRecord(ctx, record._id);
-      await ctx.db.delete(record._id);
+      await cascadeDeleteRecord(ctx, record._id);
     }
 
     const now = Date.now();
@@ -183,8 +182,7 @@ export const purgeSampleData = familyBoundMutation({
       if (record.familyId !== familyId || !record.isSample) {
         continue;
       }
-      await deleteCredentialsForRecord(ctx, record._id);
-      await ctx.db.delete(record._id);
+      await cascadeDeleteRecord(ctx, record._id);
       deletedCount++;
     }
 
