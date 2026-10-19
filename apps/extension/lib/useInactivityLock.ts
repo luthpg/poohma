@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 
-/** デフォルトのオートロックタイムアウト（分）: 15分 */
-export const DEFAULT_AUTOLOCK_MINUTES = 15;
+/** デフォルトのオートロックタイムアウト（分）: 5分（Webアプリと完全一致） */
+export const DEFAULT_AUTOLOCK_MINUTES = 5;
 
 const ACTIVITY_EVENTS = [
   "mousemove",

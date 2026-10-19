@@ -145,7 +145,7 @@ export function App() {
   useInactivityLock({
     onLock: handleLock,
     enabled: isUnlocked,
-    timeoutMinutes: 15,
+    timeoutMinutes: 5,
   });
 
   // 2. 全体状態のリフレッシュ（storage直接読み取りでハング完全防止・並行実行ロック付き）

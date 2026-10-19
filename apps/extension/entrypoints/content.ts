@@ -66,7 +66,7 @@ export default defineContentScript({
         typeof event.data === "object" &&
         event.data.type === "POOHMA_AUTH_SYNC"
       ) {
-        const { nonce, code, customToken, idToken, theme } = event.data;
+        const { nonce, code, theme } = event.data;
         if (
           typeof nonce === "string" &&
           typeof code === "string" &&
@@ -84,12 +84,11 @@ export default defineContentScript({
               return;
             }
 
+            // トークンは一切触らず nonce と code のみを Background へ中継
             const res = await chrome.runtime.sendMessage({
               type: "AUTH_SYNC_TOKEN",
               nonce,
               code,
-              customToken,
-              idToken,
               theme,
             });
 
@@ -479,12 +478,30 @@ export default defineContentScript({
     // SPA クライアントサイドルーティング検知
     let lastObservedUrl = window.location.href;
 
+    // ページロード・SPA遷移後にログインフォームの存在を検知して Background に通知（自動Popup・バッジ用）
+    function checkLoginFormPresence() {
+      setTimeout(() => {
+        if (!chrome.runtime?.id) return;
+        const hasPasswordInput =
+          document.querySelector('input[type="password"]') !== null;
+        if (hasPasswordInput) {
+          chrome.runtime
+            .sendMessage({
+              type: "CONTENT_FORM_DETECTED",
+              url: normalizeUrl(window.location.href),
+            })
+            .catch(() => {});
+        }
+      }, 800);
+    }
+
     function handleSpaNavigation() {
       const currentUrl = window.location.href;
       if (currentUrl === lastObservedUrl) return;
       lastObservedUrl = currentUrl;
 
       queryMatchedRecords(true);
+      checkLoginFormPresence();
 
       if (!isSaveDismissed) {
         try {
@@ -511,6 +528,7 @@ export default defineContentScript({
     // 4. イベントリスナー登録
     function attachListeners() {
       queryMatchedRecords();
+      checkLoginFormPresence();
 
       window.addEventListener("popstate", handleSpaNavigation);
       window.addEventListener("hashchange", handleSpaNavigation);

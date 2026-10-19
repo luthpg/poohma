@@ -79,6 +79,57 @@ export async function getRecordsCached(force = false): Promise<CachedRecord[]> {
   return recordsCache.records;
 }
 
+/**
+ * 指定タブの URL に一致する登録情報数を算出し、拡張機能アイコンのバッジに反映
+ */
+export async function updateBadgeForTab(
+  tabId: number,
+  url?: string,
+): Promise<number> {
+  if (!url) {
+    await chrome.action.setBadgeText({ tabId, text: "" }).catch(() => {});
+    return 0;
+  }
+
+  // 内部 URL（chrome:// など）は無視
+  if (
+    url.startsWith("chrome://") ||
+    url.startsWith("chrome-extension://") ||
+    url.startsWith("about:")
+  ) {
+    await chrome.action.setBadgeText({ tabId, text: "" }).catch(() => {});
+    return 0;
+  }
+
+  try {
+    const records = await getRecordsCached();
+    const matchedCount = records.filter(
+      (r) => r.url && matchRecordUrl(url, r.url) !== "none",
+    ).length;
+
+    if (matchedCount > 0) {
+      await chrome.action
+        .setBadgeText({
+          tabId,
+          text: String(matchedCount),
+        })
+        .catch(() => {});
+      await chrome.action
+        .setBadgeBackgroundColor({
+          tabId,
+          color: "#ea580c", // PoohMa ブランドカラー（オレンジ）
+        })
+        .catch(() => {});
+    } else {
+      await chrome.action.setBadgeText({ tabId, text: "" }).catch(() => {});
+    }
+    return matchedCount;
+  } catch {
+    await chrome.action.setBadgeText({ tabId, text: "" }).catch(() => {});
+    return 0;
+  }
+}
+
 // Offscreen Document のシングルトン起動管理（排他制御・コンテキスト存在保証付き）
 async function ensureOffscreenDocument(): Promise<void> {
   const offscreenUrl = chrome.runtime.getURL(OFFSCREEN_PATH);
@@ -168,13 +219,38 @@ export default defineBackground(() => {
     // 起動待機
   });
 
+  // フォーム検知による openPopup 試行のタブ別制御（同一タブ重複抑制）
+  const tabFormPrompted = new Set<number>();
+
+  // タブURL更新時のバッジ更新
+  chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (changeInfo.status === "complete" && tab.url) {
+      updateBadgeForTab(tabId, tab.url).catch(() => {});
+    }
+  });
+
+  // タブ切り替え時のバッジ更新
+  chrome.tabs.onActivated.addListener(async (activeInfo) => {
+    try {
+      const tab = await chrome.tabs.get(activeInfo.tabId);
+      if (tab?.url) {
+        await updateBadgeForTab(activeInfo.tabId, tab.url);
+      }
+    } catch {}
+  });
+
+  // タブ破棄時の追跡解除
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    tabFormPrompted.delete(tabId);
+  });
+
   // メッセージ中継・ハンドリング
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    // 1. Web 連携短命同期コード引き換え（Background で直接・確実に実行）
+    // 1. Web 連携短命同期コード引き換え（Zero Token Exposure: トークンはメッセージに含まれず Convex から直接取得）
     if (message?.type === "AUTH_SYNC_TOKEN") {
       (async () => {
         try {
-          const { nonce, code, customToken, idToken } = message;
+          const { nonce, code } = message;
           if (!nonce || !code) {
             sendResponse({ success: false, error: "Invalid parameters" });
             return;
@@ -214,7 +290,7 @@ export default defineBackground(() => {
           // リプレイ・二重引き換え防止のため、引き換え前にストレージ上の nonce を即時消費
           await setPendingSyncNonce("");
 
-          // Convex から短命コードを検証・消費してアカウント情報を取得（共有クライアントは常に未認証）
+          // Convex から短命コードを検証・消費してアカウント情報と customToken を取得
           const res = await convex.mutation(api.extensionAuth.redeemSyncToken, {
             nonce: nonce.trim(),
             code: code.trim(),
@@ -247,12 +323,13 @@ export default defineBackground(() => {
               }
             : null;
 
-          let activeIdToken = idToken;
+          const retrievedCustomToken = res.customToken;
+          let activeIdToken: string | null = null;
           let activeRefreshToken: string | null = null;
 
-          if (customToken) {
+          if (retrievedCustomToken) {
             const tokenRes = await exchangeCustomToken(
-              customToken,
+              retrievedCustomToken,
               env.VITE_FIREBASE_API_KEY,
             );
             if (tokenRes) {
@@ -287,7 +364,7 @@ export default defineBackground(() => {
           await setAuthSession(
             extensionUser,
             extensionFamily,
-            customToken,
+            retrievedCustomToken,
             activeIdToken,
             activeRefreshToken,
             extensionAccounts,
@@ -304,20 +381,17 @@ export default defineBackground(() => {
             })
             .catch(() => {});
 
-          // Offscreen へ Custom Token を渡して Firebase セッションを確立
-          if (customToken) {
-            ensureOffscreenDocument()
-              .then(() => {
-                chrome.runtime
-                  .sendMessage({
-                    type: "OFFSCREEN_SIGN_IN_CUSTOM_TOKEN",
-                    customToken,
-                    userId: extensionUser.userId,
-                  })
-                  .catch(() => {});
-              })
-              .catch(() => {});
-          }
+          // アクティブタブのバッジを更新
+          chrome.tabs
+            .query({ active: true, currentWindow: true })
+            .then(([currentTab]) => {
+              if (currentTab?.id && currentTab.url) {
+                updateBadgeForTab(currentTab.id, currentTab.url).catch(
+                  () => {},
+                );
+              }
+            })
+            .catch(() => {});
 
           sendResponse({
             success: true,
@@ -594,11 +668,26 @@ export default defineBackground(() => {
       return;
     }
 
-    // 9. Content Script からのフォーム検知通知（自律サジェスト・ID入力補助の基盤）
+    // 9. Content Script からのフォーム検知通知（バッジ即時反映 ＋ openPopup 受動的案内）
     if (message?.type === "CONTENT_FORM_DETECTED") {
-      const tabUrl = sender.tab?.url;
-      if (tabUrl) {
-        ensureOffscreenDocument().catch(() => {});
+      const tabId = sender.tab?.id;
+      const tabUrl = message.url || sender.tab?.url;
+      if (tabId && tabUrl) {
+        (async () => {
+          const count = await updateBadgeForTab(tabId, tabUrl);
+          if (count > 0 && !tabFormPrompted.has(tabId)) {
+            tabFormPrompted.add(tabId);
+            // ユーザーがログインフォーム等を開いている際に受動的動線として Popup 展開を試行
+            if (typeof chrome.action?.openPopup === "function") {
+              const windowId = sender.tab?.windowId;
+              chrome.action
+                .openPopup(windowId ? { windowId } : undefined)
+                .catch(() => {
+                  // ブラウザ権限やジェスチャー要件で拒否された場合は静かにフォールバック（バッジ表示で代替）
+                });
+            }
+          }
+        })();
       }
       sendResponse({ received: true });
       return false;

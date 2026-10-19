@@ -30,9 +30,9 @@ PoohMa の Chrome 拡張機能（Manifest V3: Side Panel / Content Script / Back
 
 以下のアーキテクチャを採用する：
 
-### 1. Web アプリ連携ワンタイム Sync Token / Nonce ハンドシェイク方式の採用
+### 1. Web アプリ連携ワンタイム Sync Token / バックチャネル取得方式の採用（Zero Token Exposure）
 
-拡張機能と Web アプリ間のセッション連携において、**「暗号学的 Nonce ＋ 短命ワンタイムコード（Sync Code）＋ 即時物理削除」**によるハンドシェイク方式を採用する。
+拡張機能と Web アプリ間のセッション連携において、**「暗号学的 Nonce ＋ 短命ワンタイムコード（Sync Code）＋ Convex バックチャネル引き換え ＋ 即時物理削除」**によるゼロトークン中継アーキテクチャを採用する。
 
 ```mermaid
 sequenceDiagram
@@ -42,50 +42,76 @@ sequenceDiagram
     participant CS as Content Script
     participant Web as Web アプリ (/auth/extension-sync)
     participant Backend as Convex Backend
-    participant Offscreen as Offscreen Document
+    participant Offscreen as Offscreen Document (Crypto Worker)
 
     SP->>Web: 連携画面を開く (openTab: ?nonce=<uuid>)
     Note over Web: ログイン確認 & アカウント確定
-    Web->>Backend: issueSyncToken({ nonce, accountId })
+    Web->>Backend: issueSyncToken({ nonce, accountId, customToken })
     Backend-->>Web: { code: <uuid>, expiresAt } (TTL: 30秒)
-    Web->>CS: window.postMessage({ type: "POOHMA_AUTH_SYNC", nonce, code, customToken, ... })
+    Note over Web: postMessage にはトークンを一切含めない (Zero Token Exposure)
+    Web->>CS: window.postMessage({ type: "POOHMA_AUTH_SYNC", nonce, code, theme })
     CS->>BG: chrome.runtime.sendMessage(AUTH_SYNC_TOKEN)
     BG->>Backend: redeemSyncToken({ nonce, code })
     Note over Backend: Nonce+Code突合 & 即時物理削除 (Single-Use)
-    Backend-->>BG: { user, family, accounts }
-    BG->>Offscreen: Firebase Custom Token 伝達
-    Offscreen->>Offscreen: signInWithCustomToken (永続セッション確立)
+    Backend-->>BG: { user, family, accounts, customToken }
+    Note over BG: Background が REST API で Custom Token を交換
+    BG->>BG: exchangeCustomToken (idToken / refreshToken 取得)
+    BG->>BG: setAuthSession (TRUSTED_CONTEXTS ストレージ保存)
     Note over SP: ユーザーがマスターパスコード入力
-    SP->>SP: ローカルで家族マスターキーを復号・検証 (E2EEアンロック完了)
+    SP->>Offscreen: VAULT_UNLOCK (パスコード照合・鍵導出)
+    Offscreen-->>SP: 鍵導出成功 (5分オートロック)
 ```
 
+- **Zero Token Exposure（DOM・Content Script からのトークン完全排除）**:
+  - `window.postMessage` や Content Script には `idToken` や `customToken` などの認証トークンを一切乗せない。
+  - Web 側は `issueSyncToken` 呼び出し時に短命レコードへ `customToken` を格納し、Background Service Worker が `redeemSyncToken` で Convex から直接（バックチャネルで）引き取ると同時にデータベースから即座に物理削除する。
+  - これにより、悪意あるサードパーティスクリプトや拡張機能の Content Script コンテキストからのトークン窃取リスクを構造的にゼロ化する。
 - **短命 TTL とワンショット物理削除**: 同期コードの有効期限は 30 秒とし、`redeemSyncToken` 実行時にデータベースから即座に物理削除する。これにより、ブラウザ履歴の漏洩や中間者による再送攻撃（リプレイ攻撃）を完全に遮断する。
-- **動的 Extension ID 制約と postMessage 採用根拠**: GitHub Releases から ZIP 配布（デベロッパーモードでのアンパックド読み込み）される環境では、Chrome 側で端末・プロファイルごとにランダムな Extension ID が動的に割り振られる。そのため、Web 側から固定 ID を宛先とする外部メッセージング（`chrome.runtime.sendMessage(EXTENSION_ID, ...)`）を行うことは不可能である。Web アプリケーション（同一オリジン検証済み）から Content Script への `window.postMessage`（暗号学的 Nonce ＋ ワンタイム短命コード）を経由する方式は、動的 Extension ID 制約下においてセッションを安全・確実に伝達する唯一かつ堅牢な設計である。
+- **動的 Extension ID 制約と postMessage 採用根拠**: GitHub Releases から ZIP 配布（デベロッパーモードでのアンパックド読み込み）される環境では、Chrome 側で端末・プロファイルごとにランダムな Extension ID が動的に割り振られる。そのため、Web 側から固定 ID を宛先とする外部メッセージング（`chrome.runtime.sendMessage(EXTENSION_ID, ...)`）を行うことは不可能である。Web アプリケーション（同一オリジン検証済み）から Content Script への `window.postMessage`（暗号学的 Nonce ＋ ワンタイム短命コードのみ）を経由する方式は、動的 Extension ID 制約下においてセッションを安全・確実に伝達する唯一かつ堅牢な設計である。
 - **オリジン検証**: Web アプリから Content Script への伝達は `window.postMessage` を使用し、`event.origin !== window.location.origin` の厳格なチェックを行う。
 - **マルチアカウント一覧の同時返却**: 同一の Firebase UID に紐づく全 `users` レコード（`accounts`）を返却することで、拡張機能側でのシームレスなアカウント切り替えを実現する。
 
-### 2. E2EE 暗号化ヒント取得と閲覧監査ログ記録の設計原則
+### 2. トークン管理の Single Source of Truth（Background Service Worker REST API 一本化）
 
+- **Background REST API への一本化**:
+  - レコード取得クエリや暗号化ヒント取得に必要な ID トークン・リフレッシュトークンの管理は、Background Service Worker が軽量な Firebase REST API（`exchangeCustomToken`, `refreshIdToken`）を直接呼び出して一本化する。
+  - Offscreen Document 内に Firebase Auth SDK を持たせる二重管理を完全に廃止し、Single Source of Truth を Background に集約する。
+- **Offscreen Document の純粋計算ワーカー化**:
+  - Offscreen Document（`entrypoints/offscreen/main.ts`）からは重厚な Firebase Auth SDK を完全に排除し、Web Crypto による暗号鍵導出（PBKDF2）・パスワードヒント復号（AES-GCM）および 5 分オートロックタイマーの管理に特化した「純粋な計算ワーカー」として運用する。
+  - これにより、Offscreen Document のバンドルサイズをわずか 1.47 kB に劇的削減し、Manifest V3 の Service Worker アイドル停止や Offscreen 破棄・再起動耐性を飛躍的に向上させた。
+
+### 3. ConvexHttpClient による単発取得＋インメモリキャッシュ方式の採用
+
+- **WebSocket 常時購読の回避**:
+  - Manifest V3 Service Worker 環境において WebSocket 常時購読（Convex React Client 等）を常時維持することは、Service Worker のアイドル終了やリソース消費、接続再確立の不安定さを招く。
+  - パスワードマネージャーのレコード一覧は秒単位で頻繁に変更されるものではなく、カレントページのドメイン照合には単発 HTTP 取得（`ConvexHttpClient`）と 1 分間のインメモリキャッシュで十分な即時性と最高のパフォーマンス・省メモリ性を達成できる。
 - **ゼロ知識暗号文と Query/Mutation 分離**:
-  - `getRecords`（単発 HTTP クエリ）によって取得されるパスワードヒント（`passwordHint`、`passwordHintDekEncrypted` 等）は、すべてクライアントサイドで E2EE 暗号化された Blob（暗号文）であり、サーバー側では一切平文を解読できない。
-  - レコード取得クエリ自体は安全な読み取り操作（Query）として扱い、ConvexHttpClient による単発取得とインメモリキャッシュによって拡張機能の動作を高速化・最適化する。
-- **明示操作時の非同期閲覧監査ログ記録（UI影響ゼロ保証）**:
-  - 実際の閲覧監査ログ（`HINT_VIEW`）は、Side Panel 上でユーザーがマスターパスコードを入力して明示的に「表示」アイコンをクリックし、Web Crypto によるローカル復号が実行された後（`decryptAndShowHint`）に Convex Mutation（`records:logRecordHintView`）を非同期ベストエフォートで呼び出して記録を試みる。
-  - 万が一ネットワーク不調やサーバーエラー等で監査ログ送信が失敗した場合でも、例外を安全に処理して UI 上のヒント表示を妨げない（UI影響ゼロ保証）。これにより、ゼロ知識暗号アーキテクチャの安全性と高い応答性・UX を両立している。
+  - `getRecords`（単発 HTTP クエリ）によって取得されるパスワードヒントは、すべてクライアントサイドで E2EE 暗号化された Blob であり、サーバー側では一切平文を解読できない。
+  - 実際の閲覧監査ログ（`HINT_VIEW`）は、Side Panel 上でユーザーが明示的にヒントを表示したタイミングで非同期ベストエフォートで記録され、UI 描画を一切ブロックしない。
 
-### 3. Offscreen Document による Firebase Auth 永続セッション管理と計算ワーカー化
+### 4. 受動的動線としてのアイコンバッジ（`setBadgeText`）および `action.openPopup` の確立
 
-Manifest V3 Service Worker の制約（DOM API 非対応、Web Crypto 実行等の分離）を補完し、Firebase Auth SDK の認証状態維持および Web Crypto 鍵導出の安全な計算処理を行うため、`chrome.offscreen` API を用いた **Offscreen Document（`entrypoints/offscreen/main.ts`）** を採用する。
-- Web 側から渡された Firebase Custom Token を用いて、Offscreen Document 内の公式 Firebase Auth SDK で `signInWithCustomToken` を実行。
-- これにより、公式のリフレッシュトークンサイクルが確立され、ID トークンの自動更新と Convex への安定したトークン供給が可能となる。
-- Offscreen Document は `chrome.storage` に依存せず、Background Service Worker との `runtime.sendMessage` 通信による純粋な計算・認証ワーカーとして機能する。
-- レコード一覧の取得は Background Service Worker が ConvexHttpClient による単発 HTTP クエリと 1 分間のインメモリキャッシュを用いて行い、WebSocket 常時購読による過剰な常駐リソース消費を防止する。
+- **DOM 内候補ポップアップ廃止に伴う代替動線**:
+  - ページ DOM 内へのサジェストポップアップ挿入を廃止（Zero DOM Pollution）したことに伴い、ユーザーが現在訪問しているサイトに登録情報が存在することを自然に認識できるよう、ツールバーアイコンに一致件数のバッジ（`chrome.action.setBadgeText`）を自動表示する。
+  - ページ内にログインフォーム（`input[type="password"]`）が検出された際、カレントタブに一致する登録情報が存在すれば `chrome.action.openPopup` の自動展開を試行し、ユーザーがワンクリックで Side Panel を開いて自動入力できる受動的動線を確保する。
 
-### 4. マスターパスコード（E2EE）の厳格な分離
+### 5. 送信後保存提案バナーの例外採用理由（Zero DOM Pollution の例外許容）
+
+- **基本原則（Zero DOM Pollution）**:
+  - PoohMa は、ページの DOM 構造を破壊・改変したり、ホストページの CSS / JavaScript との干渉によるセキュリティ脆弱性（CSS Injection や Clickjacking）を招くリスクを防止するため、閲覧ページ DOM 内部への恒常的な UI 要素挿入を原則として禁止する。
+- **例外許容の正当化理由**:
+  - 未登録サイトでの自律保存機会を完全に喪失する課題を解決するため、フォーム送信および画面遷移が検知された直後の「このログイン情報を PoohMa に保存しますか？」提案バナーに限り、例外的な UI 挿入を許容・採用する。
+  - **安全性の担保策**:
+    1. **Shadow DOM による完全隔離**: バナーは `attachShadow({ mode: "closed" })` または隔離された Shadow Root 内に構築され、ホストページの CSS スタイルによる改変や干渉を受けない。
+    2. **画面上部の非破壊フローティング表示**: ページの既存 DOM 構造やレイアウトフローを崩さないよう、最前面のフロートバーとして一時的に表示する。
+    3. **ユーザー自己決定権の徹底**: 「保存」「今回はしない」「今後このサイトで表示しない（永続除外）」の選択肢を明確に提供し、一度却下または除外設定されたオリジンには二度と表示しない。
+
+### 6. マスターパスコード（E2EE）の厳格な分離とオートロック統一
 
 - Web アプリから拡張機能へ、**平文のマスターパスコードや復号済みマスターキーは一切渡さない**。
 - 拡張機能が受け取るのは、暗号化されたマスターキー（`masterKeyEncrypted`）、ソルト（`masterKeySalt`）、IV（`masterKeyIv`）、KDF反復回数（`kdfIterations`）のみとする。
 - ユーザーは拡張機能の Side Panel 上で直接マスターパスコードを入力し、拡張機能ローカル（PBKDF2 + AES-GCM）で復号・検証を行う（ADR-001, ADR-002 準拠）。
+- オートロック時間は、Web アプリ（`AUTOLOCK_DEFAULT_MINUTES = 5`）と完全一致の **5分（無操作時）** に統一する。
 
 ---
 

@@ -11,6 +11,7 @@ export const SYNC_CODE_TTL_MS = 30 * 1000; // 30秒
 export const issueSyncToken = authenticatedMutation({
   args: {
     nonce: v.string(),
+    customToken: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const rawNonce = args.nonce.trim();
@@ -35,6 +36,7 @@ export const issueSyncToken = authenticatedMutation({
       accountId: ctx.user._id,
       nonce: rawNonce,
       code,
+      customToken: args.customToken,
       expiresAt,
     });
 
@@ -121,6 +123,7 @@ export const redeemSyncToken = mutation({
 
     return {
       success: true,
+      customToken: record.customToken ?? null,
       user: {
         _id: user._id,
         userId: user.userId, // Firebase UID

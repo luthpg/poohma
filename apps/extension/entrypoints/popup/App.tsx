@@ -1,10 +1,47 @@
-import { ExternalLink, PanelRightOpen, ShieldCheck } from "lucide-react";
+import {
+  ExternalLink,
+  KeyRound,
+  PanelRightOpen,
+  ShieldCheck,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { env } from "@/env";
+import type { MatchedRecord } from "@/lib/messaging";
 import { useTheme } from "@/lib/useTheme";
 
 export function App() {
   useTheme();
+  const [matchedRecords, setMatchedRecords] = useState<MatchedRecord[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        const [tab] = await chrome.tabs.query({
+          active: true,
+          currentWindow: true,
+        });
+        if (!isMounted || !tab?.url) return;
+
+        const res = await chrome.runtime.sendMessage({
+          type: "GET_MATCHED_RECORDS",
+          url: tab.url,
+        });
+
+        if (isMounted && res?.success && Array.isArray(res.matchedRecords)) {
+          setMatchedRecords(res.matchedRecords);
+        }
+      } catch {
+        // バックグラウンド非稼働等の例外は安全に握る
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const handleOpenSidePanel = async () => {
     try {
       const [tab] = await chrome.tabs.query({
@@ -46,9 +83,34 @@ export function App() {
         </div>
       </div>
 
-      <p className="text-xs text-muted-foreground leading-relaxed">
-        閲覧中のサイトに応じたログインIDやパスワードヒントの参照・自動入力は、サイドパネルからご利用いただけます。
-      </p>
+      {matchedRecords.length > 0 ? (
+        <div className="rounded-md border border-orange-200/80 bg-orange-50/50 p-2.5 dark:border-orange-900/60 dark:bg-orange-950/20 space-y-1.5">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-orange-900 dark:text-orange-200">
+            <KeyRound className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400 shrink-0" />
+            <span>このサイトの登録情報（{matchedRecords.length}件）</span>
+          </div>
+          <div className="space-y-1">
+            {matchedRecords.slice(0, 3).map((r) => (
+              <div
+                key={r._id}
+                className="text-[11px] text-muted-foreground truncate"
+              >
+                ・{r.title}
+                {r.credentials?.[0]?.loginId && (
+                  <span className="opacity-75">
+                    {" "}
+                    ({r.credentials[0].loginId})
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          閲覧中のサイトに応じたログインIDやパスワードヒントの参照・自動入力は、サイドパネルからご利用いただけます。
+        </p>
+      )}
 
       <Button
         onClick={handleOpenSidePanel}
@@ -56,7 +118,9 @@ export function App() {
         size="sm"
       >
         <PanelRightOpen className="mr-1.5 h-3.5 w-3.5" />
-        サイドパネルを開く
+        {matchedRecords.length > 0
+          ? "サイドパネルで開く"
+          : "サイドパネルを開く"}
       </Button>
 
       <div className="flex items-center justify-between pt-2 border-t border-border/80 text-[10px] text-muted-foreground">

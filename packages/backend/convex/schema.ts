@@ -303,6 +303,7 @@ export default defineSchema({
     accountId: v.id("users"),
     nonce: v.string(),
     code: v.string(),
+    customToken: v.optional(v.string()),
     expiresAt: v.number(),
   })
     .index("by_code_nonce", ["code", "nonce"])

@@ -35,11 +35,7 @@ function debugSyncLog(...args: unknown[]) {
 function ExtensionSyncPage() {
   const { nonce } = Route.useSearch();
   const navigate = useNavigate();
-  const {
-    isAuthenticated,
-    isLoading: isAuthLoading,
-    fetchAccessToken,
-  } = useAuth();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const { isAuthenticated: isConvexAuth, isLoading: isConvexLoading } =
     useConvexAuth();
   const {
@@ -192,34 +188,8 @@ function ExtensionSyncPage() {
           setTimeout(() => reject(new Error("Timeout")), 7000),
         );
 
-        // クライアント内の Firebase Auth から即座に ID トークンを取得（0ms、ハングしない）
-        const idTokenPromise = fetchAccessToken({
-          forceRefreshToken: false,
-        })
-          .then((token) => {
-            debugSyncLog("[PoohMa Sync] fetchAccessToken succeeded:", !!token);
-            return token;
-          })
-          .catch(() => null);
-
-        // Convex 短命同期コードの発行（Convex Mutation）
-        const issuePromise = issueSyncToken({
-          nonce: cleanNonce,
-          accountId: targetAccountId,
-        })
-          .then((res) => {
-            debugSyncLog(
-              "[PoohMa Sync] issueSyncToken succeeded:",
-              res?.code ? "code issued" : "no code",
-            );
-            return res;
-          })
-          .catch((err) => {
-            throw err;
-          });
-
         // セッションCookieからのCustom Token取得（1.5秒タイムアウト付き・失敗しても一切ブロックしない）
-        const customTokenPromise = Promise.race([
+        const customTokenRes = await Promise.race([
           getCustomTokenFromSession(),
           new Promise<null>((r) => setTimeout(() => r(null), 1500)),
         ])
@@ -232,8 +202,24 @@ function ExtensionSyncPage() {
           })
           .catch(() => null);
 
-        const [res, idToken, customTokenRes] = await Promise.race([
-          Promise.all([issuePromise, idTokenPromise, customTokenPromise]),
+        // Convex 短命同期コードの発行（Convex Mutation、Custom Token をサーバー間バックチャネルで伝達）
+        const issuePromise = issueSyncToken({
+          nonce: cleanNonce,
+          customToken: customTokenRes?.customToken ?? undefined,
+        })
+          .then((res) => {
+            debugSyncLog(
+              "[PoohMa Sync] issueSyncToken succeeded:",
+              res?.code ? "code issued" : "no code",
+            );
+            return res;
+          })
+          .catch((err) => {
+            throw err;
+          });
+
+        const [res] = await Promise.race([
+          Promise.all([issuePromise]),
           timeoutPromise,
         ]);
 
@@ -245,12 +231,12 @@ function ExtensionSyncPage() {
             typeof localStorage !== "undefined"
               ? localStorage.getItem("theme")
               : "system";
+
+          // Content Script へのトークン非露出（CWE-200対策）: nonce, code, theme のみ中継
           const syncPayload = {
             type: "POOHMA_AUTH_SYNC",
             nonce: cleanNonce,
             code: res.code,
-            idToken: idToken ?? null,
-            customToken: customTokenRes?.customToken ?? null,
             theme: currentTheme || "system",
           };
 
@@ -295,9 +281,7 @@ function ExtensionSyncPage() {
 
           // 即時送信
           window.postMessage(syncPayload, window.location.origin);
-          debugSyncLog("[PoohMa Sync] Initial window.postMessage sent:", {
-            hasIdToken: !!idToken,
-          });
+          debugSyncLog("[PoohMa Sync] Initial window.postMessage sent");
 
           // Content Script の読み込み遅延に備えて 300ms 間隔で最大 8 回再送
           let retryCount = 0;
@@ -351,7 +335,6 @@ function ExtensionSyncPage() {
     accounts,
     nonce,
     issueSyncToken,
-    fetchAccessToken,
     status,
     retryAttempt,
   ]);

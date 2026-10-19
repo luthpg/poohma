@@ -1,33 +1,12 @@
-import { initializeApp } from "firebase/app";
-import {
-  browserLocalPersistence,
-  getAuth,
-  setPersistence,
-  signInWithCustomToken,
-  signOut,
-} from "firebase/auth";
-import { env } from "@/env";
 import {
   decryptPasswordHint,
   unlockMasterKeyWithPasscode,
 } from "@/lib/passcode";
 
-// 1. Firebase 初期化
-const firebaseConfig = {
-  apiKey: env.VITE_FIREBASE_API_KEY,
-  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
-};
-
-const app = initializeApp(firebaseConfig, "poohma-extension-offscreen");
-const auth = getAuth(app);
-setPersistence(auth, browserLocalPersistence).catch(() => {});
-
-// 2. メモリ上での MasterKey 保持
+// 1. メモリ上での MasterKey 保持（暗号化ヒント復号ワーカー）
 let activeMasterKey: CryptoKey | null = null;
 let autoLockTimer: ReturnType<typeof setTimeout> | null = null;
-const AUTO_LOCK_TIMEOUT_MS = 15 * 60 * 1000;
+const AUTO_LOCK_TIMEOUT_MS = 5 * 60 * 1000; // 5分オートロック（Webアプリと一致）
 
 function resetAutoLockTimer() {
   if (autoLockTimer) {
@@ -41,7 +20,7 @@ function resetAutoLockTimer() {
   }, AUTO_LOCK_TIMEOUT_MS);
 }
 
-// 3. メッセージリスナー（chrome.storage は一切使用せず runtime メッセージのみで連携）
+// 2. メッセージリスナー（Web Crypto 計算処理に特化）
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (!message || typeof message !== "object") return;
 
@@ -51,55 +30,18 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return false;
   }
 
-  // A. Firebase Custom Token 認証
-  if (message.type === "OFFSCREEN_SIGN_IN_CUSTOM_TOKEN") {
-    (async () => {
-      try {
-        const { customToken, userId } = message;
-        if (!customToken) {
-          sendResponse({ success: false, error: "Custom token required" });
-          return;
-        }
-
-        await auth.authStateReady();
-        if (auth.currentUser && auth.currentUser.uid !== userId) {
-          await signOut(auth).catch(() => {});
-        }
-
-        const cred = await signInWithCustomToken(auth, customToken);
-        const idToken = await cred.user.getIdToken();
-        sendResponse({ success: true, idToken });
-      } catch (_err) {
-        sendResponse({ success: false });
-      }
-    })();
-    return true;
-  }
-
-  // B. Firebase サインアウト
+  // A. 暗号鍵破棄（サインアウト時）
   if (
     message.type === "AUTH_SIGN_OUT" ||
     message.type === "OFFSCREEN_SIGN_OUT"
   ) {
-    (async () => {
-      try {
-        await signOut(auth);
-      } catch (_e) {}
-      activeMasterKey = null;
-      if (autoLockTimer) clearTimeout(autoLockTimer);
-
-      chrome.runtime
-        .sendMessage({
-          type: "AUTH_STATE_CHANGED",
-          isAuthenticated: false,
-          user: null,
-          family: null,
-        })
-        .catch(() => {});
-
-      sendResponse({ success: true });
-    })();
-    return true;
+    activeMasterKey = null;
+    if (autoLockTimer) {
+      clearTimeout(autoLockTimer);
+      autoLockTimer = null;
+    }
+    sendResponse({ success: true });
+    return false;
   }
 
   // C. パスコード解除（MasterKey 展開）
