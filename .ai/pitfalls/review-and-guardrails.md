@@ -386,4 +386,56 @@ PR レビュー対応、外部 AI（CodeRabbit等）指摘の審査、および�
 - **関連実装 (Related Code References)**:
   - `apps/extension/entrypoints/sidepanel/App.tsx`
 
+---
+
+### URL パラメータによるアカウント初期選択時の保存先と暗号鍵の乖離（Single Source of Truth）
+
+- **問題 (Problem)**:
+  拡張機能等から `?accountId=A` の URL パラメータ付きで登録画面を開いた際、保存処理（`createRecord`）の保存先引数に URL の `targetAccountId` を優先採用してしまうと、ユーザーが画面上で手動でアカウント B に切り替えた後に、B の家族暗号鍵で暗号化された平文ヒントがアカウント A へ保存されてしまい、後から復号不能になる致命的なデータ破損が発生する。
+- **原因 (Root Cause)**:
+  暗号化（`PasscodeProvider`）は現在のアクティブアカウント（`activeAccountId`）の家族鍵を使用しているのに対し、保存先アカウントの決定論理が URL パラメータを優先し、状態の Single Source of Truth が破綻していたため。
+- **誤ったアプローチ (Anti-Pattern)**:
+  `accountId: targetAccountId ?? activeAccountId` のように、画面操作後の最新状態を無視して URL パラメータを保存先に固定する。
+- **正しいアプローチ (Correct Pattern)**:
+  URL の `accountId` は初回マウント時の初期切り替えトリガー（`switchAccount`）にのみ使用し、保存処理（`createRecord`）の保存先は常に暗号鍵コンテキストと同一の `activeAccountId` に統一する。
+- **再発防止 (Prevention)**:
+  暗号化を伴うフォーム画面では、暗号鍵の供給元と保存先識別子を別々のソースから取得せず、必ず単一のコンテキスト（`activeAccountId`）にバインドする。
+- **関連実装 (Related Code References)**:
+  - `apps/web/src/routes/(app)/records/new.tsx`
+
+---
+
+### WebExtension Service Worker におけるイベントリスナー登録のネスト禁止
+
+- **問題 (Problem)**:
+  `chrome.storage.onChanged.addListener` などのライフサイクル監視リスナーを、`chrome.runtime.onMessage.addListener` のコールバック内部に配置してしまうと、通常の起動・メッセージ処理で登録ブロックを通過せずリスナーが機能しなかったり、メッセージを受信するたびにリスナーが重複登録されてメモリリークや多重実行を引き起こす。
+- **原因 (Root Cause)**:
+  既知のメッセージ処理が早期 `return` することで後続コードが実行されない構造を見落とし、メッセージハンドラ内に初期化コードを混入させたため。
+- **誤ったアプローチ (Anti-Pattern)**:
+  メッセージハンドラや特定イベントの内部で、独立したグローバルイベントリスナーを登録する。
+- **正しいアプローチ (Correct Pattern)**:
+  グローバルなイベントリスナーは、必ず Service Worker（Background）のトップレベル初期化ブロック（`defineBackground(() => { ... })` 直下）で 1 回だけ登録する。
+- **再発防止 (Prevention)**:
+  WebExtension のリスナー登録はすべてトップレベルで宣言的に行い、イベントハンドラ内へのネスト登録を根絶する。
+- **関連実装 (Related Code References)**:
+  - `apps/extension/entrypoints/background.ts`
+
+---
+
+### 複数パネル・ウィンドウでのアカウント切り替え検知時の旧レコード一覧即時破棄
+
+- **問題 (Problem)**:
+  別ウィンドウや別パネルでアカウントが切り替わったことをストレージ変更通知（`storageListener`）で検知した際、暗号鍵や復号平文のみをクリアしてレコード一覧データ（`records`）を残したままにすると、新アカウントの一覧取得が通信遅延または失敗した際に、画面上に旧アカウントのサービス名やログインIDがそのまま残存し、クロステナント情報の表示や誤操作を招く。
+- **原因 (Root Cause)**:
+  自パネルでの切り替え操作（`handleSelectAccount`）では `setRecords([])` を行っていたが、外部イベント起因の同期リスナーで一覧の破棄が漏れていたため。
+- **誤ったアプローチ (Anti-Pattern)**:
+  新アカウントのデータ取得成功時まで旧一覧を表示し続け、取得失敗時もフォールバックとして旧データを保持する。
+- **正しいアプローチ (Correct Pattern)**:
+  外部からのアカウント変更通知を受信した瞬間に、鍵や平文だけでなく `setRecords([])` を呼び出して旧一覧を即時破棄する。また、データ取得失敗時も空配列を維持し、旧アカウント情報の画面残存を完全遮断する。
+- **再発防止 (Prevention)**:
+  アカウントやテナントが切り替わるイベントでは、新データの取得成否にかかわらず、まず旧テナントのあらゆるデータを同期的に完全クリアする。
+- **関連実装 (Related Code References)**:
+  - `apps/extension/entrypoints/sidepanel/App.tsx`
+
+
 

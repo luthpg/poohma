@@ -143,12 +143,16 @@ function NewRecordComponent() {
       targetAccountId &&
       accounts.length > 0
     ) {
-      hasSwitchedTargetAccountRef.current = true;
       if (
         targetAccountId !== activeAccountId &&
         accounts.some((a) => a._id === targetAccountId)
       ) {
-        switchAccount(targetAccountId as Id<"users">);
+        hasSwitchedTargetAccountRef.current = true;
+        switchAccount(targetAccountId as Id<"users">).catch(() => {
+          toast.error("アカウントの切り替えに失敗しました");
+        });
+      } else {
+        hasSwitchedTargetAccountRef.current = true;
       }
     }
   }, [targetAccountId, activeAccountId, accounts, switchAccount]);
@@ -174,9 +178,7 @@ function NewRecordComponent() {
     e.preventDefault();
     const succeeded = await form.submit(async (payload) => {
       await createRecord({
-        accountId: targetAccountId
-          ? (targetAccountId as Id<"users">)
-          : activeAccountId || undefined,
+        accountId: activeAccountId || undefined,
         ...payload,
       });
     });

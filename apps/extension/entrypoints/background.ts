@@ -222,6 +222,14 @@ export default defineBackground(() => {
       .catch(() => {});
   }
 
+  // アカウント切替・ログアウト時のキャッシュおよび in-flight Promise の確実な破棄
+  chrome.storage?.onChanged?.addListener((changes, areaName) => {
+    if (areaName === "local" && (changes.activeAccountId || changes.user)) {
+      recordsCache = null;
+      inflightRecordsPromises.clear();
+    }
+  });
+
   // ツールバーアイコンクリック時に Side Panel を開く動作を有効化
   if (chrome.sidePanel?.setPanelBehavior) {
     chrome.sidePanel
@@ -755,14 +763,6 @@ export default defineBackground(() => {
       sendResponse({ received: true });
       return false;
     }
-
-    // アカウント切替・ログアウト時のキャッシュおよび in-flight Promise の確実な破棄
-    chrome.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName === "local" && (changes.activeAccountId || changes.user)) {
-        recordsCache = null;
-        inflightRecordsPromises.clear();
-      }
-    });
 
     return;
   });

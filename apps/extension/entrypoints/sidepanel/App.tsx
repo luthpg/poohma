@@ -234,9 +234,13 @@ export function App() {
             if (accountGenerationRef.current === currentGeneration) {
               setRecords(recordsRes.records);
             }
+          } else if (accountGenerationRef.current === currentGeneration) {
+            setRecords([]);
           }
         } catch (_err) {
-          // レコード取得失敗時はスキップ
+          if (accountGenerationRef.current === currentGeneration) {
+            setRecords([]);
+          }
         }
       } else {
         setIsUnlocked(false);
@@ -320,6 +324,7 @@ export function App() {
           setVisibleHints({});
           setPendingRevealCred(null);
           setPendingRevealRecordId(null);
+          setRecords([]);
         }
         setIsWaitingSync(false);
         refreshState();
