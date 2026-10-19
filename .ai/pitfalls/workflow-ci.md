@@ -275,7 +275,6 @@ Monorepo 配下に新しいパッケージ（例: Chrome 拡張機能 `apps/exte
    タグリリース時は `if ! gh release view "${TAG_NAME}" >/dev/null 2>&1; then gh release create ...; else gh release upload ...; fi` で安全にフォールバックする。
 3. **成果物の一時保存（Artifact Upload）**:
    手動実行時でも ZIP をダウンロードして動作検証できるよう、`actions/upload-artifact@v7` で成果物を Actions Artifact として保存する。
-
-
-
-
+4. **PR テストビルド時の動的アーティファクト名分岐と Step Summary 案内**:
+   - `pull_request` トリガー時、`github.ref_name`（`372/merge` 等）をそのままアーティファクト名に使うとスラッシュが含まれ不正な名前になる恐れがあるため、`poohma-extension-pr<PR番号>` と命名する。
+   - `github.event_name == 'pull_request'` の際は GitHub Release へのアップロードを確実にスキップし、Step Summary（`$GITHUB_STEP_SUMMARY`）にダウンロード・インストール手順を出力して PR レビュー時の実機検証を支援する。

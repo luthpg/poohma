@@ -14,7 +14,7 @@ describe("Extension Auth Storage & Multi-Account Management", () => {
   beforeEach(() => {
     mockStore = {};
 
-    // chrome.storage.local モック
+    // chrome.storage.local & chrome.runtime モック
     vi.stubGlobal("chrome", {
       storage: {
         local: {
@@ -37,26 +37,11 @@ describe("Extension Auth Storage & Multi-Account Management", () => {
           }),
         },
       },
+      runtime: {
+        sendMessage: vi.fn(async () => {}),
+      },
     });
   });
-
-  const dummyUser1: ExtensionUser = {
-    _id: "user_1",
-    userId: "firebase_uid_1",
-    displayName: "User One",
-    email: "user1@example.com",
-    familyId: "fam_1",
-    familyRole: "admin",
-  };
-
-  const dummyUser2: ExtensionUser = {
-    _id: "user_2",
-    userId: "firebase_uid_1",
-    displayName: "User Two",
-    email: "user2@example.com",
-    familyId: "fam_1",
-    familyRole: "viewer",
-  };
 
   const dummyFamily: ExtensionFamily = {
     _id: "fam_1",
@@ -66,6 +51,36 @@ describe("Extension Auth Storage & Multi-Account Management", () => {
     masterKeySalt: "salt_key",
     kdfIterations: 100000,
     cryptoVersion: 1,
+  };
+
+  const dummyFamily2: ExtensionFamily = {
+    _id: "fam_2",
+    name: "Second Family",
+    masterKeyEncrypted: "enc_key_2",
+    masterKeyIv: "iv_key_2",
+    masterKeySalt: "salt_key_2",
+    kdfIterations: 100000,
+    cryptoVersion: 1,
+  };
+
+  const dummyUser1: ExtensionUser = {
+    _id: "user_1",
+    userId: "firebase_uid_1",
+    displayName: "User One",
+    email: "user1@example.com",
+    familyId: "fam_1",
+    familyRole: "admin",
+    family: dummyFamily,
+  };
+
+  const dummyUser2: ExtensionUser = {
+    _id: "user_2",
+    userId: "firebase_uid_1",
+    displayName: "User Two",
+    email: "user2@example.com",
+    familyId: "fam_2",
+    familyRole: "viewer",
+    family: dummyFamily2,
   };
 
   it("saves auth session and resets pendingSyncNonce to null", async () => {
@@ -102,6 +117,7 @@ describe("Extension Auth Storage & Multi-Account Management", () => {
 
   it("switches active account among multiple sub-accounts", async () => {
     mockStore.user = dummyUser1;
+    mockStore.family = dummyFamily;
     mockStore.accounts = [dummyUser1, dummyUser2];
     mockStore.activeAccountId = "user_1";
 
@@ -110,6 +126,10 @@ describe("Extension Auth Storage & Multi-Account Management", () => {
     const storage = await getAuthStorage();
     expect(storage.activeAccountId).toBe("user_2");
     expect(storage.user).toEqual(dummyUser2);
+    expect(storage.family).toEqual(dummyFamily2);
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+      type: "VAULT_LOCK",
+    });
   });
 
   it("clears auth session completely on sign out", async () => {

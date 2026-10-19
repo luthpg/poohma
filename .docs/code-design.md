@@ -1063,6 +1063,14 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 | createContact         | Mutation       | 公開       | お問い合わせ送信（Honeypot、Zod整合バリデーション、@convex-dev/rate-limiterトークンバケット、同一メール短時間連投制限、管理者メール通知予約） |
 | sendNotificationEmail | InternalAction | 内部限定   | 管理者（ADMIN_EMAIL）宛てにお問い合わせ受領通知メールを配信（送信者をreplyToに設定）        |
 
+### 7.8 convex/extensionAuth.ts
+
+| 関数 | 種別 | 認可 | 概要 |
+| ---------------------------------- | ---------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| issueSyncToken | Mutation | authenticated | 拡張機能連携用の短命同期コード（Sync Code）を発行（TTL: 30秒、Nonce・Custom Token保持） |
+| redeemSyncToken | Mutation | 公開 | 拡張機能 Background から Nonce + Code で引き換え。即時物理削除・有効期限検証・ユーザーアカウントと全サブアカウント（各家族メタデータ付与）返却 |
+| cleanupExpiredSyncCodesInternal | InternalMutation | 内部限定（Cron） | 期限切れ同期コードの定期クリーンアップ |
+
 ## 8. 画面設計・ルーティング設計
 
 ### 8.1 ルートグループ構成（TanStack Router）

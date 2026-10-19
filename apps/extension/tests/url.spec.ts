@@ -34,6 +34,9 @@ describe("Extension URL & Origin Verification", () => {
       expect(isTrustedPoohmaOrigin("https://poohma-attacker.vercel.app")).toBe(
         false,
       );
+      expect(
+        isTrustedPoohmaOrigin("https://poohma-git-attacker.vercel.app"),
+      ).toBe(false);
       expect(isTrustedPoohmaOrigin("https://attacker.workers.dev")).toBe(false);
       expect(
         isTrustedPoohmaOrigin("https://poohma-backup.user.workers.dev"),

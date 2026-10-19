@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import { internalMutation, mutation } from "./_generated/server";
 import { authenticatedMutation } from "./customBuilders";
 
@@ -88,22 +89,42 @@ export const redeemSyncToken = mutation({
       throw new Error("User account not found");
     }
 
-    // 所属家族情報
-    let family = null;
-    if (user.familyId) {
-      const familyDoc = await ctx.db.get(user.familyId);
-      if (familyDoc) {
-        family = {
-          _id: familyDoc._id,
-          name: familyDoc.name,
-          masterKeyEncrypted: familyDoc.masterKeyEncrypted,
-          masterKeyIv: familyDoc.masterKeyIv,
-          masterKeySalt: familyDoc.masterKeySalt,
-          kdfIterations: familyDoc.kdfIterations,
-          cryptoVersion: familyDoc.cryptoVersion,
-        };
-      }
+    // 家族暗号メタデータ取得用キャッシュヘルパー
+    type FamilyInfo = {
+      _id: Id<"families">;
+      name: string;
+      masterKeyEncrypted: string;
+      masterKeyIv: string;
+      masterKeySalt: string;
+      kdfIterations: number;
+      cryptoVersion: number;
+    } | null;
+
+    const familyCache = new Map<string, FamilyInfo>();
+
+    async function getFamilyInfo(
+      familyId?: Id<"families">,
+    ): Promise<FamilyInfo> {
+      if (!familyId) return null;
+      const cached = familyCache.get(familyId);
+      if (cached !== undefined) return cached;
+      const familyDoc = await ctx.db.get(familyId);
+      const info: FamilyInfo = familyDoc
+        ? {
+            _id: familyDoc._id,
+            name: familyDoc.name,
+            masterKeyEncrypted: familyDoc.masterKeyEncrypted,
+            masterKeyIv: familyDoc.masterKeyIv,
+            masterKeySalt: familyDoc.masterKeySalt,
+            kdfIterations: familyDoc.kdfIterations,
+            cryptoVersion: familyDoc.cryptoVersion,
+          }
+        : null;
+      familyCache.set(familyId, info);
+      return info;
     }
+
+    const family = await getFamilyInfo(user.familyId);
 
     // 同一 Firebase UID に属する全サブアカウント一覧を取得
     const userDocs = await ctx.db
@@ -111,15 +132,18 @@ export const redeemSyncToken = mutation({
       .withIndex("by_userId", (q) => q.eq("userId", user.userId))
       .collect();
 
-    const accounts = userDocs.map((u) => ({
-      _id: u._id,
-      userId: u.userId,
-      displayName: u.displayName,
-      email: u.email,
-      photoURL: u.photoURL,
-      familyId: u.familyId,
-      familyRole: u.familyRole,
-    }));
+    const accounts = await Promise.all(
+      userDocs.map(async (u) => ({
+        _id: u._id,
+        userId: u.userId,
+        displayName: u.displayName,
+        email: u.email,
+        photoURL: u.photoURL,
+        familyId: u.familyId,
+        familyRole: u.familyRole,
+        family: await getFamilyInfo(u.familyId),
+      })),
+    );
 
     return {
       success: true,
@@ -132,6 +156,7 @@ export const redeemSyncToken = mutation({
         photoURL: user.photoURL,
         familyId: user.familyId,
         familyRole: user.familyRole,
+        family,
       },
       accounts,
       family,

@@ -129,7 +129,7 @@ export function App() {
     setIsWaitingSync(false);
   }, []);
 
-  // 1. 自動ロック（無操作15分またはサイドパネル非表示で自律ロック）
+  // 1. 自動ロック（無操作5分またはサイドパネル非表示で自律ロック）
   const handleLock = useCallback(() => {
     accountGenerationRef.current += 1;
     masterKeyRef.current = null;

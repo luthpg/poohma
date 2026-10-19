@@ -647,6 +647,7 @@ export default defineContentScript({
           ) {
             return false;
           }
+          if (isPasswordLikeInput(el)) return false;
           return el.offsetParent !== null; // 可視状態チェック
         };
 
@@ -654,13 +655,22 @@ export default defineContentScript({
         if (isEligibleInput(activeInput)) {
           targetInput = activeInput;
         } else {
-          // ページ内の安全な ID 入力欄を探索
-          const candidate = document.querySelector(
-            'input[type="email"]:not([type="password"]), input[autocomplete="username"]:not([type="password"]), input[name*="user" i]:not([type="password"]), input[name*="login" i]:not([type="password"]):not([name*="pass" i]), input[type="text"]:not([type="password"])',
-          ) as HTMLInputElement | null;
-          if (isEligibleInput(candidate)) {
-            targetInput = candidate;
-          }
+          // パスワード欄を含むフォームを優先して安全な ID 入力欄を探索
+          const idSelector =
+            'input[type="email"], input[autocomplete="username"], input[name*="user" i], input[name*="login" i], input[type="text"]';
+          const loginForm = document
+            .querySelector('input[type="password"]')
+            ?.closest("form");
+          const primaryScope: ParentNode = loginForm ?? document;
+          targetInput =
+            Array.from(
+              primaryScope.querySelectorAll<HTMLInputElement>(idSelector),
+            ).find(isEligibleInput) ??
+            (primaryScope !== document
+              ? (Array.from(
+                  document.querySelectorAll<HTMLInputElement>(idSelector),
+                ).find(isEligibleInput) ?? null)
+              : null);
         }
 
         if (targetInput) {

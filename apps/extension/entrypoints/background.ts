@@ -167,7 +167,7 @@ async function ensureOffscreenDocument(): Promise<void> {
         "BLOBS" as chrome.offscreen.Reason,
       ],
       justification:
-        "Firebase Auth persistent session and Convex real-time synchronization",
+        "Web Crypto PBKDF2 and AES-GCM cryptographic operations and in-memory key isolation",
     })
     .then(async () => {
       console.log(
@@ -338,6 +338,12 @@ export default defineBackground(() => {
             }
           }
 
+          // トークン取得または交換に失敗した場合は空セッションを保存せず即時エラー
+          if (!activeIdToken || !activeRefreshToken) {
+            sendResponse({ success: false, error: "Token exchange failed" });
+            return;
+          }
+
           const extensionAccounts: ExtensionUser[] =
             Array.isArray(res.accounts) && res.accounts.length > 0
               ? res.accounts.map((a) => ({
@@ -348,6 +354,17 @@ export default defineBackground(() => {
                   photoURL: a.photoURL,
                   familyId: a.familyId,
                   familyRole: a.familyRole,
+                  family: a.family
+                    ? {
+                        _id: a.family._id,
+                        name: a.family.name,
+                        masterKeyEncrypted: a.family.masterKeyEncrypted,
+                        masterKeyIv: a.family.masterKeyIv,
+                        masterKeySalt: a.family.masterKeySalt,
+                        kdfIterations: a.family.kdfIterations,
+                        cryptoVersion: a.family.cryptoVersion,
+                      }
+                    : null,
                 }))
               : [extensionUser];
 

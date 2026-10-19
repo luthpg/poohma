@@ -126,7 +126,7 @@ sequenceDiagram
 1. **最小権限の追求**:
    - `chrome.cookies` 権限（Web のセッション Cookie を覗き見する権限）や不要な権限（`identity`, `scripting`）を一切要求せず、Web アプリ側が明示的にワンタイムコードを発行する設計とすることで、拡張機能の要求権限を最小化している。
 2. **Offscreen Document の利用正当性**:
-   - Manifest V3 で提供される `chrome.offscreen` API の正規理由（`reasons: ["DOM_SCRAPING", "BLOBS"]`）に準拠し、Firebase Auth SDK の永続認証状態維持および Web Crypto PBKDF2/AES 計算を目的として限定的に利用している。
+   - Manifest V3 で提供される `chrome.offscreen` API の正規理由（`reasons: ["DOM_SCRAPING", "BLOBS"]`）に準拠し、Service Worker から分離された安全なコンテキストでの Web Crypto PBKDF2 鍵導出、AES-GCM 暗号計算、およびメモリ上での鍵隔離・5分オートロック管理を目的として限定的に利用している。
 3. **`<all_urls>`（host_permissions）の正当性**:
    - パスワードマネージャー / ヒント管理拡張機能として、ユーザーが訪問した任意の Web サイト上でログインフォームを検出し、パスワードヒントの参照・自動入力を支援するという「単一目的（Single Purpose）」のために不可欠な権限として申請する。
 

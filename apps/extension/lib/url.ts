@@ -30,8 +30,7 @@ export function isTrustedPoohmaOrigin(origin: string): boolean {
     if (
       host === "poohma.vercel.app" ||
       (host.startsWith("poohma-") &&
-        host.endsWith("-luths-projects.vercel.app")) ||
-      (host.startsWith("poohma-git-") && host.endsWith(".vercel.app"))
+        host.endsWith("-luths-projects.vercel.app"))
     ) {
       return true;
     }

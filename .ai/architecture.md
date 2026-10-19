@@ -55,7 +55,7 @@ poohma/
 
 - **Routing**: TanStack Router によるファイルベースルーティング
   - `routes/(app)/`: 認証必須ルート（`dashboard.tsx`, `family.tsx`, `records/`, `settings/index.tsx`, `settings/bulk.tsx`, `recovery.tsx`）
-  - `routes/(public)/`: 未認証公開ルート（`index.tsx` (LP), `login.tsx`, `usage.tsx`, `faq.tsx`, `news/index.tsx`, `news/$id.tsx`, `contact.tsx`, `terms-of-service.tsx`, `privacy-policy.tsx`）
+  - `routes/(public)/`: 未認証公開ルート（`index.tsx` (LP), `login.tsx`, `usage.tsx`, `faq.tsx`, `news/index.tsx`, `news/$id.tsx`, `contact.tsx`, `terms-of-service.tsx`, `privacy-policy.tsx`, `auth.extension-sync.tsx`）
   - `routes/__root.tsx`: ルート共通レイアウト、認証コンテキスト（`beforeLoad` で `getAuthUser` 実行）、各種 Provider
 - **Components & Code Splitting**:
   - `components/UserMenu.tsx`: 全画面共通のヘッダー・メニュー。初期バンドル軽量化のためCSVや仮想スクロールの重い依存を排除（92kB → 37kB）。

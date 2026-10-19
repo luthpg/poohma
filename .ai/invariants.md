@@ -207,6 +207,13 @@
 - **CI テスト用ダミー環境変数の流用禁止**:
   - GitHub Releases 等でエンドユーザーへ配布する成果物（Chrome 拡張機能 ZIP 等）のビルドには、CI テスト用のダミー環境変数（`dummy_key` やダミードメイン）を流用してはならない。成果物が実環境で動作しなくなるため、必ず GitHub Secrets / Variables を通じた正規の本番環境変数を注入してビルドすること。
 
+### 拡張機能 ZIP ビルドの PR テストと GitHub Releases 配布の責務分離
+
+- **PR テストビルドとタグリリースの分岐**:
+  - `release-extension.yml` は、タグプッシュ（`v*`）だけでなく PR（`apps/extension/**` 等の変更時）でも起動し、動作検証用の ZIP を GitHub Actions Artifacts にアップロードする。
+  - GitHub Releases へのアタッチ（`gh release create` / `upload`）はタグプッシュ時限定とし、PR では実行しない。
+  - PR 時のアーティファクト名は `poohma-extension-pr<PR番号>` と命名し、PR 画面（Job Summary）にダウンロード・インストール手順を出力してレビュー容易性を担保する。
+
 ### Monorepo 内 postinstall による環境変数バリデーションと CI への環境変数供給
 
 - **`pnpm install` 実行ジョブでの環境変数供給**:

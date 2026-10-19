@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "turbo run dev --filter=@poohma/web --filter=@poohma/backend",
     "dev:admin": "turbo run dev --filter=@poohma/admin --filter=@poohma/backend",
-    "dev:extension": "turbo run dev --filter=@poohma/web --filter=@poohma/extension",
+    "dev:extension": "turbo run dev --filter=@poohma/web --filter=@poohma/extension --filter=@poohma/backend",
     "dev:email": "pnpm shared email:dev",
     "build": "turbo run build",
     "test": "turbo run test",

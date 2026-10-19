@@ -13,6 +13,7 @@ export type ExtensionUser = {
   photoURL?: RedeemSyncTokenResult["user"]["photoURL"];
   familyId?: string;
   familyRole?: RedeemSyncTokenResult["user"]["familyRole"];
+  family?: ExtensionFamily | null;
 };
 
 export type ExtensionFamily = Omit<
@@ -110,7 +111,15 @@ export async function switchActiveAccount(accountId: string): Promise<void> {
   await chrome.storage.local.set({
     user: targetUser,
     activeAccountId: accountId,
+    family: targetUser.family ?? null,
   });
+
+  // アカウント・家族切り替え時はメモリ上の旧家族マスターキーを安全に破棄
+  try {
+    chrome.runtime?.sendMessage?.({ type: "VAULT_LOCK" })?.catch?.(() => {});
+  } catch {
+    // 拡張機能コンテキスト外やテスト環境等のエラーを安全に無視
+  }
 }
 
 /**

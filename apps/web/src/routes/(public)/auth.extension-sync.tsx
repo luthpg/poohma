@@ -188,10 +188,10 @@ function ExtensionSyncPage() {
           setTimeout(() => reject(new Error("Timeout")), 7000),
         );
 
-        // セッションCookieからのCustom Token取得（1.5秒タイムアウト付き・失敗しても一切ブロックしない）
+        // セッションCookieからのCustom Token取得（3秒タイムアウト付き）
         const customTokenRes = await Promise.race([
           getCustomTokenFromSession(),
-          new Promise<null>((r) => setTimeout(() => r(null), 1500)),
+          new Promise<null>((r) => setTimeout(() => r(null), 3000)),
         ])
           .then((res) => {
             debugSyncLog(
@@ -202,10 +202,22 @@ function ExtensionSyncPage() {
           })
           .catch(() => null);
 
+        if (!customTokenRes?.customToken) {
+          debugSyncLog(
+            "[PoohMa Sync] Failed to retrieve custom token from session",
+          );
+          syncIssuedRef.current = false;
+          setStatus("error");
+          setErrorMessage(
+            "認証トークンの取得に失敗しました。再ログインをお試しください。",
+          );
+          return;
+        }
+
         // Convex 短命同期コードの発行（Convex Mutation、Custom Token をサーバー間バックチャネルで伝達）
         const issuePromise = issueSyncToken({
           nonce: cleanNonce,
-          customToken: customTokenRes?.customToken ?? undefined,
+          customToken: customTokenRes.customToken,
         })
           .then((res) => {
             debugSyncLog(
