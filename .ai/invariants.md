@@ -212,7 +212,7 @@
 - **`pnpm install` 実行ジョブでの環境変数供給**:
   - Monorepo 内のパッケージ（`apps/extension` 等）の `postinstall` スクリプトで環境変数スキーマ（`@t3-oss/env-core` 等）が評価される場合、`pnpm install` を実行する全 CI/CD ジョブで必要な環境変数（テスト・ドライランジョブではダミー値、実ビルドジョブでは本番/Preview値）を確実に供給すること。未供給による `pnpm install` 異常終了を構造的に防止する。
 - **環境変数の過剰スコープによるビルド設定上書きの禁止（Scoped Env 原則）**:
-  - `postinstall` 等の事前バリデーションを通過させるための環境変数は、ジョブ全体のトップレベル（`env:`）ではなく、実行ステップ（`Install dependencies` 等）に局所配置すること。ジョブ全体に配置すると後続の `vercel build` や動的 Preview 設定注入ステップを OS プロセス環境変数が上書きし、デプロイ先環境の不整合や動的 URL の固定値化事故を招く。
+  - `postinstall` 等の事前バリデーションを通過させるための環境変数は、ジョブ全体のトップレベル（`env:`）ではなく、実行ステップ（`Install dependencies` 等）に局所配置すること。ジョブ全体に配置すると後続の `vercel build` や動的 Preview 設定注入ステップ、あるいは本番デプロイ（`deploy-production.yml` での Convex デプロイ等）を不要なダミー値が上書き・汚染し、デプロイ先環境の不整合や動的 URL の固定値化事故を招く。
 - **書き込み権限（contents: write）付きワークフローでの GITHUB_TOKEN 永続化禁止（CWE-200）**:
   - `release-extension.yml` 等で `permissions: contents: write` を付与するワークフローでは、必ず `actions/checkout` に `persist-credentials: false` を明示すること。悪意ある依存関係やスクリプトがローカル `.git/config` からトークンを窃取するリスクを構造的に排除する。
 

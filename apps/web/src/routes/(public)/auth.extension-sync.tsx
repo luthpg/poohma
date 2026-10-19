@@ -71,6 +71,10 @@ function ExtensionSyncPage() {
   const [isTimedOut, setIsTimedOut] = useState(false);
   const [retryAttempt, setRetryAttempt] = useState(0);
   const syncIssuedRef = useRef(false);
+  const attemptCleanupRef = useRef<(() => void) | null>(null);
+
+  // アンマウント時に未完了のタイマー・リスナーを確実に解除
+  useEffect(() => () => attemptCleanupRef.current?.(), []);
 
   // 1. nonce ガード: 欠落・不正時は即時エラートースト表示してルートへリダイレクト
   useEffect(() => {
@@ -106,6 +110,8 @@ function ExtensionSyncPage() {
 
   // 4. 手動再試行ハンドラ
   const handleRetry = useCallback(() => {
+    attemptCleanupRef.current?.();
+    attemptCleanupRef.current = null;
     syncIssuedRef.current = false;
     setIsTimedOut(false);
     setStatus("processing");
@@ -280,6 +286,12 @@ function ExtensionSyncPage() {
             }
           };
           window.addEventListener("message", handleAck);
+          attemptCleanupRef.current = () => {
+            acknowledged = true;
+            if (retryTimer) clearInterval(retryTimer);
+            if (ackTimeoutTimer) clearTimeout(ackTimeoutTimer);
+            window.removeEventListener("message", handleAck);
+          };
 
           // 即時送信
           window.postMessage(syncPayload, window.location.origin);
@@ -309,6 +321,7 @@ function ExtensionSyncPage() {
             if (acknowledged) return;
             if (retryTimer) clearInterval(retryTimer);
             window.removeEventListener("message", handleAck);
+            attemptCleanupRef.current = null;
             syncIssuedRef.current = false;
             setStatus("error");
             setErrorMessage(

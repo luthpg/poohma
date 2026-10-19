@@ -257,6 +257,7 @@ Monorepo 配下に新しいパッケージ（例: Chrome 拡張機能 `apps/exte
 
 - **環境変数の局所スコープ配置（Scoped Env 原則）**:
   `postinstall` 対策の環境変数はジョブ全体ではなく、必要なステップ（`Install dependencies` 等）に局所配置する。後続のビルドステップに意図しない環境変数が漏洩・上書きすることを構造的に遮断する。
+  - 例: `deploy-production.yml` において、Convex デプロイキーは `Deploy Convex Backend` ステップのみにバインドし、`postinstall` 用のダミー環境変数（`VITE_FIREBASE_API_KEY` 等）は `Install dependencies` ステップのみに閉じることで、デプロイ実行プロセスへのダミー値混入を完全に防止する。
 
 ---
 

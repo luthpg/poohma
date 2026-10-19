@@ -17,13 +17,6 @@ jobs:
     name: Deploy Convex Backend
     runs-on: ubuntu-latest
     if: ${{ github.ref == 'refs/heads/main' && github.repository_owner == github.event.repository.owner.login }}
-    env:
-      CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
-      VITE_FIREBASE_API_KEY: "dummy_key"
-      VITE_FIREBASE_AUTH_DOMAIN: "dummy.firebaseapp.com"
-      VITE_FIREBASE_PROJECT_ID: "dummy"
-      VITE_CONVEX_URL: "https://dummy.convex.cloud"
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -43,6 +36,13 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        env:
+          VITE_FIREBASE_API_KEY: "dummy_key"
+          VITE_FIREBASE_AUTH_DOMAIN: "dummy.firebaseapp.com"
+          VITE_FIREBASE_PROJECT_ID: "dummy"
+          VITE_CONVEX_URL: "https://dummy.convex.cloud"
 
       - name: Deploy Convex Backend to Production
         run: pnpm --filter @poohma/backend run deploy
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}

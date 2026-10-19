@@ -367,19 +367,43 @@ export default defineContentScript({
       }
     }
 
+    // パスワード入力欄（またはパスワード表示切り替え等の疑いがある欄）か判定
+    function isPasswordLikeInput(input: HTMLInputElement): boolean {
+      if (input.type === "password") return true;
+      const name = input.name.toLowerCase();
+      const id = input.id.toLowerCase();
+      const autocomplete = (input.autocomplete || "").toLowerCase();
+      return (
+        name.includes("password") ||
+        name.includes("passwd") ||
+        id.includes("password") ||
+        id.includes("passwd") ||
+        autocomplete.includes("password")
+      );
+    }
+
     // フォーム内から安全にログインIDを抽出する（パスワード欄は完全除外）
     function extractLoginIdFromForm(form: HTMLFormElement | null): string {
       if (!form) return "";
 
-      // パスワード型以外の識別用セレクター
-      const idInput = form.querySelector(
-        'input[type="email"]:not([type="password"]), input[autocomplete="username"]:not([type="password"]), input[name*="user" i]:not([type="password"]), input[id*="user" i]:not([type="password"]), input[name*="login" i]:not([type="password"]):not([name*="pass" i]), input[type="text"]:not([type="password"])',
-      ) as HTMLInputElement | null;
+      const selectors = [
+        'input[type="email"]',
+        'input[autocomplete="username"]',
+        'input[name*="user" i]',
+        'input[id*="user" i]',
+        'input[name*="login" i]',
+        'input[type="text"]',
+      ];
 
-      if (idInput?.value) {
-        const val = idInput.value.trim();
-        if (val.length > 0 && !val.includes("\n")) {
-          return val;
+      for (const selector of selectors) {
+        const inputs = form.querySelectorAll(selector);
+        for (const el of inputs) {
+          const input = el as HTMLInputElement;
+          if (isPasswordLikeInput(input)) continue;
+          const val = input.value?.trim();
+          if (val && val.length > 0 && !val.includes("\n")) {
+            return val;
+          }
         }
       }
       return "";

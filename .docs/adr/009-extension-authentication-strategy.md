@@ -69,9 +69,9 @@ sequenceDiagram
 - **ゼロ知識暗号文と Query/Mutation 分離**:
   - `getRecords`（単発 HTTP クエリ）によって取得されるパスワードヒント（`passwordHint`、`passwordHintDekEncrypted` 等）は、すべてクライアントサイドで E2EE 暗号化された Blob（暗号文）であり、サーバー側では一切平文を解読できない。
   - レコード取得クエリ自体は安全な読み取り操作（Query）として扱い、ConvexHttpClient による単発取得とインメモリキャッシュによって拡張機能の動作を高速化・最適化する。
-- **明示操作時の不可逆な閲覧監査ログ記録**:
-  - 実際の閲覧監査ログ（`HINT_VIEW`）は、Side Panel 上でユーザーがマスターパスコードを入力して明示的に「表示」アイコンをクリックし、Web Crypto によるローカル復号が実行された瞬間（`decryptAndShowHint`）に Convex Mutation（`records:recordHintViewLog`）によって不可逆・確実に記録される。
-  - これにより、ゼロ知識暗号アーキテクチャを損なうことなく、確実な監査証跡と高い応答性を両立している。
+- **明示操作時の非同期閲覧監査ログ記録（UI影響ゼロ保証）**:
+  - 実際の閲覧監査ログ（`HINT_VIEW`）は、Side Panel 上でユーザーがマスターパスコードを入力して明示的に「表示」アイコンをクリックし、Web Crypto によるローカル復号が実行された後（`decryptAndShowHint`）に Convex Mutation（`records:logRecordHintView`）を非同期ベストエフォートで呼び出して記録を試みる。
+  - 万が一ネットワーク不調やサーバーエラー等で監査ログ送信が失敗した場合でも、例外を安全に処理して UI 上のヒント表示を妨げない（UI影響ゼロ保証）。これにより、ゼロ知識暗号アーキテクチャの安全性と高い応答性・UX を両立している。
 
 ### 3. Offscreen Document による Firebase Auth 永続セッション管理と計算ワーカー化
 

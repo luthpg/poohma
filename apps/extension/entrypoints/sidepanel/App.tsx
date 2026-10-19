@@ -115,6 +115,19 @@ export function App() {
   const isRefreshingRef = useRef<boolean>(false);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
   const accountGenerationRef = useRef<number>(0);
+  const waitingSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+
+  // 連携待機のキャンセル
+  const handleCancelWaitingSync = useCallback(async () => {
+    if (waitingSyncTimerRef.current) {
+      clearTimeout(waitingSyncTimerRef.current);
+      waitingSyncTimerRef.current = null;
+    }
+    await setPendingSyncNonce(null);
+    setIsWaitingSync(false);
+  }, []);
 
   // 1. 自動ロック（無操作15分またはサイドパネル非表示で自律ロック）
   const handleLock = useCallback(() => {
@@ -160,6 +173,9 @@ export function App() {
 
       // 認証状態（chrome.storage.local から直接取得）
       const storage = await getAuthStorage();
+      if (accountGenerationRef.current !== currentGeneration) {
+        return;
+      }
       const isAuth = !!storage.user;
 
       setIsAuthenticated(isAuth);
@@ -169,6 +185,10 @@ export function App() {
       setFamily(storage.family);
 
       if (isAuth) {
+        if (waitingSyncTimerRef.current) {
+          clearTimeout(waitingSyncTimerRef.current);
+          waitingSyncTimerRef.current = null;
+        }
         setIsWaitingSync(false);
 
         // Offscreen Document の起動完了を待機
@@ -390,6 +410,10 @@ export function App() {
 
     return () => {
       isMounted = false;
+      if (waitingSyncTimerRef.current) {
+        clearTimeout(waitingSyncTimerRef.current);
+        waitingSyncTimerRef.current = null;
+      }
       chrome.tabs.onActivated.removeListener(handleTabActivated);
       chrome.tabs.onUpdated.removeListener(handleTabUpdated);
     };
@@ -398,13 +422,28 @@ export function App() {
   // 4. Web 同期ログインの開始
   const handleStartLogin = async () => {
     try {
+      if (waitingSyncTimerRef.current) {
+        clearTimeout(waitingSyncTimerRef.current);
+        waitingSyncTimerRef.current = null;
+      }
       const nonce = crypto.randomUUID();
       await setPendingSyncNonce(nonce);
       setIsWaitingSync(true);
 
       const targetUrl = `${env.VITE_SITE_URL}/auth/extension-sync?nonce=${encodeURIComponent(nonce)}`;
       chrome.tabs.create({ url: targetUrl });
+
+      // 60秒後にタイムアウトして古い nonce を消去し、再試行可能に戻す
+      waitingSyncTimerRef.current = setTimeout(async () => {
+        await setPendingSyncNonce(null);
+        setIsWaitingSync(false);
+        waitingSyncTimerRef.current = null;
+      }, 60000);
     } catch (_err) {
+      if (waitingSyncTimerRef.current) {
+        clearTimeout(waitingSyncTimerRef.current);
+        waitingSyncTimerRef.current = null;
+      }
       setIsWaitingSync(false);
     }
   };
@@ -853,9 +892,20 @@ export function App() {
                 )}
               </Button>
               {isWaitingSync && (
-                <p className="text-[11px] text-center text-muted-foreground leading-normal">
-                  ブラウザで開いた連携タブでログインを完了すると、自動的に反映されます。
-                </p>
+                <div className="space-y-2 text-center">
+                  <p className="text-[11px] text-muted-foreground leading-normal">
+                    ブラウザで開いた連携タブでログインを完了すると、自動的に反映されます。
+                  </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs h-7 text-muted-foreground hover:text-foreground"
+                    onClick={handleCancelWaitingSync}
+                  >
+                    連携をキャンセル
+                  </Button>
+                </div>
               )}
             </CardContent>
           </Card>

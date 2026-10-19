@@ -306,5 +306,33 @@ UI 実装、外部 API 連携、環境変数、モノレポ設定における落
   - `apps/extension/entrypoints/sidepanel/App.tsx`
   - `.docs/DESIGN.md`
 
+---
+
+### 拡張機能認証同期における試行タイマー・リスナーの二重発火防止と世代管理による Race Condition 遮断
+
+- **問題 (Problem)**:
+  1. Web アプリの認証連携画面（`auth.extension-sync`）において、8 秒後に再試行ボタンが押された際、1 回目の 10 秒タイムアウト（`ackTimeoutTimer`）、再送インターバル（`retryTimer`）、および `handleAck` メッセージリスナーが解除されていないと、2 回目の処理中に 1 回目のタイムアウトが発火し、`setStatus("error")` で進行中・成功済みのステートを誤って上書き破壊してしまう。また画面離脱時にもリスナーやタイマーがリークする。
+  2. 拡張機能側（`App.tsx`）において、サインアウトやアカウント切り替えを行った直後に、非同期で遅れて完了したストレージ読み取り（`getAuthStorage`）が古い認証情報を state（`currentUser`, `accounts` 等）にセットしてしまい、ゾンビ状態が復活する。
+  3. 拡張機能側から Web 連携を開始した際、ユーザーが連携用タブを閉じたり Web 側で処理が中断された場合、拡張機能が「連携タブを確認中...」のままフリーズし、古い `pendingSyncNonce` が残存して再試行できなくなる。
+- **原因 (Root Cause)**:
+  非同期処理のライフサイクル、再試行時のクリーンアップ責務、および複数世代にまたがる状態更新の競合（Race condition）に対するガードが欠如していたこと。
+- **誤ったアプローチ (Anti-Pattern)**:
+  - 単に `retryAttempt` カウンタを増やすだけで、古いタイマーやイベントリスナーの片付けを放置する。
+  - サインアウト処理で state を初期化しても、並行して走っていた過去の `refreshState` が古い storage データをそのまま上書き適用することを許容する。
+  - 連携開始後にタイムアウトもキャンセル手段も用意せず、外部依存（連携タブの完了）を無限に待機し続ける。
+- **正しいアプローチ (Correct Pattern)**:
+  1. **試行クリーンアップの Ref 管理（`attemptCleanupRef`）**:
+     `auth.extension-sync.tsx` において、`attemptCleanupRef` にタイマー解除（`clearInterval`, `clearTimeout`）、リスナー解除（`removeEventListener`）、および古い試行の無効化フラグ（`acknowledged = true`）をまとめた関数を保持し、再試行時（`handleRetry`）およびアンマウント時に確実に実行する。
+  2. **ストレージ読み取りの世代整合性チェック（Generation Ref）**:
+     `App.tsx` の `refreshState` において、読み取り開始時の `accountGenerationRef.current` を記録し、`await getAuthStorage()` の完了直後に世代が一致しているか検証する。一致しない場合は state の更新を行わずに直ちに終了する。
+  3. **自律タイムアウト（60秒）と手動キャンセルボタンの提供**:
+     `handleStartLogin` 開始時に 60 秒の自律タイマーを設け、時間経過または手動「連携をキャンセル」クリックによって `pendingSyncNonce` を消去し、待機状態を解除して即座に再試行可能に戻す。
+- **関連実装 (Related Code References)**:
+  - `apps/web/src/routes/(public)/auth.extension-sync.tsx`
+  - `apps/extension/entrypoints/sidepanel/App.tsx`
+  - `apps/extension/lib/auth.ts`
+  - `.docs/features.md`
+
+
 
 

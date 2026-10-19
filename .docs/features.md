@@ -166,6 +166,7 @@ PoohMaでは、家族グループ内の統括管理ロールとして「ファ�
 | **ゼロDOM汚染・安全自動入力** | 外部DOMへのバッジや候補一覧の挿入を行わず（Zero DOM Pollution）、Side Panel からの明示操作によりログインIDを安全に自動入力。パスワード欄の除外および平文パスワードの直接取得・改変は一切行わない安全設計。フォーム送信検知による保存提案（SPA対応）に対応。 | 閲覧中ページ (Content Script), サイドパネル | `FR-EXT-02` | ✅ 実装済 |
 | **拡張機能セキュア暗号解除 & オートロック** | 拡張機能内で家族パスコードを入力し、メモリ上でマスターキーを展開。ヒントをオンデマンド復号。15分無操作（またはサイドパネル非表示後の復帰）による自動ロックで自律保護（手動ロック不要）。 | サイドパネル, Offscreen | `FR-EXT-03` | ✅ 実装済 |
 | **サブアカウント切替 & Webデザイン完全同期** | Web連携により同一Firebase UIDの全サブアカウントを同期保持し、サイドパネル上で即座に切替可能。Webアプリと完全に調和した角丸6px、shadow-border、OSダークモード自動追従（Web設定同期対応）、CopyButtonを搭載。 | サイドパネル | `FR-EXT-03` | ✅ 実装済 |
+| **Web認証連携 & 競合防止同期** | Web側連携ルート（`/auth/extension-sync`）と postMessage 経由で短命同期コード（30秒）を安全に授受。再試行時の古いタイマークリーンアップ、ストレージ世代管理、および 60 秒自律タイムアウト・手動キャンセル機能により、フリーズや競合を完全遮断。 | `/auth/extension-sync`, サイドパネル | `FR-EXT-03` | ✅ 実装済 |
 | **スタンドアロン GitHub Releases 配布** | CWS 審査不要の ZIP 配布。GitHub Releases からダウンロードし、デベロッパーモード「パッケージ化されていない拡張機能を読み込む」で利用可能。 | GitHub Releases, CI/CD | `FR-EXT-04` | ✅ 実装済 |
 
 ※ 拡張機能の認証・セッション同期方式の選定および Chrome Web Store 審査に関する位置付けは [ADR-009: Extension Authentication and Session Synchronization Strategy](./adr/009-extension-authentication-strategy.md) を参照。

@@ -284,10 +284,21 @@ export async function getValidIdToken(apiKey: string): Promise<string | null> {
 }
 
 /**
- * 同期待ち nonce を保存する
+ * 同期待ち nonce を保存または消去する
  */
-export async function setPendingSyncNonce(nonce: string): Promise<void> {
-  await chrome.storage.local.set({ pendingSyncNonce: nonce });
+export async function setPendingSyncNonce(nonce: string | null): Promise<void> {
+  if (nonce === null) {
+    await chrome.storage.local.remove(["pendingSyncNonce"]);
+  } else {
+    await chrome.storage.local.set({ pendingSyncNonce: nonce });
+  }
+}
+
+/**
+ * 同期待ち nonce を消去する
+ */
+export async function clearPendingSyncNonce(): Promise<void> {
+  await chrome.storage.local.remove(["pendingSyncNonce"]);
 }
 
 /**

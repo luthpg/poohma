@@ -13,7 +13,7 @@ const FORBIDDEN_PATTERNS = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
   /CONVEX_INTERNAL_SECRET/,
   /FIREBASE_ADMIN/,
-  /client_secret.*[a-zA-Z0-9_-]{24,}/,
+  /client_secret.*[a-zA-Z0-9_-]{24,}/i,
   /RESEND_API_KEY/,
   /YAHOO_CLIENT_SECRET/,
   /CLOUDFLARE_API_TOKEN/,
