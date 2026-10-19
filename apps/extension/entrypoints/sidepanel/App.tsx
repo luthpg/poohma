@@ -116,6 +116,7 @@ export function App() {
   const refreshQueuedRef = useRef<boolean>(false);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
   const accountGenerationRef = useRef<number>(0);
+  const cryptoGenerationRef = useRef<number>(0);
   const waitingSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -132,6 +133,7 @@ export function App() {
 
   // 1. 自動ロック（無操作5分またはサイドパネル非表示で自律ロック）
   const handleLock = useCallback(() => {
+    cryptoGenerationRef.current += 1;
     masterKeyRef.current = null;
     sendExtensionMessage({ type: "VAULT_LOCK" }).catch(() => {});
     setIsUnlocked(false);
@@ -275,6 +277,7 @@ export function App() {
         setFamily(message.family ?? null);
         if (!message.isAuthenticated) {
           accountGenerationRef.current += 1;
+          cryptoGenerationRef.current += 1;
           masterKeyRef.current = null;
           setDecryptedHints({});
           setVisibleHints({});
@@ -288,6 +291,7 @@ export function App() {
       if (message.type === "VAULT_LOCK_STATE_CHANGED") {
         setIsUnlocked(!!message.isUnlocked);
         if (!message.isUnlocked) {
+          cryptoGenerationRef.current += 1;
           masterKeyRef.current = null;
           setDecryptedHints({});
           setVisibleHints({});
@@ -307,6 +311,16 @@ export function App() {
           changes.accounts ||
           changes.activeAccountId)
       ) {
+        if (changes.activeAccountId || changes.user) {
+          accountGenerationRef.current += 1;
+          cryptoGenerationRef.current += 1;
+          masterKeyRef.current = null;
+          setIsUnlocked(false);
+          setDecryptedHints({});
+          setVisibleHints({});
+          setPendingRevealCred(null);
+          setPendingRevealRecordId(null);
+        }
         setIsWaitingSync(false);
         refreshState();
       }
@@ -463,6 +477,7 @@ export function App() {
     setIsAccountMenuOpen(false);
     if (accountId === activeAccountId) return;
     accountGenerationRef.current += 1;
+    cryptoGenerationRef.current += 1;
     masterKeyRef.current = null;
     setIsUnlocked(false);
     setDecryptedHints({});
@@ -481,7 +496,8 @@ export function App() {
     ) => {
       const activeKey = explicitKey || masterKeyRef.current;
       if (!activeKey) return;
-      const startGen = accountGenerationRef.current;
+      const startAccountGen = accountGenerationRef.current;
+      const startCryptoGen = cryptoGenerationRef.current;
 
       if (
         cred.passwordHint &&
@@ -500,7 +516,8 @@ export function App() {
 
           // 復号完了時にロック状態や世代を再検証（復号中のロックやアカウント切り替えによる平文復活防止）
           if (
-            accountGenerationRef.current !== startGen ||
+            accountGenerationRef.current !== startAccountGen ||
+            cryptoGenerationRef.current !== startCryptoGen ||
             !masterKeyRef.current
           ) {
             return;
@@ -623,6 +640,7 @@ export function App() {
   // 8. ログアウト
   const handleSignOut = async () => {
     accountGenerationRef.current += 1;
+    cryptoGenerationRef.current += 1;
     masterKeyRef.current = null;
     try {
       await clearAuthSession();
@@ -705,6 +723,7 @@ export function App() {
         type: "FORWARD_FILL_LOGIN_ID",
         tabId: tabInfo.tabId,
         loginId,
+        recordUrl,
       });
       if (res?.success) {
         setFilledLoginId(loginId);

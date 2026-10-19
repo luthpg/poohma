@@ -1,3 +1,4 @@
+import { matchRecordUrl } from "@poohma/shared/utils/url-matcher";
 import type { MatchedRecord } from "@/lib/messaging";
 import { isTrustedPoohmaOrigin, normalizeUrl } from "@/lib/url";
 
@@ -638,6 +639,14 @@ export default defineContentScript({
     // 5. ログインID安全自動入力メッセージ受信
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (message?.type === "CONTENT_FILL_LOGIN_ID" && message.loginId) {
+        if (
+          message.recordUrl &&
+          matchRecordUrl(window.location.href, message.recordUrl) !== "exact"
+        ) {
+          sendResponse({ success: false, reason: "Target page changed" });
+          return false;
+        }
+
         // パスワード欄ではない有効な入力要素を厳格に探索
         const isEligibleInput = (el: HTMLInputElement | null) => {
           if (!el) return false;
@@ -663,17 +672,21 @@ export default defineContentScript({
           return el.offsetParent !== null; // 可視状態チェック
         };
 
+        const idSelector =
+          'input[type="email"], input[autocomplete="username"], input[name*="user" i], input[id*="user" i], input[name*="login" i], input[id*="login" i]';
+        const loginForm = document
+          .querySelector('input[type="password"]')
+          ?.closest("form");
+        const primaryScope: ParentNode = loginForm ?? document;
+        const activeInputInLoginForm = Boolean(
+          activeInput?.form?.querySelector('input[type="password"]'),
+        );
+
         let targetInput: HTMLInputElement | null = null;
-        if (isEligibleInput(activeInput)) {
+        if (activeInputInLoginForm && isEligibleInput(activeInput)) {
           targetInput = activeInput;
         } else {
           // パスワード欄を含むフォームを優先して安全な ID 入力欄を探索
-          const idSelector =
-            'input[type="email"], input[autocomplete="username"], input[name*="user" i], input[id*="user" i], input[name*="login" i], input[id*="login" i]';
-          const loginForm = document
-            .querySelector('input[type="password"]')
-            ?.closest("form");
-          const primaryScope: ParentNode = loginForm ?? document;
           targetInput =
             Array.from(
               primaryScope.querySelectorAll<HTMLInputElement>(idSelector),

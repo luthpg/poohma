@@ -352,4 +352,38 @@ PR レビュー対応、外部 AI（CodeRabbit等）指摘の審査、および�
   - `.github/workflows/release-extension.yml`
   - `apps/extension/package.json`
 
+---
+
+### 拡張機能におけるマルチアカウント境界と in-flight Promise のアカウント分離
+
+- **問題 (Problem)**:
+  レコード取得などのリクエスト重複排除（in-flight Promise 共有）を単一変数で保持していると、アカウント A の取得中にアカウント B へ切り替えた際、B の要求が A の Promise を再利用してしまい、別アカウントのデータが返るクロステナント漏洩が発生する。
+- **原因 (Root Cause)**:
+  確定済みキャッシュには `accountId` 検証を入れていても、進行中の非同期 Promise にアカウント境界が存在しないため。
+- **誤ったアプローチ (Anti-Pattern)**:
+  単一の `let inflightPromise = null;` で全リクエストを束ねる。
+- **正しいアプローチ (Correct Pattern)**:
+  必ず `inflightPromises = new Map<string, Promise<...>>()` のように `accountId` 単位でキーを分離して管理し、完了時やアカウント切替・ログアウト時に確実にクリアする。
+- **再発防止 (Prevention)**:
+  マルチアカウント環境でのデータ取得では、確定済みキャッシュだけでなく「進行中（in-flight）の非同期リクエスト」にもアカウント識別子を必ずバインドする。
+- **関連実装 (Related Code References)**:
+  - `apps/extension/entrypoints/background.ts`
+
+---
+
+### クライアント暗号処理（E2EE）とデータフェッチの世代管理の分離（Single Responsibility）
+
+- **問題 (Problem)**:
+  復号中にロックされ、直後に再アンロックされた場合、ロック前の復号完了結果が画面に平文表示されてしまう競合（平文復活）を防ぐため、ロック時に世代を更新しようとすると、進行中のデータフェッチ（`refreshState`）まで破棄されて画面が白転・不整合になる。
+- **原因 (Root Cause)**:
+  データのライフサイクル（アカウント切替やセッション破棄）と、暗号・鍵のライフサイクル（無操作オートロックや手動ロック）を同一の単一世代参照（`accountGenerationRef`）で管理していたため。
+- **誤ったアプローチ (Anti-Pattern)**:
+  単一の世代管理を流用して副作用（リフレッシュ中断）を起こすか、逆にロック時に世代を進めず平文復活を許容する。
+- **正しいアプローチ (Correct Pattern)**:
+  データ取得用の世代（`accountGenerationRef`）とは明確に責任を分離した**暗号処理専用世代（`cryptoGenerationRef`）** を導入する。ロック・切替・ログアウトで暗号処理世代を進め、復号完了時に開始時世代を突合することで、データ取得を妨げずに古い暗号処理の平文復活を完全に遮断する。
+- **再発防止 (Prevention)**:
+  異なるライフサイクルを持つ状態（ネットワーク取得と暗号鍵状態）は、共通化せず個別の世代参照で直交して管理する。
+- **関連実装 (Related Code References)**:
+  - `apps/extension/entrypoints/sidepanel/App.tsx`
+
 

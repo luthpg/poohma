@@ -11,7 +11,6 @@ import {
   getAuthStorage,
   getValidIdToken,
   setAuthSession,
-  setPendingSyncNonce,
 } from "@/lib/auth";
 import type { MatchedRecord, ServiceRecordItem } from "@/lib/messaging";
 import { isTrustedPoohmaOrigin } from "@/lib/url";
@@ -41,7 +40,7 @@ interface PendingSaveInfo {
 }
 let pendingSave: PendingSaveInfo | null = null;
 
-let inflightRecordsPromise: Promise<CachedRecord[]> | null = null;
+const inflightRecordsPromises = new Map<string, Promise<CachedRecord[]>>();
 
 export async function getRecordsCached(force = false): Promise<CachedRecord[]> {
   const now = Date.now();
@@ -51,20 +50,23 @@ export async function getRecordsCached(force = false): Promise<CachedRecord[]> {
     return [];
   }
 
+  const accountId = currentUser._id;
+
   if (
     !force &&
     recordsCache &&
-    recordsCache.accountId === currentUser._id &&
+    recordsCache.accountId === accountId &&
     now - recordsCache.timestamp < CACHE_TTL_MS
   ) {
     return recordsCache.records;
   }
 
-  if (inflightRecordsPromise) {
-    return inflightRecordsPromise;
+  const existingPromise = inflightRecordsPromises.get(accountId);
+  if (existingPromise) {
+    return existingPromise;
   }
 
-  inflightRecordsPromise = (async () => {
+  const requestPromise = (async () => {
     try {
       const token = await getValidIdToken(env.VITE_FIREBASE_API_KEY);
       if (!token) {
@@ -75,22 +77,23 @@ export async function getRecordsCached(force = false): Promise<CachedRecord[]> {
       const authedConvex = new ConvexHttpClient(env.VITE_CONVEX_URL);
       authedConvex.setAuth(token);
       const records = await authedConvex.query(api.records.getRecords, {
-        accountId: currentUser._id as Id<"users">,
+        accountId: accountId as Id<"users">,
         includeHints: true,
       });
 
       recordsCache = {
         records: records || [],
         timestamp: Date.now(),
-        accountId: currentUser._id,
+        accountId,
       };
       return recordsCache.records;
     } finally {
-      inflightRecordsPromise = null;
+      inflightRecordsPromises.delete(accountId);
     }
   })();
 
-  return inflightRecordsPromise;
+  inflightRecordsPromises.set(accountId, requestPromise);
+  return requestPromise;
 }
 
 /**
@@ -301,9 +304,6 @@ export default defineBackground(() => {
             return;
           }
 
-          // リプレイ・二重引き換え防止のため、引き換え前にストレージ上の nonce を即時消費
-          await setPendingSyncNonce("");
-
           // Convex から短命コードを検証・消費してアカウント情報と customToken を取得
           const res = await convex.mutation(api.extensionAuth.redeemSyncToken, {
             nonce: nonce.trim(),
@@ -347,11 +347,14 @@ export default defineBackground(() => {
               env.VITE_FIREBASE_API_KEY,
             );
             if (tokenRes) {
-              if (tokenRes.userId && tokenRes.userId !== res.user.userId) {
-                console.error("[PoohMa Background] Token UID mismatch:", {
-                  expected: res.user.userId,
-                  actual: tokenRes.userId,
-                });
+              if (!tokenRes.userId || tokenRes.userId !== res.user.userId) {
+                console.error(
+                  "[PoohMa Background] Token UID mismatch or missing:",
+                  {
+                    expected: res.user.userId,
+                    actual: tokenRes.userId,
+                  },
+                );
                 sendResponse({ success: false, error: "User ID mismatch" });
                 return;
               }
@@ -450,6 +453,7 @@ export default defineBackground(() => {
         try {
           convex.clearAuth();
           recordsCache = null;
+          inflightRecordsPromises.clear();
           await clearAuthSession();
         } catch (_e) {}
 
@@ -556,6 +560,7 @@ export default defineBackground(() => {
           .sendMessage(targetTabId, {
             type: "CONTENT_FILL_LOGIN_ID",
             loginId: message.loginId,
+            recordUrl: message.recordUrl,
           })
           .then((res) => {
             sendResponse(res ?? { success: false });
@@ -750,6 +755,14 @@ export default defineBackground(() => {
       sendResponse({ received: true });
       return false;
     }
+
+    // アカウント切替・ログアウト時のキャッシュおよび in-flight Promise の確実な破棄
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName === "local" && (changes.activeAccountId || changes.user)) {
+        recordsCache = null;
+        inflightRecordsPromises.clear();
+      }
+    });
 
     return;
   });

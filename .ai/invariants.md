@@ -233,6 +233,6 @@
 ### ワークフロースクリプト内への GitHub 式直接展開の禁止（Template Injection 対策）
 
 - **`run:` スクリプトブロック内での GitHub 式埋め込み禁止**:
-  - `${{ github.event_name }}` や `${{ github.sha }}` などの GitHub コンテキスト式を `run:` のシェルスクリプト内に直接埋め込んではならない。
-  - シェルの特殊文字や意図せぬ改行・クォート破壊によるコマンドインジェクション（CWE-78）や zizmor / CodeQL 指摘の原因となる。
-  - 必ずステップレベルの `env:` でシェル変数（例: `EVENT_NAME: ${{ github.event_name }}`）として定義し、スクリプト内からは `"$EVENT_NAME"` として安全に参照すること。
+  - `${{ github.event_name }}` や `${{ github.sha }}`、`${{ github.event.pull_request.number }}` などの GitHub コンテキスト式やステップ出力を `run:` のシェルスクリプト内に直接埋め込んではならない。
+  - PR Job Summary 生成等のサマリー書き込みステップも含め、シェルの特殊文字や意図せぬ改行・クォート破壊によるコマンドインジェクション（CWE-78）や zizmor / CodeQL 指摘の原因となる。
+  - 必ずステップレベルの `env:` でシェル変数（例: `EVENT_NAME: ${{ github.event_name }}`, `PR_NUMBER: ${{ github.event.pull_request.number }}`）として定義し、スクリプト内からは `"$EVENT_NAME"` として安全に参照すること。

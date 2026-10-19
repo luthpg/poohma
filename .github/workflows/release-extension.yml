@@ -85,16 +85,19 @@ jobs:
 
       - name: Generate summary for PR review
         if: github.event_name == 'pull_request'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          ARTIFACT_NAME: ${{ steps.artifact-meta.outputs.artifact_name }}
         run: |
           cat <<EOF >> "$GITHUB_STEP_SUMMARY"
           ### 🧩 Chrome 拡張機能 PR ビルド完了
 
-          PR #${{ github.event.pull_request.number }} 用の拡張機能 zip が正常にビルドされました。
+          PR #${PR_NUMBER} 用の拡張機能 zip が正常にビルドされました。
 
-          - **アーティファクト名**: \`${{ steps.artifact-meta.outputs.artifact_name }}\`
+          - **アーティファクト名**: \`${ARTIFACT_NAME}\`
           - **検証項目**: Typecheck, Lint (check:ci), Zip Build, Bundle Safety Check (Zero Secrets)
           - **テスト手順**:
-            1. 本ワークフローの「Artifacts」から \`${{ steps.artifact-meta.outputs.artifact_name }}.zip\` をダウンロード
+            1. 本ワークフローの「Artifacts」から \`${ARTIFACT_NAME}.zip\` をダウンロード
             2. ローカルで解凍
             3. Chrome の \`chrome://extensions\` で「パッケージ化されていない拡張機能を読み込む」から解凍フォルダを選択
           EOF

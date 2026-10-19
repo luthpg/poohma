@@ -135,14 +135,21 @@ function NewRecordComponent() {
   const createRecord = useMutation(api.records.createRecord);
 
   const { url, title, loginId, accountId: targetAccountId } = Route.useSearch();
+  const hasSwitchedTargetAccountRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (
+      !hasSwitchedTargetAccountRef.current &&
       targetAccountId &&
-      targetAccountId !== activeAccountId &&
-      accounts.some((a) => a._id === targetAccountId)
+      accounts.length > 0
     ) {
-      switchAccount(targetAccountId as Id<"users">);
+      hasSwitchedTargetAccountRef.current = true;
+      if (
+        targetAccountId !== activeAccountId &&
+        accounts.some((a) => a._id === targetAccountId)
+      ) {
+        switchAccount(targetAccountId as Id<"users">);
+      }
     }
   }, [targetAccountId, activeAccountId, accounts, switchAccount]);
   const initialValues = useMemo(() => {
@@ -167,7 +174,9 @@ function NewRecordComponent() {
     e.preventDefault();
     const succeeded = await form.submit(async (payload) => {
       await createRecord({
-        accountId: activeAccountId || undefined,
+        accountId: targetAccountId
+          ? (targetAccountId as Id<"users">)
+          : activeAccountId || undefined,
         ...payload,
       });
     });

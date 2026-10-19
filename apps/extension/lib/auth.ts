@@ -163,10 +163,20 @@ export async function exchangeCustomToken(
       return null;
     }
     const data = await res.json();
+    let userId: string | undefined;
+    try {
+      const segment = String(data.idToken ?? "").split(".")[1] ?? "";
+      const payload = JSON.parse(
+        atob(segment.replace(/-/g, "+").replace(/_/g, "/")),
+      );
+      userId = payload.user_id ?? payload.sub;
+    } catch {
+      userId = undefined;
+    }
     return {
       idToken: data.idToken,
       refreshToken: data.refreshToken,
-      userId: data.localId,
+      userId: userId || data.localId,
     };
   } catch (err) {
     console.warn("[PoohMa Auth] exchangeCustomToken fetch failed:", err);

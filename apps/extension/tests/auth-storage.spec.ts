@@ -154,4 +154,48 @@ describe("Extension Auth Storage & Multi-Account Management", () => {
     expect(storage.refreshToken).toBeNull();
     expect(storage.pendingSyncNonce).toBeNull();
   });
+
+  describe("exchangeCustomToken UID verification", () => {
+    it("extracts userId from JWT idToken payload even when localId is omitted in response", async () => {
+      const payload = { sub: "jwt_uid_from_sub", user_id: "jwt_uid_from_sub" };
+      const base64Payload = btoa(JSON.stringify(payload));
+      const dummyJwt = `header.${base64Payload}.signature`;
+
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          idToken: dummyJwt,
+          refreshToken: "dummy_refresh",
+          // localId は意図的にレスポンスに含まれない状況をシミュレート
+        }),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const { exchangeCustomToken } = await import("../lib/auth");
+      const result = await exchangeCustomToken("custom_tok", "api_key");
+
+      expect(result).not.toBeNull();
+      expect(result?.userId).toBe("jwt_uid_from_sub");
+      expect(result?.idToken).toBe(dummyJwt);
+      expect(result?.refreshToken).toBe("dummy_refresh");
+    });
+
+    it("falls back to localId if JWT payload cannot be parsed", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          idToken: "invalid_jwt_format",
+          refreshToken: "dummy_refresh",
+          localId: "fallback_local_id",
+        }),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const { exchangeCustomToken } = await import("../lib/auth");
+      const result = await exchangeCustomToken("custom_tok", "api_key");
+
+      expect(result).not.toBeNull();
+      expect(result?.userId).toBe("fallback_local_id");
+    });
+  });
 });

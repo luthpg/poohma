@@ -282,6 +282,6 @@ Monorepo 配下に新しいパッケージ（例: Chrome 拡張機能 `apps/exte
    - `actions/upload-artifact` は既定で `include-hidden-files: false` で動作するため、`path: apps/extension/.output/*.zip` のようにドットから始まる隠しディレクトリを探索パスに指定すると、配下のファイルが全て除外され `No files were found with the provided path` でジョブが異常終了する。
    - 対策として、余計な中間ステージングディレクトリ（`dist-zip/` 等）を作ってファイルを二重化するのではなく、`include-hidden-files: true` を明示して正規出力先（`apps/extension/.output/*.zip`）を直接アップロードする（KISS原則・Single Source of Truth）。
 6. **インラインスクリプト内への GitHub 式直接埋め込み禁止（Template Injection 対策）**:
-   - `run:` スクリプトブロック内に `${{ github.event_name }}` や `${{ github.sha }}` などの GitHub 式を直接展開すると、シェルエスケープの破壊や zizmor / CodeQL による script injection 脆弱性（CWE-78）指摘の原因となる。
-   - コンテキスト値はステップレベルの `env:` でシェル変数（例: `EVENT_NAME: ${{ github.event_name }}`）として安全に注入し、スクリプト内では `"$EVENT_NAME"` として参照すること。
+   - `run:` スクリプトブロック内に `${{ github.event_name }}` や `${{ github.sha }}`、`${{ github.event.pull_request.number }}` などの GitHub 式を直接展開すると、シェルエスケープの破壊や zizmor / CodeQL による script injection 脆弱性（CWE-78）指摘の原因となる。
+   - PR Job Summary 生成ステップ（`$GITHUB_STEP_SUMMARY`）等も含め、すべてのコンテキスト値はステップレベルの `env:` でシェル変数（例: `PR_NUMBER: ${{ github.event.pull_request.number }}`）として安全に注入し、スクリプト内では `"$PR_NUMBER"` として参照すること。
 
