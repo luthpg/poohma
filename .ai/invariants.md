@@ -213,7 +213,7 @@
   - `release-extension.yml` は、タグプッシュ（`v*`）だけでなく PR（`apps/extension/**` 等の変更時）でも起動し、動作検証用の ZIP を GitHub Actions Artifacts にアップロードする。
   - GitHub Releases へのアタッチ（`gh release create` / `upload`）はタグプッシュ時限定とし、PR では実行しない。
   - PR 時のアーティファクト名は `poohma-extension-pr<PR番号>` と命名し、PR 画面（Job Summary）にダウンロード・インストール手順を出力してレビュー容易性を担保する。
-  - `actions/upload-artifact` は既定で隠しディレクトリ配下（`.output/` 等）を除外するため、ZIP 成果物は非隠しディレクトリ（`dist-zip/`）へステージングし、`include-hidden-files: true` を明示して確実にアップロードすること。
+  - `actions/upload-artifact` は既定で隠しディレクトリ配下（`.output/` 等）を除外するため、無駄なステージングディレクトリを作ってファイルを二重化するのではなく、`include-hidden-files: true` を明示して正規出力先（`apps/extension/.output/*.zip`）を直接アップロードすること（KISS原則・Single Source of Truth）。
 
 ### Monorepo 内 postinstall による環境変数バリデーションと CI への環境変数供給
 
