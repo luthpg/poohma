@@ -278,3 +278,6 @@ Monorepo 配下に新しいパッケージ（例: Chrome 拡張機能 `apps/exte
 4. **PR テストビルド時の動的アーティファクト名分岐と Step Summary 案内**:
    - `pull_request` トリガー時、`github.ref_name`（`372/merge` 等）をそのままアーティファクト名に使うとスラッシュが含まれ不正な名前になる恐れがあるため、`poohma-extension-pr<PR番号>` と命名する。
    - `github.event_name == 'pull_request'` の際は GitHub Release へのアップロードを確実にスキップし、Step Summary（`$GITHUB_STEP_SUMMARY`）にダウンロード・インストール手順を出力して PR レビュー時の実機検証を支援する。
+5. **actions/upload-artifact での隠しディレクトリ（`.output`等）除外事故**:
+   - `actions/upload-artifact` は既定で `include-hidden-files: false` で動作するため、`path: apps/extension/.output/*.zip` のようにドットから始まる隠しディレクトリを探索パスに指定すると、配下のファイルが全て除外され `No files were found with the provided path` でジョブが異常終了する。
+   - 対策として、ZIP 成果物を非隠しディレクトリ（`dist-zip/` 等）にステージングしてからアップロードするか、明示的に `include-hidden-files: true` を指定する。

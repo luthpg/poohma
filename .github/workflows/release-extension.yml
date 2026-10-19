@@ -58,6 +58,11 @@ jobs:
       - name: Verify bundle safety (Zero-Secrets Check)
         run: pnpm -F @poohma/extension verify:bundle
 
+      - name: Stage zip for upload
+        run: |
+          mkdir -p apps/extension/dist-zip
+          cp apps/extension/.output/*.zip apps/extension/dist-zip/
+
       - name: Determine artifact name
         id: artifact-meta
         run: |
@@ -73,8 +78,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.artifact-meta.outputs.artifact_name }}
-          path: apps/extension/.output/*.zip
+          path: apps/extension/dist-zip/*.zip
           if-no-files-found: error
+          include-hidden-files: true
 
       - name: Generate summary for PR review
         if: github.event_name == 'pull_request'
@@ -99,7 +105,7 @@ jobs:
           TAG_NAME: ${{ github.ref_name }}
         run: |
           if ! gh release view "${TAG_NAME}" >/dev/null 2>&1; then
-            gh release create "${TAG_NAME}" apps/extension/.output/*.zip --title "${TAG_NAME}" --notes "Automated release for ${TAG_NAME}"
+            gh release create "${TAG_NAME}" apps/extension/dist-zip/*.zip --title "${TAG_NAME}" --notes "Automated release for ${TAG_NAME}"
           else
-            gh release upload "${TAG_NAME}" apps/extension/.output/*.zip --clobber
+            gh release upload "${TAG_NAME}" apps/extension/dist-zip/*.zip --clobber
           fi
