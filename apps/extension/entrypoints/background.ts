@@ -41,6 +41,8 @@ interface PendingSaveInfo {
 }
 let pendingSave: PendingSaveInfo | null = null;
 
+let inflightRecordsPromise: Promise<CachedRecord[]> | null = null;
+
 export async function getRecordsCached(force = false): Promise<CachedRecord[]> {
   const now = Date.now();
   const storage = await getAuthStorage();
@@ -58,25 +60,37 @@ export async function getRecordsCached(force = false): Promise<CachedRecord[]> {
     return recordsCache.records;
   }
 
-  const token = await getValidIdToken(env.VITE_FIREBASE_API_KEY);
-  if (!token) {
-    return [];
+  if (inflightRecordsPromise) {
+    return inflightRecordsPromise;
   }
 
-  // 共有クライアントの認証状態汚染を防ぐため、認証付き専用クライアントでクエリを実行
-  const authedConvex = new ConvexHttpClient(env.VITE_CONVEX_URL);
-  authedConvex.setAuth(token);
-  const records = await authedConvex.query(api.records.getRecords, {
-    accountId: currentUser._id as Id<"users">,
-    includeHints: true,
-  });
+  inflightRecordsPromise = (async () => {
+    try {
+      const token = await getValidIdToken(env.VITE_FIREBASE_API_KEY);
+      if (!token) {
+        return [];
+      }
 
-  recordsCache = {
-    records: records || [],
-    timestamp: now,
-    accountId: currentUser._id,
-  };
-  return recordsCache.records;
+      // 共有クライアントの認証状態汚染を防ぐため、認証付き専用クライアントでクエリを実行
+      const authedConvex = new ConvexHttpClient(env.VITE_CONVEX_URL);
+      authedConvex.setAuth(token);
+      const records = await authedConvex.query(api.records.getRecords, {
+        accountId: currentUser._id as Id<"users">,
+        includeHints: true,
+      });
+
+      recordsCache = {
+        records: records || [],
+        timestamp: Date.now(),
+        accountId: currentUser._id,
+      };
+      return recordsCache.records;
+    } finally {
+      inflightRecordsPromise = null;
+    }
+  })();
+
+  return inflightRecordsPromise;
 }
 
 /**
@@ -333,6 +347,14 @@ export default defineBackground(() => {
               env.VITE_FIREBASE_API_KEY,
             );
             if (tokenRes) {
+              if (tokenRes.userId && tokenRes.userId !== res.user.userId) {
+                console.error("[PoohMa Background] Token UID mismatch:", {
+                  expected: res.user.userId,
+                  actual: tokenRes.userId,
+                });
+                sendResponse({ success: false, error: "User ID mismatch" });
+                return;
+              }
               activeIdToken = tokenRes.idToken;
               activeRefreshToken = tokenRes.refreshToken;
             }
@@ -486,10 +508,19 @@ export default defineBackground(() => {
             return;
           }
 
+          const storage = await getAuthStorage();
+          const targetAccountId =
+            message.accountId || storage.activeAccountId || storage.user?._id;
+          if (!targetAccountId) {
+            sendResponse({ success: false });
+            return;
+          }
+
           // 共有クライアントの認証状態汚染を防ぐため、認証付き専用クライアントで mutation を実行
           const authedConvex = new ConvexHttpClient(env.VITE_CONVEX_URL);
           authedConvex.setAuth(token);
           await authedConvex.mutation(api.records.logRecordHintView, {
+            accountId: targetAccountId as Id<"users">,
             recordId: message.recordId as Id<"serviceRecords">,
           });
           sendResponse({ success: true });
@@ -571,7 +602,8 @@ export default defineBackground(() => {
     if (message?.type === "GET_MATCHED_RECORDS") {
       (async () => {
         try {
-          const pageUrl = message.url;
+          // 送信元タブの URL を優先し、別ドメインからのなりすましを防止
+          const pageUrl = sender.tab?.url || message.url;
           if (!pageUrl) {
             sendResponse({ success: true, matchedRecords: [] });
             return;
@@ -602,16 +634,25 @@ export default defineBackground(() => {
 
     // 8. 新規レコード作成画面を Web で開く（未登録サイトでの自律保存サジェスト用）
     if (message?.type === "OPEN_NEW_RECORD") {
-      const { url, title, loginId } = message;
-      pendingSave = null;
-      const targetUrl = new URL(`${env.VITE_SITE_URL}/records/new`);
-      if (url) targetUrl.searchParams.set("url", url);
-      if (title) targetUrl.searchParams.set("title", title);
-      if (loginId) targetUrl.searchParams.set("loginId", loginId);
+      (async () => {
+        const { url, title, loginId, accountId } = message;
+        pendingSave = null;
+        const targetUrl = new URL(`${env.VITE_SITE_URL}/records/new`);
+        if (url) targetUrl.searchParams.set("url", url);
+        if (title) targetUrl.searchParams.set("title", title);
+        if (loginId) targetUrl.searchParams.set("loginId", loginId);
 
-      chrome.tabs.create({ url: targetUrl.toString() });
-      sendResponse({ success: true });
-      return false;
+        const storage = await getAuthStorage();
+        const effectiveAccountId =
+          accountId || storage.activeAccountId || storage.user?._id;
+        if (effectiveAccountId) {
+          targetUrl.searchParams.set("accountId", effectiveAccountId);
+        }
+
+        chrome.tabs.create({ url: targetUrl.toString() });
+        sendResponse({ success: true });
+      })();
+      return true;
     }
 
     // 8.1 ページ遷移をまたぐ保存サジェストの一時保持・取得・破棄

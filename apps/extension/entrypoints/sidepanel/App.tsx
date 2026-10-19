@@ -113,6 +113,7 @@ export function App() {
   const [visibleHints, setVisibleHints] = useState<Record<string, boolean>>({});
   const masterKeyRef = useRef<CryptoKey | null>(null);
   const isRefreshingRef = useRef<boolean>(false);
+  const refreshQueuedRef = useRef<boolean>(false);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
   const accountGenerationRef = useRef<number>(0);
   const waitingSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -131,7 +132,6 @@ export function App() {
 
   // 1. 自動ロック（無操作5分またはサイドパネル非表示で自律ロック）
   const handleLock = useCallback(() => {
-    accountGenerationRef.current += 1;
     masterKeyRef.current = null;
     sendExtensionMessage({ type: "VAULT_LOCK" }).catch(() => {});
     setIsUnlocked(false);
@@ -150,7 +150,10 @@ export function App() {
 
   // 2. 全体状態のリフレッシュ（storage直接読み取りでハング完全防止・並行実行ロック付き）
   const refreshState = useCallback(async () => {
-    if (isRefreshingRef.current) return;
+    if (isRefreshingRef.current) {
+      refreshQueuedRef.current = true;
+      return;
+    }
     isRefreshingRef.current = true;
     const currentGeneration = accountGenerationRef.current;
     try {
@@ -242,6 +245,10 @@ export function App() {
     } finally {
       isRefreshingRef.current = false;
       setLoading(false);
+      if (refreshQueuedRef.current) {
+        refreshQueuedRef.current = false;
+        refreshState();
+      }
     }
   }, []);
 
@@ -267,6 +274,10 @@ export function App() {
         }
         setFamily(message.family ?? null);
         if (!message.isAuthenticated) {
+          accountGenerationRef.current += 1;
+          masterKeyRef.current = null;
+          setDecryptedHints({});
+          setVisibleHints({});
           setIsUnlocked(false);
           setRecords([]);
         } else {
@@ -277,7 +288,6 @@ export function App() {
       if (message.type === "VAULT_LOCK_STATE_CHANGED") {
         setIsUnlocked(!!message.isUnlocked);
         if (!message.isUnlocked) {
-          accountGenerationRef.current += 1;
           masterKeyRef.current = null;
           setDecryptedHints({});
           setVisibleHints({});
@@ -471,6 +481,7 @@ export function App() {
     ) => {
       const activeKey = explicitKey || masterKeyRef.current;
       if (!activeKey) return;
+      const startGen = accountGenerationRef.current;
 
       if (
         cred.passwordHint &&
@@ -487,14 +498,26 @@ export function App() {
             activeKey,
           );
 
+          // 復号完了時にロック状態や世代を再検証（復号中のロックやアカウント切り替えによる平文復活防止）
+          if (
+            accountGenerationRef.current !== startGen ||
+            !masterKeyRef.current
+          ) {
+            return;
+          }
+
           setDecryptedHints((prev) => ({ ...prev, [cred._id]: hint }));
           setVisibleHints((prev) => ({ ...prev, [cred._id]: true }));
 
           // 閲覧監査ログを記録
           if (recordId) {
+            const currentStorage = await getAuthStorage();
+            const effectiveAccountId =
+              currentStorage.activeAccountId || currentStorage.user?._id;
             sendExtensionMessage({
               type: "LOG_RECORD_HINT_VIEW",
               recordId,
+              accountId: effectiveAccountId,
             }).catch(() => {});
           }
         } catch (err) {
@@ -633,6 +656,14 @@ export function App() {
     }
 
     if (decryptedHints[credId]) {
+      if (!isUnlocked || !masterKeyRef.current) {
+        setPendingRevealCred(cred);
+        setPendingRevealRecordId(recordId ?? null);
+        setUnlockError(null);
+        setPasscode("");
+        setIsPasscodePromptOpen(true);
+        return;
+      }
       setVisibleHints((prev) => ({ ...prev, [credId]: true }));
       return;
     }
@@ -655,11 +686,13 @@ export function App() {
     if (!tabInfo?.tabId) return;
 
     if (
-      recordUrl &&
-      tabInfo.url &&
-      matchRecordUrl(tabInfo.url, recordUrl) === "none"
+      !recordUrl ||
+      !tabInfo.url ||
+      matchRecordUrl(tabInfo.url, recordUrl) !== "exact"
     ) {
-      setFillErrorMsg("現在開いているサイトと異なるため自動入力できません");
+      setFillErrorMsg(
+        "現在開いているサイトと異なるため自動入力できません（完全一致のみ許可）",
+      );
       setTimeout(() => setFillErrorMsg(null), 3500);
       return;
     }

@@ -78,9 +78,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "VAULT_LOCK") {
     activeMasterKey = null;
     if (autoLockTimer) clearTimeout(autoLockTimer);
-    chrome.runtime
-      .sendMessage({ type: "VAULT_LOCK_STATE_CHANGED", isUnlocked: false })
-      .catch(() => {});
     sendResponse({ success: true, isUnlocked: false });
     return false;
   }

@@ -1,4 +1,5 @@
 import { api } from "@poohma/backend/api";
+import type { Id } from "@poohma/backend/dataModel";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import type React from "react";
@@ -14,6 +15,7 @@ const newRecordSearchSchema = z.object({
   url: z.string().optional(),
   title: z.string().optional(),
   loginId: z.string().optional(),
+  accountId: z.string().optional(),
 });
 
 export const Route = createFileRoute("/(app)/records/new")({
@@ -124,7 +126,7 @@ function NewRecordComponent() {
   }, [draftId]);
 
   const { isAuthenticated } = useConvexAuth();
-  const { activeAccountId } = useAccount();
+  const { activeAccountId, switchAccount, accounts } = useAccount();
   const availableTags =
     useQuery(
       api.records.getAvailableTags,
@@ -132,7 +134,17 @@ function NewRecordComponent() {
     ) || [];
   const createRecord = useMutation(api.records.createRecord);
 
-  const { url, title, loginId } = Route.useSearch();
+  const { url, title, loginId, accountId: targetAccountId } = Route.useSearch();
+
+  useEffect(() => {
+    if (
+      targetAccountId &&
+      targetAccountId !== activeAccountId &&
+      accounts.some((a) => a._id === targetAccountId)
+    ) {
+      switchAccount(targetAccountId as Id<"users">);
+    }
+  }, [targetAccountId, activeAccountId, accounts, switchAccount]);
   const initialValues = useMemo(() => {
     const init: Partial<RecordFormValues> = {};
     if (url) init.url = url;

@@ -144,7 +144,7 @@ export async function clearAuthSession(): Promise<void> {
 export async function exchangeCustomToken(
   customToken: string,
   apiKey: string,
-): Promise<{ idToken: string; refreshToken: string } | null> {
+): Promise<{ idToken: string; refreshToken: string; userId?: string } | null> {
   try {
     const res = await fetch(
       `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${apiKey}`,
@@ -166,6 +166,7 @@ export async function exchangeCustomToken(
     return {
       idToken: data.idToken,
       refreshToken: data.refreshToken,
+      userId: data.localId,
     };
   } catch (err) {
     console.warn("[PoohMa Auth] exchangeCustomToken fetch failed:", err);
@@ -232,64 +233,81 @@ export function isTokenExpired(
   }
 }
 
+let inflightIdTokenPromise: Promise<string | null> | null = null;
+
 /**
  * 有効な ID トークンを取得する（期限切れの場合は refreshToken で自動更新して保存）
  */
 export async function getValidIdToken(apiKey: string): Promise<string | null> {
-  const storage = await getAuthStorage();
-  if (!storage.idToken && !storage.refreshToken && !storage.customToken) {
-    return null;
+  if (inflightIdTokenPromise) {
+    return inflightIdTokenPromise;
   }
 
-  // まだ有効期限内であれば現在のトークンをそのまま返す
-  if (storage.idToken && !isTokenExpired(storage.idToken)) {
-    return storage.idToken;
-  }
-
-  console.log(
-    "[PoohMa Auth] ID token expired or expiring soon, attempting refresh...",
-  );
-
-  // 1. refreshToken で更新を試みる
-  if (storage.refreshToken) {
-    const refreshed = await refreshIdToken(storage.refreshToken, apiKey);
-    if (refreshed) {
-      // レースコンディション対策: 書き戻し前にストレージ状態（ログアウトやアカウント切り替え）を検証
-      const latest = await getAuthStorage();
-      if (!latest.user || latest.refreshToken !== storage.refreshToken) {
-        return latest.idToken ?? null;
+  inflightIdTokenPromise = (async () => {
+    try {
+      const storage = await getAuthStorage();
+      if (!storage.idToken && !storage.refreshToken && !storage.customToken) {
+        return null;
       }
 
-      await chrome.storage.local.set({
-        idToken: refreshed.idToken,
-        refreshToken: refreshed.refreshToken,
-      });
-      return refreshed.idToken;
-    }
-  }
-
-  // 2. refreshToken がない / 失敗した場合、customToken での再取得を試みる（フォールバック）
-  if (storage.customToken) {
-    const exchanged = await exchangeCustomToken(storage.customToken, apiKey);
-    if (exchanged) {
-      // レースコンディション対策: 書き戻し前にストレージ状態を検証
-      const latest = await getAuthStorage();
-      if (!latest.user || latest.customToken !== storage.customToken) {
-        return latest.idToken ?? null;
+      // まだ有効期限内であれば現在のトークンをそのまま返す
+      if (storage.idToken && !isTokenExpired(storage.idToken)) {
+        return storage.idToken;
       }
 
-      await chrome.storage.local.set({
-        idToken: exchanged.idToken,
-        refreshToken: exchanged.refreshToken,
-      });
-      return exchanged.idToken;
-    }
-  }
+      console.log(
+        "[PoohMa Auth] ID token expired or expiring soon, attempting refresh...",
+      );
 
-  console.warn(
-    "[PoohMa Auth] Failed to refresh ID token. Re-authentication required.",
-  );
-  return null;
+      // 1. refreshToken で更新を試みる
+      if (storage.refreshToken) {
+        const refreshed = await refreshIdToken(storage.refreshToken, apiKey);
+        if (refreshed) {
+          // レースコンディション対策: 書き戻し前にストレージ状態（ログアウトやアカウント切り替え）を検証
+          const latest = await getAuthStorage();
+          if (!latest.user || latest.refreshToken !== storage.refreshToken) {
+            return latest.idToken ?? null;
+          }
+
+          await chrome.storage.local.set({
+            idToken: refreshed.idToken,
+            refreshToken: refreshed.refreshToken,
+          });
+          return refreshed.idToken;
+        }
+      }
+
+      // 2. refreshToken がない / 失敗した場合、customToken での再取得を試みる（フォールバック）
+      if (storage.customToken) {
+        const exchanged = await exchangeCustomToken(
+          storage.customToken,
+          apiKey,
+        );
+        if (exchanged) {
+          // レースコンディション対策: 書き戻し前にストレージ状態を検証
+          const latest = await getAuthStorage();
+          if (!latest.user || latest.customToken !== storage.customToken) {
+            return latest.idToken ?? null;
+          }
+
+          await chrome.storage.local.set({
+            idToken: exchanged.idToken,
+            refreshToken: exchanged.refreshToken,
+          });
+          return exchanged.idToken;
+        }
+      }
+
+      console.warn(
+        "[PoohMa Auth] Failed to refresh ID token. Re-authentication required.",
+      );
+      return null;
+    } finally {
+      inflightIdTokenPromise = null;
+    }
+  })();
+
+  return inflightIdTokenPromise;
 }
 
 /**

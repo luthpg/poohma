@@ -216,6 +216,7 @@ function ExtensionSyncPage() {
 
         // Convex 短命同期コードの発行（Convex Mutation、Custom Token をサーバー間バックチャネルで伝達）
         const issuePromise = issueSyncToken({
+          accountId: targetAccountId,
           nonce: cleanNonce,
           customToken: customTokenRes.customToken,
         })

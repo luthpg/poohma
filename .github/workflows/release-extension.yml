@@ -60,13 +60,19 @@ jobs:
 
       - name: Determine artifact name
         id: artifact-meta
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          IS_TAG: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          REF_NAME: ${{ github.ref_name }}
+          COMMIT_SHA: ${{ github.sha }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "artifact_name=poohma-extension-pr${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ startsWith(github.ref, 'refs/tags/v') }}" = "true" ]; then
-            echo "artifact_name=poohma-extension-${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "artifact_name=poohma-extension-pr${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+          elif [ "$IS_TAG" = "true" ]; then
+            echo "artifact_name=poohma-extension-${REF_NAME}" >> "$GITHUB_OUTPUT"
           else
-            echo "artifact_name=poohma-extension-${{ github.sha }}" >> "$GITHUB_OUTPUT"
+            echo "artifact_name=poohma-extension-${COMMIT_SHA}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Upload extension zip artifact

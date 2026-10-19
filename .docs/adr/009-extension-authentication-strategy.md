@@ -58,15 +58,15 @@ sequenceDiagram
     BG->>BG: exchangeCustomToken (idToken / refreshToken 取得)
     BG->>BG: setAuthSession (TRUSTED_CONTEXTS ストレージ保存)
     Note over SP: ユーザーがマスターパスコード入力
-    SP->>Offscreen: VAULT_UNLOCK (パスコード照合・鍵導出)
-    Offscreen-->>SP: 鍵導出成功 (5分オートロック)
+    SP->>SP: unlockMasterKeyWithPasscode (Side Panel ローカルで鍵導出)
+    Note over SP: 5分無操作オートロックでメモリ破棄
 ```
 
-- **Zero Token Exposure（DOM・Content Script からのトークン完全排除）**:
+- **Zero Token Exposure（DOM・Content Script からのトークン排除）**:
   - `window.postMessage` や Content Script には `idToken` や `customToken` などの認証トークンを一切乗せない。
   - Web 側は `issueSyncToken` 呼び出し時に短命レコードへ `customToken` を格納し、Background Service Worker が `redeemSyncToken` で Convex から直接（バックチャネルで）引き取ると同時にデータベースから即座に物理削除する。
-  - これにより、悪意あるサードパーティスクリプトや拡張機能の Content Script コンテキストからのトークン窃取リスクを構造的にゼロ化する。
-- **短命 TTL とワンショット物理削除**: 同期コードの有効期限は 30 秒とし、`redeemSyncToken` 実行時にデータベースから即座に物理削除する。これにより、ブラウザ履歴の漏洩や中間者による再送攻撃（リプレイ攻撃）を完全に遮断する。
+  - これにより、サードパーティスクリプトや拡張機能の Content Script コンテキストからのトークン漏洩リスクを低減する。
+- **短命 TTL とワンショット物理削除**: 同期コードの有効期限は 30 秒とし、`redeemSyncToken` 実行時にデータベースから即座に物理削除する。これにより、ブラウザ履歴へのトークン残存や中間者による再利用リスクを大幅に低減する。
 - **動的 Extension ID 制約と postMessage 採用根拠**: GitHub Releases から ZIP 配布（デベロッパーモードでのアンパックド読み込み）される環境では、Chrome 側で端末・プロファイルごとにランダムな Extension ID が動的に割り振られる。そのため、Web 側から固定 ID を宛先とする外部メッセージング（`chrome.runtime.sendMessage(EXTENSION_ID, ...)`）を行うことは不可能である。Web アプリケーション（同一オリジン検証済み）から Content Script への `window.postMessage`（暗号学的 Nonce ＋ ワンタイム短命コードのみ）を経由する方式は、動的 Extension ID 制約下においてセッションを安全・確実に伝達する唯一かつ堅牢な設計である。
 - **オリジン検証**: Web アプリから Content Script への伝達は `window.postMessage` を使用し、`event.origin !== window.location.origin` の厳格なチェックを行う。
 - **マルチアカウント一覧の同時返却**: 同一の Firebase UID に紐づく全 `users` レコード（`accounts`）を返却することで、拡張機能側でのシームレスなアカウント切り替えを実現する。
@@ -76,9 +76,9 @@ sequenceDiagram
 - **Background REST API への一本化**:
   - レコード取得クエリや暗号化ヒント取得に必要な ID トークン・リフレッシュトークンの管理は、Background Service Worker が軽量な Firebase REST API（`exchangeCustomToken`, `refreshIdToken`）を直接呼び出して一本化する。
   - Offscreen Document 内に Firebase Auth SDK を持たせる二重管理を完全に廃止し、Single Source of Truth を Background に集約する。
-- **Offscreen Document の純粋計算ワーカー化**:
-  - Offscreen Document（`entrypoints/offscreen/main.ts`）からは重厚な Firebase Auth SDK を完全に排除し、Web Crypto による暗号鍵導出（PBKDF2）・パスワードヒント復号（AES-GCM）および 5 分オートロックタイマーの管理に特化した「純粋な計算ワーカー」として運用する。
-  - これにより、Offscreen Document のバンドルサイズをわずか 1.47 kB に劇的削減し、Manifest V3 の Service Worker アイドル停止や Offscreen 破棄・再起動耐性を飛躍的に向上させた。
+- **暗号処理の責任境界と Offscreen Document の位置付け**:
+  - 現在の実装では、ユーザーの操作性・低レイテンシを最優先し、Side Panel 自身が Web Crypto を用いてローカルでマスターキー導出（PBKDF2）およびパスワードヒント復号（AES-GCM）を直接実行する。導出された鍵は Side Panel のメモリ（`masterKeyRef`）にのみ保持され、5分間の無操作オートロックまたはパネルクローズにより即時破棄される。
+  - Offscreen Document（`entrypoints/offscreen/main.ts`）は、将来的なバックグラウンドでの自律的暗号処理や別コンテキストとの共有を見据えた基盤として準備されており、Firebase Auth SDK を完全に排除した純粋な計算ワーカーとして構成されている。
 
 ### 3. ConvexHttpClient による単発取得＋インメモリキャッシュ方式の採用
 
@@ -98,13 +98,13 @@ sequenceDiagram
 ### 5. 送信後保存提案バナーの例外採用理由（Zero DOM Pollution の例外許容）
 
 - **基本原則（Zero DOM Pollution）**:
-  - PoohMa は、ページの DOM 構造を破壊・改変したり、ホストページの CSS / JavaScript との干渉によるセキュリティ脆弱性（CSS Injection や Clickjacking）を招くリスクを防止するため、閲覧ページ DOM 内部への恒常的な UI 要素挿入を原則として禁止する。
+  - PoohMa は、ページの DOM 構造を破壊・改変したり、ホストページの CSS / JavaScript との干渉によるセキュリティ脆弱性を招くリスクを防止するため、閲覧ページ DOM 内部への恒常的な UI 要素挿入を原則として禁止する。
 - **例外許容の正当化理由**:
   - 未登録サイトでの自律保存機会を完全に喪失する課題を解決するため、フォーム送信および画面遷移が検知された直後の「このログイン情報を PoohMa に保存しますか？」提案バナーに限り、例外的な UI 挿入を許容・採用する。
   - **安全性の担保策**:
-    1. **Shadow DOM による完全隔離**: バナーは `attachShadow({ mode: "closed" })` または隔離された Shadow Root 内に構築され、ホストページの CSS スタイルによる改変や干渉を受けない。
-    2. **画面上部の非破壊フローティング表示**: ページの既存 DOM 構造やレイアウトフローを崩さないよう、最前面のフロートバーとして一時的に表示する。
-    3. **ユーザー自己決定権の徹底**: 「保存」「今回はしない」「今後このサイトで表示しない（永続除外）」の選択肢を明確に提供し、一度却下または除外設定されたオリジンには二度と表示しない。
+    1. **インラインスタイルによる局所表示**: バナーは独立したコンテナ要素（`#poohma-save-banner`）として生成され、すべての装飾に明示的なインライン CSS を指定することでホストページのスタイルの影響を最小化する。
+    2. **画面右下の非破壊フロート表示**: ページのレイアウトを崩さないよう、画面右下に固定配置（`position: fixed; bottom: 20px; right: 20px;`）で一時的に表示する。
+    3. **ユーザー自己決定権とセッション抑止**: 「PoohMa に保存」「後で」および閉じるボタンを提供。「後で」または閉じる操作が行われた場合、該当ドメインに対する提案バナーの表示はセッション中（`sessionStorage` / `chrome.storage.session`）確実に抑止される。
 
 ### 6. マスターパスコード（E2EE）の厳格な分離とオートロック統一
 

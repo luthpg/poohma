@@ -391,7 +391,7 @@ export default defineContentScript({
         'input[name*="user" i]',
         'input[id*="user" i]',
         'input[name*="login" i]',
-        'input[type="text"]',
+        'input[id*="login" i]',
       ];
 
       for (const selector of selectors) {
@@ -466,6 +466,10 @@ export default defineContentScript({
       delay = 400,
     ) {
       if (isSaveDismissed) return;
+      if (delay === 0) {
+        checkAndTriggerSaveSuggestion(form);
+        return;
+      }
       if (saveTriggerTimeout) {
         clearTimeout(saveTriggerTimeout);
       }
@@ -568,12 +572,12 @@ export default defineContentScript({
         }
       });
 
-      // フォーム送信（submit）時の保存サジェスト
+      // フォーム送信（submit）時の保存サジェスト（ページ破棄前に即時抽出・登録）
       document.addEventListener("submit", (e) => {
         if (isSaveDismissed) return;
         const form = e.target as HTMLFormElement;
         if (form?.querySelector?.('input[type="password"]')) {
-          scheduleSaveSuggestion(form, 300);
+          scheduleSaveSuggestion(form, 0);
         }
       });
 
@@ -643,7 +647,15 @@ export default defineContentScript({
             type === "password" ||
             type === "hidden" ||
             type === "checkbox" ||
-            type === "radio"
+            type === "radio" ||
+            type === "search"
+          ) {
+            return false;
+          }
+          if (
+            el.getAttribute("role") === "searchbox" ||
+            el.name?.toLowerCase().includes("search") ||
+            el.id?.toLowerCase().includes("search")
           ) {
             return false;
           }
@@ -657,7 +669,7 @@ export default defineContentScript({
         } else {
           // パスワード欄を含むフォームを優先して安全な ID 入力欄を探索
           const idSelector =
-            'input[type="email"], input[autocomplete="username"], input[name*="user" i], input[name*="login" i], input[type="text"]';
+            'input[type="email"], input[autocomplete="username"], input[name*="user" i], input[id*="user" i], input[name*="login" i], input[id*="login" i]';
           const loginForm = document
             .querySelector('input[type="password"]')
             ?.closest("form");

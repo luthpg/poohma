@@ -158,4 +158,62 @@ describe("拡張機能連携認証 API (extensionAuth: issueSyncToken / redeemSy
       expect(remaining).toBeNull();
     });
   });
+
+  it("マルチアカウント: 同一 Firebase UID に複数アカウントが存在する場合、指定した accountId で同期コードが発行され redeem 時に反映されること", async () => {
+    const t = convexTest(schema, modules);
+
+    let accountAId!: Id<"users">;
+    let accountBId!: Id<"users">;
+
+    await t.run(async (ctx) => {
+      accountAId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "multi_firebase_uid",
+        email: "user@example.com",
+        displayName: "アカウントA",
+        updatedAt: Date.now(),
+      });
+      accountBId = await ctx.db.insert("users", {
+        createdAt: Date.now(),
+        familyRole: "admin",
+        userId: "multi_firebase_uid",
+        email: "user+family@example.com",
+        displayName: "アカウントB",
+        updatedAt: Date.now(),
+      });
+    });
+
+    const userClient = t.withIdentity({ subject: "multi_firebase_uid" });
+
+    // 1. accountId 省略時は resolveAccount でマルチアカウント拒否エラーになること
+    await expect(
+      userClient.mutation(api.extensionAuth.issueSyncToken, {
+        nonce: "multi-nonce-1",
+      }),
+    ).rejects.toThrow("Account ID is required for multi-account users");
+
+    // 2. accountId を明示的に指定した場合は正常に発行され、指定したアカウントが主ユーザーとなること
+    const issueRes = await userClient.mutation(
+      api.extensionAuth.issueSyncToken,
+      {
+        accountId: accountBId,
+        nonce: "multi-nonce-2",
+      },
+    );
+
+    expect(issueRes.success).toBe(true);
+
+    const redeemRes = await t.mutation(api.extensionAuth.redeemSyncToken, {
+      nonce: "multi-nonce-2",
+      code: issueRes.code,
+    });
+
+    expect(redeemRes.success).toBe(true);
+    expect(redeemRes.user._id).toBe(accountBId);
+    expect(redeemRes.user.displayName).toBe("アカウントB");
+    expect(redeemRes.accounts.length).toBe(2);
+    expect(redeemRes.accounts.map((a) => a._id)).toContain(accountAId);
+    expect(redeemRes.accounts.map((a) => a._id)).toContain(accountBId);
+  });
 });
