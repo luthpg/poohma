@@ -68,7 +68,7 @@ sequenceDiagram
   - これにより、サードパーティスクリプトや拡張機能の Content Script コンテキストからのトークン漏洩リスクを低減する。
 - **短命 TTL とワンショット物理削除**: 同期コードの有効期限は 30 秒とし、`redeemSyncToken` 実行時にデータベースから即座に物理削除する。これにより、ブラウザ履歴へのトークン残存や中間者による再利用リスクを大幅に低減する。
 - **動的 Extension ID 制約と postMessage 採用根拠**: GitHub Releases から ZIP 配布（デベロッパーモードでのアンパックド読み込み）される環境では、Chrome 側で端末・プロファイルごとにランダムな Extension ID が動的に割り振られる。そのため、Web 側から固定 ID を宛先とする外部メッセージング（`chrome.runtime.sendMessage(EXTENSION_ID, ...)`）を行うことは不可能である。Web アプリケーション（同一オリジン検証済み）から Content Script への `window.postMessage`（暗号学的 Nonce ＋ ワンタイム短命コードのみ）を経由する方式は、動的 Extension ID 制約下においてセッションを安全・確実に伝達する唯一かつ堅牢な設計である。
-- **オリジン検証**: Web アプリから Content Script への伝達は `window.postMessage` を使用し、`event.origin !== window.location.origin` の厳格なチェックを行う。
+- **オリジン検証**: Web アプリから Content Script への伝達は `window.postMessage` を使用し、`event.origin !== window.location.origin` の厳格なチェックを行う。また、Background Service Worker 受信時も送信元コンテキスト URL（`sender.tab?.url || sender.url`）を安全に取得し、信頼された PoohMa オリジンおよび `/auth/extension-sync` パスであることを多層防御で検証する。
 - **マルチアカウント一覧の同時返却**: 同一の Firebase UID に紐づく全 `users` レコード（`accounts`）を返却することで、拡張機能側でのシームレスなアカウント切り替えを実現する。
 
 ### 2. トークン管理の Single Source of Truth（Background Service Worker REST API 一本化）

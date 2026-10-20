@@ -275,7 +275,7 @@ export default defineBackground(() => {
           }
 
           // 送信元コンテキストの厳格な検証（自拡張機能の Content Script かつ正規パスのみ許可）
-          const senderUrl = sender.tab?.url;
+          const senderUrl = sender.tab?.url || sender.url;
           if (!sender.id || sender.id !== chrome.runtime.id || !senderUrl) {
             sendResponse({ success: false, error: "Untrusted sender context" });
             return;
