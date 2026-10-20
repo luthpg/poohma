@@ -22,7 +22,6 @@ for (const envFile of envFiles) {
   }
 }
 
-const STORAGE_STATE = path.join(dirname, "e2e/.auth/e2e-user.json");
 const defaultPort = process.env.PORT ?? "3100";
 const configuredBaseURL =
   process.env.E2E_BASE_URL ?? process.env.E2E_STAGING_URL;
@@ -37,8 +36,18 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: process.env.CI ? "github" : "html",
+  workers: process.env.CI ? 2 : undefined,
+  reporter: process.env.CI
+    ? [
+        ["github"],
+        ["html", { open: "never" }],
+        ["./e2e/support/timing-reporter.ts"],
+      ]
+    : [
+        ["list"],
+        ["html", { open: "never" }],
+        ["./e2e/support/timing-reporter.ts"],
+      ],
   use: {
     baseURL,
     ignoreHTTPSErrors,
@@ -88,19 +97,17 @@ export default defineConfig({
       ],
       use: {
         ...devices["Desktop Chrome"],
-        storageState: STORAGE_STATE,
       },
       dependencies: ["setup"],
-      workers: 1,
+      workers: process.env.CI ? 2 : 3,
     },
     {
       name: "logout",
       testMatch: /logout\.spec\.ts/,
       use: {
         ...devices["Desktop Chrome"],
-        storageState: STORAGE_STATE,
       },
-      dependencies: ["authenticated"],
+      dependencies: ["setup"],
     },
   ],
 });

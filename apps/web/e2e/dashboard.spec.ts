@@ -1,5 +1,5 @@
 import { ensureOnboardingCompleted } from "./support/ensure-onboarding";
-import { expect, test } from "./support/test-fixtures";
+import { ensureFamilyAssigned, expect, test } from "./support/test-fixtures";
 
 test.describe("認証済みルートのアクセス検証", () => {
   test("ログイン済み状態でアクセスでき、認証済みUI（ダッシュボードまたは家族管理）が完全に描画される", async ({
@@ -48,32 +48,8 @@ test.describe("認証済みルートのアクセス検証", () => {
       }
     });
 
-    // 1. まず /family にアクセスして家族所属状態を確認・準備
-    await page.goto("/family");
-    await page.waitForURL(/.*\/family/, { timeout: 20000 });
-    await ensureOnboardingCompleted(page);
-
-    // 家族未所属の場合は家族グループを作成
-    const familyCreateInput = page.locator("input#family-name-input");
-    const isUnassigned = await familyCreateInput
-      .waitFor({ state: "visible", timeout: 5000 })
-      .then(() => true)
-      .catch(() => false);
-
-    if (isUnassigned) {
-      const passcode =
-        process.env.E2E_FAMILY_PASSCODE || "PoohMa#Secure2026!Pass";
-      await familyCreateInput.fill("E2Eテスト家族");
-      await page.locator("input#family-passcode-input").fill(passcode);
-      await page.locator("input#family-passcode-confirm-input").fill(passcode);
-      await page
-        .locator('button[type="submit"]')
-        .filter({ hasText: "作成する" })
-        .click();
-      await expect(
-        page.locator('[data-testid="family-manager-section"]'),
-      ).toBeVisible({ timeout: 25000 });
-    }
+    // 1. まず /family にアクセスして家族所属状態を確認・準備（状態待機により5秒空振りを回避）
+    await ensureFamilyAssigned(page, "E2Eテスト家族");
 
     // 2. /dashboard へアクセスして初期表示を確認
     await page.goto("/dashboard");
@@ -129,15 +105,24 @@ test.describe("認証済みルートのアクセス検証", () => {
   test("アカウント登録フォーム（/records/new）で、ログインID・パスワードヒント・ラベルが縦配置で正しく描画・操作できること", async ({
     page,
   }) => {
+    const passcode =
+      process.env.E2E_FAMILY_PASSCODE || "PoohMa#Secure2026!Pass";
+
+    // 先行テストに依存せず、家族所属状態を確定させてから /records/new へ遷移
+    await ensureFamilyAssigned(page, "E2Eテスト家族", passcode);
+
     await page.goto("/records/new");
     await page.waitForURL(/.*\/records\/new/, { timeout: 20000 });
-    await ensureOnboardingCompleted(page);
+
+    const loginIdInput = page.locator("input#login-id-input-0");
+    const unlockInput = page.locator('input[placeholder="パスコード"]');
+
+    await expect(loginIdInput.or(unlockInput).first()).toBeVisible({
+      timeout: 15000,
+    });
 
     // アンロックプロンプトが表示されている場合はパスコードを入力して解除
-    const unlockInput = page.locator('input[placeholder="パスコード"]');
     if (await unlockInput.isVisible()) {
-      const passcode =
-        process.env.E2E_FAMILY_PASSCODE || "PoohMa#Secure2026!Pass";
       await unlockInput.fill(passcode);
       const unlockBtn = page.locator('button:has-text("ロック解除")');
       if (await unlockBtn.isVisible()) {
@@ -149,7 +134,6 @@ test.describe("認証済みルートのアクセス検証", () => {
     }
 
     // 1. 主要項目の入力欄が表示され、補助ラベル欄はデフォルトで折りたたまれていること
-    const loginIdInput = page.locator("input#login-id-input-0");
     const hintInput = page.locator("input#pw-hint-input-0");
     const labelInput = page.locator("input#label-input-0");
 
