@@ -234,13 +234,9 @@ export function App() {
             if (accountGenerationRef.current === currentGeneration) {
               setRecords(recordsRes.records);
             }
-          } else if (accountGenerationRef.current === currentGeneration) {
-            setRecords([]);
           }
         } catch (_err) {
-          if (accountGenerationRef.current === currentGeneration) {
-            setRecords([]);
-          }
+          // レコード取得失敗時は既存の一覧を維持（アカウント変更時は storageListener / handleSelectAccount で即時破棄済み）
         }
       } else {
         setIsUnlocked(false);

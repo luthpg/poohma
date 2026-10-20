@@ -398,8 +398,9 @@ PR レビュー対応、外部 AI（CodeRabbit等）指摘の審査、および�
   `accountId: targetAccountId ?? activeAccountId` のように、画面操作後の最新状態を無視して URL パラメータを保存先に固定する。
 - **正しいアプローチ (Correct Pattern)**:
   URL の `accountId` は初回マウント時の初期切り替えトリガー（`switchAccount`）にのみ使用し、保存処理（`createRecord`）の保存先は常に暗号鍵コンテキストと同一の `activeAccountId` に統一する。
+  また、指定された `targetAccountId` がユーザーのアカウント一覧に存在しない場合や切り替えに失敗した場合は、エラー表示を行ってユーザーによる明示的な再選択または現在アカウントの承認があるまで保存をブロックし、無確認での別アカウントへの保存を完全防止する。
 - **再発防止 (Prevention)**:
-  暗号化を伴うフォーム画面では、暗号鍵の供給元と保存先識別子を別々のソースから取得せず、必ず単一のコンテキスト（`activeAccountId`）にバインドする。
+  暗号化を伴うフォーム画面では、暗号鍵の供給元と保存先識別子を別々のソースから取得せず、必ず単一のコンテキスト（`activeAccountId`）にバインドする。また、外部指定されたアカウントが未解決・存在しない場合はフォールバックで暗黙保存させず、必ずユーザーに確認を求める。
 - **関連実装 (Related Code References)**:
   - `apps/web/src/routes/(app)/records/new.tsx`
 
