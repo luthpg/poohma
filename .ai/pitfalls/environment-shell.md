@@ -52,3 +52,18 @@ PowerShell 7 (pwsh / Windows) 環境における落とし穴と回避法です�
 - **問題**: 自己署名証明書（`basic-ssl` 等）を使う開発サーバーの起動待機に `https.get` を利用すると、自己署名エラーを回避するために `rejectUnauthorized: false` を指定しがちになる。しかしこれは CodeQL の `Disabling certificate validation (CWE-295)` で重大セキュリティ指摘となる。
 - **回避法**: ローカルサーバーのリッスン待機（ヘルスチェック）には TLS 層を通さない `net.Socket` による TCP ポート疎通確認（`socket.connect(port, 'localhost')`）を採用する。TLS/HTTPS の証明書検証ロジックをバイパスすることなく安全かつシンプルに起動判定できる。
 
+---
+
+### WXT 拡張機能におけるフラット構成と shadcn の整合性（KISS原則）
+
+- **問題**: WXT（Web Extension Framework）において、`entrypoints/` のみをルート直下に置き、UI コンポーネントやユーティリティを `src/` 配下に格納する中途半端なハイブリッド構成にすると、WXT の標準エイリアス（`@` = ルート）と shadcn CLI の標準エイリアス（`@` = `src`）の間でパス解決の摩擦や Rolldown エラー（`os error 2/3`）が発生する。
+- **回避法**: `src/` ディレクトリを全廃し、ルート直下に `components/`, `lib/`, `styles/`, `env.ts` を配置する**フラット構成**に統一する。これにより、追加のエイリアス設定（Vite の `resolve.alias` や `tsconfig.json` の paths 上書き）が一切不要（完全ゼロコンフィグ）となり、WXT の標準挙動と shadcn の `@/components/...`, `@/lib/utils` のインポートが美しく整合する。
+
+---
+
+### Windows (Node.js) における `npm_execpath` と pnpm v12 ネイティブバイナリの起動エラー（ERR_UNKNOWN_FILE_EXTENSION）
+
+- **問題**: pnpm スクリプト内から子プロセスでさらに pnpm を実行する際、`execFileSync(process.execPath, [process.env.npm_execpath, ...args])` というイディオム（Node.js で `npm_execpath` の `.js` / `.cjs` を起動する書き方）を使うと、Windows の pnpm v12 環境では `npm_execpath` が `pnpm.exe`（ネイティブバイナリ）となるため、Node.js が `TypeError [ERR_UNKNOWN_FILE_EXTENSION]: Unknown file extension ".exe"` を投げてクラッシュする。
+- **回避法**: `pnpmExecPath` が `/\.[cm]?js$/i` で終わる JavaScript スクリプトであるか判定し、`.js` であれば `node <pnpmExecPath>`、`.exe` 等のバイナリであれば直接 `execFileSync(pnpmExecPath, args)` で実行する共通ヘルパー関数 `runPnpm` を経由する。
+
+

@@ -1,3 +1,6 @@
+import type { api } from "@poohma/backend/api";
+import type { FunctionArgs } from "convex/server";
+
 export interface SampleCredentialDefinition {
   label?: string;
   loginId?: string;
@@ -16,26 +19,12 @@ export interface SampleRecordDefinition {
   credentials: SampleCredentialDefinition[];
 }
 
-export interface EncryptedCredentialInput {
-  label?: string;
-  loginId?: string;
-  passwordHint: string;
-  passwordHintIv: string;
-  passwordHintDekEncrypted: string;
-  passwordHintDekIv: string;
-}
+export type EncryptedSampleRecordInput = FunctionArgs<
+  typeof api.onboarding.insertSampleRecords
+>["records"][number];
 
-export interface EncryptedSampleRecordInput {
-  title: string;
-  titleReading?: string;
-  url?: string;
-  ogpImage?: string;
-  ogpDescription?: string;
-  memo?: string;
-  tags: string[];
-  ownerType: "user" | "family";
-  credentials: EncryptedCredentialInput[];
-}
+export type EncryptedCredentialInput =
+  EncryptedSampleRecordInput["credentials"][number];
 
 export type OnboardingPhase =
   | "idle"

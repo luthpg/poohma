@@ -241,6 +241,7 @@ export const getRecords = authenticatedQuery({
     archiveStatus: v.optional(
       v.union(v.literal("active"), v.literal("archived"), v.literal("all")),
     ),
+    includeHints: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const { user } = ctx;
@@ -267,7 +268,7 @@ export const getRecords = authenticatedQuery({
     }
 
     // 各レコードに紐づく credentials を小さなバッチ（Bounded Concurrency: 32件）で取得
-    // 一覧表示・検索に必要なフィールド（_id, label, loginId）のみを結合し、暗号化データは除外してペイロードを軽量化
+    // 一覧表示・検索に必要なフィールド（_id, label, loginId）を結合。includeHints が true の場合は暗号化ヒントも結合
     const recordsWithCredentials = await asyncMapBounded(
       records,
       async (record) => {
@@ -277,6 +278,14 @@ export const getRecords = authenticatedQuery({
           id: c._id,
           label: c.label,
           loginId: c.loginId,
+          ...(args.includeHints
+            ? {
+                passwordHint: c.passwordHint,
+                passwordHintIv: c.passwordHintIv,
+                passwordHintDekEncrypted: c.passwordHintDekEncrypted,
+                passwordHintDekIv: c.passwordHintDekIv,
+              }
+            : {}),
         }));
         return {
           ...record,

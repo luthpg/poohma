@@ -16,6 +16,7 @@ PoohMaは、フロントエンドとサーバーサイド処理を単一のTanSt
 リポジトリは Turborepo によるモノレポ構成をとっており、責務に応じて以下のパッケージに分離されている：
 - `apps/web`: フロントエンド & SSR（TanStack Start, Vite）およびブラウザ E2E テスト（Playwright）
 - `apps/admin`: 管理者コンソール（TanStack Start, Cloudflare Workers / Vite Plugin, cmdk, Geist Fonts）
+- `apps/extension`: Chrome 拡張機能（Manifest V3, WXT, React 19, Tailwind v4, Side Panel, Offscreen Document, Content Script）
 - `packages/backend`: Convex バックエンド（Schema, Functions, RLS, customBuilders, admin API, 結合テスト、Preview 環境プロビジョニング、シードエクスポート）
 - `packages/crypto`: 暗号化コアモジュール（`@poohma/crypto`: Web Crypto API, マスターキー/DEKエンベロープ暗号化, 鍵導出, extractable制御）
 - `packages/shared`: 共通モジュール（`@poohma/shared`: Zod スキーマ, React Email テンプレート, URLドメイン照合, 拡張機能メッセージプロトコル, ユーティリティ）
@@ -441,6 +442,20 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 
 インデックス: by_createdAt, by_email_createdAt。同一メールアドレスによる短時間連投の抑止（レート制限）および一覧照会に使用。
 
+#### extensionSyncCodes
+
+Chrome 拡張機能連携用の短命ワンタイム同期コードテーブル。Web 側で発行され、拡張機能側で検証・消費されると即座に物理削除される（認証・セッション同期方式の選定および Chrome Web Store 審査に関する位置付けは [ADR-009](./adr/009-extension-authentication-strategy.md) 参照）。Zero Token Exposure 原則に基づき、Web 側が一時格納した `customToken` は Content Script や DOM を経由せず、Background Service Worker が `redeemSyncToken` で Convex から直接引き取る。
+
+| フィールド | 型 | 説明 |
+| ---------- | --- | --- |
+| accountId | Id<users> | 発行元のアカウント ID |
+| nonce | string | 拡張機能が生成した暗号学的乱数（UUID v4） |
+| code | string | サーバー側で発行されたワンタイム短命コード（UUID v4） |
+| customToken | string(optional) | バックチャネル引き渡し用の Firebase Custom Token（redeem 時に即時消費・物理削除） |
+| expiresAt | number | 有効期限（発行から 30 秒） |
+
+インデックス: by_code_nonce, by_expiresAt。検証成功時の即時物理削除に加え、定期 cron（`cleanupExpiredSyncCodes`）により期限切れレコードが自動パージされる。
+
 ## 5. 認証・認可設計
 
 ### 5.1 認証要素の責務分離（4層モデル）
@@ -672,6 +687,32 @@ TanStack Start / ConvexReactClient の Mutation 実行時、認証トークン�
 - **設計方針（KISS原則）**:
   - `users.emailNotificationSettings` に保存し、未設定時は `?? true`（デフォルト配信）。
   - 重要セキュリティ通知（OTP、新端末ログイン、パスコード変更等）はオプトアウト不可（強制送信）。
+
+### 5.9 拡張機能認証連携（convex/extensionAuth.ts, FR-EXT-01）
+
+Chrome 拡張機能（Side Panel / Popup）とのセッション同期を行うため、短命ワンタイムコード（TTL 30秒）の発行・引き換えを提供する。
+
+```txt
+構成とフロー（Zero Token Exposure / Backchannel Redemption）：
+1. issueSyncToken = authenticatedMutation:
+   - 引数: { nonce: v.string(), accountId?: v.optional(v.id("users")), customToken?: v.optional(v.string()) }
+   - 責務: Web 側でセッション確認後に呼び出し、UUID v4 の短命コード（code）を発行。
+     暗号学的乱数 nonce と共に extensionSyncCodes に格納（TTL: 30秒）。
+     Zero Token Exposure 原則に基づき、Web 側で生成した customToken も安全なバックチャネルとして本レコードに一時格納する。
+     返却値: { success: true, code: string, expiresAt: number }
+
+2. redeemSyncToken = mutation:
+   - 引数: { nonce: v.string(), code: v.string() }
+   - 責務: 拡張機能 Background Service Worker から直接呼び出し。
+     nonce と code の組み合わせで extensionSyncCodes を照合し、有効期限内であることを検証。
+     検証成功時、レコードを即時物理削除（Single-Use / リプレイ攻撃防止）。
+     紐づくアカウント（users）、所属家族（families）、同一 Firebase UID の全アカウント一覧（accounts）、
+     および格納されていた customToken を Background へ返却する。
+     返却値: { success: true, user, accounts, family, customToken }
+
+3. cleanupExpiredSyncCodes = internalMutation:
+   - 定期 cron（crons.ts）により、30 秒を超過した期限切れの extensionSyncCodes レコードを一括パージ。
+```
 
 ## 6. 暗号化設計（E2EE）
 
@@ -1021,6 +1062,14 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 | --------------------- | -------------- | ---------- | -------------------------------------------------------------------------------------------- |
 | createContact         | Mutation       | 公開       | お問い合わせ送信（Honeypot、Zod整合バリデーション、@convex-dev/rate-limiterトークンバケット、同一メール短時間連投制限、管理者メール通知予約） |
 | sendNotificationEmail | InternalAction | 内部限定   | 管理者（ADMIN_EMAIL）宛てにお問い合わせ受領通知メールを配信（送信者をreplyToに設定）        |
+
+### 7.8 convex/extensionAuth.ts
+
+| 関数 | 種別 | 認可 | 概要 |
+| ---------------------------------- | ---------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| issueSyncToken | Mutation | authenticated | 拡張機能連携用の短命同期コード（Sync Code）を発行（TTL: 30秒、Nonce・Custom Token保持） |
+| redeemSyncToken | Mutation | 公開 | 拡張機能 Background から Nonce + Code で引き換え。即時物理削除・有効期限検証・ユーザーアカウントと全サブアカウント（各家族メタデータ付与）返却 |
+| cleanupExpiredSyncCodesInternal | InternalMutation | 内部限定（Cron） | 期限切れ同期コードの定期クリーンアップ |
 
 ## 8. 画面設計・ルーティング設計
 

@@ -11,6 +11,10 @@ poohma/
 │   │   ├── src/           # UI, Routes, Hooks, Server Functions
 │   │   ├── e2e/           # Playwright E2E シナリオ
 │   │   └── tests/         # フロントエンド単体・ブラウザ暗号テスト
+│   ├── extension/         # @poohma/extension (Chrome 拡張機能 Manifest V3: WXT + React 19)
+│   │   ├── entrypoints/   # background, content, sidepanel, offscreen, popup
+│   │   ├── components/    # UIコンポーネント (Geist デザインシステム, Tailwind CSS v4)
+│   │   └── lib/           # auth, messaging, passcode (共通暗号処理)
 │   └── admin/             # @poohma/admin (管理者コンソール: TanStack Start + Cloudflare)
 │       └── src/           # 管理画面 UI (漆黒 Obsidian テーマ, cmdk, KPI, お問い合わせ)
 ├── packages/
@@ -36,6 +40,7 @@ poohma/
 | Workspace | 責務 | 主要技術 |
 | --- | --- | --- |
 | `apps/web` | メインWebアプリケーション（フロントエンド、SSR、Server Functions） | React 19, TanStack Start, TanStack Router, Tailwind CSS v4, shadcn/ui, Web Crypto API |
+| `apps/extension` | Chrome 拡張機能（閲覧中サイトのアカウント参照・パスコード解除・ヒント復号・自動入力支援） | WXT, Manifest V3, React 19, Tailwind CSS v4, Web Crypto API |
 | `apps/admin` | 管理者コンソール（お問い合わせ対応、統計KPI、ユーザー/ファミリー照会、システム監査） | React 19, TanStack Start, Cloudflare Workers/Vite Plugin, cmdk, Geist Fonts |
 | `packages/backend` | Convex BaaS バックエンド（スキーマ、関数、RLS、admin API、プレビュー構築） | Convex, convex-helpers, convex-test, TypeScript |
 | `packages/shared` | 共通バリデーションスキーマ、URL検証（SSRF対策）、メール定義 | Zod, React Email, ipaddr.js, TypeScript |
@@ -50,7 +55,7 @@ poohma/
 
 - **Routing**: TanStack Router によるファイルベースルーティング
   - `routes/(app)/`: 認証必須ルート（`dashboard.tsx`, `family.tsx`, `records/`, `settings/index.tsx`, `settings/bulk.tsx`, `recovery.tsx`）
-  - `routes/(public)/`: 未認証公開ルート（`index.tsx` (LP), `login.tsx`, `usage.tsx`, `faq.tsx`, `news/index.tsx`, `news/$id.tsx`, `contact.tsx`, `terms-of-service.tsx`, `privacy-policy.tsx`）
+  - `routes/(public)/`: 未認証公開ルート（`index.tsx` (LP), `login.tsx`, `usage.tsx`, `faq.tsx`, `news/index.tsx`, `news/$id.tsx`, `contact.tsx`, `terms-of-service.tsx`, `privacy-policy.tsx`, `auth.extension-sync.tsx`）
   - `routes/__root.tsx`: ルート共通レイアウト、認証コンテキスト（`beforeLoad` で `getAuthUser` 実行）、各種 Provider
 - **Components & Code Splitting**:
   - `components/UserMenu.tsx`: 全画面共通のヘッダー・メニュー。初期バンドル軽量化のためCSVや仮想スクロールの重い依存を排除（92kB → 37kB）。
@@ -81,6 +86,7 @@ poohma/
 - `families.ts`: 家族グループ、家族招待（`familyInvites`）、参加申請（`joinRequests`、保留中申請取得 `getPendingRequests`）、家族移行（`familyMigrations`）、パスコードローテーション、メンバーロール変更（`updateMemberRole`）、メンバーキック・データ持ち出し（`pendingExportVaults`）
 - `users.ts`: ユーザー同期、アカウント作成・切り替え・削除、メール通知設定更新（`updateEmailNotificationSettings`）、ログイン履歴記録、SSR用ユーザー/アカウント（family暗号化メタデータ含む）取得
 - `contacts.ts`: お問い合わせ受付（`createContact` mutation）、Honeypot スパム防御、多層レート制限（①Convex公式 `@convex-dev/rate-limiter` トークンバケット ＋ ②同一メール短時間連投制限 `by_email_createdAt`）、管理者メール通知（`sendNotificationEmail` internalAction、`ADMIN_EMAIL` 宛て Resend 送信、replyTo: 問い合わせ者メール）
+- `extensionAuth.ts`: Chrome 拡張機能連携用の短命同期コード発行（`issueSyncToken`）・検証引き換え（`redeemSyncToken`、全サブアカウント一覧 `accounts`、家族暗号メタデータ、および `customToken` のバックチャネル返却、Zero Token Exposure、Single-Use即時物理削除）、期限切れコード定期パージ（`cleanupExpiredSyncCodes`）
 - `recovery.ts`: リカバリーキット検証、2段階復元（メールOTP発行・検証、マスターキー再ラップ）
 - `actions.ts`: Node.js ランタイムでの外部連携（OGP取得、ふりがなAPI、Resend メール送信。環境変数 `DISABLE_EMAIL_DELIVERY=true` での外部配送スキップ対応）
 - `http.ts`: 内部 HTTP エンドポイント（`getUserByFirebaseUid`、内部共有シークレット認証）

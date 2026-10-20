@@ -1,8 +1,9 @@
 import { api } from "@poohma/backend/api";
-import type { Id } from "@poohma/backend/dataModel";
+import type { Doc, Id } from "@poohma/backend/dataModel";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import type React from "react";
 import {
   createContext,
@@ -16,35 +17,18 @@ import { useAuth } from "@/components/AuthProvider";
 import { clearQueryCache } from "@/hooks/usePersistentQuery";
 import { auth } from "@/utils/firebase";
 
-export interface Account {
-  _id: Id<"users">;
+type RawAccount = FunctionReturnType<typeof api.users.getAccounts>[number];
+
+export type Account = Omit<
+  Doc<"users">,
+  "_creationTime" | "createdAt" | "familyRole"
+> & {
   id: Id<"users">;
-  userId: string;
-  familyId?: Id<"families">;
-  familyRole?: "admin" | "viewer";
-  emailNotificationSettings?: {
-    notifyRecordChanges?: boolean;
-    notifyFamilyActivity?: boolean;
-    notifyDataExport?: boolean;
-    notifySecuritySettings?: boolean;
-  };
-  displayName?: string;
   name?: string;
-  email: string;
-  photoURL?: string;
-  family?: {
-    id: Id<"families">;
-    name: string;
-    masterKeyEncrypted?: string;
-    masterKeyIv?: string;
-    masterKeySalt?: string;
-    kdfIterations?: number;
-    cryptoVersion?: number;
-  } | null;
-  onboardingVersion?: number;
-  createdAt?: number;
-  updatedAt: number;
-}
+  createdAt?: Doc<"users">["createdAt"];
+  familyRole?: Doc<"users">["familyRole"];
+  family?: RawAccount["family"];
+};
 
 export interface AccountContextValue {
   accounts: Account[];

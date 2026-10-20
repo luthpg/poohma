@@ -421,3 +421,28 @@ PoohMa のブランドカラー本体（`#f97316` / orange-500：ロゴや変更
 4. Color is functional, never decorative — workflow colors (Red/Pink/Blue) mark pipeline stages only
 5. The inner `#fafafa` ring in card shadows is what gives Vercel cards their subtle inner glow
 6. Geist Mono uppercase for technical labels, Geist Sans for everything else
+
+---
+
+## 10. Chrome 拡張機能 & 連携画面デザイン仕様 (Side Panel & Web Sync)
+
+### 10.1 Side Panel UI (`apps/extension/entrypoints/sidepanel`)
+- **世界観とトーン**: Web アプリと 100% 同一の Geist デザインシステム、PoohMa Orange、Vercel 哲学の shadow-as-border、角丸 6px（`--radius: 6px`）を採用。
+- **絵文字の完全排除**: 🐻 などの装飾的絵文字は全廃。公式ロゴ（`/poohma_icon.png`）および Lucide アイコン（`<ShieldCheck />`, `<KeyRound />`, `<PencilSparkles />` 等）を使用。
+- **未認証ステート**: 簡潔で親しみやすいカードレイアウト、シンプルな「ログイン」ボタン（クリックで nonce 採番・Web 同期タブ起動）。待機中は60秒自律タイムアウトおよび「連携をキャンセル」ボタンを提供し、タブ放置時や失敗時でも即座に再試行可能。
+- **パスコードロック解除 & オートロック**: パスコード表示/非表示トグル、指数バックオフ試行制限カウントダウン（「試行制限中です。残り X 秒お待ちください」）。5分無操作（またはサイドパネル非表示後の復帰）による自律オートロックを採用し、不要な手動ロックボタンは撤廃。
+- **解除済み通常画面**:
+  - ヘッダー: 公式アイコン、サブアカウント切り替えドロップダウン（複数アカウント保持時）、更新・ログアウトのアクション。
+  - インクリメンタル検索バー: 即座に他サイトのアカウントも絞り込み可能。
+  - サイト一致カード: 閲覧中 URL と一致するレコードを最上部に表示。Web互換の `CopyButton`（「コピー」「コピー済」ラベル、44pxタップ領域、緑のチェック）、ページ自動入力（`<PencilSparkles />`）、ヒント伏字（`••••••••`）とオンデマンド復号トグル。
+  - ダークモード: OSのデバイス設定（`prefers-color-scheme`）にリアルタイム追従し、Web同期時に引き継がれたテーマ設定にも調和。
+  - 未登録サイト対応: 「このサイトを PoohMa に追加」導線（`/records/new?url=...` 起動）。
+
+### 10.2 Web 同期画面 (`apps/web/src/routes/(public)/auth.extension-sync.tsx`)
+- **ユーザー主導の信頼性**: 勝手にタブを閉じる（`window.close()`）動作を廃止し、明示的な「このタブを閉じる」ボタンおよび「ダッシュボードへ移動」リンクを提供。
+- **使用済みリンクの親切なハンドリング**: 連携成功後にリロードや再アクセスされた場合、内部エラーにせず「この認証リンクは既に使用されています」というガイダンスとトップページへの導線を表示。
+- **平穏な通知文言**: 恐怖を煽る「不正な」を廃止し、「無効な連携リクエストです」などの平穏で安全な表現に統一。
+- **同期インジケーター**: `<ShieldCheck />` と HoneyPotLoader による滑らかな認証セッション確立体験。テーマ設定（`theme`）も拡張機能へ自動受け渡し。8秒後の手動再試行時には前回のタイマー・ACKリスナーを即座に破棄（`attemptCleanupRef`）し、タイマー競合（Race condition）を防止。
+
+※ 拡張機能の認証方式の選定および Chrome Web Store 審査に関する位置付けは [ADR-009: Extension Authentication and Session Synchronization Strategy](./adr/009-extension-authentication-strategy.md) を参照。
+

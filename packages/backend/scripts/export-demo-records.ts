@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, type StdioOptions } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,22 +16,27 @@ console.log(
 const familyId = process.argv[2];
 const argsArg = familyId ? JSON.stringify({ familyId }) : "{}";
 
-try {
-  const pnpmExecPath = process.env.npm_execpath;
-  if (!pnpmExecPath) {
-    throw new Error("npm_execpath is missing in environment");
-  }
+function runPnpm(
+  args: string[],
+  options: {
+    cwd?: string;
+    env?: NodeJS.ProcessEnv;
+    stdio?: StdioOptions;
+    encoding?: BufferEncoding;
+  },
+) {
+  const pnpmExecPath = process.env.npm_execpath || "pnpm";
+  const isJsScript = /\.[cm]?js$/i.test(pnpmExecPath);
 
-  const stdout = execFileSync(
-    process.execPath,
-    [
-      pnpmExecPath,
-      "exec",
-      "convex",
-      "run",
-      "demo:exportDemoRecordsInternal",
-      argsArg,
-    ],
+  if (isJsScript) {
+    return execFileSync(process.execPath, [pnpmExecPath, ...args], options);
+  }
+  return execFileSync(pnpmExecPath, args, options);
+}
+
+try {
+  const stdout = runPnpm(
+    ["exec", "convex", "run", "demo:exportDemoRecordsInternal", argsArg],
     {
       cwd: backendDir,
       encoding: "utf-8",
@@ -39,7 +44,7 @@ try {
     },
   );
 
-  const trimmed = stdout.trim();
+  const trimmed = stdout.toString().trim();
   const startIdx = trimmed.indexOf("[");
   const endIdx = trimmed.lastIndexOf("]");
   if (startIdx === -1 || endIdx === -1 || startIdx >= endIdx) {

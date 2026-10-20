@@ -1,6 +1,7 @@
 import { api } from "@poohma/backend/api";
-import type { Doc, Id } from "@poohma/backend/dataModel";
+import type { Id } from "@poohma/backend/dataModel";
 import { useMutation } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { Ban, Check, Clock, Copy, Plus, QrCode, Share2 } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import { useState } from "react";
@@ -9,9 +10,9 @@ import { AdminRestrictedSection } from "@/components/common/AdminRestrictedSecti
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 
-type FamilyInvite = Doc<"familyInvites"> & {
-  status: "active" | "expired" | "revoked";
-};
+type FamilyInvite = FunctionReturnType<
+  typeof api.families.getFamilyInvites
+>[number];
 
 interface FamilyInviteSectionProps {
   family?: { name: string } | null;

@@ -12,6 +12,7 @@ PoohMa におけるテストアーキテクチャ、テスト作成パターン�
 | 暗号化 / E2EE / ユーティリティ | `vitest` + Web Crypto API (Node 20+ 組み込み) | PBKDF2 鍵導出、DEK/MasterKey ラップ、ソートキー生成、バリデーション |
 | フロントエンド UI / Hooks | `@testing-library/react` + `vitest` | `PasscodeProvider`, `AccountProvider`, フォームバリデーション等のコンポーネントテスト |
 | 暗号・WebAuthn PRF サブシステム (Browser E2E) | `@vitest/browser-playwright` + Chromium (CDP) | 実ブラウザ Web Crypto API、CDP Virtual Authenticator (PRF拡張)、PasscodeProvider 実UI結合、再暗号化フロー |
+| Chrome 拡張機能 (`apps/extension`) | `vitest` (Node環境) | URL正規化・PoohMaオリジン検証、認証・マルチアカウントストレージ、パスコード誤入力バックオフ、PSL URL照合の単体テスト |
 | ユーザー導線フルスタック E2E (Staging) | `@playwright/test` + Firebase Admin SDK カスタムトークン | ステージング実環境に対するログインブートストラップ、初期設定・レコード暗号化保存〜復号の貫通検証 |
 
 ---
@@ -310,3 +311,16 @@ AI Agent がコード変更を行う際、静的検証（`pnpm check` や `pnpm 
   2. ローカル動的テストの実行: `pnpm test:e2e` を実行し、全テストケースが合格することを確認。
   3. テストが失敗した場合は、プロダクションコードを独断で改変せず、原因を精査して合意を得て修正すること（第7節参照）。
   4. 全テスト合格を確認した後に限り、コミット・プッシュを行う。
+
+---
+
+## 10. Vitest 単一ファイル実行時のカバレッジ閾値判定の仕様と注意点
+
+- **現象**:
+  `pnpm vitest run apps/web/tests/xxx.spec.tsx` のように単一テストファイルを直接指定して実行した場合、テストケース自体がすべて合格（PASS）していても、Vitest が exit code 1 で終了することがある。
+- **原因**:
+  Vitest のグローバルカバレッジ設定（Lines 50%, Branch 40% など）が有効な状態で単一ファイルのみを実行すると、対象テストが通過したコードのみでプロジェクト全体のカバレッジが算出されるため、閾値未達と判定されてプロセスが失敗ステータスを返す。
+- **対処法**:
+  - 単一ファイルや特定スイートの動作確認時は、カバレッジ閾値判定をバイパスするため `--coverage.enabled=false` を付与して実行する。
+  - プロジェクト全体の網羅率検証は、カバレッジ付きの一括実行スクリプト（`pnpm test` または `pnpm test:coverage`）で全ファイルを網羅走査して確認する。
+

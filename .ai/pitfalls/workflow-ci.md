@@ -210,4 +210,78 @@ execFileSync(
 ```
 `process.execPath`（Node.js バイナリ）から `pnpmExecPath` を引数配列として直接起動することで、シェル展開の介在余地を根本から排除する。
 
+---
+
+## 12. 配布用成果物（Release）ビルドワークフローへの CI/テスト用ダミー環境変数の流用
+
+### 事象
+
+Chrome 拡張機能などの配布用 ZIP パッケージを生成・GitHub Releases に添付するリリースワークフロー（`release-extension.yml` 等）において、CI のユニットテスト用設定を流用し、`VITE_FIREBASE_API_KEY: "dummy_key"` やステージング用 URL などの仮値をハードコードしてビルドしてしまう。
+この成果物がそのまま Release に添付・配布されると、ユーザーがインストールした拡張機能で Firebase 認証（ログイン）が必ず失敗し、実運用不能な ZIP が公開されてしまう。
+
+### 対策
+
+1. **CI ジョブとリリース（配布物生成）ジョブの明確な分離**:
+   - 単なる構文・型・テスト検査（`ci.yml`）ではダミー値で十分だが、配布用パッケージを生成するワークフローでは実環境用の環境変数を注入する。
+2. **GitHub Secrets / Variables からの本番環境変数注入**:
+   - `VITE_FIREBASE_API_KEY`、`VITE_FIREBASE_PROJECT_ID`、`VITE_CONVEX_URL` 等はハードコードせず、GitHub Secrets または Variables（`${{ secrets.VITE_FIREBASE_API_KEY }}`）から安全に注入してビルドする。
+
+---
+
+## 13. Monorepo 内パッケージの `postinstall` による環境変数バリデーションと CI での `pnpm install` 失敗
+
+### 事象
+
+Monorepo 配下に新しいパッケージ（例: Chrome 拡張機能 `apps/extension`）を追加した際、`package.json` に `"postinstall": "wxt prepare"` などの型生成・初期化スクリプトが定義されていると、リポジトリルートで `pnpm install` を実行した際に自動的にこの `postinstall` がトリガーされる。
+このツール（WXT 等）がエントリーポイントを静的走査して `@t3-oss/env-core` などの環境変数スキーマを評価する場合、**必須の環境変数が未定義（または URL 形式でない）だとバリデーションエラー（ZodError）でプロセスが exit 1 で異常終了し、`pnpm install` 自体が失敗する**。
+その結果、対象パッケージとは直接関係のない CI/CD ジョブ（例: `convex-dry-run`、`deploy-staging.yml`、`deploy-production.yml`）であっても、`pnpm install` ステップでジョブ全体がクラッシュしてしまう。
+
+### 対策
+
+1. **CI ワークフローの依存解決ステップへの環境変数の局所供給（Scoped Env 原則）**:
+   - `pnpm install` を実行するステップ（`Install dependencies` 等）において、ステップレベルの `env:` で必要な環境変数を明示的に供給する（※ジョブ全体への安易な配置は後続の `vercel build` 等の設定値を上書きするリスクがあるため、第14節の局所スコープ配置原則を遵守する）。
+   - テスト・ドライラン・Convex デプロイなど、実際のフロントエンド成果物をビルドしないジョブでは、安全なダミー値（`VITE_FIREBASE_API_KEY: "dummy_key"`, `VITE_CONVEX_URL: "https://dummy.convex.cloud"` 等）を定義してバリデーションを通過させる。
+   - ステージングデプロイ等の実ビルドを伴うジョブでは、適切な Preview 用 Secrets を注入して整合性を保つ。
+2. **新パッケージ導入時の Monorepo 影響範囲チェック**:
+   - `postinstall` で実行されるコマンドが外部環境変数に依存していないかを事前に点検し、Monorepo 全体の CI/CD パイプラインへの波及影響を意識する。
+
+---
+
+## 14. ジョブレベル `env:` での環境変数スコープ過剰によるビルド設定上書き事故
+
+### 事象
+
+`deploy-staging.yml` や `deploy-e2e` において、Monorepo 内パッケージの `postinstall` バリデーション対策としてジョブ全体（`env:`）に `VITE_CONVEX_URL: ${{ secrets.CONVEX_PREVIEW_URL }}` を配置してしまうと、後続の `vercel build` や動的 Preview 設定注入ステップ（`.vercel/.env.preview.local`）に対して OS プロセス環境変数が優先してしまい、Staging ビルドが Preview URL で固められたり、動的 Preview URL が固定値で上書きされてしまう。
+
+### 対策
+
+- **環境変数の局所スコープ配置（Scoped Env 原則）**:
+  `postinstall` 対策の環境変数はジョブ全体ではなく、必要なステップ（`Install dependencies` 等）に局所配置する。後続のビルドステップに意図しない環境変数が漏洩・上書きすることを構造的に遮断する。
+  - 例: `deploy-production.yml` において、Convex デプロイキーは `Deploy Convex Backend` ステップのみにバインドし、`postinstall` 用のダミー環境変数（`VITE_FIREBASE_API_KEY` 等）は `Install dependencies` ステップのみに閉じることで、デプロイ実行プロセスへのダミー値混入を完全に防止する。
+
+---
+
+## 15. リリースワークフローでの GITHUB_TOKEN 漏洩防止（`persist-credentials: false`）と成果物保存
+
+### 事象
+
+`release-extension.yml` 等で `contents: write` 権限を付与する場合、`actions/checkout` に `persist-credentials: false` を明示しないと、ローカル `.git/config` に書き込み権限付きトークンが残存し、npm スクリプト等から窃取されるリスク（CWE-200）がある。また、タグプッシュ時に GitHub Release が未作成だと `gh release upload` が失敗し、手動実行時（`workflow_dispatch`）には成果物がどこにも保存されない問題が生じる。
+
+### 対策
+
+1. **`persist-credentials: false` の徹底**:
+   `actions/checkout` には必ず `persist-credentials: false` を指定し、トークンのローカルディスク残存を防止する。
+2. **リリース自動作成フォールバック**:
+   タグリリース時は `if ! gh release view "${TAG_NAME}" >/dev/null 2>&1; then gh release create ...; else gh release upload ...; fi` で安全にフォールバックする。
+3. **成果物の一時保存（Artifact Upload）**:
+   手動実行時でも ZIP をダウンロードして動作検証できるよう、`actions/upload-artifact@v7` で成果物を Actions Artifact として保存する。
+4. **PR テストビルド時の動的アーティファクト名分岐と Step Summary 案内**:
+   - `pull_request` トリガー時、`github.ref_name`（`372/merge` 等）をそのままアーティファクト名に使うとスラッシュが含まれ不正な名前になる恐れがあるため、`poohma-extension-pr<PR番号>` と命名する。
+   - `github.event_name == 'pull_request'` の際は GitHub Release へのアップロードを確実にスキップし、Step Summary（`$GITHUB_STEP_SUMMARY`）にダウンロード・インストール手順を出力して PR レビュー時の実機検証を支援する。
+5. **actions/upload-artifact での隠しディレクトリ（`.output`等）除外事故**:
+   - `actions/upload-artifact` は既定で `include-hidden-files: false` で動作するため、`path: apps/extension/.output/*.zip` のようにドットから始まる隠しディレクトリを探索パスに指定すると、配下のファイルが全て除外され `No files were found with the provided path` でジョブが異常終了する。
+   - 対策として、余計な中間ステージングディレクトリ（`dist-zip/` 等）を作ってファイルを二重化するのではなく、`include-hidden-files: true` を明示して正規出力先（`apps/extension/.output/*.zip`）を直接アップロードする（KISS原則・Single Source of Truth）。
+6. **インラインスクリプト内への GitHub 式直接埋め込み禁止（Template Injection 対策）**:
+   - `run:` スクリプトブロック内に `${{ github.event_name }}` や `${{ github.sha }}`、`${{ github.event.pull_request.number }}` などの GitHub 式を直接展開すると、シェルエスケープの破壊や zizmor / CodeQL による script injection 脆弱性（CWE-78）指摘の原因となる。
+   - PR Job Summary 生成ステップ（`$GITHUB_STEP_SUMMARY`）等も含め、すべてのコンテキスト値はステップレベルの `env:` でシェル変数（例: `PR_NUMBER: ${{ github.event.pull_request.number }}`）として安全に注入し、スクリプト内では `"$PR_NUMBER"` として参照すること。
 

@@ -1,10 +1,56 @@
 // @vitest-environment jsdom
-import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+} from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  AccountContext,
+  type AccountContextValue,
+} from "@/components/AccountProvider";
 import { useRecordForm } from "@/hooks/useRecordForm";
+
+const mockCreateRecord = vi.fn().mockResolvedValue("new_record_id");
+const mockNavigate = vi.fn().mockResolvedValue(undefined);
+let mockSearchParams: {
+  draftId?: string;
+  url?: string;
+  title?: string;
+  loginId?: string;
+  accountId?: string;
+} = {};
 
 vi.mock("convex/react", () => ({
   useAction: vi.fn(() => vi.fn().mockResolvedValue({})),
+  useConvexAuth: vi.fn(() => ({ isAuthenticated: true, isLoading: false })),
+  useQuery: vi.fn(() => []),
+  useMutation: vi.fn(() => mockCreateRecord),
+}));
+
+vi.mock("@tanstack/react-router", () => ({
+  useNavigate: () => mockNavigate,
+  createFileRoute: () => (options: { component: unknown }) => ({
+    options,
+    useSearch: () => mockSearchParams,
+  }),
+}));
+
+vi.mock("@/components/records/RecordForm", () => ({
+  RecordForm: ({
+    onSubmit,
+    submitIdleLabel,
+  }: {
+    onSubmit: (e: React.FormEvent) => void;
+    submitIdleLabel?: string;
+  }) => (
+    <form data-testid="record-form" onSubmit={onSubmit}>
+      <button type="submit">{submitIdleLabel ?? "保存"}</button>
+    </form>
+  ),
 }));
 
 const mockRequireUnlock = vi.fn().mockResolvedValue(true);
@@ -870,6 +916,288 @@ describe("useRecordForm", () => {
       renderHook(() => useRecordForm(undefined, "rec-456"));
 
       expect(mockRequireUnlock).toHaveBeenCalled();
+    });
+  });
+
+  describe("初期値（initialValues）のクレデンシャル引き継ぎ", () => {
+    it("拡張機能等から loginId を含む credentials が渡された場合、自動で一意なIDが付与され1件目に設定されること", () => {
+      const initialValues = {
+        title: "GitHub",
+        url: "https://github.com/login",
+        credentials: [
+          {
+            label: "",
+            loginId: "developer@example.com",
+            passwordHint: "",
+          },
+        ],
+      };
+
+      const { result } = renderHook(() => useRecordForm(initialValues));
+
+      expect(result.current.values.title).toBe("GitHub");
+      expect(result.current.values.url).toBe("https://github.com/login");
+      expect(result.current.values.credentials).toHaveLength(1);
+      expect(result.current.values.credentials[0]!.loginId).toBe(
+        "developer@example.com",
+      );
+      expect(result.current.values.credentials[0]!.id).toBeDefined();
+      expect(typeof result.current.values.credentials[0]!.id).toBe("string");
+    });
+  });
+
+  describe("NewRecordComponent (拡張機能からの accountId 引き継ぎ・誤保存防止ガード)", () => {
+    const accountsList = [
+      { _id: "acc_A", displayName: "アカウントA" },
+      { _id: "acc_B", displayName: "アカウントB" },
+    ] as AccountContextValue["accounts"];
+
+    beforeEach(() => {
+      mockSearchParams = {};
+      mockCreateRecord.mockClear();
+      mockNavigate.mockClear();
+      window.scrollTo = vi.fn();
+    });
+
+    afterEach(() => {
+      cleanup();
+    });
+
+    const createAccountContext = (
+      overrides: Partial<AccountContextValue> = {},
+    ): AccountContextValue => ({
+      accounts: accountsList,
+      activeAccount:
+        accountsList.find(
+          (a) => a._id === (overrides.activeAccountId ?? "acc_A"),
+        ) ?? null,
+      activeAccountId: "acc_A" as AccountContextValue["activeAccountId"],
+      isLoading: false,
+      switchAccount: vi.fn().mockResolvedValue(undefined),
+      createAccount: vi.fn().mockResolvedValue("acc_new" as never),
+      deleteAccount: vi.fn().mockResolvedValue(undefined),
+      ...overrides,
+    });
+
+    it("初期レンダリングで activeAccountId が null → acc_A へ初期化される際、存在しない accountId 指定時の警告バナーが自動消去されず保存をブロックし、続行ボタン押下後に保存可能になること", async () => {
+      const { Route } = await import("@/routes/(app)/records/new");
+      const NewRecordComponent = (
+        Route as unknown as { options: { component: React.ComponentType } }
+      ).options.component;
+      const { toast } = await import("sonner");
+
+      mockSearchParams = {
+        title: "GitHub",
+        url: "https://github.com",
+        loginId: "dev@example.com",
+        accountId: "invalid_account_id",
+      };
+
+      // 第1段階: accounts ロード直後で activeAccountId がまだ null の状態（AccountProvider の useEffect 発火前）
+      const ctxPhase1 = createAccountContext({
+        activeAccountId: null,
+        activeAccount: null,
+      });
+
+      const { rerender } = render(
+        <AccountContext.Provider value={ctxPhase1}>
+          <NewRecordComponent />
+        </AccountContext.Provider>,
+      );
+
+      // 解決待機中はローディング表示となり、自動アンロックも発火しない
+      expect(screen.getByText("アカウントを切り替えています...")).toBeTruthy();
+      expect(mockRequireUnlock).not.toHaveBeenCalled();
+
+      // 第2段階: AccountProvider がデフォルトアカウント acc_A を初期設定
+      const ctxPhase2 = createAccountContext({
+        activeAccountId: "acc_A" as never,
+      });
+
+      await act(async () => {
+        rerender(
+          <AccountContext.Provider value={ctxPhase2}>
+            <NewRecordComponent />
+          </AccountContext.Provider>,
+        );
+      });
+
+      // 警告バナーが表示されたままであり、勝手に消去されないこと
+      const alertBanner = screen.getByRole("alert");
+      expect(alertBanner.textContent).toContain(
+        "指定された保存先アカウントが見つかりません",
+      );
+      // エラー状態の間は autoUnlock も抑止されていること
+      expect(mockRequireUnlock).not.toHaveBeenCalled();
+
+      // この状態で送信してもブロックされ、createRecord は呼ばれないこと
+      await act(async () => {
+        fireEvent.submit(screen.getByTestId("record-form"));
+      });
+      expect(toast.error).toHaveBeenCalledWith(
+        "保存先アカウントを選択してください",
+      );
+      expect(mockCreateRecord).not.toHaveBeenCalled();
+
+      // 「現在のアカウント（アカウントA）で保存を続行する」をクリックするとエラー解除され保存できること
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole("button", {
+            name: /現在のアカウント（アカウントA）で保存を続行する/,
+          }),
+        );
+      });
+
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(mockRequireUnlock).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        fireEvent.submit(screen.getByTestId("record-form"));
+      });
+      expect(mockCreateRecord).toHaveBeenCalledTimes(1);
+      expect(mockCreateRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accountId: "acc_A",
+          title: "GitHub",
+        }),
+      );
+    });
+
+    it("有効な accountId (acc_B) が指定された場合、切り替え完了まで autoUnlock を遅延させ、切り替え後に手動で acc_A に戻した場合は acc_A に保存されること", async () => {
+      const { Route } = await import("@/routes/(app)/records/new");
+      const NewRecordComponent = (
+        Route as unknown as { options: { component: React.ComponentType } }
+      ).options.component;
+
+      mockSearchParams = {
+        title: "Example Service",
+        url: "https://example.com",
+        accountId: "acc_B",
+      };
+
+      let resolveSwitch!: () => void;
+      const switchAccountMock = vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveSwitch = resolve;
+          }),
+      );
+
+      const ctxInitial = createAccountContext({
+        activeAccountId: "acc_A" as never,
+        switchAccount: switchAccountMock,
+      });
+
+      const { rerender } = render(
+        <AccountContext.Provider value={ctxInitial}>
+          <NewRecordComponent />
+        </AccountContext.Provider>,
+      );
+
+      // switchAccount("acc_B") が呼ばれ、完了前はローディング中かつ requireUnlock 未 호출
+      expect(switchAccountMock).toHaveBeenCalledWith("acc_B");
+      expect(screen.getByText("アカウントを切り替えています...")).toBeTruthy();
+      expect(mockRequireUnlock).not.toHaveBeenCalled();
+
+      // 切り替え完了 & activeAccountId が acc_B に更新
+      await act(async () => {
+        resolveSwitch();
+        rerender(
+          <AccountContext.Provider
+            value={createAccountContext({
+              activeAccountId: "acc_B" as never,
+              switchAccount: switchAccountMock,
+            })}
+          >
+            <NewRecordComponent />
+          </AccountContext.Provider>,
+        );
+      });
+
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(mockRequireUnlock).toHaveBeenCalledTimes(1);
+
+      // その後ユーザーがヘッダー等で手動で acc_A に切り替えた場合、再強制スイッチされず acc_A で保存されること
+      await act(async () => {
+        rerender(
+          <AccountContext.Provider
+            value={createAccountContext({
+              activeAccountId: "acc_A" as never,
+              switchAccount: switchAccountMock,
+            })}
+          >
+            <NewRecordComponent />
+          </AccountContext.Provider>,
+        );
+      });
+
+      expect(switchAccountMock).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        fireEvent.submit(screen.getByTestId("record-form"));
+      });
+      expect(mockCreateRecord).toHaveBeenCalledTimes(1);
+      expect(mockCreateRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accountId: "acc_A",
+          title: "Example Service",
+        }),
+      );
+    });
+
+    it("switchAccount が失敗（reject）した場合に警告バナーを表示して保存をブロックし、手動でアカウントを切り替えると警告が自動クリアされること", async () => {
+      const { Route } = await import("@/routes/(app)/records/new");
+      const NewRecordComponent = (
+        Route as unknown as { options: { component: React.ComponentType } }
+      ).options.component;
+      const { toast } = await import("sonner");
+
+      mockSearchParams = {
+        title: "Fail Switch Service",
+        accountId: "acc_B",
+      };
+
+      const switchAccountMock = vi
+        .fn()
+        .mockRejectedValue(new Error("Switch failed"));
+
+      const { rerender } = render(
+        <AccountContext.Provider
+          value={createAccountContext({
+            activeAccountId: "acc_A" as never,
+            switchAccount: switchAccountMock,
+          })}
+        >
+          <NewRecordComponent />
+        </AccountContext.Provider>,
+      );
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(screen.getByRole("alert").textContent).toContain(
+        "指定された保存先アカウントへの切り替えに失敗しました",
+      );
+      expect(toast.error).toHaveBeenCalledWith(
+        "アカウントの切り替えに失敗しました",
+      );
+
+      // ユーザーがヘッダーで別アカウント（acc_B）へ手動切り替えすると警告バナーがクリアされること
+      await act(async () => {
+        rerender(
+          <AccountContext.Provider
+            value={createAccountContext({
+              activeAccountId: "acc_B" as never,
+              switchAccount: switchAccountMock,
+            })}
+          >
+            <NewRecordComponent />
+          </AccountContext.Provider>,
+        );
+      });
+
+      expect(screen.queryByRole("alert")).toBeNull();
     });
   });
 });

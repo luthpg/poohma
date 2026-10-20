@@ -18,15 +18,7 @@ export interface StoredRecordDraftContainer {
   accountId?: string | null;
   timestamp: number;
   expiresAt: number;
-  values: {
-    title: string;
-    titleReading: string;
-    url: string;
-    ogpImage: string;
-    ogpDescription: string;
-    memo: string;
-    ownerType: "user" | "family";
-    tags: string[];
+  values: Omit<RecordFormValues, "credentials"> & {
     credentials: Array<{
       id?: string;
       label: string;

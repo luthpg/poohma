@@ -1,16 +1,23 @@
 import { api } from "@poohma/backend/api";
+import type { Id } from "@poohma/backend/dataModel";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { AlertCircle } from "lucide-react";
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { RecordForm } from "@/components/records/RecordForm";
+import { Spinner } from "@/components/ui/spinner";
 import { useAccount } from "@/hooks/useAccount";
-import { useRecordForm } from "@/hooks/useRecordForm";
+import { type RecordFormValues, useRecordForm } from "@/hooks/useRecordForm";
 
 const newRecordSearchSchema = z.object({
   draftId: z.string().optional(),
+  url: z.string().optional(),
+  title: z.string().optional(),
+  loginId: z.string().optional(),
+  accountId: z.string().optional(),
 });
 
 export const Route = createFileRoute("/(app)/records/new")({
@@ -121,7 +128,12 @@ function NewRecordComponent() {
   }, [draftId]);
 
   const { isAuthenticated } = useConvexAuth();
-  const { activeAccountId } = useAccount();
+  const {
+    activeAccountId,
+    switchAccount,
+    accounts,
+    isLoading: isAccountLoading,
+  } = useAccount();
   const availableTags =
     useQuery(
       api.records.getAvailableTags,
@@ -129,10 +141,110 @@ function NewRecordComponent() {
     ) || [];
   const createRecord = useMutation(api.records.createRecord);
 
-  const form = useRecordForm(undefined, undefined, draftId);
+  const { url, title, loginId, accountId: targetAccountId } = Route.useSearch();
+  const handledTargetAccountRef = useRef<string | undefined>(undefined);
+  const [resolvedTargetAccountId, setResolvedTargetAccountId] = useState<
+    string | undefined
+  >(undefined);
+  const [isSwitchingAccount, setIsSwitchingAccount] = useState<boolean>(false);
+  const [accountResolutionError, setAccountResolutionError] = useState<
+    string | null
+  >(null);
+
+  const isResolvingTargetAccount =
+    Boolean(targetAccountId) &&
+    (resolvedTargetAccountId !== targetAccountId || isSwitchingAccount);
+
+  const prevActiveAccountIdRef = useRef<string | null>(activeAccountId);
+  useEffect(() => {
+    if (isResolvingTargetAccount) {
+      prevActiveAccountIdRef.current = activeAccountId;
+      return;
+    }
+    if (prevActiveAccountIdRef.current !== activeAccountId) {
+      prevActiveAccountIdRef.current = activeAccountId;
+      if (accountResolutionError) {
+        setAccountResolutionError(null);
+      }
+    }
+  }, [activeAccountId, accountResolutionError, isResolvingTargetAccount]);
+
+  useEffect(() => {
+    if (!targetAccountId) return;
+    if (handledTargetAccountRef.current === targetAccountId) return;
+    if (isAccountLoading) return;
+    if (accounts.length > 0 && activeAccountId == null) return;
+
+    const targetUser = accounts.find((a) => a._id === targetAccountId);
+    if (!targetUser) {
+      handledTargetAccountRef.current = targetAccountId;
+      prevActiveAccountIdRef.current = activeAccountId;
+      setAccountResolutionError(
+        "指定された保存先アカウントが見つかりません。保存先のアカウントを選択してください。",
+      );
+      setResolvedTargetAccountId(targetAccountId);
+      return;
+    }
+
+    if (targetAccountId !== activeAccountId) {
+      handledTargetAccountRef.current = targetAccountId;
+      setIsSwitchingAccount(true);
+      switchAccount(targetAccountId as Id<"users">)
+        .then(() => {
+          prevActiveAccountIdRef.current = targetAccountId;
+          setAccountResolutionError(null);
+        })
+        .catch(() => {
+          prevActiveAccountIdRef.current = activeAccountId;
+          setAccountResolutionError(
+            "指定された保存先アカウントへの切り替えに失敗しました。保存先のアカウントを選択してください。",
+          );
+          toast.error("アカウントの切り替えに失敗しました");
+        })
+        .finally(() => {
+          setIsSwitchingAccount(false);
+          setResolvedTargetAccountId(targetAccountId);
+        });
+    } else {
+      handledTargetAccountRef.current = targetAccountId;
+      prevActiveAccountIdRef.current = activeAccountId;
+      setAccountResolutionError(null);
+      setResolvedTargetAccountId(targetAccountId);
+    }
+  }, [
+    targetAccountId,
+    activeAccountId,
+    accounts,
+    isAccountLoading,
+    switchAccount,
+  ]);
+  const initialValues = useMemo(() => {
+    const init: Partial<RecordFormValues> = {};
+    if (url) init.url = url;
+    if (title) init.title = title;
+    if (loginId) {
+      init.credentials = [
+        {
+          label: "",
+          loginId,
+          passwordHint: "",
+        },
+      ];
+    }
+    return Object.keys(init).length > 0 ? init : undefined;
+  }, [url, title, loginId]);
+
+  const form = useRecordForm(initialValues, undefined, draftId, {
+    autoUnlock: !isResolvingTargetAccount && !accountResolutionError,
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isResolvingTargetAccount) return;
+    if (accountResolutionError) {
+      toast.error("保存先アカウントを選択してください");
+      return;
+    }
     const succeeded = await form.submit(async (payload) => {
       await createRecord({
         accountId: activeAccountId || undefined,
@@ -150,11 +262,51 @@ function NewRecordComponent() {
     navigate({ to: "/dashboard" });
   };
 
+  if (isResolvingTargetAccount) {
+    return (
+      <div className="mx-auto max-w-3xl p-6 flex flex-col items-center justify-center min-h-[300px] gap-3">
+        <Spinner className="h-6 w-6 text-orange-600" />
+        <p className="text-sm text-muted-foreground">
+          アカウントを切り替えています...
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-3xl p-6 pb-24 sm:pb-32">
       <h1 className="mb-8 text-[24px] font-semibold tracking-geist-h2 text-foreground">
         サービスを登録
       </h1>
+      {accountResolutionError && (
+        <div
+          role="alert"
+          className="mb-6 rounded-lg bg-destructive/10 border border-destructive/20 p-4 text-destructive flex items-start gap-3 animate-in fade-in"
+        >
+          <AlertCircle className="h-5 w-5 shrink-0 mt-0.5 text-destructive" />
+          <div className="space-y-2 flex-1">
+            <p className="text-sm font-semibold text-foreground">
+              {accountResolutionError}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              URL で指定された保存先アカウント（ID: {targetAccountId}
+              ）が見つからないか、切り替えに失敗しました。別のアカウントへの誤保存を防ぐため、保存が制限されています。
+            </p>
+            <div className="pt-1 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setAccountResolutionError(null)}
+                className="inline-flex items-center text-xs font-semibold text-orange-600 dark:text-orange-400 hover:underline cursor-pointer"
+              >
+                現在のアカウント（
+                {accounts.find((a) => a._id === activeAccountId)?.displayName ||
+                  "選択中のアカウント"}
+                ）で保存を続行する
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <RecordForm
         form={form}
         availableTags={availableTags}

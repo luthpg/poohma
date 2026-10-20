@@ -30,6 +30,8 @@ flowchart TD
     PoohMaAccount -.->|"actor"| AuditLog
     RecUser -.->|"optional ref"| AuditLog
     RecFamily -.->|"optional ref"| AuditLog
+
+    PoohMaAccount -->|"1:N"| SyncCodes["extensionSyncCodes (TTL 30s)"]
 ```
 
 > **カスケード削除の完全性**: レコード削除（単一・一括・退会・孤立共有レコード掃除）の際は、共通ヘルパー `cascadeDeleteRecord` により、`serviceRecords` と共に紐づく `credentials`, `recordEditingSessions`, `viewLogs` が完全に一括削除されます。
@@ -423,5 +425,26 @@ PoohMa では、過去の機能拡張に伴い暫定的に `v.optional()` とさ
 ### 13.2 整合性保証の原則
 1. **アプリ側フォールバックの排除**: スキーマで必須化されたフィールドに対して、ビジネスロジック内で `field ?? fallback` や `if (!field)` のような不要な防御コードを記述しない（KISS 原則）。
 2. **監査ログ・更新者追跡の同期**: `serviceRecords` を変更する全 mutation（`shareRecord`, `unshareRecord`, `addRecordAdmin`, `removeRecordAdmin`, `createCredential`, `updateCredential`, `deleteCredential`, `reorderCredentials` 等）において、`updatedAt` のみならず `revision: record.revision + 1` および `updatedByAccountId: ctx.user._id` を漏れなく同期更新する。
+
+---
+
+## 14. 拡張機能連携（短命同期コード `extensionSyncCodes`）のライフサイクル
+
+```mermaid
+flowchart TD
+    Ext["拡張機能 Side Panel<br/>ログインボタン押下"] -->|"nonce (UUID) 生成 & 保存<br/>/auth/extension-sync?nonce=... を新規タブ起動"| Web["PoohMa Web<br/>同期画面 (/auth/extension-sync)"]
+    Web -->|"1. nonce ガード検証<br/>2. 未認証時 /login リダイレクト<br/>3. issueSyncToken(nonce, customToken)"| ConvexIssue["Convex DB (extensionSyncCodes)<br/>短命同期コード発行 (UUID, TTL 30s)<br/>+ customToken を一時格納"]
+    Web -->|"window.postMessage<br/>(nonce, code, theme)<br/>※トークン完全排除 (Zero Token Exposure)"| ContentScript["拡張機能 Content Script<br/>(同一オリジン検証 & 受信)"]
+    ContentScript -->|"chrome.runtime.sendMessage<br/>(AUTH_SYNC_TOKEN: nonce, code)"| Background["拡張機能 Background (Service Worker)"]
+    Background -->|"redeemSyncToken(nonce, code)"| ConvexRedeem["Convex DB<br/>即時物理削除 (Single-Use)<br/>& ユーザー・家族・customToken 返却"]
+    Background -->|"Background REST API (exchangeCustomToken)<br/>idToken / refreshToken 取得"| Storage["chrome.storage.local (TRUSTED_CONTEXTS)<br/>セッション保存 & 即時有効化"]
+    Storage --> Ready["連携完了・利用可能"]
+```
+
+- **Zero Token Exposure（DOM・Content Script からのトークン完全排除）**: `window.postMessage` や Content Script には `idToken` や `customToken` などの認証トークンを一切乗せず、Convex のバックチャネル（`extensionSyncCodes`）経由で Background が直接引き取る。
+- **短命 TTL（30秒）**: 不正傍受や放置による悪用を防ぐため、発行から30秒で自動失効（Crons による定期パージ対象）。
+- **Single-Use（使い捨て・即時物理削除）**: `redeemSyncToken` で検証成功した瞬間にレコードを物理削除し、リプレイ攻撃や横取りを完全排除。
+- **nonce バインディング**: 拡張機能が生成した `nonce` と同期コードをペアで検証することで、第三者画面からの不正な連携リクエストを遮断。
+
 
 

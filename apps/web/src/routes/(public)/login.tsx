@@ -106,6 +106,18 @@ function LoginPage() {
           try {
             const url = new URL(target, window.location.origin);
             const hash = url.hash.replace(/^#/, "") || undefined;
+
+            // 拡張機能連携ページの場合は、同一オリジンかつ完全一致のパスであることを厳格に検証し、フルリロードで遷移
+            if (
+              url.origin === window.location.origin &&
+              url.pathname === "/auth/extension-sync"
+            ) {
+              window.location.replace(
+                `${url.pathname}${url.search}${url.hash}`,
+              );
+              return;
+            }
+
             await router.navigate({
               to: url.pathname,
               search: Object.fromEntries(url.searchParams),

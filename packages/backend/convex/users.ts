@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { logAuditEvent } from "./auditLogs";
 import {
@@ -140,6 +140,18 @@ export const syncUser = identityVerifiedMutation({
   },
 });
 
+function toAccountFamilySummary(familyDoc: Doc<"families">) {
+  return {
+    id: familyDoc._id,
+    name: familyDoc.name,
+    masterKeyEncrypted: familyDoc.masterKeyEncrypted,
+    masterKeyIv: familyDoc.masterKeyIv,
+    masterKeySalt: familyDoc.masterKeySalt,
+    kdfIterations: familyDoc.kdfIterations,
+    cryptoVersion: familyDoc.cryptoVersion,
+  };
+}
+
 /**
  * ログイン中のFirebaseユーザーに紐づくPoohMaアカウント一覧を取得
  */
@@ -156,30 +168,8 @@ export const getAccounts = identityVerifiedQuery({
 
     const results = await Promise.all(
       accounts.map(async (acc) => {
-        let family: {
-          id: Id<"families">;
-          name: string;
-          masterKeyEncrypted?: string;
-          masterKeyIv?: string;
-          masterKeySalt?: string;
-          kdfIterations?: number;
-          cryptoVersion?: number;
-        } | null = null;
-
-        if (acc.familyId) {
-          const familyDoc = await ctx.db.get(acc.familyId);
-          if (familyDoc) {
-            family = {
-              id: familyDoc._id,
-              name: familyDoc.name,
-              masterKeyEncrypted: familyDoc.masterKeyEncrypted,
-              masterKeyIv: familyDoc.masterKeyIv,
-              masterKeySalt: familyDoc.masterKeySalt,
-              kdfIterations: familyDoc.kdfIterations,
-              cryptoVersion: familyDoc.cryptoVersion,
-            };
-          }
-        }
+        const familyDoc = acc.familyId ? await ctx.db.get(acc.familyId) : null;
+        const family = familyDoc ? toAccountFamilySummary(familyDoc) : null;
 
         return {
           _id: acc._id,
@@ -573,19 +563,11 @@ export const getUserByFirebaseUid = internalQuery({
 
     if (!user) return null;
 
-    let family = null;
+    let family: ReturnType<typeof toAccountFamilySummary> | null = null;
     if (user.familyId) {
       const familyDoc = await ctx.db.get(user.familyId);
       if (familyDoc) {
-        family = {
-          id: familyDoc._id,
-          name: familyDoc.name,
-          masterKeyEncrypted: familyDoc.masterKeyEncrypted,
-          masterKeyIv: familyDoc.masterKeyIv,
-          masterKeySalt: familyDoc.masterKeySalt,
-          kdfIterations: familyDoc.kdfIterations,
-          cryptoVersion: familyDoc.cryptoVersion,
-        };
+        family = toAccountFamilySummary(familyDoc);
       }
     }
 
@@ -597,28 +579,12 @@ export const getUserByFirebaseUid = internalQuery({
 
     const accountsWithFamily = await Promise.all(
       allAccounts.map(async (acc) => {
-        let accFamily: {
-          id: Id<"families">;
-          name: string;
-          masterKeyEncrypted?: string;
-          masterKeyIv?: string;
-          masterKeySalt?: string;
-          kdfIterations?: number;
-          cryptoVersion?: number;
-        } | null = null;
+        let accFamily: ReturnType<typeof toAccountFamilySummary> | null = null;
 
         if (acc.familyId) {
           const familyDoc = await ctx.db.get(acc.familyId);
           if (familyDoc) {
-            accFamily = {
-              id: familyDoc._id,
-              name: familyDoc.name,
-              masterKeyEncrypted: familyDoc.masterKeyEncrypted,
-              masterKeyIv: familyDoc.masterKeyIv,
-              masterKeySalt: familyDoc.masterKeySalt,
-              kdfIterations: familyDoc.kdfIterations,
-              cryptoVersion: familyDoc.cryptoVersion,
-            };
+            accFamily = toAccountFamilySummary(familyDoc);
           }
         }
 
@@ -659,27 +625,11 @@ export const getUserById = internalQuery({
 
     if (!user) return null;
 
-    let family: {
-      id: Id<"families">;
-      name: string;
-      masterKeyEncrypted: string | undefined;
-      masterKeyIv: string | undefined;
-      masterKeySalt: string | undefined;
-      kdfIterations: number | undefined;
-      cryptoVersion: number | undefined;
-    } | null = null;
+    let family: ReturnType<typeof toAccountFamilySummary> | null = null;
     if (user.familyId) {
       const familyDoc = await ctx.db.get(user.familyId);
       if (familyDoc) {
-        family = {
-          id: familyDoc._id,
-          name: familyDoc.name,
-          masterKeyEncrypted: familyDoc.masterKeyEncrypted,
-          masterKeyIv: familyDoc.masterKeyIv,
-          masterKeySalt: familyDoc.masterKeySalt,
-          kdfIterations: familyDoc.kdfIterations,
-          cryptoVersion: familyDoc.cryptoVersion,
-        };
+        family = toAccountFamilySummary(familyDoc);
       }
     }
 

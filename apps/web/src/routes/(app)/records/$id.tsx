@@ -9,6 +9,7 @@ import {
   useSearch,
 } from "@tanstack/react-router";
 import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import {
   Archive,
   ArchiveRestore,
@@ -29,7 +30,10 @@ import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { usePasscode } from "@/components/PasscodeProvider";
 import { RecordAuditHistoryAccordion } from "@/components/records/RecordAuditHistoryAccordion";
 import { RecordForm } from "@/components/records/RecordForm";
-import { ShareSettingsDialog } from "@/components/records/RecordShareDialog";
+import {
+  type FamilyMemberItem,
+  ShareSettingsDialog,
+} from "@/components/records/RecordShareDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -157,16 +161,13 @@ function RecordDetailWrapper() {
   );
 }
 
+type RecordDetailData = NonNullable<
+  FunctionReturnType<typeof api.records.getRecordDetail>
+>;
+type RecordDetailCredential = RecordDetailData["credentials"][number];
+
 async function decryptRecordCredentials(
-  credentials: {
-    id: string;
-    label?: string;
-    loginId?: string;
-    passwordHint?: string;
-    passwordHintIv?: string;
-    passwordHintDekEncrypted?: string;
-    passwordHintDekIv?: string;
-  }[],
+  credentials: RecordDetailCredential[],
   decryptHint: (
     cipher: string,
     iv: string,
@@ -207,16 +208,10 @@ function RecordDetailComponent({
   activeAccountId,
   familyMembers,
 }: {
-  record: NonNullable<(typeof api.records.getRecordDetail)["_returnType"]>;
+  record: RecordDetailData;
   availableTags: string[];
   activeAccountId?: Id<"users"> | null;
-  familyMembers: {
-    id: Id<"users">;
-    userId: string;
-    email?: string;
-    displayName?: string;
-    familyRole?: "admin" | "viewer";
-  }[];
+  familyMembers: FamilyMemberItem[];
 }) {
   const effectiveAccountId = activeAccountId || record.accountId;
   const isOwner =
@@ -1714,15 +1709,7 @@ function CredentialCard({
   onRevealStart,
   onRevealSuccess,
 }: {
-  cred: {
-    id: string;
-    label?: string;
-    loginId?: string;
-    passwordHint?: string;
-    passwordHintIv?: string;
-    passwordHintDekEncrypted?: string;
-    passwordHintDekIv?: string;
-  };
+  cred: RecordDetailCredential;
   recordId: Id<"serviceRecords">;
   onRevealStart?: () => void;
   onRevealSuccess?: () => void;

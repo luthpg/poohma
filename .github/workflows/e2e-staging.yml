@@ -22,9 +22,10 @@ jobs:
     env:
       E2E_BASE_URL: ${{ inputs.base_url != '' && inputs.base_url || vars.E2E_STAGING_URL }}
       VITE_CONVEX_URL: ${{ inputs.convex_url != '' && inputs.convex_url || vars.VITE_CONVEX_URL }}
-      FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-      VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
-      VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+      FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_PREVIEW_SERVICE_ACCOUNT }}
+      VITE_FIREBASE_API_KEY: ${{ secrets.FIREBASE_PREVIEW_API_KEY }}
+      VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_PREVIEW_AUTH_DOMAIN }}
+      VITE_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PREVIEW_PROJECT_ID }}
       CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
       CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
       VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
@@ -37,7 +38,7 @@ jobs:
 
       - uses: pnpm/action-setup@v3
         with:
-          version: 11.24.0
+          version: 12.14.0
 
       - uses: actions/setup-node@v5
         with:

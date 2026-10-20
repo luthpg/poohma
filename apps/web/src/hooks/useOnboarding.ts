@@ -13,24 +13,11 @@ import {
 } from "@/lib/onboarding/sampleData";
 import type { OnboardingPhase } from "@/lib/onboarding/types";
 
+import type { DashboardSearchParams } from "@/routes/(app)/dashboard";
+
 const ONBOARDING_CURRENT_VERSION = 1;
 
-// ダッシュボードの SearchParams の型を定義
-export interface DashboardSearchParams {
-  q?: string;
-  tag?: string;
-  sort?:
-    | "name-asc"
-    | "name-desc"
-    | "url-asc"
-    | "url-desc"
-    | "date-asc"
-    | "date-desc"
-    | "updatedAt-asc"
-    | "updatedAt-desc";
-  view?: "card" | "list";
-  onboarding?: string;
-}
+export type { DashboardSearchParams };
 
 /**
  * オンボーディングの状態管理・画面間遷移を統括するフック

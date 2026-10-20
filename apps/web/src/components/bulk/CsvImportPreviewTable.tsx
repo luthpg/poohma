@@ -13,7 +13,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { JpText } from "@/components/JpText";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { DiffItem } from "@/hooks/useImportCsvDiff";
+import type { DiffAction, DiffItem } from "@/hooks/useImportCsvDiff";
 
 interface CsvImportPreviewTableProps {
   diffItems: DiffItem[];
@@ -22,7 +22,7 @@ interface CsvImportPreviewTableProps {
   onCancel: () => void;
 }
 
-type FilterTab = "ALL" | "CREATE" | "UPDATE" | "SKIP" | "ERROR";
+type FilterTab = "ALL" | DiffAction;
 
 export function CsvImportPreviewTable({
   diffItems,

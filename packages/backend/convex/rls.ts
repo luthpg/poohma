@@ -5,7 +5,7 @@ import type { Doc, Id } from "./_generated/dataModel";
  */
 export function getEffectiveOwnerType(
   record: Doc<"serviceRecords">,
-): "user" | "family" {
+): Doc<"serviceRecords">["ownerType"] {
   return record.ownerType ?? "user";
 }
 
@@ -65,7 +65,9 @@ export function requireContentAccess(
 /**
  * ユーザーの実効的な家族ロールを取得するヘルパー
  */
-export function getEffectiveFamilyRole(user: Doc<"users">): "admin" | "viewer" {
+export function getEffectiveFamilyRole(
+  user: Doc<"users">,
+): Doc<"users">["familyRole"] {
   return user.familyRole;
 }
 

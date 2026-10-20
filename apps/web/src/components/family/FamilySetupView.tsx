@@ -24,6 +24,13 @@ const PasscodeStrengthMeter = lazy(() =>
   })),
 );
 
+export interface FamilyChangeFormData {
+  createName: string;
+  createPasscode: string;
+  createPasscodeConfirm: string;
+  joinCode: string;
+}
+
 interface PendingExportVault {
   oldFamilyName?: string;
   expiresAt: number;
@@ -50,12 +57,7 @@ interface FamilySetupViewProps {
   onChangeFamily?: (
     action: "create" | "join",
     e: React.SubmitEvent,
-    data: {
-      createName: string;
-      createPasscode: string;
-      createPasscodeConfirm: string;
-      joinCode: string;
-    },
+    data: FamilyChangeFormData,
   ) => Promise<void>;
 }
 

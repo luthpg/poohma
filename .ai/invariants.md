@@ -201,3 +201,38 @@
   - ステージングデプロイにおいて、「キーが未設定なら開発用や本番用キーを流用する」といったフォールバックコードを記述してはならない。環境の混同や本番への誤爆を防ぐため、未設定時は即座に失敗（fail-fast）させる。
 - **本番デプロイワークフローの main ブランチ厳格制限**:
   - 本番デプロイジョブは手動実行（workflow_dispatch）を含め、必ず `github.ref == 'refs/heads/main'` かつリポジトリオーナーの一致を検証する実行条件を課し、未マージブランチからの本番反映を構造的に遮断する。
+
+### 配布用リリース成果物（Release ZIP等）への環境変数注入
+
+- **CI テスト用ダミー環境変数の流用禁止**:
+  - GitHub Releases 等でエンドユーザーへ配布する成果物（Chrome 拡張機能 ZIP 等）のビルドには、CI テスト用のダミー環境変数（`dummy_key` やダミードメイン）を流用してはならない。成果物が実環境で動作しなくなるため、必ず GitHub Secrets / Variables を通じた正規の本番環境変数を注入してビルドすること。
+
+### 拡張機能 ZIP ビルドの PR テストと GitHub Releases 配布の責務分離
+
+- **PR テストビルドとタグリリースの分岐**:
+  - `release-extension.yml` は、タグプッシュ（`v*`）だけでなく PR（`apps/extension/**` 等の変更時）でも起動し、動作検証用の ZIP を GitHub Actions Artifacts にアップロードする。
+  - GitHub Releases へのアタッチ（`gh release create` / `upload`）はタグプッシュ時限定とし、PR では実行しない。
+  - PR 時のアーティファクト名は `poohma-extension-pr<PR番号>` と命名し、PR 画面（Job Summary）にダウンロード・インストール手順を出力してレビュー容易性を担保する。
+  - `actions/upload-artifact` は既定で隠しディレクトリ配下（`.output/` 等）を除外するため、無駄なステージングディレクトリを作ってファイルを二重化するのではなく、`include-hidden-files: true` を明示して正規出力先（`apps/extension/.output/*.zip`）を直接アップロードすること（KISS原則・Single Source of Truth）。
+
+### Monorepo 内 postinstall による環境変数バリデーションと CI への環境変数供給
+
+- **`pnpm install` 実行ジョブでの環境変数供給**:
+  - Monorepo 内のパッケージ（`apps/extension` 等）の `postinstall` スクリプトで環境変数スキーマ（`@t3-oss/env-core` 等）が評価される場合、`pnpm install` を実行する全 CI/CD ジョブで必要な環境変数（テスト・ドライランジョブではダミー値、実ビルドジョブでは本番/Preview値）を確実に供給すること。未供給による `pnpm install` 異常終了を構造的に防止する。
+- **環境変数の過剰スコープによるビルド設定上書きの禁止（Scoped Env 原則）**:
+  - `postinstall` 等の事前バリデーションを通過させるための環境変数は、ジョブ全体のトップレベル（`env:`）ではなく、実行ステップ（`Install dependencies` 等）に局所配置すること。ジョブ全体に配置すると後続の `vercel build` や動的 Preview 設定注入ステップ、あるいは本番デプロイ（`deploy-production.yml` での Convex デプロイ等）を不要なダミー値が上書き・汚染し、デプロイ先環境の不整合や動的 URL の固定値化事故を招く。
+- **書き込み権限（contents: write）付きワークフローでの GITHUB_TOKEN 永続化禁止（CWE-200）**:
+  - `release-extension.yml` 等で `permissions: contents: write` を付与するワークフローでは、必ず `actions/checkout` に `persist-credentials: false` を明示すること。悪意ある依存関係やスクリプトがローカル `.git/config` からトークンを窃取するリスクを構造的に排除する。
+
+### CI/CD における静的検証（Lint/Format）の副作用排除とローカル快適性の両立
+
+- **ローカル `check`（`--write`）と CI `check:ci`（読み取り専用）の責務分離**:
+  - CI パイプライン内で実行するコード品質検査（Biome 等）は、自動修正によって差分改変や偽陽性通過が発生する副作用を防ぐため、必ず副作用のない読み取り専用コマンド（`check:ci` / `biome ci`）を実行すること。
+  - 一方でローカル開発環境の `check` スクリプトは、開発者の快適性とフォーマット自動適用を最大化するため `--write` を付与した構成を維持し、ローカルの開発生産性と CI の厳格な整合性検証を両立させる。
+
+### ワークフロースクリプト内への GitHub 式直接展開の禁止（Template Injection 対策）
+
+- **`run:` スクリプトブロック内での GitHub 式埋め込み禁止**:
+  - `${{ github.event_name }}` や `${{ github.sha }}`、`${{ github.event.pull_request.number }}` などの GitHub コンテキスト式やステップ出力を `run:` のシェルスクリプト内に直接埋め込んではならない。
+  - PR Job Summary 生成等のサマリー書き込みステップも含め、シェルの特殊文字や意図せぬ改行・クォート破壊によるコマンドインジェクション（CWE-78）や zizmor / CodeQL 指摘の原因となる。
+  - 必ずステップレベルの `env:` でシェル変数（例: `EVENT_NAME: ${{ github.event_name }}`, `PR_NUMBER: ${{ github.event.pull_request.number }}`）として定義し、スクリプト内からは `"$EVENT_NAME"` として安全に参照すること。

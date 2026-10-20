@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, type StdioOptions } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -40,9 +40,22 @@ if (!previewKey) {
   process.exit(0);
 }
 
-const pnpmExecPath = process.env.npm_execpath;
-if (!pnpmExecPath) {
-  throw new Error("[setup-preview] npm_execpath is missing in environment");
+function runPnpm(
+  args: string[],
+  options: {
+    cwd?: string;
+    env?: NodeJS.ProcessEnv;
+    stdio?: StdioOptions;
+    encoding?: BufferEncoding;
+  },
+) {
+  const pnpmExecPath = process.env.npm_execpath || "pnpm";
+  const isJsScript = /\.[cm]?js$/i.test(pnpmExecPath);
+
+  if (isJsScript) {
+    return execFileSync(process.execPath, [pnpmExecPath, ...args], options);
+  }
+  return execFileSync(pnpmExecPath, args, options);
 }
 
 const isClean = process.argv.includes("--clean");
@@ -56,10 +69,8 @@ console.log(
 
 try {
   // 1. Convex Preview デプロイ & URL書き出し (backendDir 相対パスで安全に実行)
-  execFileSync(
-    process.execPath,
+  runPnpm(
     [
-      pnpmExecPath,
       "exec",
       "convex",
       "deploy",
@@ -115,10 +126,8 @@ try {
     console.log(
       `⚙️  [setup-preview] Applying server environment variables to preview deployment "${deploymentName}" from ${e2eLocalEnvPath}...`,
     );
-    execFileSync(
-      process.execPath,
+    runPnpm(
       [
-        pnpmExecPath,
         "exec",
         "convex",
         "env",
@@ -148,10 +157,8 @@ try {
   console.log(
     `✉️  [setup-preview] Ensuring DISABLE_EMAIL_DELIVERY=true on "${deploymentName}"...`,
   );
-  execFileSync(
-    process.execPath,
+  runPnpm(
     [
-      pnpmExecPath,
       "exec",
       "convex",
       "env",

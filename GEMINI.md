@@ -28,8 +28,8 @@
 - **Artifacts（Implementation Plan等）の履歴保持（過去内容の消去禁止）**:
   - Implementation Plan や Walkthrough 等の artifacts を改訂・更新する際、新しい論点に気を取られて過去の計画内容やユーザー指示（制約条件、環境前提、削除方針など）を上書き消去してはならない。
   - コンテキスト要約や話題転換による指示の忘却・見落としを防ぐため、過去内容は「アーカイブ / 過去フェーズ」として保持した上で追記・改訂すること（[`.ai/pitfalls/review-and-guardrails.md`](./.ai/pitfalls/review-and-guardrails.md) 参照）。
-- **`.ai/` Knowledge Base の事前参照（Read）と事後還元（Write）の義務**:
-  - 実装・調査・テスト・レビュー作業に着手する前に、必ず「8. 作業種別ごとの事前参照マトリクス」に従って関連するドキュメント（特に [`.ai/invariants.md`](./.ai/invariants.md) や [`.ai/pitfalls/`](./.ai/pitfalls/)）を確認し、不変条件に抵触しないかを事前審査すること。
+- **`.ai/` Knowledge Base および `.docs/` 公式仕様の事前参照（Read）と事後還元（Write）の義務**:
+  - 実装・調査・テスト・レビュー作業に着手する前に、必ず「7.1 Context Selection（タスク開始時の文脈特定義務）」に従って関連するドキュメント（[`.ai/invariants.md`](./.ai/invariants.md)、[`.ai/pitfalls/`](./.ai/pitfalls/)、および [`.docs/`](./.docs/) の該当設計書）を確認し、既存仕様や不変条件に抵触しないかを事前審査すること。
   - また、ユーザーからの指摘やレビュー対応、試行錯誤を通じて得られた知見は、コミット前に必ず [`.ai/pitfalls/`](./.ai/pitfalls/) や [`.ai/invariants.md`](./.ai/invariants.md) に還元・蓄積すること。
 - **方針変更・Replan時の先走り実装禁止（提案と合意の徹底分離）**:
   - ユーザーから「replan」「方針再検討」「deny」等の指示を受けた際、または初期計画から外れる設計課題を発見した際、**ユーザーへ修正方向・再計画案を文章で提示し、明示的な合意（「ok」等）を得る前に勝手にコード修正や検証コマンドを実行することを厳禁とする**。
@@ -125,11 +125,13 @@ PoohMa では、AI Agent と人間の協調（Human-in-the-Loop）による継�
 
 | 作業フェーズ / タスク種別 | 必須事前参照ファイル | 特に確認すべき項目・不変条件 |
 | :--- | :--- | :--- |
+| **新機能開発・仕様変更・計画** | [`.docs/features.md`](./.docs/features.md)<br>[`.docs/requirements.md`](./.docs/requirements.md)<br>[`.docs/code-design.md`](./.docs/code-design.md)<br>[`.ai/architecture.md`](./.ai/architecture.md) | ・既存の機能仕様・ER図・API設計・状態管理責務表との整合性<br>・Single Source of Truth の維持（過剰冗長化の排除） |
+| **フロントエンド・UI・画面改修** | [`.ai/invariants.md`](./.ai/invariants.md) (第5節)<br>[`.ai/pitfalls/ui-and-misc.md`](./.ai/pitfalls/ui-and-misc.md)<br>[`.docs/DESIGN.md`](./.docs/DESIGN.md)<br>[`.docs/features.md`](./.docs/features.md) | ・生エラー（`error.message`）や例外オブジェクトの UI/console 露出禁止<br>・`toast.error(固定日本語メッセージ)` 徹底<br>・画面固定フッター・安全域対応 |
 | **外部レビュー（CodeRabbit等）対応** | [`.ai/invariants.md`](./.ai/invariants.md)<br>[`.ai/pitfalls/review-and-guardrails.md`](./.ai/pitfalls/review-and-guardrails.md) | ・トースト/UIへの生エラー非露出<br>・過剰防衛コードの排除（KISS原則）<br>・PoohMa固有の不変条件を優先 |
 | **エラーハンドリング・例外処理実装** | [`.ai/invariants.md`](./.ai/invariants.md) (第5節) | ・`toast.error(固定メッセージ)` 徹底<br>・ブラウザ側 `console.error` 等への生例外オブジェクト非露出（CWE-209、暗号鍵保護） |
-| **スキーマ変更・DBマイグレーション** | [`.ai/domain.md`](./.ai/domain.md)<br>[`.ai/patterns.md`](./.ai/patterns.md)<br>[`.ai/workflows/one-shot-migration.md`](./.ai/workflows/one-shot-migration.md)<br>[`.ai/pitfalls/review-and-guardrails.md`](./.ai/pitfalls/review-and-guardrails.md) | ・全12ステップのワンショット移行手順遵守<br>・移行前後スナップショット突合<br>・マージ前の一時マイグレ関数完全削除<br>・アプリ側に未バックフィル検査ガードを混入させない（KISS原則） |
+| **バックエンド・スキーマ・DB移行** | [`.ai/domain.md`](./.ai/domain.md)<br>[`.ai/patterns.md`](./.ai/patterns.md)<br>[`.ai/workflows/one-shot-migration.md`](./.ai/workflows/one-shot-migration.md)<br>[`.ai/pitfalls/backend-convex.md`](./.ai/pitfalls/backend-convex.md)<br>[`.docs/code-design.md`](./.docs/code-design.md) | ・生の query/mutation export 禁止 (`customBuilders` 必須)<br>・全12ステップのワンショット移行手順遵守（移行前後突合、一時マイグレ関数完全削除）<br>・アプリ側に未バックフィル検査ガードを混入させない（KISS原則） |
 | **E2E / ユニットテスト作成・改修・整理** | [`.ai/testing.md`](./.ai/testing.md)<br>[`.ai/workflows/test-refactoring.md`](./.ai/workflows/test-refactoring.md)<br>[`.ai/pitfalls/e2e-testing.md`](./.ai/pitfalls/e2e-testing.md) | ・テスト失敗時のプロダクションコード改変禁止<br>・「削除すると何を見逃すか」基準の重複排除<br>・`convex dev --once` のワンショット実行 |
-| **認証・セッション・暗号(E2EE)** | [`.ai/invariants.md`](./.ai/invariants.md) (1〜4節)<br>[`.ai/pitfalls/auth-session.md`](./.ai/pitfalls/auth-session.md)<br>[`.ai/pitfalls/crypto-e2ee.md`](./.ai/pitfalls/crypto-e2ee.md) | ・長期セッションの Single Source of Truth（Firebase Auth）<br>・Session Cookie の位置付け<br>・鍵階層（DEK / MasterKey / PRF）の破壊防止 |
+| **認証・セッション・暗号(E2EE)** | [`.ai/invariants.md`](./.ai/invariants.md) (1〜4節)<br>[`.ai/pitfalls/auth-session.md`](./.ai/pitfalls/auth-session.md)<br>[`.ai/pitfalls/crypto-e2ee.md`](./.ai/pitfalls/crypto-e2ee.md)<br>[`.docs/security/e2ee.md`](./.docs/security/e2ee.md)<br>[`.docs/security/security-model.md`](./.docs/security/security-model.md) | ・長期セッションの Single Source of Truth（Firebase Auth）<br>・Session Cookie の位置付け<br>・鍵階層（DEK / MasterKey / PRF）の破壊防止 |
 | **CI/CD・GitHub Actions 改修** | [`.ai/invariants.md`](./.ai/invariants.md) (第7節)<br>[`.ai/pitfalls/workflow-ci.md`](./.ai/pitfalls/workflow-ci.md) | ・`pnpm lint:workflows` の事前実行義務<br>・`jq --arg` 引数展開<br>・curl タイムアウト必須<br>・変数クォート（SC2086防止） |
 | **Git操作・シェル実行・パス指定** | [`.ai/pitfalls/environment-shell.md`](./.ai/pitfalls/environment-shell.md)<br>[`.ai/workflows/git-workflow.md`](./.ai/workflows/git-workflow.md) | ・`(app)` や `$` を含むパスのシングルクォート囲み義務<br>・Git/ghに渡すテキスト作成時はBOMなしUTF-8一時ファイル経由 |
 

@@ -1,6 +1,7 @@
 import { api } from "@poohma/backend/api";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAction, useQuery } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import {
   Activity,
   ArrowRight,
@@ -20,21 +21,10 @@ import { CopyableBadge } from "../../components/ui/CopyableBadge";
 import { LivePulse } from "../../components/ui/LivePulse";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 
-interface ServiceHealth {
-  id: string;
-  name: string;
-  category: "database" | "auth" | "cms" | "email" | "nlp" | "geo";
-  description: string;
-  status: "healthy" | "degraded" | "unconfigured" | "error";
-  latencyMs: number;
-  message: string;
-}
-
-interface SystemHealthResult {
-  checkedAt: number;
-  allHealthy: boolean;
-  services: ServiceHealth[];
-}
+type SystemHealthResult = FunctionReturnType<
+  typeof api.admin.system.checkSystemHealth
+>;
+type ServiceHealth = SystemHealthResult["services"][number];
 
 export const Route = createFileRoute("/_auth/")({
   component: DashboardPage,
@@ -106,7 +96,7 @@ function DashboardPage() {
     setIsCheckingHealth(true);
     try {
       const res = await checkHealth();
-      setHealthData(res as SystemHealthResult);
+      setHealthData(res);
     } catch {
       // 内部エラーは握る（KISS原則・情報漏洩防止）
     } finally {

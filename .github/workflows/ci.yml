@@ -37,7 +37,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v3
         with:
-          version: 11.24.0
+          version: 12.14.0
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -107,6 +107,10 @@ jobs:
     if: ${{ github.repository_owner == github.event.repository.owner.login && !github.event.pull_request.head.repo.fork }}
     env:
       CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_STAGING_DEPLOY_KEY }}
+      VITE_FIREBASE_API_KEY: "dummy_key"
+      VITE_FIREBASE_AUTH_DOMAIN: "dummy.firebaseapp.com"
+      VITE_FIREBASE_PROJECT_ID: "dummy"
+      VITE_CONVEX_URL: "https://dummy.convex.cloud"
 
     steps:
       - name: Checkout code
@@ -115,7 +119,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v3
         with:
-          version: 11.24.0
+          version: 12.14.0
 
       - name: Setup Node.js
         uses: actions/setup-node@v5

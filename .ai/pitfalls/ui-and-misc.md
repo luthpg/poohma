@@ -255,4 +255,84 @@ UI 実装、外部 API 連携、環境変数、モノレポ設定における落
   - `apps/web/tests/IndexScrollBar.spec.tsx`
   - `.docs/code-design.md`
 
+---
+
+### ワンタイム nonce / 外部連携完了画面における再アクセス・リロード時の例外エラー防止
+
+- **問題 (Problem)**:
+  拡張機能連携やワンタイム招待リンクなど、1度きりの nonce / トークンを消費して認証を行う画面において、連携成功後にユーザーがページをリロードしたり、ブラウザの「戻る」「進む」で再訪した場合、サーバー側では nonce が既に消費・削除されているため、「無効な nonce です」等の内部例外エラーや失敗トーストが露出してしまう。
+- **原因 (Root Cause)**:
+  ワンタイムトークンのライフサイクル（サーバー側の Single-Use 原則）と、ブラウザのナビゲーション・リロードによる再実行（冪等性のない操作の再試行）の不整合。
+- **誤ったアプローチ (Anti-Pattern)**:
+  - サーバー側のエラーレスポンスを生でキャッチしてトーストに垂れ流す（CWE-209、不親切な UX）。
+  - クライアント側で状態を一切覚えず、URL に残った nonce で愚直に再通信を行い毎回エラーにする。
+- **正しいアプローチ (Correct Pattern)**:
+  1. **クライアントでの消費記録**: 連携 Mutation 成功時に、`sessionStorage` や `localStorage` に対象 nonce を消費済みとして記録する。
+  2. **先行クライアント判定**: 画面マウント時にストレージを確認し、すでに消費済みであればバックエンド通信を行わず即座に `status: "used"` 状態へ移行する。
+  3. **親切で安全なガイダンス UI**: エラー扱いではなく、「この認証リンクは既に使用されています。拡張機能側のログイン状態をご確認ください」という安心感のあるメッセージと、トップページやダッシュボードへ戻るボタンを表示する。
+- **再発防止 (Prevention)**:
+  ワンタイムトークンや nonce を扱う画面では、初回消費後の「リロード・再訪問・ブラウザバック」のジャーニーを必ず考慮し、使用済み状態をエラーではなく正常な案内フローとしてハンドリングする。
+- **関連実装 (Related Code References)**:
+  - `apps/web/src/routes/(public)/auth.extension-sync.tsx`
+  - `packages/backend/convex/extensionAuth.ts`
+  - `.docs/features.md`
+
+---
+
+### Chrome 拡張機能（Side Panel / Popup）と Web アプリケーションのデザイン・機能調和
+
+- **問題 (Problem)**:
+  拡張機能プロジェクト（WXT/Tailwind）に Shadcn を初期セットアップした際、Shadcn デフォルトの丸みを帯びたトークン（`--radius: 0.625rem` / 10px）や物理 CSS ボーダー（`border border-border`）、無彩色ダークパレットがそのまま適用され、Web アプリ（Vercel Geist 哲学の 6px 角丸、`shadow-border`、青黒ダークモード、Geist タイポグラフィ）と世界観が乖離してしまう。また、手動ロックボタンなどの不要な操作を安易に配置して画面を煩雑にしてしまう。
+- **原因 (Root Cause)**:
+  マルチパッケージ環境において、Web アプリの CSS トークンや UX 設計指針（無操作オートロックによる自律防衛）を拡張機能側に正確に同期せず、フレームワーク初期値を漫然と放置したこと。
+- **誤ったアプローチ (Anti-Pattern)**:
+  - 拡張機能側を「簡易ツール」と割り切り、角丸や影、ダークモード色相の不一致を放置する。
+  - Web 側にある「無操作オートロック（Inactivity Lock）」を省き、代わりに画面上に手動ロックボタンを置いてユーザーに手動操作を強要する。
+- **正しいアプローチ (Correct Pattern)**:
+  1. **デザインシステム・トークンの完全同期**:
+     - `--radius: 6px`、`.shadow-border`（`box-shadow: 0px 0px 0px 1px rgba(0, 0, 0, 0.08)`）、Web と同一のダークモード OKLCH パレット（`oklch(0.12 0.005 285.823)`）を `apps/extension/styles/globals.css` に移植。
+  2. **OS デバイス設定への自動追従 ＆ Web 同期**:
+     - `window.matchMedia("(prefers-color-scheme: dark)")` により OS のライト/ダーク切り替えにリアルタイム連動させ、Web 連携時に受け渡されたテーマ設定も反映。
+  3. **自律無操作オートロックによる手動ロックボタン撤廃**:
+     - ユーザー操作（キー、マウス、スクロール）およびタブ/パネル非表示復帰を監視し、5分無操作で自律的に MasterKey を破棄。不要な手動ロックボタンを画面から撤廃して UI をクリーン化。
+  4. **共通アセットの利用**:
+     - 公式アセット（`poohma_icon.png`、各種解像度 PNG、favicon）を `apps/extension/public` に配備し、統一利用する。
+- **再発防止 (Prevention)**:
+  拡張機能やサブアプリを開発する際は、デザインシステム（トークン・角丸・影・タイポグラフィ）および主要な安全機構（オートロック等）を親アプリと揃える監査・Doc-Sync チェックを必須化する。
+- **関連実装 (Related Code References)**:
+  - `apps/extension/styles/globals.css`
+  - `apps/extension/lib/useTheme.ts`
+  - `apps/extension/lib/useInactivityLock.ts`
+  - `apps/extension/entrypoints/sidepanel/App.tsx`
+  - `.docs/DESIGN.md`
+
+---
+
+### 拡張機能認証同期における試行タイマー・リスナーの二重発火防止と世代管理による Race Condition 遮断
+
+- **問題 (Problem)**:
+  1. Web アプリの認証連携画面（`auth.extension-sync`）において、8 秒後に再試行ボタンが押された際、1 回目の 10 秒タイムアウト（`ackTimeoutTimer`）、再送インターバル（`retryTimer`）、および `handleAck` メッセージリスナーが解除されていないと、2 回目の処理中に 1 回目のタイムアウトが発火し、`setStatus("error")` で進行中・成功済みのステートを誤って上書き破壊してしまう。また画面離脱時にもリスナーやタイマーがリークする。
+  2. 拡張機能側（`App.tsx`）において、サインアウトやアカウント切り替えを行った直後に、非同期で遅れて完了したストレージ読み取り（`getAuthStorage`）が古い認証情報を state（`currentUser`, `accounts` 等）にセットしてしまい、ゾンビ状態が復活する。
+  3. 拡張機能側から Web 連携を開始した際、ユーザーが連携用タブを閉じたり Web 側で処理が中断された場合、拡張機能が「連携タブを確認中...」のままフリーズし、古い `pendingSyncNonce` が残存して再試行できなくなる。
+- **原因 (Root Cause)**:
+  非同期処理のライフサイクル、再試行時のクリーンアップ責務、および複数世代にまたがる状態更新の競合（Race condition）に対するガードが欠如していたこと。
+- **誤ったアプローチ (Anti-Pattern)**:
+  - 単に `retryAttempt` カウンタを増やすだけで、古いタイマーやイベントリスナーの片付けを放置する。
+  - サインアウト処理で state を初期化しても、並行して走っていた過去の `refreshState` が古い storage データをそのまま上書き適用することを許容する。
+  - 連携開始後にタイムアウトもキャンセル手段も用意せず、外部依存（連携タブの完了）を無限に待機し続ける。
+- **正しいアプローチ (Correct Pattern)**:
+  1. **試行クリーンアップの Ref 管理（`attemptCleanupRef`）**:
+     `auth.extension-sync.tsx` において、`attemptCleanupRef` にタイマー解除（`clearInterval`, `clearTimeout`）、リスナー解除（`removeEventListener`）、および古い試行の無効化フラグ（`acknowledged = true`）をまとめた関数を保持し、再試行時（`handleRetry`）およびアンマウント時に確実に実行する。
+  2. **ストレージ読み取りの世代整合性チェック（Generation Ref）**:
+     `App.tsx` の `refreshState` において、読み取り開始時の `accountGenerationRef.current` を記録し、`await getAuthStorage()` の完了直後に世代が一致しているか検証する。一致しない場合は state の更新を行わずに直ちに終了する。
+  3. **自律タイムアウト（60秒）と手動キャンセルボタンの提供**:
+     `handleStartLogin` 開始時に 60 秒の自律タイマーを設け、時間経過または手動「連携をキャンセル」クリックによって `pendingSyncNonce` を消去し、待機状態を解除して即座に再試行可能に戻す。
+- **関連実装 (Related Code References)**:
+  - `apps/web/src/routes/(public)/auth.extension-sync.tsx`
+  - `apps/extension/entrypoints/sidepanel/App.tsx`
+  - `apps/extension/lib/auth.ts`
+  - `.docs/features.md`
+
+
+
 

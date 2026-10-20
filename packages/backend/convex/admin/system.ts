@@ -68,7 +68,6 @@ export const triggerDemoReset = systemAdminAction({
         force: args.force ?? true,
       },
     );
-
     return result as DemoResetResult;
   },
 });

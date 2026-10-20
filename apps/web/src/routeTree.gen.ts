@@ -26,6 +26,7 @@ import { Route as appRecordsNewRouteImport } from './routes/(app)/records/new'
 import { Route as appSettingsIndexRouteImport } from './routes/(app)/settings/index'
 import { Route as appSettingsBulkRouteImport } from './routes/(app)/settings/bulk'
 import { Route as appSettingsTagsRouteImport } from './routes/(app)/settings/tags'
+import { Route as publicAuthExtensionSyncRouteImport } from './routes/(public)/auth.extension-sync'
 import { Route as publicNewsIndexRouteImport } from './routes/(public)/news/index'
 import { Route as publicNewsIdRouteImport } from './routes/(public)/news/$id'
 
@@ -112,6 +113,11 @@ const appSettingsTagsRoute = appSettingsTagsRouteImport.update({
   path: '/settings/tags',
   getParentRoute: () => appRouteRoute,
 } as any)
+const publicAuthExtensionSyncRoute = publicAuthExtensionSyncRouteImport.update({
+  id: '/auth/extension-sync',
+  path: '/auth/extension-sync',
+  getParentRoute: () => publicRouteRoute,
+} as any)
 const publicNewsIndexRoute = publicNewsIndexRouteImport.update({
   id: '/news/',
   path: '/news/',
@@ -138,6 +144,7 @@ export interface FileRoutesByFullPath {
   '/records/new': typeof appRecordsNewRoute
   '/settings/bulk': typeof appSettingsBulkRoute
   '/settings/tags': typeof appSettingsTagsRoute
+  '/auth/extension-sync': typeof publicAuthExtensionSyncRoute
   '/news/$id': typeof publicNewsIdRoute
   '/settings/': typeof appSettingsIndexRoute
   '/news/': typeof publicNewsIndexRoute
@@ -157,6 +164,7 @@ export interface FileRoutesByTo {
   '/records/new': typeof appRecordsNewRoute
   '/settings/bulk': typeof appSettingsBulkRoute
   '/settings/tags': typeof appSettingsTagsRoute
+  '/auth/extension-sync': typeof publicAuthExtensionSyncRoute
   '/news/$id': typeof publicNewsIdRoute
   '/settings': typeof appSettingsIndexRoute
   '/news': typeof publicNewsIndexRoute
@@ -179,6 +187,7 @@ export interface FileRoutesById {
   '/(app)/records/new': typeof appRecordsNewRoute
   '/(app)/settings/bulk': typeof appSettingsBulkRoute
   '/(app)/settings/tags': typeof appSettingsTagsRoute
+  '/(public)/auth/extension-sync': typeof publicAuthExtensionSyncRoute
   '/(public)/news/$id': typeof publicNewsIdRoute
   '/(app)/settings/': typeof appSettingsIndexRoute
   '/(public)/news/': typeof publicNewsIndexRoute
@@ -200,6 +209,7 @@ export interface FileRouteTypes {
     | '/records/new'
     | '/settings/bulk'
     | '/settings/tags'
+    | '/auth/extension-sync'
     | '/news/$id'
     | '/settings/'
     | '/news/'
@@ -219,6 +229,7 @@ export interface FileRouteTypes {
     | '/records/new'
     | '/settings/bulk'
     | '/settings/tags'
+    | '/auth/extension-sync'
     | '/news/$id'
     | '/settings'
     | '/news'
@@ -240,6 +251,7 @@ export interface FileRouteTypes {
     | '/(app)/records/new'
     | '/(app)/settings/bulk'
     | '/(app)/settings/tags'
+    | '/(public)/auth/extension-sync'
     | '/(public)/news/$id'
     | '/(app)/settings/'
     | '/(public)/news/'
@@ -371,6 +383,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof appSettingsTagsRouteImport
       parentRoute: typeof appRouteRoute
     }
+    '/(public)/auth/extension-sync': {
+      id: '/(public)/auth/extension-sync'
+      path: '/auth/extension-sync'
+      fullPath: '/auth/extension-sync'
+      preLoaderRoute: typeof publicAuthExtensionSyncRouteImport
+      parentRoute: typeof publicRouteRoute
+    }
     '/(public)/news/': {
       id: '/(public)/news/'
       path: '/news'
@@ -422,6 +441,7 @@ interface publicRouteRouteChildren {
   publicTermsOfServiceRoute: typeof publicTermsOfServiceRoute
   publicUsageRoute: typeof publicUsageRoute
   publicIndexRoute: typeof publicIndexRoute
+  publicAuthExtensionSyncRoute: typeof publicAuthExtensionSyncRoute
   publicNewsIdRoute: typeof publicNewsIdRoute
   publicNewsIndexRoute: typeof publicNewsIndexRoute
 }
@@ -434,6 +454,7 @@ const publicRouteRouteChildren: publicRouteRouteChildren = {
   publicTermsOfServiceRoute: publicTermsOfServiceRoute,
   publicUsageRoute: publicUsageRoute,
   publicIndexRoute: publicIndexRoute,
+  publicAuthExtensionSyncRoute: publicAuthExtensionSyncRoute,
   publicNewsIdRoute: publicNewsIdRoute,
   publicNewsIndexRoute: publicNewsIndexRoute,
 }

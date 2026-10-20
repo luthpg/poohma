@@ -1,6 +1,7 @@
 import { api } from "@poohma/backend/api";
 import { createFileRoute } from "@tanstack/react-router";
 import { useAction } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import {
   Edit3,
   ExternalLink,
@@ -20,32 +21,15 @@ import { CopyableBadge } from "../../components/ui/CopyableBadge";
 import { stripHtmlTags } from "../../lib/utils";
 
 // 型定義
-interface InfoItem {
-  id: string;
-  title: string;
-  content?: string;
-  published_at?: string;
-  publishedAt?: string;
-  createdAt: string;
-  updatedAt: string;
-  status?: "published" | "draft";
-}
-
-interface FaqItem {
-  id: string;
-  slug?: string;
-  question: string;
-  answer: string;
-  category: string | { id?: string; name: string };
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface LegalItem {
-  terms: string;
-  privacy: string;
-  published_at?: string;
-}
+type InfoItem = FunctionReturnType<
+  typeof api.admin.cms.getCmsInfoList
+>["contents"][number];
+type FaqItem = FunctionReturnType<
+  typeof api.admin.cms.getCmsFaqList
+>["contents"][number];
+type LegalItem = NonNullable<
+  FunctionReturnType<typeof api.admin.cms.getCmsLegal>["data"]
+>;
 
 export const Route = createFileRoute("/_auth/cms")({
   component: CmsPage,

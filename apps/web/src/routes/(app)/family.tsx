@@ -43,7 +43,10 @@ import { toast } from "sonner";
 import { AccountSwitcher } from "@/components/AccountSwitcher";
 import { FamilyAuditLogsSection } from "@/components/family/FamilyAuditLogsSection";
 import { FamilyInviteSection } from "@/components/family/FamilyInviteSection";
-import { FamilySetupView } from "@/components/family/FamilySetupView";
+import {
+  type FamilyChangeFormData,
+  FamilySetupView,
+} from "@/components/family/FamilySetupView";
 import { MemberActionDialogs } from "@/components/family/MemberActionDialogs";
 import { PasscodeRotateSection } from "@/components/family/PasscodeRotateSection";
 import { RecoveryKitDialog } from "@/components/family/RecoveryKitDialog";
@@ -678,12 +681,7 @@ function FamilyComponent() {
   const handleChangeFamily = async (
     action: "create" | "join",
     e: React.SubmitEvent,
-    data: {
-      createName: string;
-      createPasscode: string;
-      createPasscodeConfirm: string;
-      joinCode: string;
-    },
+    data: FamilyChangeFormData,
   ) => {
     e.preventDefault();
     if (action === "create") {
