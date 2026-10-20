@@ -195,15 +195,8 @@ async function ensureOffscreenDocument(): Promise<void> {
     })
     .catch((err) => {
       if (err?.message?.includes("Only a single offscreen")) {
-        console.log(
-          "[PoohMa Background] Single offscreen already exists (caught error)",
-        );
         return;
       }
-      console.error(
-        "[PoohMa Background] Failed to create offscreen document:",
-        err,
-      );
       throw err;
     });
 
@@ -356,13 +349,6 @@ export default defineBackground(() => {
             );
             if (tokenRes) {
               if (!tokenRes.userId || tokenRes.userId !== res.user.userId) {
-                console.error(
-                  "[PoohMa Background] Token UID mismatch or missing:",
-                  {
-                    expected: res.user.userId,
-                    actual: tokenRes.userId,
-                  },
-                );
                 sendResponse({ success: false, error: "User ID mismatch" });
                 return;
               }
@@ -595,16 +581,8 @@ export default defineBackground(() => {
       (async () => {
         try {
           const records = await getRecordsCached(true);
-          console.log(
-            "[PoohMa Background] getRecordsCached returned count:",
-            records?.length ?? 0,
-          );
           sendResponse({ success: true, records: records ?? [] });
-        } catch (err) {
-          console.error(
-            "[PoohMa Background] GET_ALL_RECORDS error caught:",
-            err,
-          );
+        } catch (_err) {
           sendResponse({ success: false, records: [] });
         }
       })();

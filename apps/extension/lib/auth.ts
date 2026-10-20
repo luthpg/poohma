@@ -155,11 +155,6 @@ export async function exchangeCustomToken(
       },
     );
     if (!res.ok) {
-      const errBody = await res.text().catch(() => "");
-      console.warn(
-        `[PoohMa Auth] exchangeCustomToken HTTP ${res.status}:`,
-        errBody.slice(0, 150),
-      );
       return null;
     }
     const data = await res.json();
@@ -178,8 +173,7 @@ export async function exchangeCustomToken(
       refreshToken: data.refreshToken,
       userId: userId || data.localId,
     };
-  } catch (err) {
-    console.warn("[PoohMa Auth] exchangeCustomToken fetch failed:", err);
+  } catch {
     return null;
   }
 }
@@ -201,11 +195,6 @@ export async function refreshIdToken(
       },
     );
     if (!res.ok) {
-      const errBody = await res.text().catch(() => "");
-      console.warn(
-        `[PoohMa Auth] refreshIdToken HTTP ${res.status}:`,
-        errBody.slice(0, 150),
-      );
       return null;
     }
     const data = await res.json();
@@ -213,8 +202,7 @@ export async function refreshIdToken(
       idToken: data.id_token,
       refreshToken: data.refresh_token,
     };
-  } catch (err) {
-    console.warn("[PoohMa Auth] refreshIdToken fetch failed:", err);
+  } catch {
     return null;
   }
 }

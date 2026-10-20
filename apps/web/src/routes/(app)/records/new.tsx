@@ -128,7 +128,12 @@ function NewRecordComponent() {
   }, [draftId]);
 
   const { isAuthenticated } = useConvexAuth();
-  const { activeAccountId, switchAccount, accounts } = useAccount();
+  const {
+    activeAccountId,
+    switchAccount,
+    accounts,
+    isLoading: isAccountLoading,
+  } = useAccount();
   const availableTags =
     useQuery(
       api.records.getAvailableTags,
@@ -137,55 +142,82 @@ function NewRecordComponent() {
   const createRecord = useMutation(api.records.createRecord);
 
   const { url, title, loginId, accountId: targetAccountId } = Route.useSearch();
-  const hasSwitchedTargetAccountRef = useRef<boolean>(false);
+  const handledTargetAccountRef = useRef<string | undefined>(undefined);
+  const [resolvedTargetAccountId, setResolvedTargetAccountId] = useState<
+    string | undefined
+  >(undefined);
   const [isSwitchingAccount, setIsSwitchingAccount] = useState<boolean>(false);
   const [accountResolutionError, setAccountResolutionError] = useState<
     string | null
   >(null);
 
+  const isResolvingTargetAccount =
+    Boolean(targetAccountId) &&
+    (resolvedTargetAccountId !== targetAccountId || isSwitchingAccount);
+
   const prevActiveAccountIdRef = useRef<string | null>(activeAccountId);
   useEffect(() => {
+    if (isResolvingTargetAccount) {
+      prevActiveAccountIdRef.current = activeAccountId;
+      return;
+    }
     if (prevActiveAccountIdRef.current !== activeAccountId) {
       prevActiveAccountIdRef.current = activeAccountId;
       if (accountResolutionError) {
         setAccountResolutionError(null);
       }
     }
-  }, [activeAccountId, accountResolutionError]);
+  }, [activeAccountId, accountResolutionError, isResolvingTargetAccount]);
 
   useEffect(() => {
-    if (
-      !hasSwitchedTargetAccountRef.current &&
-      targetAccountId &&
-      accounts.length > 0
-    ) {
-      const targetUser = accounts.find((a) => a._id === targetAccountId);
-      if (!targetUser) {
-        hasSwitchedTargetAccountRef.current = true;
-        setAccountResolutionError(
-          "指定された保存先アカウントが見つかりません。保存先のアカウントを選択してください。",
-        );
-        return;
-      }
+    if (!targetAccountId) return;
+    if (handledTargetAccountRef.current === targetAccountId) return;
+    if (isAccountLoading) return;
+    if (accounts.length > 0 && activeAccountId == null) return;
 
-      if (targetAccountId !== activeAccountId) {
-        hasSwitchedTargetAccountRef.current = true;
-        setIsSwitchingAccount(true);
-        switchAccount(targetAccountId as Id<"users">)
-          .catch(() => {
-            setAccountResolutionError(
-              "指定された保存先アカウントへの切り替えに失敗しました。保存先のアカウントを選択してください。",
-            );
-            toast.error("アカウントの切り替えに失敗しました");
-          })
-          .finally(() => {
-            setIsSwitchingAccount(false);
-          });
-      } else {
-        hasSwitchedTargetAccountRef.current = true;
-      }
+    const targetUser = accounts.find((a) => a._id === targetAccountId);
+    if (!targetUser) {
+      handledTargetAccountRef.current = targetAccountId;
+      prevActiveAccountIdRef.current = activeAccountId;
+      setAccountResolutionError(
+        "指定された保存先アカウントが見つかりません。保存先のアカウントを選択してください。",
+      );
+      setResolvedTargetAccountId(targetAccountId);
+      return;
     }
-  }, [targetAccountId, activeAccountId, accounts, switchAccount]);
+
+    if (targetAccountId !== activeAccountId) {
+      handledTargetAccountRef.current = targetAccountId;
+      setIsSwitchingAccount(true);
+      switchAccount(targetAccountId as Id<"users">)
+        .then(() => {
+          prevActiveAccountIdRef.current = targetAccountId;
+          setAccountResolutionError(null);
+        })
+        .catch(() => {
+          prevActiveAccountIdRef.current = activeAccountId;
+          setAccountResolutionError(
+            "指定された保存先アカウントへの切り替えに失敗しました。保存先のアカウントを選択してください。",
+          );
+          toast.error("アカウントの切り替えに失敗しました");
+        })
+        .finally(() => {
+          setIsSwitchingAccount(false);
+          setResolvedTargetAccountId(targetAccountId);
+        });
+    } else {
+      handledTargetAccountRef.current = targetAccountId;
+      prevActiveAccountIdRef.current = activeAccountId;
+      setAccountResolutionError(null);
+      setResolvedTargetAccountId(targetAccountId);
+    }
+  }, [
+    targetAccountId,
+    activeAccountId,
+    accounts,
+    isAccountLoading,
+    switchAccount,
+  ]);
   const initialValues = useMemo(() => {
     const init: Partial<RecordFormValues> = {};
     if (url) init.url = url;
@@ -202,11 +234,13 @@ function NewRecordComponent() {
     return Object.keys(init).length > 0 ? init : undefined;
   }, [url, title, loginId]);
 
-  const form = useRecordForm(initialValues, undefined, draftId);
+  const form = useRecordForm(initialValues, undefined, draftId, {
+    autoUnlock: !isResolvingTargetAccount && !accountResolutionError,
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSwitchingAccount) return;
+    if (isResolvingTargetAccount) return;
     if (accountResolutionError) {
       toast.error("保存先アカウントを選択してください");
       return;
@@ -228,7 +262,7 @@ function NewRecordComponent() {
     navigate({ to: "/dashboard" });
   };
 
-  if (isSwitchingAccount) {
+  if (isResolvingTargetAccount) {
     return (
       <div className="mx-auto max-w-3xl p-6 flex flex-col items-center justify-center min-h-[300px] gap-3">
         <Spinner className="h-6 w-6 text-orange-600" />

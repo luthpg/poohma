@@ -538,8 +538,8 @@ export function App() {
               accountId: effectiveAccountId,
             }).catch(() => {});
           }
-        } catch (err) {
-          console.warn("[PoohMa Sidepanel] Decrypt hint failed:", err);
+        } catch (_err) {
+          // 復号エラー時は生例外をログ露出せず安全に握る（CWE-209・暗号鍵保護）
         }
       }
     },
@@ -1198,6 +1198,14 @@ export function App() {
                         }
                         if (tabInfo?.title) {
                           newUrl.searchParams.set("title", tabInfo.title);
+                        }
+                        const effectiveAccountId =
+                          activeAccountId || currentUser?._id;
+                        if (effectiveAccountId) {
+                          newUrl.searchParams.set(
+                            "accountId",
+                            effectiveAccountId,
+                          );
                         }
                         chrome.tabs.create({ url: newUrl.toString() });
                       }}
