@@ -333,6 +333,23 @@ UI 実装、外部 API 連携、環境変数、モノレポ設定における落
   - `apps/extension/lib/auth.ts`
   - `.docs/features.md`
 
+---
+
+### Chrome 拡張 Background での送信元コンテキスト検証時における `sender.tab?.url` 欠落問題と `sender.url` フォールバック
+
+- **問題 (Problem)**:
+  Content Script から `chrome.runtime.sendMessage` で送信されたメッセージを Background Service Worker で受信・検証する際、`const senderUrl = sender.tab?.url;` としていると、タブのロード状態や permissions 構成によって `sender.tab?.url` が `undefined` となり、送信元ドメイン・パス検証（`isTrustedPoohmaOrigin`）に到達する前に `Untrusted sender context` として即座にリクエストが拒否されてしまう。
+- **原因 (Root Cause)**:
+  Chrome 拡張（Manifest V3）の仕様上、Content Script からのメッセージ送信時、`sender.tab` オブジェクト自体は存在しても、タブの権限スコープやナビゲーション途中のタイミングによって `sender.tab.url` が空になる場合がある。`runtime.MessageSender` の `sender.url` は optional であり、存在する場合は送信元のページまたはフレームの URL を表す。iframe からの送信では、親ページではなく送信元 iframe の URL になる。
+- **誤ったアプローチ (Anti-Pattern)**:
+  `sender.tab?.url` のみを参照し、それが存在しない場合に即座に拒否・例外スローする。
+- **正しいアプローチ (Correct Pattern)**:
+  `const senderUrl = sender.tab?.url || sender.url;` とし、`sender.tab?.url` が取得できない場合は、`sender.url` が存在するときのみフォールバックとして利用する。両方が欠落している場合は `Untrusted sender context` として要求を拒否する。URL が取得できた場合のみ `new URL(senderUrl)` により `isTrustedPoohmaOrigin(parsed.origin)` および期待するパス（`/auth/extension-sync` 等）の一致検証を実施する。
+- **関連実装 (Related Code References)**:
+  - `apps/extension/entrypoints/background.ts`
+  - `apps/extension/lib/url.ts`
+
+
 
 
 
