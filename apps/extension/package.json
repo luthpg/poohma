@@ -1,6 +1,5 @@
 {
   "name": "@poohma/extension",
-  "version": "0.1.0",
   "description": "PoohMa Chrome Extension - Family Password & Account Manager",
   "private": true,
   "type": "module",

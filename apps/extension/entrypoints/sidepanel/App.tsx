@@ -58,7 +58,7 @@ import {
 import { normalizeUrl } from "@/lib/url";
 import { useInactivityLock } from "@/lib/useInactivityLock";
 import { useTheme } from "@/lib/useTheme";
-import packageJson from "@/package.json";
+import rootPackageJson from "../../../../package.json" with { type: "json" };
 
 interface CurrentTabInfo {
   tabId?: number;
@@ -1325,7 +1325,10 @@ export function App() {
 
       {/* フッター */}
       <footer className="border-t border-border/80 bg-background/50 px-3 py-2 text-center text-[10px] text-muted-foreground flex items-center justify-between">
-        <span>PoohMa Extension v{packageJson.version}</span>
+        <span>
+          PoohMa Extension v
+          {chrome.runtime?.getManifest?.()?.version ?? rootPackageJson.version}
+        </span>
         <a
           href={env.VITE_SITE_URL}
           target="_blank"
