@@ -1,9 +1,4 @@
-import {
-  ExternalLink,
-  KeyRound,
-  PanelRightOpen,
-  ShieldCheck,
-} from "lucide-react";
+import { ExternalLink, KeyRound, PanelRightOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { env } from "@/env";
@@ -123,11 +118,7 @@ export function App() {
           : "サイドパネルを開く"}
       </Button>
 
-      <div className="flex items-center justify-between pt-2 border-t border-border/80 text-[10px] text-muted-foreground">
-        <span className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
-          <ShieldCheck className="h-3.5 w-3.5" />
-          ゼロ知識 E2EE 暗号保護
-        </span>
+      <div className="flex items-center justify-center pt-2 border-t border-border/80 text-[10px] text-muted-foreground">
         <a
           href={env.VITE_SITE_URL}
           target="_blank"
