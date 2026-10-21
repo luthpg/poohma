@@ -47,7 +47,7 @@ export async function getFirebaseIdTokenForUid(uid?: string): Promise<string> {
 async function purgeConvexDataForUid(
   convexUrl: string,
   uid: string,
-): Promise<number> {
+): Promise<number | null> {
   try {
     const idToken = await getFirebaseIdTokenForUid(uid);
     const client = new ConvexHttpClient(convexUrl);
@@ -55,7 +55,7 @@ async function purgeConvexDataForUid(
     const result = await client.mutation(api.users.deleteAllAccounts, {});
     return result.deletedCount;
   } catch {
-    return 0;
+    return null;
   }
 }
 
@@ -135,6 +135,9 @@ export async function purgeAllTestData(
   const deletedCounts = await Promise.all(
     targetUids.map(async (uid) => {
       const deleted = await purgeConvexDataForUid(convexUrl, uid);
+      if (deleted === null) {
+        return 0;
+      }
       await deleteE2EFirebaseUserIfDynamic(uid);
       return deleted;
     }),

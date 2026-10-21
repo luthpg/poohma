@@ -118,6 +118,18 @@ Playwright E2E テストおよびフロントエンド遷移における落と�
   2. 分岐判定には固定タイムアウトの `try/catch` を使わず、`familyCreateInput.or(familyManagerSection).first().waitFor({ state: "visible" })` や `modalTitle.or(recordCount).first().waitFor({ state: "visible" })` のような複合ロケータによる状態待機を用いる。
   3. 家族所属が前提のテスト（`/records/new` 等）は、先行テストの副作用に依存せず `ensureFamilyAssigned` で家族所属状態を確定させてから対象ルートへ遷移する。
 
+---
+
+### 外部サービス間（Convex + Firebase Auth）を跨ぐ E2E テストデータ回収における削除順序と Source of Truth 消失の罠
+
+- **問題**:
+  - 動的ワーカー UID や過去の中断セッションを回収する際、`purgeConvexDataForUid` が一時的な通信エラーや Convex 例外で失敗したにもかかわらず、呼び出し元が無条件に `deleteE2EFirebaseUserIfDynamic(uid)` を実行してしまうと、Firebase ユーザーのみが先に削除され、Convex 側のファミリー・アカウント・レコードが孤立データとして取り残される。
+  - 残留テストユーザーの自動検知機構（`listStaleE2ETestUids`）は Firebase Auth（`auth.listUsers`）を走査して動的 UID（`e2e-*@poohma-staging.internal`）を列挙しているため、Firebase 側を消してしまうと、次回以降のテスト実行時に当該 UID を再発見・再パージする手段（Source of Truth）が永久に失われる。
+- **回避法**:
+  - Convex パージ処理の戻り値を `Promise<number | null>` とし、正常終了（削除件数 0 件を含む）と異常終了（`null`）を厳格に区別する。
+  - Convex パージが成功した UID（`deleted !== null`）のみ Firebase ユーザーを削除し、パージ失敗時は Firebase ユーザーを意図的に保持する。これにより、次回以降の実行（`auth.setup.ts` や `auth.teardown.ts`）で `listStaleE2ETestUids` から自動的に再検出され、Convex データの確実な後続クリーンアップが行われる。
+
+
 
 
 

@@ -16,6 +16,7 @@ interface StepTiming {
 }
 
 interface TestTimingRecord {
+  id: string;
   project: string;
   file: string;
   title: string;
@@ -23,6 +24,7 @@ interface TestTimingRecord {
   status: string;
   retry: number;
   durationMs: number;
+  totalDurationMs: number;
   steps: StepTiming[];
 }
 
@@ -56,7 +58,7 @@ export default class TimingReporter implements Reporter {
     const relFile = path
       .relative(path.join(webDir, "e2e"), test.location.file)
       .replace(/\\/g, "/");
-    const key = `${project}::${relFile}::${test.title}`;
+    const key = test.id;
 
     const steps: StepTiming[] = result.steps
       .filter((step) => step.category === "test.step")
@@ -65,7 +67,13 @@ export default class TimingReporter implements Reporter {
         durationMs: step.duration,
       }));
 
+    const totalDurationMs = test.results.reduce(
+      (sum, r) => sum + r.duration,
+      0,
+    );
+
     this.records.set(key, {
+      id: test.id,
       project,
       file: relFile,
       title: test.title,
@@ -73,6 +81,7 @@ export default class TimingReporter implements Reporter {
       status: result.status,
       retry: result.retry,
       durationMs: result.duration,
+      totalDurationMs,
       steps,
     });
   }
@@ -126,8 +135,12 @@ export default class TimingReporter implements Reporter {
     ];
 
     for (const item of entries) {
+      const durationDisplay =
+        item.retry > 0
+          ? `${formatSeconds(item.durationMs)} (total: ${formatSeconds(item.totalDurationMs)})`
+          : formatSeconds(item.durationMs);
       lines.push(
-        `| \`${item.project}\` | W${item.parallelIndex} | \`${item.file}\` | ${item.title} | ${item.retry} | ${formatSeconds(item.durationMs)} |`,
+        `| \`${item.project}\` | W${item.parallelIndex} | \`${item.file}\` | ${item.title} | ${item.retry} | ${durationDisplay} |`,
       );
       for (const step of item.steps) {
         lines.push(
