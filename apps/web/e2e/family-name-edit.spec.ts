@@ -1,36 +1,11 @@
-import { ensureOnboardingCompleted } from "./support/ensure-onboarding";
-import { expect, test } from "./support/test-fixtures";
+import { ensureFamilyAssigned, expect, test } from "./support/test-fixtures";
 
 test.describe("家族グループ名の変更機能 (Issue #177)", () => {
   test("ファミリー管理者が家族管理画面から家族グループ名を変更・キャンセルできること", async ({
     page,
   }) => {
-    // 1. /family へアクセス
-    await page.goto("/family");
-    await page.waitForURL(/.*\/family/, { timeout: 20000 });
-    await ensureOnboardingCompleted(page);
-
-    // 家族未所属の場合は家族グループを作成
-    const familyCreateInput = page.locator("input#family-name-input");
-    const isUnassigned = await familyCreateInput
-      .waitFor({ state: "visible", timeout: 5000 })
-      .then(() => true)
-      .catch(() => false);
-
-    if (isUnassigned) {
-      const passcode =
-        process.env.E2E_FAMILY_PASSCODE || "PoohMa#Secure2026!Pass";
-      await familyCreateInput.fill("E2Eテスト家族");
-      await page.locator("input#family-passcode-input").fill(passcode);
-      await page.locator("input#family-passcode-confirm-input").fill(passcode);
-      await page
-        .locator('button[type="submit"]')
-        .filter({ hasText: "作成する" })
-        .click();
-      await expect(
-        page.locator('[data-testid="family-manager-section"]'),
-      ).toBeVisible({ timeout: 25000 });
-    }
+    // 1. /family へアクセスし、家族所属状態を状態待機で確定（未所属なら即座に作成）
+    await ensureFamilyAssigned(page, "E2Eテスト家族");
 
     // 2. 家族管理セクションと現在の家族名を確認
     const familySection = page.locator(
@@ -83,7 +58,6 @@ test.describe("家族グループ名の変更機能 (Issue #177)", () => {
       // 6. ページをリロードしても新しい家族名が維持されていること（永続化の検証）
       await page.reload();
       await page.waitForURL(/.*\/family/, { timeout: 15000 });
-      await ensureOnboardingCompleted(page);
       await expect(nameHeading).toHaveText(newFamilyName, { timeout: 10000 });
     } finally {
       // 7. クリーンアップ：元の名前に戻しておく

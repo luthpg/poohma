@@ -278,9 +278,10 @@ Monorepo 配下に新しいパッケージ（例: Chrome 拡張機能 `apps/exte
 4. **PR テストビルド時の動的アーティファクト名分岐と Step Summary 案内**:
    - `pull_request` トリガー時、`github.ref_name`（`372/merge` 等）をそのままアーティファクト名に使うとスラッシュが含まれ不正な名前になる恐れがあるため、`poohma-extension-pr<PR番号>` と命名する。
    - `github.event_name == 'pull_request'` の際は GitHub Release へのアップロードを確実にスキップし、Step Summary（`$GITHUB_STEP_SUMMARY`）にダウンロード・インストール手順を出力して PR レビュー時の実機検証を支援する。
-5. **actions/upload-artifact での隠しディレクトリ（`.output`等）除外事故**:
-   - `actions/upload-artifact` は既定で `include-hidden-files: false` で動作するため、`path: apps/extension/.output/*.zip` のようにドットから始まる隠しディレクトリを探索パスに指定すると、配下のファイルが全て除外され `No files were found with the provided path` でジョブが異常終了する。
-   - 対策として、余計な中間ステージングディレクトリ（`dist-zip/` 等）を作ってファイルを二重化するのではなく、`include-hidden-files: true` を明示して正規出力先（`apps/extension/.output/*.zip`）を直接アップロードする（KISS原則・Single Source of Truth）。
+5. **actions/upload-artifact での二重 zip 化防止と隠しディレクトリ（`.output`等）除外事故**:
+   - `actions/upload-artifact` はダウンロード時に自動で全体を zip 圧縮するため、`path: apps/extension/.output/*.zip` のように zip ファイルを指定すると「zip の中に zip」という 2 重 zip 構造になり、ユーザーが 2 回解凍を強いられる。
+   - そのため Artifacts にはビルド展開ディレクトリ（`apps/extension/.output/chrome-mv3`）を指定し、ダウンロードされた zip を 1 度解凍するだけで直接 Chrome に読み込める単一 zip 構造とする。
+   - また `actions/upload-artifact` は既定で `include-hidden-files: false` で動作するため、`.output` のようなドットから始まる隠しディレクトリを探索パスに含める際は、配下のファイルが全て除外され `No files were found with the provided path` でジョブが異常終了するのを防ぐため、必ず `include-hidden-files: true` を明示する（KISS原則・Single Source of Truth）。
 6. **インラインスクリプト内への GitHub 式直接埋め込み禁止（Template Injection 対策）**:
    - `run:` スクリプトブロック内に `${{ github.event_name }}` や `${{ github.sha }}`、`${{ github.event.pull_request.number }}` などの GitHub 式を直接展開すると、シェルエスケープの破壊や zizmor / CodeQL による script injection 脆弱性（CWE-78）指摘の原因となる。
    - PR Job Summary 生成ステップ（`$GITHUB_STEP_SUMMARY`）等も含め、すべてのコンテキスト値はステップレベルの `env:` でシェル変数（例: `PR_NUMBER: ${{ github.event.pull_request.number }}`）として安全に注入し、スクリプト内では `"$PR_NUMBER"` として参照すること。

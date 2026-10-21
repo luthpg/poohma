@@ -23,6 +23,7 @@ jobs:
       VITE_FIREBASE_AUTH_DOMAIN: "${{ secrets.VITE_FIREBASE_PROJECT_ID }}.firebaseapp.com"
       VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
       VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL }}
+      VITE_CONVEX_SITE_URL: ${{ secrets.VITE_CONVEX_SITE_URL }}
       VITE_SITE_URL: "https://poohma.ciderlabs.link"
       VITE_GITHUB_REPO_URL: "https://github.com/luthpg/poohma"
 
@@ -79,7 +80,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.artifact-meta.outputs.artifact_name }}
-          path: apps/extension/.output/*.zip
+          path: apps/extension/.output/chrome-mv3
           if-no-files-found: error
           include-hidden-files: true
 

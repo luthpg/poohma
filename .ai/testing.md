@@ -233,14 +233,18 @@ export const test = base.extend({
 });
 ```
 
-### テストスイート構成
+### テストスイート構成と並列ワーカー分離アーキテクチャ
 - `public-routes.spec.ts`: LP、利用規約、プライバシーポリシー、未認証ガード（`/dashboard` / `/family` から `/login` へのリダイレクト）
-- `auth.setup.ts`: Firebase Admin SDK カスタムトークン発行と Bridge IIFE によるブラウザ `signInWithCustomToken`、認証ストレージ保存
-- `dashboard.spec.ts`: ログイン済みアクセス、認証済み状態での `/login` からの自動リダイレクト、および `/family` / `/settings` 等への画面遷移と見出し検証
+- `auth.setup.ts`: Firebase Admin SDK カスタムトークン発行と Bridge IIFE によるブラウザ `signInWithCustomToken`、Worker 0 用の認証ストレージ（`e2e/.auth/e2e-user.json`）保存
+- `dashboard.spec.ts`: ログイン済みアクセス、認証済み状態での `/login` からの自動リダイレクト、`/family` / `/settings` 等への画面遷移と見出し検証、および `/records/new` 登録フォーム検証（各テストが独立して家族所属状態を確定）
 - `family-name-edit.spec.ts`: ファミリー管理者による家族グループ名の変更およびキャンセル動作の検証
 - `onboarding-tour.spec.ts`: 新規家族作成からの初回オンボーディングツアー、サンプルデータ暗号化投入、詳細画面遷移、合言葉暗号化ヒント復号（モーダル一時非表示）、復号後ヒント平文スポットライト、ダッシュボード戻り時の後半ツアー自動再開・完走の貫通検証
-- `logout.spec.ts`: ログアウト処理実行後のセッション破棄・未認証状態遷移の検証
-- `e2ee-seed-import.spec.ts`: 家族作成（Master Key生成・KEK導出）、CSVインポートによる平文ヒントのクライアント暗号化Seed投入、詳細画面でのヒント復号検証、およびUI一括削除機能による他家族データを壊さない安全なクリーンアップ検証
+- `logout.spec.ts`: 専用 Firebase UID（`e2e-${runScope}-logout`）を用いたログアウト処理実行後のセッション破棄・未認証状態遷移の検証（通常ワーカーの `revokeRefreshTokens` 干渉を防ぎ並列実行）
+- `e2ee-seed-import.spec.ts`:
+  1. 家族作成（Master Key生成・KEK導出）、35件CSVインポートによる平文ヒントのクライアント暗号化Seed投入、詳細画面でのヒント復号検証、35件一括削除、およびアカウント削除クリーンアップの一貫ジャーニー検証
+  2. 一括操作モードによる公開設定変更（家族共有・確認画面・戻る操作・共有解除）の独立検証
+- `support/timing-reporter.ts`: 機密情報を含めずにテスト別・`test.step` 別の所要時間とリトライ回数を `test-results/e2e-timings.json` および GitHub Actions Job Summary へ出力するカスタムレポーター
+- `support/ensure-test-user.ts` & `support/cleanup.ts`: Worker 単位（`parallelIndex` × 実行スコープ）で独立した Firebase UID / `storageState` を発行し、Teardown（`auth.teardown.ts`）で全アクティブ UID の Convex データ一括パージおよび動的・残留 Firebase Auth テストユーザーの自動回収を行う
 
 #### `tests/convex-audit-logs.spec.ts`（バックエンド統合テスト）
 

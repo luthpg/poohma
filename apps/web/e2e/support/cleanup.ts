@@ -1,18 +1,26 @@
 import type { Page } from "@playwright/test";
 import { api } from "@poohma/backend/api";
 import { ConvexHttpClient } from "convex/browser";
-import { ensureTestUserCustomToken } from "./ensure-test-user";
+import {
+  clearRecordedActiveUids,
+  deleteE2EFirebaseUserIfDynamic,
+  ensureTestUserCustomToken,
+  getRecordedActiveUids,
+  listStaleE2ETestUids,
+} from "./ensure-test-user";
 
 /**
- * Node.js 側から Firebase REST API を叩き、Custom Token を ID Token に交換
+ * Node.js 側から Firebase REST API を叩き、指定 UID の Custom Token を ID Token に交換
  */
-async function getFirebaseIdToken(): Promise<string> {
+export async function getFirebaseIdTokenForUid(uid?: string): Promise<string> {
   const apiKey = process.env.VITE_FIREBASE_API_KEY;
   if (!apiKey) {
     throw new Error("VITE_FIREBASE_API_KEY が設定されていません");
   }
 
-  const customToken = await ensureTestUserCustomToken();
+  const customToken = await ensureTestUserCustomToken(
+    uid ? { uid } : undefined,
+  );
   const res = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${apiKey}`,
     {
@@ -36,11 +44,30 @@ async function getFirebaseIdToken(): Promise<string> {
   return data.idToken;
 }
 
+async function purgeConvexDataForUid(
+  convexUrl: string,
+  uid: string,
+): Promise<number | null> {
+  try {
+    const idToken = await getFirebaseIdTokenForUid(uid);
+    const client = new ConvexHttpClient(convexUrl);
+    client.setAuth(idToken);
+    const result = await client.mutation(api.users.deleteAllAccounts, {});
+    return result.deletedCount;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * E2Eテストユーザー（e2e-test-user）に紐づくすべての PoohMa アカウント、
- * 所属ファミリー、レコード、招待、参加申請を Convex から完全パージする
+ * E2Eテストユーザー（全Worker UID・Logout専用UID・残留テストUID）に紐づくすべての
+ * PoohMa アカウント、所属ファミリー、レコード、招待、参加申請を Convex から完全パージし、
+ * 動的生成された Firebase Auth テストユーザーも回収する。
  */
-export async function purgeAllTestData(page?: Page): Promise<number> {
+export async function purgeAllTestData(
+  page?: Page,
+  explicitUids?: string[],
+): Promise<number> {
   const convexUrl = process.env.VITE_CONVEX_URL;
   if (!convexUrl) {
     throw new Error("VITE_CONVEX_URL が設定されていません");
@@ -49,11 +76,12 @@ export async function purgeAllTestData(page?: Page): Promise<number> {
     throw new Error("VITE_CONVEX_URL は HTTPS プロトコルである必要があります");
   }
 
-  // 1. ブラウザページが利用可能な場合はブラウザのログインセッション経由を優先
+  let totalDeleted = 0;
+
+  // 1. ブラウザページが渡された場合はそのセッションのアカウントを即時パージ
   if (page && !page.isClosed()) {
     try {
       const result = await page.evaluate(async (url) => {
-        // Firebase Auth からトークン取得
         const { getApps } = await import("firebase/app");
         const { getAuth } = await import("firebase/auth");
         const apps = getApps();
@@ -76,34 +104,49 @@ export async function purgeAllTestData(page?: Page): Promise<number> {
           }),
         });
 
-        if (!res.ok) {
-          const err = await res.text();
-          throw new Error(`Mutation failed: ${res.status} ${err}`);
-        }
+        if (!res.ok) return null;
 
         const json = (await res.json()) as {
           status: string;
           value?: { success: boolean; deletedCount: number };
-          errorMessage?: string;
         };
-        if (json.status !== "success") {
-          throw new Error(json.errorMessage || "deleteAllAccounts failed");
-        }
+        if (json.status !== "success") return null;
         return json.value?.deletedCount ?? 0;
       }, convexUrl);
 
       if (result !== null) {
-        return result;
+        totalDeleted += result;
       }
     } catch {
-      // ブラウザ側での実行に失敗した場合は Node.js 側のフォールバックを実行
+      // フォールバックへ継続
     }
   }
 
-  // 2. Node.js 側の ConvexHttpClient 経由で確実に完全パージ
-  const idToken = await getFirebaseIdToken();
-  const client = new ConvexHttpClient(convexUrl);
-  client.setAuth(idToken);
-  const result = await client.mutation(api.users.deleteAllAccounts, {});
-  return result.deletedCount;
+  // 2. 対象 UID 一覧の確定（明示指定がなければ今回のアクティブUID + 残留E2Eユーザー）
+  const targetUids = explicitUids
+    ? [...new Set(explicitUids)]
+    : [
+        ...new Set([
+          ...getRecordedActiveUids(),
+          ...(await listStaleE2ETestUids()),
+        ]),
+      ];
+
+  const deletedCounts = await Promise.all(
+    targetUids.map(async (uid) => {
+      const deleted = await purgeConvexDataForUid(convexUrl, uid);
+      if (deleted === null) {
+        return 0;
+      }
+      await deleteE2EFirebaseUserIfDynamic(uid);
+      return deleted;
+    }),
+  );
+  totalDeleted += deletedCounts.reduce((sum, count) => sum + count, 0);
+
+  if (!explicitUids) {
+    clearRecordedActiveUids();
+  }
+
+  return totalDeleted;
 }
