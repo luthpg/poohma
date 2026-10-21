@@ -1,8 +1,4 @@
-import {
-  ExternalLink,
-  KeyRound,
-  PanelRightOpen,
-} from "lucide-react";
+import { ExternalLink, KeyRound, PanelRightOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { env } from "@/env";
