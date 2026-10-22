@@ -11,7 +11,8 @@
     "test": "vitest run --coverage",
     "preview:setup": "tsx scripts/setup-preview.ts",
     "preview:setup:clean": "tsx scripts/setup-preview.ts --clean",
-    "demo:export": "tsx scripts/export-demo-records.ts"
+    "demo:export": "tsx scripts/export-demo-records.ts",
+    "auth:switch": "tsx scripts/switch-auth-config.ts"
   },
   "exports": {
     "./api": {

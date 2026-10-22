@@ -2907,6 +2907,141 @@ describe("2.1.13 メンバーキック機能とExport Vault（E2EEデータ持�
     expect(vault?.expiresAt).toBeGreaterThan(Date.now());
   });
 
+  it("kickMember: 除名されたユーザーの参加申請および未完了マイグレーションが失効し、再承認なしで復帰・暗号情報取得ができないこと", async () => {
+    const t = convexTest(schema, modules);
+
+    let familyId!: Id<"families">;
+    let userBId!: Id<"users">;
+    let joinRequestId!: Id<"joinRequests">;
+
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "佐藤家",
+        updatedAt: Date.now(),
+      });
+
+      await ctx.db.insert("users", {
+        userId: "user_a",
+        email: "a@example.com",
+        displayName: "ユーザーA",
+        familyId,
+        familyRole: "admin",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+
+      userBId = await ctx.db.insert("users", {
+        userId: "user_b",
+        email: "b@example.com",
+        displayName: "ユーザーB",
+        familyRole: "viewer",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+
+      // ユーザーBが参加申請を作成
+      joinRequestId = await ctx.db.insert("joinRequests", {
+        familyId,
+        userId: "user_b",
+        accountId: userBId,
+        status: "pending",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+    });
+
+    const userA = t.withIdentity({
+      subject: "user_a",
+      email: "a@example.com",
+    });
+    const userB = t.withIdentity({
+      subject: "user_b",
+      email: "b@example.com",
+    });
+
+    // 1. 管理者AがユーザーBを承認（新規即時所属）
+    await userA.mutation(api.families.approveJoinRequest, {
+      requestId: joinRequestId,
+    });
+
+    // ユーザーBが所属していること
+    const memberB = await t.run(async (ctx) => ctx.db.get(userBId));
+    expect(memberB?.familyId).toBe(familyId);
+
+    // 承認済み申請が一旦存在すること
+    const approvedReq = await t.run(async (ctx) => ctx.db.get(joinRequestId));
+    expect(approvedReq?.status).toBe("approved");
+
+    // テスト用に、もし旧システムのように残存した approved joinRequest を挿入しておく
+    const ghostRequestId = await t.run(async (ctx) => {
+      return await ctx.db.insert("joinRequests", {
+        familyId,
+        userId: "user_b",
+        accountId: userBId,
+        status: "approved",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+    });
+
+    // さらに未完了の familyMigrations (PREPARED) も作成しておく
+    const ghostMigrationId = await t.run(async (ctx) => {
+      return await ctx.db.insert("familyMigrations", {
+        userId: "user_b",
+        accountId: userBId,
+        action: "join",
+        targetFamilyId: familyId,
+        serviceRecordIds: [],
+        status: "PREPARED",
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 30 * 60 * 1000,
+      });
+    });
+
+    // 2. 管理者AがユーザーBを除名
+    await userA.mutation(api.families.kickMember, {
+      targetAccountId: userBId,
+    });
+
+    // 3. 検証: 残存していた joinRequests がすべて削除されていること
+    const deletedReq1 = await t.run(async (ctx) => ctx.db.get(joinRequestId));
+    expect(deletedReq1).toBeNull();
+    const deletedReq2 = await t.run(async (ctx) => ctx.db.get(ghostRequestId));
+    expect(deletedReq2).toBeNull();
+
+    // 4. 検証: 未完了の familyMigrations が EXPIRED に更新されていること
+    const expiredMig = await t.run(async (ctx) => ctx.db.get(ghostMigrationId));
+    expect(expiredMig?.status).toBe("EXPIRED");
+
+    // 5. 検証: 除名後、ユーザーBは getFamilyInfoByFamilyId で暗号情報を取得できないこと
+    await expect(
+      userB.query(api.families.getFamilyInfoByFamilyId, {
+        familyId,
+      }),
+    ).rejects.toThrow(
+      "Access denied: You must be approved to access family keys",
+    );
+
+    // 6. 検証: 除名後、ユーザーBは prepareFamilyMigration を実行できないこと
+    await expect(
+      userB.mutation(api.families.prepareFamilyMigration, {
+        action: "join",
+        familyId,
+      }),
+    ).rejects.toThrow(
+      "Access denied: You must be approved to join this family",
+    );
+
+    // 7. 検証: commitFamilyMigration を直接実行しようとしても拒絶されること
+    await expect(
+      userB.mutation(api.families.commitFamilyMigration, {
+        migrationId: ghostMigrationId,
+        credentials: [],
+      }),
+    ).rejects.toThrow();
+  });
+
   it("自分自身（または自分の別アカウント）をキックしようとすると拒否されること", async () => {
     const t = convexTest(schema, modules);
 

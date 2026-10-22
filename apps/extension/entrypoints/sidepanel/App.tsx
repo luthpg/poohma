@@ -201,6 +201,9 @@ export function App() {
           type: "ENSURE_OFFSCREEN",
         }).catch(() => ({ success: false }));
 
+        // 最新の家族暗号メタデータ・所属・アカウントをバックグラウンドで同期
+        sendExtensionMessage({ type: "SYNC_SESSION_STATE" }).catch(() => {});
+
         // ロック状態確認（メモリ上の MasterKey で即時判定）
         setIsUnlocked(masterKeyRef.current !== null);
 
@@ -311,7 +314,7 @@ export function App() {
           changes.accounts ||
           changes.activeAccountId)
       ) {
-        if (changes.activeAccountId || changes.user) {
+        if (changes.activeAccountId || changes.user || changes.family) {
           accountGenerationRef.current += 1;
           cryptoGenerationRef.current += 1;
           masterKeyRef.current = null;
@@ -556,8 +559,13 @@ export function App() {
 
     startTransition(async () => {
       try {
+        // パスコード解除前に最新の家族暗号メタデータ同期を試みる（Web側でパスコード変更された場合の即時追従）
+        await sendExtensionMessage({ type: "SYNC_SESSION_STATE" }).catch(
+          () => {},
+        );
+
         const storage = await getAuthStorage();
-        const currentFamily = family || storage.family;
+        const currentFamily = storage.family || family;
         if (
           !currentFamily?.masterKeyEncrypted ||
           !currentFamily?.masterKeyIv ||

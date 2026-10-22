@@ -60,6 +60,7 @@ flowchart TD
 - **承認時**: ファミリー管理者（`familyAdminMutation`）が承認（`approveJoinRequest`）すると、対象アカウントの `user.familyId` が更新され、申請者に通知（一般メンバーは一覧確認のみ可能）。
 - **拒否・取り下げ時**: ファミリー管理者による拒否（`rejectJoinRequest`）または申請者自身によるキャンセル（`cancelJoinRequest`）により `rejected` となり、家族へのアクセス権は付与されない。
 - **参加完了後**: 申請者は家族パスコードを入力してマスターキーをロック解除し、家族内での利用を開始する。
+- **除名（キック）時の無効化**: メンバー除名（`kickMember`）実行時は、過去に承認・作成された当該ユーザーの全参加申請（`joinRequests`）を DB から物理削除し、進行中の未完了家族移行（`familyMigrations`）を即座に `EXPIRED` に失効させる。また、家族移行確定時（`commitFamilyMigration`）にも現在有効な承認済み申請が存在することを必須再検証し、除名後の無承認復帰を完全に遮断する。
 
 ---
 
@@ -442,3 +443,5 @@ flowchart TD
 - **短命 TTL（30秒）**: 不正傍受や放置による悪用を防ぐため、発行から30秒で自動失効（Crons による定期パージ対象）。
 - **Single-Use（使い捨て・即時物理削除）**: `redeemSyncToken` で検証成功した瞬間にレコードを物理削除し、リプレイ攻撃や横取りを完全排除。
 - **nonce バインディング**: 拡張機能が生成した `nonce` と同期コードをペアで検証することで、第三者画面からの不正な連携リクエストを遮断。
+- **Custom Token の即時破棄と長期セッション維持**: Background で `customToken` を Firebase Auth REST API で引き換えた後、`customToken` は一切ストレージに保存せず即座に破棄する。Web 側と同じく `refreshToken` のみを Single Source of Truth として `chrome.storage.local` に保持し、ID トークン失効時は `refreshToken` を用いて自動更新することで長期セッションを維持する。
+- **家族暗号メタデータのバックグラウンド自動同期 (`SYNC_SESSION_STATE`)**: 家族のパスコード変更や暗号メタデータ更新が発生した場合、拡張機能側で古い暗号メタデータを保持したままだとアンロックに失敗し続ける。そのため、拡張機能はアンロック時・状態リフレッシュ時・レコード取得時に `SYNC_SESSION_STATE` メッセージ（`SyncSessionStateMessageSchema`）経由で Convex `extensionAuth.getSessionState` を呼び出し、最新の `family` 暗号メタデータをバックグラウンドで自動同期する。ストレージ上の暗号メタデータ更新（`changes.family`）を検知した場合は直ちにインメモリ鍵を破棄して再ロックし、安全な再アンロックを促す。

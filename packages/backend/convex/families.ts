@@ -719,13 +719,30 @@ export const commitFamilyMigration = authenticatedMutation({
       });
     }
 
-    const approvedRequest = await ctx.db
-      .query("joinRequests")
-      .withIndex("by_familyId_accountId", (q) =>
-        q.eq("familyId", migration.targetFamilyId).eq("accountId", user._id),
-      )
-      .filter((q) => q.eq(q.field("status"), "approved"))
-      .first();
+    const approvedRequest =
+      (await ctx.db
+        .query("joinRequests")
+        .withIndex("by_familyId_accountId", (q) =>
+          q.eq("familyId", migration.targetFamilyId).eq("accountId", user._id),
+        )
+        .filter((q) => q.eq(q.field("status"), "approved"))
+        .first()) ||
+      (await ctx.db
+        .query("joinRequests")
+        .withIndex("by_familyId_userId", (q) =>
+          q.eq("familyId", migration.targetFamilyId).eq("userId", user.userId),
+        )
+        .filter((q) =>
+          q.and(
+            q.eq(q.field("status"), "approved"),
+            q.eq(q.field("accountId"), undefined),
+          ),
+        )
+        .first());
+
+    if (migration.action === "join" && !approvedRequest) {
+      throw new Error("Unauthorized: Approved join request is no longer valid");
+    }
 
     if (approvedRequest) {
       await ctx.db.delete(approvedRequest._id);
@@ -1649,6 +1666,45 @@ export const kickMember = familyAdminMutation({
 
     // 3. 家族所属を解除（個人所有レコードはownerUserId・暗号化スコープとも維持される）
     await ctx.db.patch(targetUser._id, { familyId: undefined });
+
+    // 3.1 当該家族・対象ユーザーに紐づく参加申請を削除（除名後の無承認復帰を遮断）
+    const relatedJoinRequestsByAccount = await ctx.db
+      .query("joinRequests")
+      .withIndex("by_familyId_accountId", (q) =>
+        q.eq("familyId", familyId).eq("accountId", targetUser._id),
+      )
+      .collect();
+    for (const req of relatedJoinRequestsByAccount) {
+      await ctx.db.delete(req._id);
+    }
+
+    const relatedJoinRequestsByUserId = await ctx.db
+      .query("joinRequests")
+      .withIndex("by_familyId_userId", (q) =>
+        q.eq("familyId", familyId).eq("userId", targetUser.userId),
+      )
+      .collect();
+    for (const req of relatedJoinRequestsByUserId) {
+      await ctx.db.delete(req._id);
+    }
+
+    // 3.2 当該家族に関連する未完了マイグレーション（PREPARED）を失効
+    const activeMigrations = await ctx.db
+      .query("familyMigrations")
+      .withIndex("by_accountId", (q) => q.eq("accountId", targetUser._id))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("status"), "PREPARED"),
+          q.or(
+            q.eq(q.field("sourceFamilyId"), familyId),
+            q.eq(q.field("targetFamilyId"), familyId),
+          ),
+        ),
+      )
+      .collect();
+    for (const mig of activeMigrations) {
+      await ctx.db.patch(mig._id, { status: "EXPIRED" });
+    }
 
     // 4. 通知メールをスケジュール送信
     await ctx.scheduler.runAfter(

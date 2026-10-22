@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { internalMutation, mutation } from "./_generated/server";
-import { authenticatedMutation } from "./customBuilders";
+import { authenticatedMutation, authenticatedQuery } from "./customBuilders";
 
 export const SYNC_CODE_TTL_MS = 30 * 1000; // 30秒
 
@@ -151,6 +151,67 @@ export const redeemSyncToken = mutation({
       user: {
         _id: user._id,
         userId: user.userId, // Firebase UID
+        displayName: user.displayName,
+        email: user.email,
+        photoURL: user.photoURL,
+        familyId: user.familyId,
+        familyRole: user.familyRole,
+        family,
+      },
+      accounts,
+      family,
+    };
+  },
+});
+
+/**
+ * 拡張機能用: 最新のユーザー情報・サブアカウント一覧・家族暗号メタデータを一括同期取得するクエリ
+ */
+export const getSessionState = authenticatedQuery({
+  args: {},
+  handler: async (ctx) => {
+    const { user } = ctx;
+
+    async function getFamilyInfo(familyId?: Id<"families">) {
+      if (!familyId) return null;
+      const familyDoc = await ctx.db.get(familyId);
+      if (!familyDoc) return null;
+      return {
+        _id: familyDoc._id,
+        name: familyDoc.name,
+        masterKeyEncrypted: familyDoc.masterKeyEncrypted,
+        masterKeyIv: familyDoc.masterKeyIv,
+        masterKeySalt: familyDoc.masterKeySalt,
+        kdfIterations: familyDoc.kdfIterations,
+        cryptoVersion: familyDoc.cryptoVersion,
+      };
+    }
+
+    const family = await getFamilyInfo(user.familyId);
+
+    // 同一 Firebase UID に属する全サブアカウント一覧を取得
+    const userDocs = await ctx.db
+      .query("users")
+      .withIndex("by_userId", (q) => q.eq("userId", user.userId))
+      .collect();
+
+    const accounts = await Promise.all(
+      userDocs.map(async (u) => ({
+        _id: u._id,
+        userId: u.userId,
+        displayName: u.displayName,
+        email: u.email,
+        photoURL: u.photoURL,
+        familyId: u.familyId,
+        familyRole: u.familyRole,
+        family: await getFamilyInfo(u.familyId),
+      })),
+    );
+
+    return {
+      user: {
+        _id: user._id,
+        userId: user.userId,
         displayName: user.displayName,
         email: user.email,
         photoURL: user.photoURL,
