@@ -34,11 +34,13 @@ export interface AuthStorageData {
   refreshToken: string | null;
 }
 
+export type AuthStorageItems = Partial<AuthStorageData>;
+
 /**
  * ローカルストレージから認証データを取得する
  */
 export async function getAuthStorage(): Promise<AuthStorageData> {
-  const result = await chrome.storage.local.get([
+  const result = await chrome.storage.local.get<AuthStorageItems>([
     "user",
     "accounts",
     "activeAccountId",
@@ -48,16 +50,15 @@ export async function getAuthStorage(): Promise<AuthStorageData> {
     "idToken",
     "refreshToken",
   ]);
-  const user = (result.user as ExtensionUser) ?? null;
-  const rawAccounts = result.accounts as ExtensionUser[] | undefined;
+  const user = result.user ?? null;
+  const rawAccounts = result.accounts;
   const accounts =
     Array.isArray(rawAccounts) && rawAccounts.length > 0
       ? rawAccounts
       : user
         ? [user]
         : [];
-  const activeAccountId =
-    (result.activeAccountId as string | undefined) || user?._id || null;
+  const activeAccountId = result.activeAccountId || user?._id || null;
 
   return {
     user,
