@@ -650,6 +650,28 @@ export function useRecordForm(
     [],
   );
 
+  const reorderCredentials = useCallback(
+    (oldIndex: number, newIndex: number) => {
+      if (oldIndex === newIndex) return;
+      setValues((prev) => {
+        if (
+          oldIndex < 0 ||
+          oldIndex >= prev.credentials.length ||
+          newIndex < 0 ||
+          newIndex >= prev.credentials.length
+        ) {
+          return prev;
+        }
+        const next = [...prev.credentials];
+        const [moved] = next.splice(oldIndex, 1);
+        if (!moved) return prev;
+        next.splice(newIndex, 0, moved);
+        return { ...prev, credentials: next };
+      });
+    },
+    [],
+  );
+
   // ---- 暗号化ペイロード生成 -------------------------------------------
 
   const buildEncryptedPayload =
@@ -859,6 +881,7 @@ export function useRecordForm(
     setTags,
     addCredential,
     removeCredential,
+    reorderCredentials,
     updateCredentialField,
     reset,
     setBaselineValues,

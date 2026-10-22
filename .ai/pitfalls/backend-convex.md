@@ -188,3 +188,30 @@ Convex バックエンド開発における落とし穴と回避法です。
 - **関連実装 (Related Code References)**:
   - `packages/backend/tests/test-helpers.ts`
   - `packages/backend/tests/convex-users-auth.spec.ts`
+
+---
+
+### 親・子コンポーネント間での Convex クエリ重複発火による DB I/O 肥大化とインデックス未使用スキャンの罠
+
+- **問題 (Problem)**:
+  - Convex の月間 DB I/O が急増し、無料枠上限（Free tier limit）に抵触する（例: `records.getRecords` だけで月間 388MB の DB I/O を消費）。
+  - ダッシュボードなどの一覧画面を開くだけで、複数の同一・類似クエリが同時に発火し、ドキュメントの読み込み量が倍加する。
+  - アーカイブ済みレコードが増加しても、未指定時に全件読み込んでからメモリ上で `isArchived` を除外しているため、DB スキャン量が減少しない。
+- **原因 (Root Cause)**:
+  - `dashboard.tsx` 内で、親画面（`DashboardPage`：`sort` 引数なし）、一覧セクション（`RecordListSection`：`sort: "name_asc"`）、バナーセクション（`RecordListBannerSection`：サンプルデータ判定用・引数なし）など、同一画面の複数箇所から引数の微妙に異なる `api.records.getRecords` が個別に `useQuery` されていたため、Convex クライアント側でキャッシュが共有されず全クエリが個別にサーバーへ発行されていた。
+  - バックエンド側でも、`collectVisibleRecords` が `archiveStatus` 条件をインデックスクエリに反映せず、テーブル全件をスキャンした後に `filter` で除外していた。
+- **誤ったアプローチ (Anti-Pattern)**:
+  - 各コンポーネントが自律的に必要なデータをフェッチすべきと考え、親から渡さずに各セクション内で安易に `useQuery` を呼ぶ。
+  - バックエンドで全件読み込んでから JavaScript の `.filter()` で除外する。
+- **正しいアプローチ (Correct Pattern)**:
+  1. **Single Source of Truth による Props 伝搬**:
+     画面ルート（`DashboardPage`）で必要なパラメータ（ソート・検索・フィルター）を指定した単一の `useQuery(api.records.getRecords, ...)` を発行し、子コンポーネント（`RecordListSection`, `RecordListBannerSection` 等）にはその結果を props として受け渡す。バナー判定等の派生値はクライアント側で `useMemo` で導出する。
+  2. **複合インデックスによる DB 走査レベルの遮断**:
+     `archiveStatus === "active"`（通常の一覧表示）時は、`by_family_isArchived` 複合インデックスを用いて `q.eq("familyId", familyId).eq("isArchived", false)` でクエリし、アーカイブ済みレコードを DB 読み込み前に除外する。
+- **再発防止 (Prevention)**:
+  - 画面作成・改修時は「同一データ・同一テーブルを参照する `useQuery` が同一画面内で重複して呼ばれていないか」を監査する。
+  - Convex 関数を実装する際は、頻出するフィルタ条件（`isArchived`, `status` 等）をインデックス定義と連携させ、全件取得後のメモリフィルタを避ける。
+- **関連実装 (Related Code References)**:
+  - `apps/web/src/routes/(app)/dashboard.tsx`
+  - `packages/backend/convex/records.ts`
+  - `packages/backend/convex/schema.ts`

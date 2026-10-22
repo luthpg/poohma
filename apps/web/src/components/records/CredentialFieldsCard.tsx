@@ -1,4 +1,10 @@
-import { ChevronDown, ChevronUp, Lightbulb, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  GripVertical,
+  Lightbulb,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 import {
   Accordion,
@@ -20,6 +26,7 @@ export interface CredentialFieldsCardProps {
   onRemove: (index: number) => void;
   isFieldModified?: (field: string) => boolean;
   isEditMode?: boolean;
+  dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>;
 }
 
 export function CredentialFieldsCard({
@@ -30,6 +37,7 @@ export function CredentialFieldsCard({
   onRemove,
   isFieldModified,
   isEditMode = false,
+  dragHandleProps,
 }: CredentialFieldsCardProps) {
   const [isLabelOpen, setIsLabelOpen] = useState(Boolean(credential.label));
   const isLabelModified = isFieldModified?.(`credential_${index}_label`);
@@ -45,21 +53,38 @@ export function CredentialFieldsCard({
     }`;
   };
 
+  const hasHeaderActions = removable || Boolean(dragHandleProps);
+
   return (
     <div className="relative w-full rounded-md border border-border/60 bg-muted/50 p-5 shadow-border-light group">
-      {removable && (
-        <button
-          type="button"
-          onClick={() => onRemove(index)}
-          className="absolute right-2 top-2 inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md p-2.5 text-muted-foreground opacity-70 transition-all hover:bg-red-500/10 hover:text-red-500 hover:opacity-100 focus-visible:ring-2 focus-visible:ring-red-500/30 focus-visible:opacity-100 cursor-pointer"
-          title="このアカウント情報を削除"
-          aria-label="このアカウント情報を削除"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
+      {hasHeaderActions && (
+        <div className="absolute right-2 top-2 flex items-center gap-1 z-10">
+          {dragHandleProps && (
+            <button
+              type="button"
+              {...dragHandleProps}
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md p-2.5 text-muted-foreground opacity-70 transition-all hover:bg-muted hover:text-foreground hover:opacity-100 cursor-grab active:cursor-grabbing touch-none focus-visible:ring-2 focus-visible:ring-orange-500/30"
+              title="並び替え"
+              aria-label={`アカウント情報 ${index + 1} を並び替え`}
+            >
+              <GripVertical className="h-4 w-4" />
+            </button>
+          )}
+          {removable && (
+            <button
+              type="button"
+              onClick={() => onRemove(index)}
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md p-2.5 text-muted-foreground opacity-70 transition-all hover:bg-red-500/10 hover:text-red-500 hover:opacity-100 focus-visible:ring-2 focus-visible:ring-red-500/30 focus-visible:opacity-100 cursor-pointer"
+              title="このアカウント情報を削除"
+              aria-label="このアカウント情報を削除"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       )}
 
-      <div className={removable ? "pt-2 sm:pt-0" : ""}>
+      <div className={hasHeaderActions ? "pt-2 sm:pt-0" : ""}>
         {/* 主要項目: ログインID & パスワードヒント */}
         <div className="space-y-5 max-w-xl">
           {/* 1. ログインID */}

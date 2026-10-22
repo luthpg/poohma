@@ -151,6 +151,18 @@ describe("FAQ ユーティリティと検索・グルーピング", () => {
       expect(grouped[0]?.items[0]?.id).toBe("faq-2");
     });
 
+    it("ひらがなでカタカナ質問を検索できること (Issue #376)", () => {
+      const grouped = filterAndGroupFaqs(mockFaqs, "ぱすこーど");
+      expect(grouped.length).toBe(1);
+      expect(grouped[0]?.items[0]?.id).toBe("faq-2");
+    });
+
+    it("スペースの有無を吸収して検索できること (Issue #376)", () => {
+      const grouped = filterAndGroupFaqs(mockFaqs, "GoogleChrome");
+      expect(grouped.length).toBe(1);
+      expect(grouped[0]?.items[0]?.id).toBe("faq-4");
+    });
+
     it("該当がない場合は空の配列が返ること", () => {
       const grouped = filterAndGroupFaqs(mockFaqs, "存在しないキーワード12345");
       expect(grouped.length).toBe(0);
