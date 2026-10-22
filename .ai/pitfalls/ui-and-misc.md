@@ -157,6 +157,7 @@ UI 実装、外部 API 連携、環境変数、モノレポ設定における落
   - jsdom は `window.scrollTo` はモック可能だが、汎用 `HTMLElement` のプロトタイプには `scrollTo` を実装していない場合がある。
 - **回避法**:
   - 要素のスクロールリセットを行う際は、必ずオプショナルチェーンを用いて安全に呼び出す：
+
     ```ts
     contentRef.current?.scrollTo?.({ top: 0, behavior: "instant" });
     ```
@@ -348,8 +349,3 @@ UI 実装、外部 API 連携、環境変数、モノレポ設定における落
 - **関連実装 (Related Code References)**:
   - `apps/extension/entrypoints/background.ts`
   - `apps/extension/lib/url.ts`
-
-
-
-
-

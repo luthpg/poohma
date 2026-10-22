@@ -36,4 +36,3 @@ pnpm workspace（`pnpm-workspace.yaml`：`apps/*` / `workers/*` / `packages/*`�
 ## 関連ドキュメント
 
 - [Architecture Overview](../architecture.md)
-

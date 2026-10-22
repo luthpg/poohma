@@ -34,7 +34,6 @@ PoohMaは、実際のパスワードではなく「パスワードのヒント�
 ## なぜゼロ知識（Zero-Knowledge）なのか
 
 一般的なクラウドサービスでは「運営者を信頼する」前提でデータが保管されますが、PoohMa では「**暗号鍵をサーバーに預けない**」Zero-Knowledge アーキテクチャを徹底しています。
-
 - **不信の最小化**: 平文のパスコードや復号済みマスターキーは家族のデバイス（メモリ上）でのみ導出・保持されます。WebAuthn PRF（生体認証）を有効にした場合は、暗号化済みパスコード等の認証資材が端末内の安全なIndexedDBにのみ保存されます。いずれの場合も、平文パスコードやマスターキーがサーバーやログに送信・保存されることは一切ありません。
 - **サーバー侵害への強固な耐性**: 万が一 Convex のデータベースやバックアップ（R2）が第三者に漏洩・侵害された場合でも、暗号化データは AES-256-GCM により保護されており、家族の合言葉（十分なエントロピーを持つパスコード）なしにサーバー側の保存データ単体から復号することは計算量的に極めて困難です。
 - **構造的なプライバシー保護**: 「見ない」という運営者の運用誓約に依存せず、「暗号鍵をサーバーが保持しない」ゼロ知識構造によって、サービス提供者による平文閲覧リスクを最小化しています。
@@ -63,7 +62,6 @@ PoohMa の暗号設計思想、ゼロ知識E2EE（エンベロープ暗号化）
 ## デモ環境でお試し（Live Demo）
 
 ポートフォリオ閲覧や技術検証用に、PoohMa の「ゼロ知識E2EE（エンドツーエンド暗号化）」および「家族承認フロー」を実際に体験できる公開デモファミリーを用意しています。
-
 - **URL**: [https://poohma.ciderlabs.link](https://poohma.ciderlabs.link)
 - **デモ招待コード**: `5f76e73f-ea8b-485f-900b-ffc61a69d83b`
 - **デモ家族パスコード**: `Demo5917@p`
@@ -84,27 +82,26 @@ PoohMa の暗号設計思想、ゼロ知識E2EE（エンベロープ暗号化）
 
 ## 技術スタック
 
-| 分類          | 技術                                                             |
-| ----------- | -------------------------------------------------------------- |
-| フロントエンド     | React 19, TanStack Start（SSR）, TanStack Router, TanStack Query |
-| スタイリング      | Tailwind CSS v4, shadcn/ui                                     |
-| バックエンド／DB   | Convex（サーバーレス関数＋リアクティブDB）                                      |
-| 認証          | Firebase Authentication（Google OAuth）＋ セッションCookie             |
-| CMS         | microCMS（FAQ・利用規約・プライバシーポリシー）                                  |
-| メール送信       | Resend                                                         |
-| 暗号化         | Web Crypto API（AES-GCM, PBKDF2）, WebAuthn（PRF拡張）               |
-| バリデーション     | zod                                                            |
-| テスト         | Vitest, @testing-library/react, convex-test, Playwright        |
-| Lint／フォーマット | Biome                                                          |
-| デプロイ        | Vercel（フロントエンド）, Convex Cloud（バックエンド）                          |
-| バックアップ     | Cloudflare Workers（定時自動実行）, Cloudflare R2（ZIP保存・90日保持）         |
+| 分類               | 技術                                                                   |
+| ------------------ | ---------------------------------------------------------------------- |
+| フロントエンド     | React 19, TanStack Start（SSR）, TanStack Router, TanStack Query       |
+| スタイリング       | Tailwind CSS v4, shadcn/ui                                             |
+| バックエンド／DB   | Convex（サーバーレス関数＋リアクティブDB）                             |
+| 認証               | Firebase Authentication（Google OAuth）＋ セッションCookie             |
+| CMS                | microCMS（FAQ・利用規約・プライバシーポリシー）                        |
+| メール送信         | Resend                                                                 |
+| 暗号化             | Web Crypto API（AES-GCM, PBKDF2）, WebAuthn（PRF拡張）                 |
+| バリデーション     | zod                                                                    |
+| テスト             | Vitest, @testing-library/react, convex-test, Playwright                |
+| Lint／フォーマット | Biome                                                                  |
+| デプロイ           | Vercel（フロントエンド）, Convex Cloud（バックエンド）                 |
+| バックアップ       | Cloudflare Workers（定時自動実行）, Cloudflare R2（ZIP保存・90日保持） |
 
 技術的な詳細（DBスキーマ、API一覧、暗号鍵の階層構造など）は [設計書](#関連ドキュメント) を参照してください。
 
 ## セキュリティ設計の概要
 
 PoohMaの暗号化は、次の3層構造になっています。
-
 1. 家族の合言葉（パスコード）は、サーバーにもブラウザにも保存されません。家族メンバーの頭の中だけにあります。
 2. パスコードから導出した鍵が、家族共通の「マスターキー」を保護（ラップ）します。
 3. マスターキーが、サービスアカウントごとに生成される「DEK」を保護し、DEKがパスワードヒント本体を暗号化します（エンベロープ暗号化）。
@@ -115,19 +112,19 @@ PoohMaの暗号化は、次の3層構造になっています。
 
 ## 関連ドキュメント
 
-| ドキュメント | 内容 |
-| ------------ | --------------------------------------------------------------------------------- |
-| [要件定義書](.docs/requirements.md) | 機能要件・非機能要件、画面一覧、制約事項 |
-| [詳細設計書](.docs/code-design.md) | アーキテクチャ、DBスキーマ、API設計、主要シーケンス |
-| [アーキテクチャ概要](.docs/architecture.md) | コンポーネント構成、データフロー、外部連携の全体像 |
-| [データモデル](.docs/architecture/data-model.md) | 主要エンティティとリレーション（ER図） |
-| [機能一覧](.docs/features.md) | 全提供機能の業務・画面・要件別カタログ |
-| [セキュリティモデル](.docs/security/security-model.md) | 認証・認可・E2EE境界、セッション、WebAuthn仕様 |
-| [E2EE 設計書](.docs/security/e2ee.md) | 鍵階層（Key Hierarchy）、暗号化・復号・ローテーションの詳細 |
-| [脅威モデル](.docs/security/threat-model.md) | 保護対象資産、信頼境界、攻撃者モデルと防御・残存リスク |
-| [テスト戦略](.docs/testing.md) | テストレイヤー、Vitest/convex-test/Playwright の責務と方針 |
-| [アーキテクチャ決定記録 (ADR)](.docs/adr/001-e2ee.md) | E2EE、鍵管理、リカバリー、認可、モノレポ等の設計判断の背景・理由 |
-| [技術解説記事 (Zenn)](https://zenn.dev/luth/articles/e2ee-design-poohma) / [(Qiita)](https://qiita.com/luth/items/b42f1752ae46d4c4bc31) | ゼロ知識E2EE設計、鍵階層、WebAuthn PRF、データ移行の詳細解説 |
+| ドキュメント                                                                                                                            | 内容                                                             |
+| --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| [要件定義書](.docs/requirements.md)                                                                                                     | 機能要件・非機能要件、画面一覧、制約事項                         |
+| [詳細設計書](.docs/code-design.md)                                                                                                      | アーキテクチャ、DBスキーマ、API設計、主要シーケンス              |
+| [アーキテクチャ概要](.docs/architecture.md)                                                                                             | コンポーネント構成、データフロー、外部連携の全体像               |
+| [データモデル](.docs/architecture/data-model.md)                                                                                        | 主要エンティティとリレーション（ER図）                           |
+| [機能一覧](.docs/features.md)                                                                                                           | 全提供機能の業務・画面・要件別カタログ                           |
+| [セキュリティモデル](.docs/security/security-model.md)                                                                                  | 認証・認可・E2EE境界、セッション、WebAuthn仕様                   |
+| [E2EE 設計書](.docs/security/e2ee.md)                                                                                                   | 鍵階層（Key Hierarchy）、暗号化・復号・ローテーションの詳細      |
+| [脅威モデル](.docs/security/threat-model.md)                                                                                            | 保護対象資産、信頼境界、攻撃者モデルと防御・残存リスク           |
+| [テスト戦略](.docs/testing.md)                                                                                                          | テストレイヤー、Vitest/convex-test/Playwright の責務と方針       |
+| [アーキテクチャ決定記録 (ADR)](.docs/adr/001-e2ee.md)                                                                                   | E2EE、鍵管理、リカバリー、認可、モノレポ等の設計判断の背景・理由 |
+| [技術解説記事 (Zenn)](https://zenn.dev/luth/articles/e2ee-design-poohma) / [(Qiita)](https://qiita.com/luth/items/b42f1752ae46d4c4bc31) | ゼロ知識E2EE設計、鍵階層、WebAuthn PRF、データ移行の詳細解説     |
 
 
 ## セットアップ
@@ -158,45 +155,45 @@ pnpm install
 
 クライアント（ `VITE_` プレフィックス、ブラウザに露出する値）：
 
-| 変数名                             | 必須 | 説明                                         |
-| ------------------------------- | -- | ------------------------------------------ |
-| VITE\_APP\_TITLE                | 任意 | アプリタイトル                                    |
-| VITE\_FIREBASE\_API\_KEY        | 必須 | Firebase APIキー                             |
-| VITE\_FIREBASE\_AUTH\_DOMAIN    | 必須 | Firebase Authドメイン                          |
-| VITE\_FIREBASE\_PROJECT\_ID     | 必須 | FirebaseプロジェクトID                           |
-| VITE\_FIREBASE\_STORAGE\_BUCKET | 必須 | Firebase Storageバケット                       |
+| 変数名                          | 必須 | 説明                                                      |
+| ------------------------------- | ---- | --------------------------------------------------------- |
+| VITE\_APP\_TITLE                | 任意 | アプリタイトル                                            |
+| VITE\_FIREBASE\_API\_KEY        | 必須 | Firebase APIキー                                          |
+| VITE\_FIREBASE\_AUTH\_DOMAIN    | 必須 | Firebase Authドメイン                                     |
+| VITE\_FIREBASE\_PROJECT\_ID     | 必須 | FirebaseプロジェクトID                                    |
+| VITE\_FIREBASE\_STORAGE\_BUCKET | 必須 | Firebase Storageバケット                                  |
 | VITE\_CONVEX\_URL               | 必須 | ConvexデプロイURL（ `npx convex dev` 実行時に発行される） |
 
 サーバー（TanStack Startのサーバー関数用）：
 
-| 変数名                            | 必須 | 説明                                              |
-| --------------------------------- | -- | ------------------------------------------------- |
-| SERVER\_URL                       | 任意 | サーバーURL                                         |
-| MICROCMS\_SERVICE\_DOMAIN         | 必須 | microCMSサービスドメイン                                |
-| MICROCMS\_API\_KEY                | 必須 | microCMS APIキー                                  |
-| CONVEX\_INTERNAL\_SECRET          | 必須 | Convex内部API保護用シークレット（下記Convex環境変数と同じ値を設定） |
-| ABSTRACT\_IP\_GEOLOCATION\_API\_KEY | 任意 | Abstract API GeoIP（ログイン・監査メール位置情報取得用） |
+| 変数名                              | 必須 | 説明                                                                |
+| ----------------------------------- | ---- | ------------------------------------------------------------------- |
+| SERVER\_URL                         | 任意 | サーバーURL                                                         |
+| MICROCMS\_SERVICE\_DOMAIN           | 必須 | microCMSサービスドメイン                                            |
+| MICROCMS\_API\_KEY                  | 必須 | microCMS APIキー                                                    |
+| CONVEX\_INTERNAL\_SECRET            | 必須 | Convex内部API保護用シークレット（下記Convex環境変数と同じ値を設定） |
+| ABSTRACT\_IP\_GEOLOCATION\_API\_KEY | 任意 | Abstract API GeoIP（ログイン・監査メール位置情報取得用）            |
 
 Convex実行環境（ `npx convex env set` 等でConvex側に設定）：
 
-| 変数名                                                            | 説明                          |
-| -------------------------------------------------------------- | --------------------------- |
-| FIREBASE\_SERVICE\_ACCOUNT または FIREBASE\_ADMINSDK\_CREDENTIALS | Firebase Admin初期化用サービスアカウント |
-| RESEND\_API\_KEY / RESEND\_MAIL\_FROM                          | メール送信設定                     |
-| YAHOO\_CLIENT\_ID                                              | ふりがな取得API用アプリケーションID        |
-| CONVEX\_INTERNAL\_SECRET                                       | サーバー側の値と一致させる内部API保護用シークレット |
-| DEMO\_FAMILY\_ID                                               | 定期リセット対象のデモファミリーID（任意・デモ運用時必須） |
-| DEMO\_ADMIN\_USER\_IDS                                         | デモファミリーの管理者ユーザーID（カンマ区切り、kick除外用。PoohMaアカウントID `_id` または Firebase UID のいずれでも可） |
+| 変数名                                                            | 説明                                                                                                                      |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| FIREBASE\_SERVICE\_ACCOUNT または FIREBASE\_ADMINSDK\_CREDENTIALS | Firebase Admin初期化用サービスアカウント                                                                                  |
+| RESEND\_API\_KEY / RESEND\_MAIL\_FROM                             | メール送信設定                                                                                                            |
+| YAHOO\_CLIENT\_ID                                                 | ふりがな取得API用アプリケーションID                                                                                       |
+| CONVEX\_INTERNAL\_SECRET                                          | サーバー側の値と一致させる内部API保護用シークレット                                                                       |
+| DEMO\_FAMILY\_ID                                                  | 定期リセット対象のデモファミリーID（任意・デモ運用時必須）                                                                |
+| DEMO\_ADMIN\_USER\_IDS                                            | デモファミリーの管理者ユーザーID（カンマ区切り、kick除外用。PoohMaアカウントID `_id` または Firebase UID のいずれでも可） |
 
-| DEMO\_INVITE\_CODE                                             | デモファミリー用招待コード（任意、デフォルト: `poohma-demo`） |
+| DEMO\_INVITE\_CODE | デモファミリー用招待コード（任意、デフォルト: `poohma-demo`） |
 
 GitHub Actions シークレット（デモ自動リセットワークフロー用）：
 
-| シークレット名                   | 必須 | 説明                                                |
-| ----------------------------- | -- | ------------------------------------------------- |
-| CONVEX\_SITE\_URL             | 必須 | Convex HTTPアクションの公開URL（例: `https://<deployment>.convex.site`） |
-| CONVEX\_INTERNAL\_SECRET      | 必須 | `POST /resetDemoFamily` 認証用シークレット（上記Convex環境変数と一致） |
-| DISCORD\_WEBHOOK\_URL         | 任意 | リセット実行結果・失敗時の通知先Discord Webhook URL          |
+| シークレット名           | 必須 | 説明                                                                     |
+| ------------------------ | ---- | ------------------------------------------------------------------------ |
+| CONVEX\_SITE\_URL        | 必須 | Convex HTTPアクションの公開URL（例: `https://<deployment>.convex.site`） |
+| CONVEX\_INTERNAL\_SECRET | 必須 | `POST /resetDemoFamily` 認証用シークレット（上記Convex環境変数と一致）   |
+| DISCORD\_WEBHOOK\_URL    | 任意 | リセット実行結果・失敗時の通知先Discord Webhook URL                      |
 
 
 ### 3. Convexのセットアップ
@@ -220,14 +217,14 @@ pnpm dev
 
 ## 利用可能なスクリプト
 
-| コマンド              | 内容                                    |
-| ----------------- | ------------------------------------- |
-| `pnpm dev`        | Turborepo 経由で Web アプリの開発サーバーを起動       |
-| `pnpm build`      | Turborepo 経由で全ワークスペースの本番ビルド      |
-| `pnpm typecheck`  | Turborepo 経由で全ワークスペースの型チェック     |
-| `pnpm check`      | Biomeによる静的解析・フォーマット（自動修正）       |
+| コマンド              | 内容                                                                        |
+| --------------------- | --------------------------------------------------------------------------- |
+| `pnpm dev`            | Turborepo 経由で Web アプリの開発サーバーを起動                             |
+| `pnpm build`          | Turborepo 経由で全ワークスペースの本番ビルド                                |
+| `pnpm typecheck`      | Turborepo 経由で全ワークスペースの型チェック                                |
+| `pnpm check`          | Biomeによる静的解析・フォーマット（自動修正）                               |
 | `pnpm lint:workflows` | Docker経由でGitHub Actionsワークフローを静的解析（actionlint + shellcheck） |
-| `pnpm test`       | Turborepo 経由でテスト実行               |
+| `pnpm test`           | Turborepo 経由でテスト実行                                                  |
 
 実際のスクリプト名・オプションは `package.json` を正としてください。
 
@@ -273,7 +270,6 @@ workers/
 ## コントリビューション
 
 Issue・Pull Requestを歓迎します。パスワードや暗号鍵を扱うプロジェクトの性質上、以下の点にご協力ください。
-
 - 認証・認可・暗号化ロジックに関わる変更は、必ずテストを添えてください。
 - 新しいConvex関数を追加する場合は、 `customBuilders.ts` の認可レベル（ `authenticatedQuery` / `familyBoundQuery` 等）を必ず経由してください。生のQuery/Mutationを直接使わないでください。
 - UIの変更は、スマートフォンでの片手操作・タップ領域を意識してください。

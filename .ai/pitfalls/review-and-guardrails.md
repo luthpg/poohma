@@ -437,6 +437,3 @@ PR レビュー対応、外部 AI（CodeRabbit等）指摘の審査、および�
   アカウントやテナントが切り替わるイベントでは、新データの取得成否にかかわらず、まず旧テナントのあらゆるデータを同期的に完全クリアする。
 - **関連実装 (Related Code References)**:
   - `apps/extension/entrypoints/sidepanel/App.tsx`
-
-
-

@@ -37,15 +37,15 @@ poohma/
 
 ### Workspaceの責務
 
-| Workspace | 責務 | 主要技術 |
-| --- | --- | --- |
-| `apps/web` | メインWebアプリケーション（フロントエンド、SSR、Server Functions） | React 19, TanStack Start, TanStack Router, Tailwind CSS v4, shadcn/ui, Web Crypto API |
-| `apps/extension` | Chrome 拡張機能（閲覧中サイトのアカウント参照・パスコード解除・ヒント復号・自動入力支援） | WXT, Manifest V3, React 19, Tailwind CSS v4, Web Crypto API |
-| `apps/admin` | 管理者コンソール（お問い合わせ対応、統計KPI、ユーザー/ファミリー照会、システム監査） | React 19, TanStack Start, Cloudflare Workers/Vite Plugin, cmdk, Geist Fonts |
-| `packages/backend` | Convex BaaS バックエンド（スキーマ、関数、RLS、admin API、プレビュー構築） | Convex, convex-helpers, convex-test, TypeScript |
-| `packages/shared` | 共通バリデーションスキーマ、URL検証（SSRF対策）、メール定義 | Zod, React Email, ipaddr.js, TypeScript |
-| `packages/knowledge-tools` | AI開発支援、Doc-Sync、参照整合性検証ツール | TypeScript, simple-git |
-| `workers/backup` | Convex Cloud からの定期データエクスポートおよび Cloudflare R2 へのアーカイブ保存 | Cloudflare Workers, Cloudflare R2, Wrangler, Fetch |
+| Workspace                  | 責務                                                                                      | 主要技術                                                                              |
+| -------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `apps/web`                 | メインWebアプリケーション（フロントエンド、SSR、Server Functions）                        | React 19, TanStack Start, TanStack Router, Tailwind CSS v4, shadcn/ui, Web Crypto API |
+| `apps/extension`           | Chrome 拡張機能（閲覧中サイトのアカウント参照・パスコード解除・ヒント復号・自動入力支援） | WXT, Manifest V3, React 19, Tailwind CSS v4, Web Crypto API                           |
+| `apps/admin`               | 管理者コンソール（お問い合わせ対応、統計KPI、ユーザー/ファミリー照会、システム監査）      | React 19, TanStack Start, Cloudflare Workers/Vite Plugin, cmdk, Geist Fonts           |
+| `packages/backend`         | Convex BaaS バックエンド（スキーマ、関数、RLS、admin API、プレビュー構築）                | Convex, convex-helpers, convex-test, TypeScript                                       |
+| `packages/shared`          | 共通バリデーションスキーマ、URL検証（SSRF対策）、メール定義                               | Zod, React Email, ipaddr.js, TypeScript                                               |
+| `packages/knowledge-tools` | AI開発支援、Doc-Sync、参照整合性検証ツール                                                | TypeScript, simple-git                                                                |
+| `workers/backup`           | Convex Cloud からの定期データエクスポートおよび Cloudflare R2 へのアーカイブ保存          | Cloudflare Workers, Cloudflare R2, Wrangler, Fetch                                    |
 
 ---
 
@@ -98,13 +98,13 @@ poohma/
 
 ### 認証要素の責務分離（4層モデル）
 
-| 認証要素 | 役割 | 保持期間 | 責務と位置付け |
-| --- | --- | --- | --- |
-| **Firebase Auth** | 長期ログイン状態の本体 | 数ヶ月単位（無期限） | **Single Source of Truth**。IndexedDB + LocalStorage 永続化によりブラウザ側で長期間維持。 |
-| **Firebase ID Token** | Convex バックエンドへの通信認証 | 1時間（SDK自動更新） | Convex への WebSocket/HTTP 通信時に付与され、Convex 側 OIDC 検証で直接認証。 |
-| **session Cookie** | SSR初期表示・Server Function用キャッシュ | 14日間（自動ローリング延長） | サーバー側補助セッション。Cookie の期限切れのみでログアウト扱いにしてはならない。 |
-| **Custom Token** | Client Auth 消失時のリカバリ | 一時発行（1回限り） | ブラウザストレージの揮発時に session Cookie から Client Auth を復旧するための非常用経路。 |
-| **poohma_active_account_id Cookie** | SSR時のアクティブアカウント同期 | 365日間（アカウント切替時に更新） | SSR初期表示でクライアントと同一のアカウント/家族コンテキストを確定・整合させる補助Cookie。ふとした利用時でもアカウント再選択を不要にし、端末上で直前の利用アカウントを長期間保持する。 |
+| 認証要素                            | 役割                                     | 保持期間                          | 責務と位置付け                                                                                                                                                                         |
+| ----------------------------------- | ---------------------------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Firebase Auth**                   | 長期ログイン状態の本体                   | 数ヶ月単位（無期限）              | **Single Source of Truth**。IndexedDB + LocalStorage 永続化によりブラウザ側で長期間維持。                                                                                              |
+| **Firebase ID Token**               | Convex バックエンドへの通信認証          | 1時間（SDK自動更新）              | Convex への WebSocket/HTTP 通信時に付与され、Convex 側 OIDC 検証で直接認証。                                                                                                           |
+| **session Cookie**                  | SSR初期表示・Server Function用キャッシュ | 14日間（自動ローリング延長）      | サーバー側補助セッション。Cookie の期限切れのみでログアウト扱いにしてはならない。                                                                                                      |
+| **Custom Token**                    | Client Auth 消失時のリカバリ             | 一時発行（1回限り）               | ブラウザストレージの揮発時に session Cookie から Client Auth を復旧するための非常用経路。                                                                                              |
+| **poohma_active_account_id Cookie** | SSR時のアクティブアカウント同期          | 365日間（アカウント切替時に更新） | SSR初期表示でクライアントと同一のアカウント/家族コンテキストを確定・整合させる補助Cookie。ふとした利用時でもアカウント再選択を不要にし、端末上で直前の利用アカウントを長期間保持する。 |
 
 ### 認証フロー
 
@@ -177,14 +177,14 @@ flowchart TD
 
 ## 5. 主要な Source of Truth
 
-| 領域 | Source of Truth |
-| --- | --- |
-| DB スキーマ・インデックス | `packages/backend/convex/schema.ts` |
-| Convex 認証・認可基盤 | `packages/backend/convex/customBuilders.ts` |
-| レコード単位アクセス制御 (RLS) | `packages/backend/convex/rls.ts` |
-| E2EE 暗号化・鍵導出アルゴリズム | `packages/crypto/src/index.ts` |
-| 脅威モデル・セキュリティ境界 | `.docs/security/threat-model.md` |
-| 人間向け正規仕様・詳細設計 | `.docs/requirements.md`, `.docs/code-design.md` |
+| 領域                            | Source of Truth                                 |
+| ------------------------------- | ----------------------------------------------- |
+| DB スキーマ・インデックス       | `packages/backend/convex/schema.ts`             |
+| Convex 認証・認可基盤           | `packages/backend/convex/customBuilders.ts`     |
+| レコード単位アクセス制御 (RLS)  | `packages/backend/convex/rls.ts`                |
+| E2EE 暗号化・鍵導出アルゴリズム | `packages/crypto/src/index.ts`                  |
+| 脅威モデル・セキュリティ境界    | `.docs/security/threat-model.md`                |
+| 人間向け正規仕様・詳細設計      | `.docs/requirements.md`, `.docs/code-design.md` |
 
 ---
 

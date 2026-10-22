@@ -28,4 +28,3 @@ Issue #134 への対応として、発行時に一度だけ提示される高エ
 
 - [E2EE Design](../security/e2ee.md)
 - [Security Model](../security/security-model.md)
-

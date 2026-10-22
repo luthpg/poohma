@@ -359,7 +359,7 @@ html.dark .driver-overlay path {
 
 /* 矢印の色 */
 .driver-popover.poohma-tour-popover
-.driver-popover-arrow-side-top.driver-popover-arrow {
+  .driver-popover-arrow-side-top.driver-popover-arrow {
   border-top-color: var(--color-card, #ffffff);
 }
 .driver-popover.poohma-tour-popover

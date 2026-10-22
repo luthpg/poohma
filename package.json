@@ -38,9 +38,9 @@
     "preview:auth": "pnpm web exec playwright test e2e/auth.setup.ts --project=setup --no-deps"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.13",
-    "tsx": "^4.23.13",
-    "turbo": "^2.10.12",
+    "@biomejs/biome": "^2.6.2",
+    "tsx": "^4.23.15",
+    "turbo": "^2.11.10",
     "typescript": "^7.0.2"
   },
   "packageManager": "pnpm@12.14.0",

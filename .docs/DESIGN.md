@@ -9,7 +9,6 @@ The custom Geist font family is the crown jewel. Geist Sans uses aggressive nega
 What distinguishes Vercel from other monochrome design systems is its shadow-as-border philosophy. Instead of traditional CSS borders, Vercel uses `box-shadow: 0px 0px 0px 1px rgba(0,0,0,0.08)` — a zero-offset, zero-blur, 1px-spread shadow that creates a border-like line without the box model implications. This technique allows borders to exist in the shadow layer, enabling smoother transitions, rounded corners without clipping, and a subtler visual weight than traditional borders. The entire depth system is built on layered, multi-value shadow stacks where each layer serves a specific purpose: one for the border, one for soft elevation, one for ambient depth.
 
 **Key Characteristics:**
-
 - Geist Sans with extreme negative letter-spacing (-2.4px to -2.88px at display) — text as compressed infrastructure
 - Geist Mono for code and technical labels with OpenType `"liga"` globally
 - Shadow-as-border technique: `box-shadow 0px 0px 0px 1px` replaces traditional borders throughout
@@ -84,26 +83,26 @@ What distinguishes Vercel from other monochrome design systems is its shadow-as-
 
 ### Hierarchy
 
-| Role | Font | Size | Weight | Line Height | Letter Spacing | Notes |
-| ------ | ------ | ------ | -------- | ------------- | ---------------- | ------- |
-| Display Hero | Geist | 48px (3.00rem) | 600 | 1.00–1.17 (tight) | -2.4px to -2.88px | Maximum compression, billboard impact |
-| Section Heading | Geist | 40px (2.50rem) | 600 | 1.20 (tight) | -2.4px | Feature section titles |
-| Sub-heading Large | Geist | 32px (2.00rem) | 600 | 1.25 (tight) | -1.28px | Card headings, sub-sections |
-| Sub-heading | Geist | 32px (2.00rem) | 400 | 1.50 | -1.28px | Lighter sub-headings |
-| Card Title | Geist | 24px (1.50rem) | 600 | 1.33 | -0.96px | Feature cards |
-| Card Title Light | Geist | 24px (1.50rem) | 500 | 1.33 | -0.96px | Secondary card headings |
-| Body Large | Geist | 20px (1.25rem) | 400 | 1.80 (relaxed) | normal | Introductions, feature descriptions |
-| Body | Geist | 18px (1.13rem) | 400 | 1.56 | normal | Standard reading text |
-| Body Small | Geist | 16px (1.00rem) | 400 | 1.50 | normal | Standard UI text |
-| Body Medium | Geist | 16px (1.00rem) | 500 | 1.50 | normal | Navigation, emphasized text |
-| Body Semibold | Geist | 16px (1.00rem) | 600 | 1.50 | -0.32px | Strong labels, active states |
-| Button / Link | Geist | 14px (0.88rem) | 500 | 1.43 | normal | Buttons, links, captions |
-| Button Small | Geist | 14px (0.88rem) | 400 | 1.00 (tight) | normal | Compact buttons |
-| Caption | Geist | 12px (0.75rem) | 400–500 | 1.33 | normal | Metadata, tags |
-| Mono Body | Geist Mono | 16px (1.00rem) | 400 | 1.50 | normal | Code blocks |
-| Mono Caption | Geist Mono | 13px (0.81rem) | 500 | 1.54 | normal | Code labels |
-| Mono Small | Geist Mono | 12px (0.75rem) | 500 | 1.00 (tight) | normal | `text-transform: uppercase`, technical labels |
-| Micro Badge | Geist | 7px (0.44rem) | 700 | 1.00 (tight) | normal | `text-transform: uppercase`, tiny badges |
+| Role              | Font       | Size           | Weight  | Line Height       | Letter Spacing    | Notes                                         |
+| ----------------- | ---------- | -------------- | ------- | ----------------- | ----------------- | --------------------------------------------- |
+| Display Hero      | Geist      | 48px (3.00rem) | 600     | 1.00–1.17 (tight) | -2.4px to -2.88px | Maximum compression, billboard impact         |
+| Section Heading   | Geist      | 40px (2.50rem) | 600     | 1.20 (tight)      | -2.4px            | Feature section titles                        |
+| Sub-heading Large | Geist      | 32px (2.00rem) | 600     | 1.25 (tight)      | -1.28px           | Card headings, sub-sections                   |
+| Sub-heading       | Geist      | 32px (2.00rem) | 400     | 1.50              | -1.28px           | Lighter sub-headings                          |
+| Card Title        | Geist      | 24px (1.50rem) | 600     | 1.33              | -0.96px           | Feature cards                                 |
+| Card Title Light  | Geist      | 24px (1.50rem) | 500     | 1.33              | -0.96px           | Secondary card headings                       |
+| Body Large        | Geist      | 20px (1.25rem) | 400     | 1.80 (relaxed)    | normal            | Introductions, feature descriptions           |
+| Body              | Geist      | 18px (1.13rem) | 400     | 1.56              | normal            | Standard reading text                         |
+| Body Small        | Geist      | 16px (1.00rem) | 400     | 1.50              | normal            | Standard UI text                              |
+| Body Medium       | Geist      | 16px (1.00rem) | 500     | 1.50              | normal            | Navigation, emphasized text                   |
+| Body Semibold     | Geist      | 16px (1.00rem) | 600     | 1.50              | -0.32px           | Strong labels, active states                  |
+| Button / Link     | Geist      | 14px (0.88rem) | 500     | 1.43              | normal            | Buttons, links, captions                      |
+| Button Small      | Geist      | 14px (0.88rem) | 400     | 1.00 (tight)      | normal            | Compact buttons                               |
+| Caption           | Geist      | 12px (0.75rem) | 400–500 | 1.33              | normal            | Metadata, tags                                |
+| Mono Body         | Geist Mono | 16px (1.00rem) | 400     | 1.50              | normal            | Code blocks                                   |
+| Mono Caption      | Geist Mono | 13px (0.81rem) | 500     | 1.54              | normal            | Code labels                                   |
+| Mono Small        | Geist Mono | 12px (0.75rem) | 500     | 1.00 (tight)      | normal            | `text-transform: uppercase`, technical labels |
+| Micro Badge       | Geist      | 7px (0.44rem)  | 700     | 1.00 (tight)      | normal            | `text-transform: uppercase`, tiny badges      |
 
 ### Principles
 
@@ -117,7 +116,6 @@ What distinguishes Vercel from other monochrome design systems is its shadow-as-
 ### Buttons
 
 **Primary White (Shadow-bordered)**
-
 - Background: `#ffffff`
 - Text: `#171717`
 - Padding: 0px 6px (minimal — content-driven width)
@@ -128,7 +126,6 @@ What distinguishes Vercel from other monochrome design systems is its shadow-as-
 - Use: Standard secondary button
 
 **Primary Dark (Inferred from Geist system)**
-
 - Background: `#171717`
 - Text: `#ffffff`
 - Padding: 8px 16px
@@ -138,7 +135,6 @@ What distinguishes Vercel from other monochrome design systems is its shadow-as-
 **Primary Action Button (Orange CTA - Button Specific)**
 
 PoohMa のブランドカラー本体（`#f97316` / orange-500：ロゴや変更インジケーター等のシグネチャー）と調和を保ちつつ、ボタン内の白文字の視認性（WCAGコントラスト比）およびモバイル操作性を担保するための**ボタン限定の専用スタイル**：
-
 - Background: `#ea580c` (orange-600), Hover: `#c2410c` (orange-700)
 - Text: `#ffffff`
 - Font: `font-semibold text-xs sm:text-[14px]` (コントラスト比 3.56:1、太字UI要素/ラージテキスト基準 3:1 クリア)
@@ -147,7 +143,6 @@ PoohMa のブランドカラー本体（`#f97316` / orange-500：ロゴや変更
 - Use: レコード関連フローの主要送信・決定アクション限定（"登録する", "保存する", "編集する"）
 
 **Pill Button / Badge**
-
 - Background: `#ebf5ff` (tinted blue)
 - Text: `#0068d6`
 - Padding: 0px 10px
@@ -156,7 +151,6 @@ PoohMa のブランドカラー本体（`#f97316` / orange-500：ロゴや変更
 - Use: Status badges, tags, feature labels
 
 **Large Pill (Navigation)**
-
 - Background: transparent or `#171717`
 - Radius: 64px–100px
 - Use: Tab navigation, section selectors
@@ -178,7 +172,6 @@ PoohMa のブランドカラー本体（`#f97316` / orange-500：ロゴや変更
 - Border: via shadow technique, not traditional border
 
 **Full-width Search Bar (Dashboard)**
-
 - Container: `relative flex-1`
 - Search Icon: `absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none`
 - Input: `w-full rounded-md bg-card pl-10 pr-10 py-2.5 h-10 text-base md:text-[14px] shadow-border focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-shadow`
@@ -186,7 +179,6 @@ PoohMa のブランドカラー本体（`#f97316` / orange-500：ロゴや変更
 - Characteristics: 手動検索ボタンを撤去し、フルワイド100%幅で250msデバウンス自動検索を提供。
 
 **Integrated Scope & Tag Filter Bar (Dashboard)**
-
 - Container: `flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 min-w-0`
 - Scope Chip (shadcn/ui DropdownMenu):
   - Height: `h-[30px]` / `h-8`（ピル型 `rounded-full`、幅 約 85px〜105px）
@@ -199,7 +191,6 @@ PoohMa のブランドカラー本体（`#f97316` / orange-500：ロゴや変更
 - Tag Cloud: 残り全幅をスムーズに横スクロール。モバイル（375px幅）でも縦方向をわずか36px（1行）に抑え、タグ領域に約268pxの広いスワイプ領域を確保。
 
 **Visual Accent Bar (Form Modification Indicator)**
-
 - Container: `relative pl-3.5`（編集画面では常に左余白 14px を確保し、レイアウトシフト＝ガタつきを完全防止）
 - Indicator Bar: `before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-1 before:bg-orange-500 before:rounded-full before:transition-all before:duration-200`
 - State:
@@ -210,7 +201,6 @@ PoohMa のブランドカラー本体（`#f97316` / orange-500：ロゴや変更
 ### Fixed Action Footer (Service Records)
 
 レコード詳細閲覧、レコード編集、新規登録の3画面において、下部アクションバーの体験・配置を統一：
-
 - Container: `fixed bottom-0 left-0 right-0 z-20 border-t border-border/80 bg-background/95 backdrop-blur-md px-4 py-2.5 sm:px-6 sm:py-3.5 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] dark:shadow-[0_-4px_12px_rgba(0,0,0,0.3)] pb-[max(0.625rem,env(safe-area-inset-bottom))] sm:pb-[max(0.875rem,env(safe-area-inset-bottom))]`
 - Content Width: `max-w-4xl mx-auto flex items-center justify-between`
 - Button Alignment & Tap Targets:
@@ -258,20 +248,17 @@ PoohMa のブランドカラー本体（`#f97316` / orange-500：ロゴや変更
 ### Distinctive Components
 
 **Workflow Pipeline**
-
 - Three-step horizontal pipeline: Develop → Preview → Ship
 - Each step has its own accent color: Blue → Pink → Red
 - Connected with lines/arrows
 - The visual metaphor for Vercel's core value proposition
 
 **Trust Bar / Logo Grid**
-
 - Company logos (Perplexity, ChatGPT, Cursor, etc.) in grayscale
 - Horizontal scroll or grid layout
 - Subtle `#ebebeb` border separation
 
 **Metric Cards**
-
 - Large number display (e.g., "10x faster")
 - Geist 48px weight 600 for the metric
 - Description below in gray body text
@@ -313,14 +300,14 @@ PoohMa のブランドカラー本体（`#f97316` / orange-500：ロゴや変更
 
 ## 6. Depth & Elevation
 
-| Level | Treatment | Use |
-| ------- | ----------- | ----- |
-| Flat (Level 0) | No shadow | Page background, text blocks |
-| Ring (Level 1) | `rgba(0,0,0,0.08) 0px 0px 0px 1px` | Shadow-as-border for most elements |
-| Light Ring (Level 1b) | `rgb(235,235,235) 0px 0px 0px 1px` | Lighter ring for tabs, images |
-| Subtle Card (Level 2) | Ring + `rgba(0,0,0,0.04) 0px 2px 2px` | Standard cards with minimal lift |
-| Full Card (Level 3) | Ring + Subtle + `rgba(0,0,0,0.04) 0px 8px 8px -8px` + inner `#fafafa` ring | Featured cards, highlighted panels |
-| Focus (Accessibility) | `2px solid hsla(212, 100%, 48%, 1)` outline | Keyboard focus on all interactive elements |
+| Level                 | Treatment                                                                  | Use                                        |
+| --------------------- | -------------------------------------------------------------------------- | ------------------------------------------ |
+| Flat (Level 0)        | No shadow                                                                  | Page background, text blocks               |
+| Ring (Level 1)        | `rgba(0,0,0,0.08) 0px 0px 0px 1px`                                         | Shadow-as-border for most elements         |
+| Light Ring (Level 1b) | `rgb(235,235,235) 0px 0px 0px 1px`                                         | Lighter ring for tabs, images              |
+| Subtle Card (Level 2) | Ring + `rgba(0,0,0,0.04) 0px 2px 2px`                                      | Standard cards with minimal lift           |
+| Full Card (Level 3)   | Ring + Subtle + `rgba(0,0,0,0.04) 0px 8px 8px -8px` + inner `#fafafa` ring | Featured cards, highlighted panels         |
+| Focus (Accessibility) | `2px solid hsla(212, 100%, 48%, 1)` outline                                | Keyboard focus on all interactive elements |
 
 **Shadow Philosophy**: Vercel has arguably the most sophisticated shadow system in modern web design. Rather than using shadows for elevation in the traditional Material Design sense, Vercel uses multi-value shadow stacks where each layer has a distinct architectural purpose: one creates the "border" (0px spread, 1px), another adds ambient softness (2px blur), another handles depth at distance (8px blur with negative spread), and an inner ring (`#fafafa`) creates the subtle highlight that makes the card "glow" from within. This layered approach means cards feel built, not floating.
 
@@ -359,15 +346,15 @@ PoohMa のブランドカラー本体（`#f97316` / orange-500：ロゴや変更
 
 ### Breakpoints
 
-| Name | Width | Key Changes |
-| ------ | ------- | ------------- |
-| Mobile Small | <400px | Tight single column, minimal padding |
-| Mobile | 400–600px | Standard mobile, stacked layout |
-| Tablet Small | 600–768px | 2-column grids begin |
-| Tablet | 768–1024px | Full card grids, expanded padding |
-| Desktop Small | 1024–1200px | Standard desktop layout |
-| Desktop | 1200–1400px | Full layout, maximum content width |
-| Large Desktop | >1400px | Centered, generous margins |
+| Name          | Width       | Key Changes                          |
+| ------------- | ----------- | ------------------------------------ |
+| Mobile Small  | <400px      | Tight single column, minimal padding |
+| Mobile        | 400–600px   | Standard mobile, stacked layout      |
+| Tablet Small  | 600–768px   | 2-column grids begin                 |
+| Tablet        | 768–1024px  | Full card grids, expanded padding    |
+| Desktop Small | 1024–1200px | Standard desktop layout              |
+| Desktop       | 1200–1400px | Full layout, maximum content width   |
+| Large Desktop | >1400px     | Centered, generous margins           |
 
 ### Touch Targets
 
@@ -427,6 +414,7 @@ PoohMa のブランドカラー本体（`#f97316` / orange-500：ロゴや変更
 ## 10. Chrome 拡張機能 & 連携画面デザイン仕様 (Side Panel & Web Sync)
 
 ### 10.1 Side Panel UI (`apps/extension/entrypoints/sidepanel`)
+
 - **世界観とトーン**: Web アプリと 100% 同一の Geist デザインシステム、PoohMa Orange、Vercel 哲学の shadow-as-border、角丸 6px（`--radius: 6px`）を採用。
 - **絵文字の完全排除**: 🐻 などの装飾的絵文字は全廃。公式ロゴ（`/poohma_icon.png`）および Lucide アイコン（`<ShieldCheck />`, `<KeyRound />`, `<PencilSparkles />` 等）を使用。
 - **未認証ステート**: 簡潔で親しみやすいカードレイアウト、シンプルな「ログイン」ボタン（クリックで nonce 採番・Web 同期タブ起動）。待機中は60秒自律タイムアウトおよび「連携をキャンセル」ボタンを提供し、タブ放置時や失敗時でも即座に再試行可能。
@@ -439,10 +427,10 @@ PoohMa のブランドカラー本体（`#f97316` / orange-500：ロゴや変更
   - 未登録サイト対応: 「このサイトを PoohMa に追加」導線（`/records/new?url=...` 起動）。
 
 ### 10.2 Web 同期画面 (`apps/web/src/routes/(public)/auth.extension-sync.tsx`)
+
 - **ユーザー主導の信頼性**: 勝手にタブを閉じる（`window.close()`）動作を廃止し、明示的な「このタブを閉じる」ボタンおよび「ダッシュボードへ移動」リンクを提供。
 - **使用済みリンクの親切なハンドリング**: 連携成功後にリロードや再アクセスされた場合、内部エラーにせず「この認証リンクは既に使用されています」というガイダンスとトップページへの導線を表示。
 - **平穏な通知文言**: 恐怖を煽る「不正な」を廃止し、「無効な連携リクエストです」などの平穏で安全な表現に統一。
 - **同期インジケーター**: `<ShieldCheck />` と HoneyPotLoader による滑らかな認証セッション確立体験。テーマ設定（`theme`）も拡張機能へ自動受け渡し。8秒後の手動再試行時には前回のタイマー・ACKリスナーを即座に破棄（`attemptCleanupRef`）し、タイマー競合（Race condition）を防止。
 
 ※ 拡張機能の認証方式の選定および Chrome Web Store 審査に関する位置付けは [ADR-009: Extension Authentication and Session Synchronization Strategy](./adr/009-extension-authentication-strategy.md) を参照。
-

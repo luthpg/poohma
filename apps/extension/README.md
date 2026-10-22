@@ -18,7 +18,6 @@
 ## インストール手順（利用者向け）
 
 Chrome Web Store の審査を経ず、GitHub Releases から直接インストールできます。
-
 1. **zip ファイルのダウンロード**:
    - [PoohMa Releases](https://github.com/luthpg/poohma/releases) から最新の `poohma-extension-vX.X.X-chrome.zip` をダウンロードします。
 2. **zip の解凍**:
