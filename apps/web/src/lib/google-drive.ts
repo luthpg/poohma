@@ -190,6 +190,80 @@ export async function showGoogleDrivePicker({
 }
 
 /**
+ * Google Picker を起動して PDF リカバリーキットを選択させる
+ * ファイルが選択された場合はその fileId と name を返し、キャンセルの場合は null を返す
+ */
+export async function showGoogleDrivePdfPicker({
+  accessToken,
+  apiKey,
+  appId,
+}: {
+  accessToken: string;
+  apiKey: string;
+  appId?: string;
+}): Promise<{ fileId: string; name: string } | null> {
+  if (typeof window === "undefined" || !window.google?.picker) {
+    throw new Error(
+      "Google Picker library is not loaded. Call loadGooglePickerScript first.",
+    );
+  }
+
+  const pickerApi = window.google.picker;
+
+  return new Promise((resolve, reject) => {
+    try {
+      const { DocsView, PickerBuilder, ViewId, Action, Feature } = pickerApi;
+
+      // 1. マイドライブ用 PDF ビュー
+      const myDrivePdfView = new DocsView(ViewId.DOCS)
+        .setMimeTypes("application/pdf")
+        .setIncludeFolders(true)
+        .setParent("root");
+
+      // 2. 共有ドライブ用 PDF ビュー
+      const sharedDrivesPdfView = new DocsView(ViewId.DOCS)
+        .setMimeTypes("application/pdf")
+        .setIncludeFolders(true)
+        .setEnableDrives(true);
+
+      const pickerBuilder = new PickerBuilder()
+        .addView(myDrivePdfView)
+        .addView(sharedDrivesPdfView)
+        .setOAuthToken(accessToken)
+        .setDeveloperKey(apiKey)
+        .setTitle("リカバリーキット（PDF）を選択")
+        .setCallback((data: GooglePickerResponse) => {
+          if (data.action === Action.PICKED) {
+            const doc = data.docs?.[0];
+            if (doc?.id) {
+              resolve({ fileId: doc.id, name: doc.name });
+            } else {
+              resolve(null);
+            }
+          } else if (data.action === Action.CANCEL) {
+            resolve(null);
+          } else if (data.action === Action.ERROR) {
+            reject(data);
+          }
+        });
+
+      if (Feature?.SUPPORT_DRIVES) {
+        pickerBuilder.enableFeature(Feature.SUPPORT_DRIVES);
+      }
+
+      if (appId) {
+        pickerBuilder.setAppId(appId);
+      }
+
+      const picker = pickerBuilder.build();
+      picker.setVisible(true);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+/**
  * Google Drive へファイルをアップロード（マルチパート）
  */
 export async function uploadFileToGoogleDrive({
@@ -261,7 +335,7 @@ export async function downloadFileFromGoogleDrive({
 }): Promise<Blob | null> {
   try {
     const res = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&supportsAllDrives=true`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,

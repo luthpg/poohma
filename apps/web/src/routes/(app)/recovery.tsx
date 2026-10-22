@@ -19,6 +19,7 @@ import {
   Eye,
   EyeOff,
   FileUp,
+  HardDrive,
   KeyRound,
   RotateCcw,
   ShieldAlert,
@@ -34,8 +35,15 @@ import {
 } from "@/components/ui/input-otp";
 import { Spinner } from "@/components/ui/spinner";
 import { MIN_PASSCODE_LENGTH } from "@/constants/passcode";
+import { env } from "@/env/client";
 import { useAccount } from "@/hooks/useAccount";
+import {
+  downloadFileFromGoogleDrive,
+  loadGooglePickerScript,
+  showGoogleDrivePdfPicker,
+} from "@/lib/google-drive";
 import { extractRecoveryCodeFromFile } from "@/lib/recovery-kit";
+import { getGoogleDriveAccessToken } from "@/utils/firebase";
 
 const PasscodeStrengthMeter = lazy(() =>
   import("@/components/PasscodeStrengthMeter").then((m) => ({
@@ -70,7 +78,76 @@ function RecoveryPageComponent() {
   // Step 1: Recovery Code
   const [rawCode, setRawCode] = useState("");
   const [isExtractingFile, setIsExtractingFile] = useState(false);
+  const [isDrivePicking, setIsDrivePicking] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Google Drive からの PDF リカバリーキット選択・読み込み（PC限定）
+  const handleGoogleDrivePick = async () => {
+    setIsDrivePicking(true);
+    try {
+      const accessToken = await getGoogleDriveAccessToken();
+      if (!accessToken) {
+        setIsDrivePicking(false);
+        return;
+      }
+
+      const isLoaded = await loadGooglePickerScript();
+      if (!isLoaded) {
+        toast.error("Google Drive ライブラリの読み込みに失敗しました");
+        setIsDrivePicking(false);
+        return;
+      }
+
+      const apiKey =
+        env.VITE_GOOGLE_PICKER_API_KEY || env.VITE_FIREBASE_API_KEY;
+      const appId =
+        env.VITE_GOOGLE_CLOUD_PROJECT_NUMBER || env.VITE_FIREBASE_PROJECT_ID;
+
+      const pickRes = await showGoogleDrivePdfPicker({
+        accessToken,
+        apiKey,
+        appId,
+      });
+
+      if (!pickRes) {
+        setIsDrivePicking(false);
+        return;
+      }
+
+      const pdfBlob = await downloadFileFromGoogleDrive({
+        accessToken,
+        fileId: pickRes.fileId,
+      });
+
+      if (!pdfBlob) {
+        toast.error("Google Drive からのファイル取得に失敗しました");
+        setIsDrivePicking(false);
+        return;
+      }
+
+      const file = new File([pdfBlob], pickRes.name, {
+        type: "application/pdf",
+      });
+
+      setIsExtractingFile(true);
+      const extracted = await extractRecoveryCodeFromFile(file);
+      if (extracted) {
+        setRawCode(extracted);
+        toast.success(
+          "Google Drive のファイルからリカバリーコードを読み取りました",
+        );
+      } else {
+        toast.error(
+          "ファイルからQRコードを検出できませんでした。コードを手入力してください。",
+        );
+      }
+    } catch (_err) {
+      toast.error("Google Drive からの読み込み中にエラーが発生しました");
+    } finally {
+      setIsDrivePicking(false);
+      setIsExtractingFile(false);
+    }
+  };
 
   // Step 2: Email OTP
   const [otp, setOtp] = useState("");
@@ -409,6 +486,30 @@ function RecoveryPageComponent() {
                   </>
                 )}
               </label>
+            </div>
+
+            {/* PC限定: Google Drive 連携ボタン */}
+            <div className="hidden sm:flex justify-center -mt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleGoogleDrivePick}
+                disabled={isExtractingFile || isDrivePicking}
+                className="gap-2 text-xs font-medium text-foreground hover:bg-muted cursor-pointer"
+              >
+                {isDrivePicking ? (
+                  <>
+                    <Spinner className="h-3.5 w-3.5 text-primary" />
+                    Google Drive から取得中...
+                  </>
+                ) : (
+                  <>
+                    <HardDrive className="h-3.5 w-3.5 text-primary" />
+                    Google Drive からPDFを選択
+                  </>
+                )}
+              </Button>
             </div>
 
             <div className="relative flex items-center justify-center">

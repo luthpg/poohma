@@ -6,6 +6,10 @@ import {
   RecordInputSchema,
 } from "@poohma/shared/schemas";
 import { computeSortKey } from "@poohma/shared/utils/index-group";
+import {
+  extractSearchWords,
+  matchesSearchWords,
+} from "@poohma/shared/utils/search-normalization";
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { z } from "zod";
@@ -145,13 +149,29 @@ async function collectVisibleRecords(
   ctx: { db: QueryCtx["db"] },
   user: Doc<"users">,
   ownedOnly = false,
+  archiveStatus: "active" | "archived" | "all" = "all",
 ): Promise<Doc<"serviceRecords">[]> {
   const familyId = user.familyId;
   if (familyId) {
-    const familyRecords = await ctx.db
-      .query("serviceRecords")
-      .withIndex("by_family_sortKey", (i) => i.eq("familyId", familyId))
-      .collect();
+    const familyRecords =
+      archiveStatus === "active"
+        ? await ctx.db
+            .query("serviceRecords")
+            .withIndex("by_family_isArchived", (i) =>
+              i.eq("familyId", familyId).eq("isArchived", false),
+            )
+            .collect()
+        : archiveStatus === "archived"
+          ? await ctx.db
+              .query("serviceRecords")
+              .withIndex("by_family_isArchived", (i) =>
+                i.eq("familyId", familyId).eq("isArchived", true),
+              )
+              .collect()
+          : await ctx.db
+              .query("serviceRecords")
+              .withIndex("by_family_sortKey", (i) => i.eq("familyId", familyId))
+              .collect();
 
     if (ownedOnly) {
       return familyRecords.filter((r) => {
@@ -182,7 +202,12 @@ async function collectVisibleRecords(
     .withIndex("by_accountId", (i) => i.eq("accountId", user._id))
     .collect();
 
-  return personalRecords.filter((r) => getEffectiveOwnerType(r) === "user");
+  return personalRecords.filter((r) => {
+    if (getEffectiveOwnerType(r) !== "user") return false;
+    if (archiveStatus === "active") return !r.isArchived;
+    if (archiveStatus === "archived") return r.isArchived;
+    return true;
+  });
 }
 
 /**
@@ -246,9 +271,8 @@ export const getRecords = authenticatedQuery({
   handler: async (ctx, args) => {
     const { user } = ctx;
 
-    let records = await collectVisibleRecords(ctx, user);
-
     const archiveStatus = args.archiveStatus ?? "active";
+    let records = await collectVisibleRecords(ctx, user, false, archiveStatus);
     if (archiveStatus === "active") {
       records = records.filter((r) => !r.isArchived);
     } else if (archiveStatus === "archived") {
@@ -298,37 +322,24 @@ export const getRecords = authenticatedQuery({
     let filtered = recordsWithCredentials;
 
     if (args.q) {
-      const rawQ = args.q.trim();
-      if (rawQ) {
-        // NFKC 正規化により全角スペース（\u3000）も半角スペース（\u0020）に変換される
-        const searchWords = rawQ
-          .normalize("NFKC")
-          .toLowerCase()
-          .split(/\s+/)
-          .filter(Boolean);
+      const searchWords = extractSearchWords(args.q);
+      if (searchWords.length > 0) {
+        filtered = filtered.filter((r) => {
+          const searchableTexts: string[] = [
+            r.title,
+            r.titleReading,
+            r.url,
+            r.memo,
+            ...(r.tags ?? []),
+            ...r.credentials.flatMap((c) => [c.label, c.loginId]),
+          ].filter(
+            (text): text is string =>
+              typeof text === "string" && text.length > 0,
+          );
 
-        if (searchWords.length > 0) {
-          filtered = filtered.filter((r) => {
-            const searchableTexts: string[] = [
-              r.title,
-              r.titleReading,
-              r.url,
-              r.memo,
-              ...(r.tags ?? []),
-              ...r.credentials.flatMap((c) => [c.label, c.loginId]),
-            ]
-              .filter(
-                (text): text is string =>
-                  typeof text === "string" && text.length > 0,
-              )
-              .map((text) => text.normalize("NFKC").toLowerCase());
-
-            // AND 検索: 指定されたすべての単語がいずれかの検索対象フィールドに含まれること
-            return searchWords.every((word) =>
-              searchableTexts.some((text) => text.includes(word)),
-            );
-          });
-        }
+          // AND 検索: 指定されたすべての単語がいずれかの検索対象フィールド（ひらがな・カタカナ同一視、スペース・中黒吸収）にマッチすること
+          return matchesSearchWords(searchableTexts, searchWords);
+        });
       }
     }
 
@@ -418,17 +429,24 @@ export const getRecordsPaginated = authenticatedQuery({
 
     let filtered = recordsWithCredentials;
     if (args.q) {
-      const q = args.q.toLowerCase();
-      filtered = filtered.filter(
-        (r) =>
-          r.title.toLowerCase().includes(q) ||
-          r.memo?.toLowerCase().includes(q) ||
-          r.credentials.some(
-            (c) =>
-              c.label?.toLowerCase().includes(q) ||
-              c.loginId?.toLowerCase().includes(q),
-          ),
-      );
+      const searchWords = extractSearchWords(args.q);
+      if (searchWords.length > 0) {
+        filtered = filtered.filter((r) => {
+          const searchableTexts: string[] = [
+            r.title,
+            r.titleReading,
+            r.url,
+            r.memo,
+            ...(r.tags ?? []),
+            ...r.credentials.flatMap((c) => [c.label, c.loginId]),
+          ].filter(
+            (text): text is string =>
+              typeof text === "string" && text.length > 0,
+          );
+
+          return matchesSearchWords(searchableTexts, searchWords);
+        });
+      }
     }
 
     return {

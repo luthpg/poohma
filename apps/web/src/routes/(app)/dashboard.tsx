@@ -225,6 +225,7 @@ function RouteComponent() {
     accountId: activeAccountId || undefined,
     q: searchParams.q,
     tag: searchParams.tag,
+    sort: sortParam,
     archiveStatus: searchParams.archiveStatus,
   });
   const family = useQuery(api.families.getFamilyMembers, {
@@ -260,6 +261,7 @@ function RouteComponent() {
       records?.find((r) => (r as RecordType & { isSample?: boolean }).isSample),
     [records],
   );
+  const hasSamples = Boolean(firstSampleRecord);
 
   // 初回表示時にモーダルを表示、またはURLクエリから復帰
   useEffect(() => {
@@ -663,6 +665,7 @@ function RouteComponent() {
       />
       {/* サンプルデータ表示中バナー */}
       <RecordListBannerSection
+        hasSamples={hasSamples}
         onRestart={onboarding.restartTour}
         onPurge={onboarding.purgeSamples}
         isPurging={onboarding.isPurging}
@@ -726,6 +729,7 @@ function RouteComponent() {
 
       {/* レコード一覧 */}
       <RecordListSection
+        records={records}
         isOnboardingTour1Active={onboarding.phase === "dashboard-tour-1"}
         searchParams={searchParams}
         sortParam={sortParam}
@@ -1069,27 +1073,16 @@ function RouteComponent() {
 
 // サンプルデータ表示中バナー（レコード一覧のisSampleをチェック）
 function RecordListBannerSection({
+  hasSamples,
   onRestart,
   onPurge,
   isPurging,
 }: {
+  hasSamples: boolean;
   onRestart: () => void;
   onPurge: () => void;
   isPurging: boolean;
 }) {
-  const { activeAccountId } = useAccount();
-  const records = usePersistentQuery<RecordType[]>(api.records.getRecords, {
-    accountId: activeAccountId || undefined,
-  });
-
-  const hasSamples = useMemo(
-    () =>
-      records?.some(
-        (r) => (r as RecordType & { isSample?: boolean }).isSample,
-      ) ?? false,
-    [records],
-  );
-
   if (!hasSamples) return null;
 
   return (
@@ -1272,6 +1265,7 @@ function BulkTagModal({
 
 // レコード一覧コンポーネント
 function RecordListSection({
+  records,
   searchParams,
   sortParam,
   viewMode,
@@ -1286,6 +1280,7 @@ function RecordListSection({
   onSelectAll,
   isOnboardingTour1Active,
 }: {
+  records: RecordType[] | undefined;
   searchParams: z.infer<typeof searchSchema>;
   sortParam: SortParam;
   viewMode: "card" | "list";
@@ -1300,15 +1295,6 @@ function RecordListSection({
   handleArchiveStatusChange: (status: "active" | "archived" | "all") => void;
   isOnboardingTour1Active?: boolean;
 }) {
-  const { activeAccountId } = useAccount();
-  const records = usePersistentQuery<RecordType[]>(api.records.getRecords, {
-    accountId: activeAccountId || undefined,
-    q: searchParams.q,
-    tag: searchParams.tag,
-    sort: sortParam,
-    archiveStatus: searchParams.archiveStatus,
-  });
-
   const currentFilter = (searchParams.filter as ScopeFilterType) || "all";
 
   const filteredRecords = useMemo(() => {

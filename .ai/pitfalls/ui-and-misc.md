@@ -349,3 +349,35 @@ UI 実装、外部 API 連携、環境変数、モノレポ設定における落
 - **関連実装 (Related Code References)**:
   - `apps/extension/entrypoints/background.ts`
   - `apps/extension/lib/url.ts`
+
+---
+
+### TanStack Start (React 19 / SSR) における @dnd-kit 導入時の注意点（ハイドレーション・誤操作・スクロール干渉）
+
+- **問題 (Problem)**:
+  - TanStack Start (SSR) 環境で `@dnd-kit` を導入した際、サーバーとクライアント間で自動生成されるアクセシビリティ ID（`aria-describedby` 等）が一致せずハイドレーション警告（`Prop id did not match`）が発生する。
+  - 通常のクリックやタップ時にも意図せずドラッグ判定が発火してフォーム入力やボタン操作が誤爆する。
+  - スマホ等でドラッグハンドル付近をスクロールしようとした際にブラウザのネイティブ縦スクロールと競合し、画面がガタつく。
+  - 要素の移動アニメーションに `CSS.Transform` を使用すると、ドラッグ中に要素が拡大縮小されたり歪む現象が発生する。
+  - `UniqueIdentifier` に `undefined` や非一意なキーが渡ると DndContext 内部でエラーが発生する。
+- **原因 (Root Cause)**:
+  - `@dnd-kit` のデフォルト ID 生成がクライアント側の乱数/カウンタに依存していること。
+  - デフォルトの `PointerSensor` は 0px 移動（クリックした瞬間）からドラッグを開始するため、通常のクリック・タップとの境界がないこと。
+  - タッチイベントがブラウザのスクロールアクションと競合すること。
+  - `CSS.Transform.toString(transform)` は `scale` 変形なども適用するため、リスト項目の並び替えでは親や子の寸法比率によって意図しない歪みが生じること。
+- **誤ったアプローチ (Anti-Pattern)**:
+  - `suppressHydrationWarning` で警告を握りつぶす。
+  - クリック誤爆対策を自前の `isDragging` フラグや複雑なタイマーで実装する。
+  - `CSS.Transform` をそのまま使い続ける。
+- **正しいアプローチ (Correct Pattern)**:
+  1. **固定 ID 指定**: `React.useId()` を使用し、`<DndContext id={dndId}>` を明示的に指定して SSR ハイドレーションを保護する。
+  2. **移動閾値（Constraint）の設定**: `useSensor(PointerSensor, { activationConstraint: { distance: 5 } })` を指定し、5px 以上移動して初めてドラッグを開始させる（クリックやタップの誤爆を防止）。
+  3. **モバイル縦スクロール保護**: ドラッグハンドル要素に `touch-action: none`（Tailwind の `touch-none`）を付与し、ハンドル操作時のみブラウザスクロールを抑制する。カード全体ではなく専用ハンドル（GripVertical 等）に限定する。
+  4. **Translate への限定**: スタイル適用には `CSS.Transform` ではなく `CSS.Translate.toString(transform)` を採用し、拡縮変形による要素サイズの歪みを防ぐ。
+  5. **確定 ID の保証**: `UniqueIdentifier` には `cred.id ?? `cred-${index}`` のようにフォールバックを設け、`undefined` を渡さない。
+- **再発防止 (Prevention)**:
+  - ドラッグ＆ドロップ UI を追加する際は、SSR 環境でのハイドレーション、タッチデバイスでのスクロール競合、クリック誤爆防止の 3 点を必ずチェックリストとして設計に組み込む。
+- **関連実装 (Related Code References)**:
+  - `apps/web/src/components/records/RecordForm.tsx`
+  - `apps/web/src/components/records/CredentialFieldsCard.tsx`
+  - `apps/web/src/hooks/useRecordForm.ts`

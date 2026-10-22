@@ -1,3 +1,7 @@
+import {
+  extractSearchWords,
+  matchesSearchWords,
+} from "@poohma/shared/utils/search-normalization";
 import type { FAQCategoryField, FAQContent } from "./cms.server";
 
 export const FAQ_CATEGORIES = [
@@ -78,25 +82,29 @@ export function normalizeSearchText(value: string): string {
 /**
  * FAQ単体が検索クエリにマッチするか判定する
  */
-export function matchFaq(faq: FAQContent, normalizedQuery: string): boolean {
-  if (normalizedQuery === "") {
+export function matchFaq(
+  faq: FAQContent,
+  searchQueryOrWords: string | string[],
+): boolean {
+  const searchWords = Array.isArray(searchQueryOrWords)
+    ? searchQueryOrWords
+    : extractSearchWords(searchQueryOrWords);
+
+  if (searchWords.length === 0) {
     return true;
   }
 
   const rawKey = extractCategoryKey(faq.category);
   const label = getCategoryLabel(rawKey);
 
-  const normalizedQuestion = normalizeSearchText(faq.question);
-  const normalizedAnswer = normalizeSearchText(stripHtml(faq.answer));
-  const normalizedLabel = normalizeSearchText(label);
-  const normalizedKey = normalizeSearchText(rawKey);
+  const searchableTexts = [
+    faq.question,
+    stripHtml(faq.answer),
+    label,
+    rawKey,
+  ].filter((t): t is string => typeof t === "string" && t.length > 0);
 
-  return (
-    normalizedQuestion.includes(normalizedQuery) ||
-    normalizedAnswer.includes(normalizedQuery) ||
-    normalizedLabel.includes(normalizedQuery) ||
-    normalizedKey.includes(normalizedQuery)
-  );
+  return matchesSearchWords(searchableTexts, searchWords);
 }
 
 /**
@@ -110,8 +118,8 @@ export function filterAndGroupFaqs(
   faqs: FAQContent[],
   searchQuery?: string,
 ): GroupedFaqCategory[] {
-  const normalizedQuery = normalizeSearchText(searchQuery ?? "");
-  const isSearching = normalizedQuery.length > 0;
+  const searchWords = extractSearchWords(searchQuery ?? "");
+  const isSearching = searchWords.length > 0;
 
   // 各定義済みカテゴリのマップを初期化
   const categoryMap = new Map<string, FAQContent[]>();
@@ -121,7 +129,7 @@ export function filterAndGroupFaqs(
   const otherItems: FAQContent[] = [];
 
   for (const faq of faqs) {
-    if (isSearching && !matchFaq(faq, normalizedQuery)) {
+    if (isSearching && !matchFaq(faq, searchWords)) {
       continue;
     }
 

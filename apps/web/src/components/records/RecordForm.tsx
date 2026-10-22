@@ -1,3 +1,19 @@
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { MAX_CREDENTIALS_PER_RECORD } from "@poohma/shared/schemas";
 import {
   AlertCircle,
@@ -7,12 +23,15 @@ import {
   Lock,
   Users,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { SessionExpiredDialog } from "@/components/auth/SessionExpiredDialog";
 import { Spinner } from "@/components/ui/spinner";
 import { TagInput } from "@/components/ui/tag-input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import type { UseRecordFormReturn } from "@/hooks/useRecordForm";
+import type {
+  RecordFormCredential,
+  UseRecordFormReturn,
+} from "@/hooks/useRecordForm";
 import { CredentialFieldsCard } from "./CredentialFieldsCard";
 
 export interface RecordFormProps {
@@ -37,6 +56,59 @@ export function RecordForm({
   const isEditMode = Boolean(form.targetRecordId);
   const isBusy =
     form.isSubmitting || form.isFetchingOgp || form.isFetchingFurigana;
+
+  // SSR ハイドレーション一致保護のための固定一意 ID
+  const dndId = useId();
+
+  // クリック・フォーカス誤爆防止のため 5px 以上の移動でドラッグ開始判定
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = values.credentials.findIndex((c) => c.id === active.id);
+    const newIndex = values.credentials.findIndex((c) => c.id === over.id);
+    if (oldIndex !== -1 && newIndex !== -1) {
+      form.reorderCredentials(oldIndex, newIndex);
+    }
+  };
+
+  const credentialsListRef = useRef<HTMLDivElement>(null);
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (scrollTimerRef.current) {
+        clearTimeout(scrollTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handleAddCredential = () => {
+    form.addCredential();
+    if (scrollTimerRef.current) {
+      clearTimeout(scrollTimerRef.current);
+    }
+    // DOM反映を待機したのち、追加された最後の枠へスムーズにスクロール
+    scrollTimerRef.current = setTimeout(() => {
+      const container = credentialsListRef.current;
+      if (!container) return;
+      const lastItem = container.lastElementChild as HTMLElement | null;
+      if (lastItem) {
+        lastItem.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
+      }
+    }, 120);
+  };
 
   const getModifiedClass = (field: string) => {
     if (!isEditMode) return "";
@@ -225,7 +297,7 @@ export function RecordForm({
           </h2>
           <button
             type="button"
-            onClick={form.addCredential}
+            onClick={handleAddCredential}
             disabled={values.credentials.length >= MAX_CREDENTIALS_PER_RECORD}
             className="inline-flex items-center min-h-[44px] px-2.5 py-1.5 text-[14px] font-medium text-orange-500 hover:text-orange-600 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
           >
@@ -233,20 +305,31 @@ export function RecordForm({
           </button>
         </div>
 
-        <div className="space-y-6">
-          {values.credentials.map((cred, index) => (
-            <CredentialFieldsCard
-              key={cred.id}
-              index={index}
-              credential={cred}
-              removable={values.credentials.length > 1}
-              onChange={form.updateCredentialField}
-              onRemove={form.removeCredential}
-              isFieldModified={isFieldModified}
-              isEditMode={isEditMode}
-            />
-          ))}
-        </div>
+        <DndContext
+          id={dndId}
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={values.credentials.map((c, i) => c.id ?? `cred-${i}`)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div ref={credentialsListRef} className="space-y-6">
+              {values.credentials.map((cred, index) => (
+                <SortableCredentialItem
+                  key={cred.id ?? `cred-${index}`}
+                  cred={cred}
+                  index={index}
+                  totalCount={values.credentials.length}
+                  form={form}
+                  isFieldModified={isFieldModified}
+                  isEditMode={isEditMode}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       </section>
 
       {/* 所有設定・タグ・メモ */}
@@ -372,5 +455,56 @@ export function RecordForm({
         values={values}
       />
     </form>
+  );
+}
+
+function SortableCredentialItem({
+  cred,
+  index,
+  totalCount,
+  form,
+  isFieldModified,
+  isEditMode,
+}: {
+  cred: RecordFormCredential;
+  index: number;
+  totalCount: number;
+  form: UseRecordFormReturn;
+  isFieldModified: (field: string) => boolean;
+  isEditMode: boolean;
+}) {
+  const credentialId = cred.id ?? `cred-${index}`;
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: credentialId });
+
+  const style: React.CSSProperties = {
+    // スケール歪みを防ぐため CSS.Translate を使用
+    transform: CSS.Translate.toString(transform),
+    transition,
+    zIndex: isDragging ? 20 : undefined,
+    opacity: isDragging ? 0.7 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <CredentialFieldsCard
+        index={index}
+        credential={cred}
+        removable={totalCount > 1}
+        onChange={form.updateCredentialField}
+        onRemove={form.removeCredential}
+        isFieldModified={isFieldModified}
+        isEditMode={isEditMode}
+        dragHandleProps={
+          totalCount > 1 ? { ...attributes, ...listeners } : undefined
+        }
+      />
+    </div>
   );
 }

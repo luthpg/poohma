@@ -2718,6 +2718,34 @@ describe("2.4 getRecords 検索・フィルタリング機能 (Convex版)", () =
         order: 0,
         updatedAt: Date.now(),
       });
+
+      // 4. Google Drive (スペース・中黒吸収テスト用)
+      const driveId = await ctx.db.insert("serviceRecords", {
+        stableId: crypto.randomUUID(),
+        userId: "search_user",
+        accountId: userAccountId,
+        revision: 0,
+        updatedByAccountId: userAccountId,
+        familyId,
+        ownerFamilyId: familyId,
+        title: "Google Drive",
+        titleReading: "グーグル・ドライブ",
+        url: "https://drive.google.com",
+        sortKey: computeSortKey("Google Drive"),
+        ownerType: "family",
+        admins: [userAccountId],
+        tags: ["クラウド", "ストレージ"],
+        isArchived: false,
+        updatedAt: Date.now(),
+      });
+      await ctx.db.insert("credentials", {
+        recordId: driveId,
+        stableId: crypto.randomUUID(),
+        label: "Storage",
+        loginId: "drive_user",
+        order: 0,
+        updatedAt: Date.now(),
+      });
     });
 
     const user = t.withIdentity({
@@ -2729,8 +2757,8 @@ describe("2.4 getRecords 検索・フィルタリング機能 (Convex版)", () =
     const resReading = await user.query(api.records.getRecords, {
       q: "グーグル",
     });
-    expect(resReading).toHaveLength(1);
-    expect(resReading[0]?.title).toBe("Google");
+    // Google, Google Drive の2件がヒット
+    expect(resReading).toHaveLength(2);
 
     // 2. URL（ドメイン）による検索
     const resUrl = await user.query(api.records.getRecords, {
@@ -2779,6 +2807,34 @@ describe("2.4 getRecords 検索・フィルタリング機能 (Convex版)", () =
       q: "グーグル　developer",
     });
     expect(resAndFullMismatch).toHaveLength(0);
+
+    // 8. ひらがなによるカタカナ読み仮名の同一視検索 (Issue #376)
+    const resHiragana = await user.query(api.records.getRecords, {
+      q: "ぎっとはぶ",
+    });
+    expect(resHiragana).toHaveLength(1);
+    expect(resHiragana[0]?.title).toBe("GitHub");
+
+    // 9. スペース除去による検索 (Issue #376: 「GoogleDrive」で「Google Drive」がヒット)
+    const resNoSpace = await user.query(api.records.getRecords, {
+      q: "GoogleDrive",
+    });
+    expect(resNoSpace).toHaveLength(1);
+    expect(resNoSpace[0]?.title).toBe("Google Drive");
+
+    // 10. 中黒（・）の有無吸収 (Issue #376: 「グーグルドライブ」で「グーグル・ドライブ」がヒット)
+    const resNoDot = await user.query(api.records.getRecords, {
+      q: "グーグルドライブ",
+    });
+    expect(resNoDot).toHaveLength(1);
+    expect(resNoDot[0]?.title).toBe("Google Drive");
+
+    // 11. 検索語の中黒（・）による AND 検索
+    const resDotAnd = await user.query(api.records.getRecords, {
+      q: "グーグル・gmail",
+    });
+    expect(resDotAnd).toHaveLength(1);
+    expect(resDotAnd[0]?.title).toBe("Google");
   });
 });
 

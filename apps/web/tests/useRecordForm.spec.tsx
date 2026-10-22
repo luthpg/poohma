@@ -89,6 +89,25 @@ describe("useRecordForm", () => {
     expect(result.current.values.credentials).toHaveLength(1);
   });
 
+  it("reorderCredentials で credential の並び替えができること (Issue #373)", () => {
+    const { result } = renderHook(() => useRecordForm());
+    act(() => {
+      result.current.updateCredentialField(0, "loginId", "first");
+      result.current.addCredential();
+    });
+    act(() => {
+      result.current.updateCredentialField(1, "loginId", "second");
+    });
+    expect(result.current.values.credentials[0]?.loginId).toBe("first");
+    expect(result.current.values.credentials[1]?.loginId).toBe("second");
+
+    act(() => {
+      result.current.reorderCredentials(0, 1);
+    });
+    expect(result.current.values.credentials[0]?.loginId).toBe("second");
+    expect(result.current.values.credentials[1]?.loginId).toBe("first");
+  });
+
   it("最後の1件は削除できないこと", () => {
     const { result } = renderHook(() => useRecordForm());
     act(() => result.current.removeCredential(0));

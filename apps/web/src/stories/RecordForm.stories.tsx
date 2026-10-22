@@ -63,7 +63,12 @@ function MockFormContainer({
         ...prev,
         credentials: [
           ...prev.credentials,
-          { label: "", loginId: "", passwordHint: "" },
+          {
+            id: `mock-cred-${Date.now()}`,
+            label: "",
+            loginId: "",
+            passwordHint: "",
+          },
         ],
       })),
     removeCredential: (index) =>
@@ -71,6 +76,14 @@ function MockFormContainer({
         ...prev,
         credentials: prev.credentials.filter((_, i) => i !== index),
       })),
+    reorderCredentials: (oldIndex, newIndex) =>
+      setValues((prev) => {
+        const next = [...prev.credentials];
+        const [moved] = next.splice(oldIndex, 1);
+        if (!moved) return prev;
+        next.splice(newIndex, 0, moved);
+        return { ...prev, credentials: next };
+      }),
     updateCredentialField: (index, field, value) =>
       setValues((prev) => ({
         ...prev,

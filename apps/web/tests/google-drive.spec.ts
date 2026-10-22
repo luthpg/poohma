@@ -152,7 +152,7 @@ describe("Google Drive / Google Picker 連携 (src/lib/google-drive.ts)", () => 
 
       expect(result).toEqual(mockBlob);
       expect(global.fetch).toHaveBeenCalledWith(
-        "https://www.googleapis.com/drive/v3/files/file-xyz?alt=media",
+        "https://www.googleapis.com/drive/v3/files/file-xyz?alt=media&supportsAllDrives=true",
         expect.objectContaining({
           headers: {
             Authorization: "Bearer valid-token",

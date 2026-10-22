@@ -76,30 +76,30 @@ PWA 構成要素と責務:
 
 ## 2. 技術スタック一覧
 
-| 分類                         | 技術・ライブラリ                                                                                                                                                                    |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| フロントエンドフレームワーク | React 19, TanStack Start（SSR）                                                                                                                                                     |
-| ルーティング                 | TanStack Router（ファイルベースルーティング、(app)/(public)のルートグループ分割）                                                                                                   |
-| スタイリング                 | Tailwind CSS v4, shadcn/ui（radix-ui ベース）、Geist Sans／Geist Mono（ `@fontsource/geist-sans`, `@fontsource/geist-mono` 。8.5参照）                                              |
-| 状態管理・データ取得         | TanStack Query, Convex React SDK（リアルタイムQuery/Mutation）。責務分離は8.4参照                                                                                                   |
-| 日本語処理                   | budoux（禁則処理・分かち書き、和文の適切な折り返し）                                                                                                                                |
-| UI補助                       | next-themes（ライト/ダーク/システムテーマ切替）、cmdk（コマンドパレット系UI）、@icons-pack/react-simple-icons（サービスロゴアイコン）、html-react-parser（CMSリッチテキストの描画） |
-| バックエンド／DB             | Convex（サーバーレス関数＋リアクティブDB）                                                                                                                                          |
-| 認証                         | Firebase Authentication（Google OAuth）＋ firebase-admin（サーバー側検証）＋ httpOnlyセッションCookie                                                                               |
-| CMS                          | microCMS（microcms-js-sdk）                                                                                                                                                         |
-| メール送信・テンプレート     | Resend, React Email（`@react-email/components`）                                                                                                                                    |
-| 外部API                      | Yahoo!テキスト解析API（ふりがな）、任意サイトのOGPスクレイピング（cheerio）、Abstract IP Geolocation API（位置情報取得）、ipaddr.js（IPアドレス検証・SSRF/プライベートIP除外）      |
-| CSV処理                      | papaparse                                                                                                                                                                           |
-| QRコード                     | qrcode.react                                                                                                                                                                        |
-| PWA                          | Web App Manifest（`public/manifest.json`）、iOS standalone判定ロジック（自前実装）                                                                                                  |
-| PDF生成                      | @cantoo/pdf-lib, @cantoo/fontkit（Noto Sans JP サブセット埋め込みによる日本語ベクターPDF生成）＋qrcode（リカバリーキット印刷用、FR-CRYPT-06）                                       |
-| 暗号                         | Web Crypto API（AES-GCM, PBKDF2）、WebAuthn（PRF拡張）                                                                                                                              |
-| バリデーション               | zod, convex-helpers（customQuery/customMutation）                                                                                                                                   |
-| 監視                         | Vercel Analytics, Vercel Speed Insights                                                                                                                                             |
-| テスト                       | Vitest, @testing-library/react, convex-test, Playwright（ブラウザモード）                                                                                                           |
-| コンポーネントカタログ       | Storybook（Storybook Test Runner + axe-core による a11y 自動テスト連携）                                                                                                            |
-| Lint／フォーマット           | Biome                                                                                                                                                                               |
-| デプロイ                     | Vercel（フロントエンド）、Convex Cloud（バックエンド）                                                                                                                              |
+| 分類                         | 技術・ライブラリ                                                                                                                                                                                                           |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| フロントエンドフレームワーク | React 19, TanStack Start（SSR）                                                                                                                                                                                            |
+| ルーティング                 | TanStack Router（ファイルベースルーティング、(app)/(public)のルートグループ分割）                                                                                                                                          |
+| スタイリング                 | Tailwind CSS v4, shadcn/ui（radix-ui ベース）、Geist Sans／Geist Mono（ `@fontsource/geist-sans`, `@fontsource/geist-mono` 。8.5参照）                                                                                     |
+| 状態管理・データ取得         | TanStack Query, Convex React SDK（リアルタイムQuery/Mutation）。責務分離は8.4参照                                                                                                                                          |
+| 日本語処理                   | budoux（禁則処理・分かち書き、和文の適切な折り返し）                                                                                                                                                                       |
+| UI補助                       | next-themes（ライト/ダーク/システムテーマ切替）、cmdk（コマンドパレット系UI）、@icons-pack/react-simple-icons（サービスロゴアイコン）、html-react-parser（CMSリッチテキストの描画）、@dnd-kit（クレデンシャルDnD並び替え） |
+| バックエンド／DB             | Convex（サーバーレス関数＋リアクティブDB）                                                                                                                                                                                 |
+| 認証                         | Firebase Authentication（Google OAuth）＋ firebase-admin（サーバー側検証）＋ httpOnlyセッションCookie                                                                                                                      |
+| CMS                          | microCMS（microcms-js-sdk）                                                                                                                                                                                                |
+| メール送信・テンプレート     | Resend, React Email（`@react-email/components`）                                                                                                                                                                           |
+| 外部API                      | Yahoo!テキスト解析API（ふりがな）、任意サイトのOGPスクレイピング（cheerio）、Abstract IP Geolocation API（位置情報取得）、ipaddr.js（IPアドレス検証・SSRF/プライベートIP除外）                                             |
+| CSV処理                      | papaparse                                                                                                                                                                                                                  |
+| QRコード                     | qrcode.react                                                                                                                                                                                                               |
+| PWA                          | Web App Manifest（`public/manifest.json`）、iOS standalone判定ロジック（自前実装）                                                                                                                                         |
+| PDF生成                      | @cantoo/pdf-lib, @cantoo/fontkit（Noto Sans JP サブセット埋め込みによる日本語ベクターPDF生成）＋qrcode（リカバリーキット印刷用、FR-CRYPT-06）                                                                              |
+| 暗号                         | Web Crypto API（AES-GCM, PBKDF2）、WebAuthn（PRF拡張）                                                                                                                                                                     |
+| バリデーション               | zod, convex-helpers（customQuery/customMutation）                                                                                                                                                                          |
+| 監視                         | Vercel Analytics, Vercel Speed Insights                                                                                                                                                                                    |
+| テスト                       | Vitest, @testing-library/react, convex-test, Playwright（ブラウザモード）                                                                                                                                                  |
+| コンポーネントカタログ       | Storybook（Storybook Test Runner + axe-core による a11y 自動テスト連携）                                                                                                                                                   |
+| Lint／フォーマット           | Biome                                                                                                                                                                                                                      |
+| デプロイ                     | Vercel（フロントエンド）、Convex Cloud（バックエンド）                                                                                                                                                                     |
 
 ## 3. ディレクトリ構成（抜粋）
 
@@ -143,7 +143,7 @@ poohma/                    … プロジェクトルート（Turborepo / pnpm wo
 │   ├── shared/            … @poohma/shared（共通バリデーションスキーマ、URLドメイン照合、拡張機能メッセージ定義、メール定義、ユーティリティ）
 │   │   ├── emails/        … メールテンプレート定義・配信レジストリ (React Email / Resend)
 │   │   ├── src/schemas/   … 拡張機能メッセージ (extension-messages.ts) 等の型安全スキーマ
-│   │   └── src/utils/     … url-matcher.ts (Public Suffix List準拠ドメイン判定) 等
+│   │   └── src/utils/     … url-matcher.ts (Public Suffix List準拠ドメイン判定), search-normalization.ts 等
 │   └── knowledge-tools/   … @poohma/knowledge-tools（知見運用・Doc-Sync検証）
 ├── workers/
 │   └── backup/            … @poohma/backup（定期自動バックアップ用Cloudflare Worker）
@@ -1121,7 +1121,8 @@ ConvexProviderWithAuth(useConvexFirebaseAuth)
 - 変更インジケーター（FR-REC-29）：レコード編集時、各入力コンテナ左端に `before:bg-orange-500` の視覚的アクセントバーを配置。入力中のガタつき（レイアウトシフト）を完全に防止するため、未変更時も常時余白（`pl-3.5`）を確保し、`opacity` と `scale-y` の滑らかなトランジションで状態を切り替える。復号結果を動的基準値に同期し、新規作成時は抑止する。
 - 固定アクションフッター（FR-REC-30）：レコード詳細閲覧・編集・新規登録の3画面において、最下部固定（`fixed bottom-0` + `backdrop-blur-md` + `pb-safe`）アクションフッターの体験を統一。右端にSubmit相当（オレンジPrimary）、左端に削除ボタン（Destructive、誤タップ防止のため隔離・モバイルではアイコン化）を配置する。
 - 五十音インデックススクロールバー（FR-REC-07, Issue #366）：名前順ソート時に画面右端に配置。タップ時のネイティブ `smooth` ジャンプと、タッチドラッグ時の `requestAnimationFrame` lerp（減速カーブ）による追従スクロールをハイブリッド制御。単発タップとドラッグ操作（閾値6px）を厳格に分離し、タップ時はドラッグ用rAFアニメーションの先行発火を抑止してネイティブsmoothに任せる。自前rAFスクロールには「最小ステップ（1px）保証による丸めスタック防止」「3フレーム進行停止（スタック）検知による即時スナップ終了」「800ms時間上限」および「外部操作（ホイール・タッチスワイプ）検知による即時割り込みキャンセル」を完備し、スクロール位置のロックや引き戻し暴走を防止する。ドラッグ・タップ中は現在および前後のインデックスを画面中央にプレビューするセントラルポップオーバー（ライト/ダーク両対応のグラスモーフィズムカード）を表示。また、iOS Safari / PWA 特有の `:active` 擬似クラス残留による二重ハイライトを防ぐため、状態駆動のアクティブ表示（`activeBubble === key`）と `-webkit-tap-highlight-color: transparent` および `touch-action: none` を適用する。
-- フルワイド自動検索 & 統合フィルターバー（FR-REC-08, FR-REC-20, Issue #151）：ダッシュボードの検索入力欄は「検索」ボタンを撤去して横幅100%に拡張。半角・全角スペース区切りの複数単語による横断 AND 検索、250msデバウンス（IME確定後実行）とNFKC正規化による表記揺れ吸収（サービス名、読み仮名、URL、タグ名、メモ、ID・ラベル対象）を提供。検索欄直下に shadcn/ui DropdownMenu 経由の共有種別フィルター（`ScopeFilterChip`: すべて / 自分のみ[エメラルド] / 共有中[ブルー]）とタグクラウドを高さ36pxの1行フレックスバーとして統合。モバイル（375px幅）でも縦方向の高さを占有せず、タグ領域に約268pxの広いスワイプ領域を確保する。一覧・詳細画面の所有権バッジも同一テーマ（共有中: Blue / 自分のみ: Emerald）で連動。
+- クレデンシャル並び替え（FR-REC-04, Issue #373）：アカウント情報フォームにおいて、@dnd-kit（@dnd-kit/core, @dnd-kit/sortable）によるドラッグ＆ドロップ並び替えを提供。SSRハイドレーション保護（useId）、誤操作防止の移動閾値（activationConstraint 5px）、モバイル縦スクロール保護（touch-none）、CSS.Translateによる要素歪み防止を完備。
+- フルワイド自動検索 & 統合フィルターバー（FR-REC-08, FR-REC-20, Issue #151, Issue #376）：ダッシュボードの検索入力欄は「検索」ボタンを撤去して横幅100%に拡張。半角・全角スペース区切りの複数単語による横断 AND 検索、ひらがな・カタカナ同一視、半角・全角変換、中黒・スペース有無の差異を吸収する正規化（search-normalization）と250msデバウンス（IME確定後実行）による高速自動絞り込み。ダッシュボードの検索入力欄は「検索」ボタンを撤去して横幅100%に拡張。半角・全角スペース区切りの複数単語による横断 AND 検索、250msデバウンス（IME確定後実行）とNFKC正規化による表記揺れ吸収（サービス名、読み仮名、URL、タグ名、メモ、ID・ラベル対象）を提供。検索欄直下に shadcn/ui DropdownMenu 経由の共有種別フィルター（`ScopeFilterChip`: すべて / 自分のみ[エメラルド] / 共有中[ブルー]）とタグクラウドを高さ36pxの1行フレックスバーとして統合。モバイル（375px幅）でも縦方向の高さを占有せず、タグ領域に約268pxの広いスワイプ領域を確保する。一覧・詳細画面の所有権バッジも同一テーマ（共有中: Blue / 自分のみ: Emerald）で連動。
 
 ### 8.4 状態管理・キャッシュ戦略（TanStack Query vs Convex）
 
@@ -1137,11 +1138,12 @@ TanStack QueryとConvexは双方がキャッシュ機構を持つため、責務
 | 未保存フォームドラフト    | localStorage（useRecordForm / auth-recovery） | 暗号化済みレコード入力値（poohma_draft_*）                                                | iOSメモリ解放耐性・再認証後の入力復元。24h TTL、タブ複製衝突自律回避     |
 
 基本原則：
-1. **二重キャッシュの禁止** ：Convexが提供するアプリケーションデータは、ConvexのWebSocket経由のリアクティブ同期によって常に最新状態が保たれる。これをTanStack Queryで再度フェッチ・ラップしてキャッシュすることは、他端末での編集が即時反映されない等のデータ不整合と、不要なHTTPリクエストを招くため厳禁とする。
-2. **描画品質（チラツキ防止）の担保** ：Convexのデータ取得が開始してから完了するまでの遷移期間に画面がちらつかないよう、コンポーネントは `usePersistentQuery` フックを介してメモリ上にフォールバックキャッシュ（直近取得結果、最大1,000件、NFR-PERF-02）を保持する。
-3. **セッションクリーンアップ** ：ログアウト時は、TanStack Queryのキャッシュ（ `queryClient.clear()` ）と `usePersistentQuery` のインメモリキャッシュの両方を即時にクリアし、アカウント間でのデータ残存・露出を防ぐ。
-4. **ドラフトの安全なライフサイクル管理** ：未保存ドラフトは短命 `draftDEK` で暗号化され、平文のままストレージに永続化されることはない。保存成功、明示的キャンセル、競合解決完了（最新リロード／上書き保存）時には即座に物理削除（`discardDraft`）する。また別タブでの複製操作に対しては `BroadcastChannel`（`poohma_draft_bus`）により衝突を自律検知して新規IDへ分岐する。
-5. **編集・ドラフト復元時の基準値同期と安全ブロック** ：
+1. **クエリ統合とDB I/O最適化（Issue #379）** ：同一画面内の複数セクション（一覧、バナー等）で同一データを参照する場合、個別に異なる引数でクエリを発行せず、親コンポーネントで取得したデータを Single Source of Truth として Props 伝搬する。またバックエンド（Convex）では `by_family_isArchived` などの複合インデックスを活用し、不要なレコードの走査・読み込みを DB レベルで遮断して無料枠上限および I/O を抑制する。
+2. **二重キャッシュの禁止** ：Convexが提供するアプリケーションデータは、ConvexのWebSocket経由のリアクティブ同期によって常に最新状態が保たれる。これをTanStack Queryで再度フェッチ・ラップしてキャッシュすることは、他端末での編集が即時反映されない等のデータ不整合と、不要なHTTPリクエストを招くため厳禁とする。
+3. **描画品質（チラツキ防止）の担保** ：Convexのデータ取得が開始してから完了するまでの遷移期間に画面がちらつかないよう、コンポーネントは `usePersistentQuery` フックを介してメモリ上にフォールバックキャッシュ（直近取得結果、最大1,000件、NFR-PERF-02）を保持する。
+4. **セッションクリーンアップ** ：ログアウト時は、TanStack Queryのキャッシュ（ `queryClient.clear()` ）と `usePersistentQuery` のインメモリキャッシュの両方を即時にクリアし、アカウント間でのデータ残存・露出を防ぐ。
+5. **ドラフトの安全なライフサイクル管理** ：未保存ドラフトは短命 `draftDEK` で暗号化され、平文のままストレージに永続化されることはない。保存成功、明示的キャンセル、競合解決完了（最新リロード／上書き保存）時には即座に物理削除（`discardDraft`）する。また別タブでの複製操作に対しては `BroadcastChannel`（`poohma_draft_bus`）により衝突を自律検知して新規IDへ分岐する。
+6. **編集・ドラフト復元時の基準値同期と安全ブロック** ：
    - **動的基準値同期（`setBaselineValues`）**：localStorage からのドラフト復元時、DB レコードの暗号化パスワードヒントを復号して基準値に同期する。これにより、DB 保存値と同一のヒントに対する変更インジケータ誤点灯を完全に排除する。
    - **復号失敗時の安全ブロックとドラフト破棄**：編集開始時およびドラフト復元（`loadRecordDraft`）時、暗号化ヒントの復号に失敗した場合は空文字へのサイレントフォールバックを完全撤廃し、復元・編集開始を即座に中断する。復号に失敗した壊れたドラフトはストレージから安全に破棄（`clearRecordDraft`）し、固定日本語トースト（CWE-209保護）で通知することで、空文字での上書き保存による既存暗号化データの消滅・不可逆破壊を確実に防止する。
    - **アンロックキャンセル時の安全復帰（`onUnlockCancelled`）**：未保存ドラフトが存在してマウント時に編集画面として起動された際、ユーザーがパスコードロック解除をキャンセルした場合は、ヒント欄がブランクのまま編集画面に留まるのを防ぎ、即座に閲覧モード（`isEditing: false`）へ安全に復帰する。

@@ -7,6 +7,7 @@
     "./utils/index-group": "./src/utils/index-group.ts",
     "./utils/url-safety": "./src/utils/url-safety.ts",
     "./utils/url-matcher": "./src/utils/url-matcher.ts",
+    "./utils/search-normalization": "./src/utils/search-normalization.ts",
     "./schemas/extension-messages": "./src/schemas/extension-messages.ts",
     "./constants/contacts": "./src/constants/contacts.ts",
     "./emails": "./src/emails/dispatch.ts",
