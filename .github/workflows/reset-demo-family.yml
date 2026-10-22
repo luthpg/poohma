@@ -3,16 +3,16 @@ name: Reset Demo Family
 on:
   schedule:
     # 毎日午前4:00 JST (19:00 UTC)
-    - cron: '0 19 * * *'
+    - cron: "0 19 * * *"
   workflow_dispatch:
     inputs:
       reason:
-        description: 'リセット実行理由 (例: デモ前準備、定期テストなど)'
+        description: "リセット実行理由 (例: デモ前準備、定期テストなど)"
         required: false
-        default: '手動ディスパッチによるリセット'
+        default: "手動ディスパッチによるリセット"
         type: string
       force:
-        description: '10分間のクールダウンガードをバイパスする'
+        description: "10分間のクールダウンガードをバイパスする"
         required: false
         default: false
         type: boolean

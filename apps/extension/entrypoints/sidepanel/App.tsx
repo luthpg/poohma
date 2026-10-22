@@ -402,7 +402,7 @@ export function App() {
       }
     };
 
-    const handleTabActivated = (activeInfo: chrome.tabs.TabActiveInfo) => {
+    const handleTabActivated = (activeInfo: chrome.tabs.OnActivatedInfo) => {
       if (panelWindowId && activeInfo.windowId !== panelWindowId) {
         return;
       }
@@ -411,7 +411,7 @@ export function App() {
 
     const handleTabUpdated = (
       tabId: number,
-      changeInfo: chrome.tabs.TabChangeInfo,
+      changeInfo: chrome.tabs.OnUpdatedInfo,
       tab: chrome.tabs.Tab,
     ) => {
       if (panelWindowId && tab.windowId !== panelWindowId) {

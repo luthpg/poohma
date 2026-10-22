@@ -76,30 +76,30 @@ PWA 構成要素と責務:
 
 ## 2. 技術スタック一覧
 
-| 分類             | 技術・ライブラリ                                                                                                                     |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| フロントエンドフレームワーク | React 19, TanStack Start（SSR）                                                                                                |
-| ルーティング         | TanStack Router（ファイルベースルーティング、(app)/(public)のルートグループ分割）                                                                      |
-| スタイリング         | Tailwind CSS v4, shadcn/ui（radix-ui ベース）、Geist Sans／Geist Mono（ `@fontsource/geist-sans`, `@fontsource/geist-mono` 。8.5参照）   |
-| 状態管理・データ取得     | TanStack Query, Convex React SDK（リアルタイムQuery/Mutation）。責務分離は8.4参照                                                            |
-| 日本語処理          | budoux（禁則処理・分かち書き、和文の適切な折り返し）                                                                                                |
-| UI補助           | next-themes（ライト/ダーク/システムテーマ切替）、cmdk（コマンドパレット系UI）、@icons-pack/react-simple-icons（サービスロゴアイコン）、html-react-parser（CMSリッチテキストの描画） |
-| バックエンド／DB      | Convex（サーバーレス関数＋リアクティブDB）                                                                                                    |
-| 認証             | Firebase Authentication（Google OAuth）＋ firebase-admin（サーバー側検証）＋ httpOnlyセッションCookie                                          |
-| CMS            | microCMS（microcms-js-sdk）                                                                                                    |
-| メール送信・テンプレート | Resend, React Email（`@react-email/components`）                                                                                |
-| 外部API          | Yahoo!テキスト解析API（ふりがな）、任意サイトのOGPスクレイピング（cheerio）、Abstract IP Geolocation API（位置情報取得）、ipaddr.js（IPアドレス検証・SSRF/プライベートIP除外） |
-| CSV処理          | papaparse                                                                                                                    |
-| QRコード          | qrcode.react                                                                                                                 |
-| PWA            | Web App Manifest（`public/manifest.json`）、iOS standalone判定ロジック（自前実装）                                            |
-| PDF生成          | @cantoo/pdf-lib, @cantoo/fontkit（Noto Sans JP サブセット埋め込みによる日本語ベクターPDF生成）＋qrcode（リカバリーキット印刷用、FR-CRYPT-06）                   |
-| 暗号             | Web Crypto API（AES-GCM, PBKDF2）、WebAuthn（PRF拡張）                                                                              |
-| バリデーション        | zod, convex-helpers（customQuery/customMutation）                                                                              |
-| 監視             | Vercel Analytics, Vercel Speed Insights                                                                                      |
-| テスト            | Vitest, @testing-library/react, convex-test, Playwright（ブラウザモード）                                                             |
-| コンポーネントカタログ    | Storybook（Storybook Test Runner + axe-core による a11y 自動テスト連携）                                                            |
-| Lint／フォーマット    | Biome                                                                                                                        |
-| デプロイ           | Vercel（フロントエンド）、Convex Cloud（バックエンド）                                                                                         |
+| 分類                         | 技術・ライブラリ                                                                                                                                                                    |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| フロントエンドフレームワーク | React 19, TanStack Start（SSR）                                                                                                                                                     |
+| ルーティング                 | TanStack Router（ファイルベースルーティング、(app)/(public)のルートグループ分割）                                                                                                   |
+| スタイリング                 | Tailwind CSS v4, shadcn/ui（radix-ui ベース）、Geist Sans／Geist Mono（ `@fontsource/geist-sans`, `@fontsource/geist-mono` 。8.5参照）                                              |
+| 状態管理・データ取得         | TanStack Query, Convex React SDK（リアルタイムQuery/Mutation）。責務分離は8.4参照                                                                                                   |
+| 日本語処理                   | budoux（禁則処理・分かち書き、和文の適切な折り返し）                                                                                                                                |
+| UI補助                       | next-themes（ライト/ダーク/システムテーマ切替）、cmdk（コマンドパレット系UI）、@icons-pack/react-simple-icons（サービスロゴアイコン）、html-react-parser（CMSリッチテキストの描画） |
+| バックエンド／DB             | Convex（サーバーレス関数＋リアクティブDB）                                                                                                                                          |
+| 認証                         | Firebase Authentication（Google OAuth）＋ firebase-admin（サーバー側検証）＋ httpOnlyセッションCookie                                                                               |
+| CMS                          | microCMS（microcms-js-sdk）                                                                                                                                                         |
+| メール送信・テンプレート     | Resend, React Email（`@react-email/components`）                                                                                                                                    |
+| 外部API                      | Yahoo!テキスト解析API（ふりがな）、任意サイトのOGPスクレイピング（cheerio）、Abstract IP Geolocation API（位置情報取得）、ipaddr.js（IPアドレス検証・SSRF/プライベートIP除外）      |
+| CSV処理                      | papaparse                                                                                                                                                                           |
+| QRコード                     | qrcode.react                                                                                                                                                                        |
+| PWA                          | Web App Manifest（`public/manifest.json`）、iOS standalone判定ロジック（自前実装）                                                                                                  |
+| PDF生成                      | @cantoo/pdf-lib, @cantoo/fontkit（Noto Sans JP サブセット埋め込みによる日本語ベクターPDF生成）＋qrcode（リカバリーキット印刷用、FR-CRYPT-06）                                       |
+| 暗号                         | Web Crypto API（AES-GCM, PBKDF2）、WebAuthn（PRF拡張）                                                                                                                              |
+| バリデーション               | zod, convex-helpers（customQuery/customMutation）                                                                                                                                   |
+| 監視                         | Vercel Analytics, Vercel Speed Insights                                                                                                                                             |
+| テスト                       | Vitest, @testing-library/react, convex-test, Playwright（ブラウザモード）                                                                                                           |
+| コンポーネントカタログ       | Storybook（Storybook Test Runner + axe-core による a11y 自動テスト連携）                                                                                                            |
+| Lint／フォーマット           | Biome                                                                                                                                                                               |
+| デプロイ                     | Vercel（フロントエンド）、Convex Cloud（バックエンド）                                                                                                                              |
 
 ## 3. ディレクトリ構成（抜粋）
 
@@ -184,34 +184,34 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 
 #### families
 
-| フィールド | 型 | 説明 |
-| -------------------------- | ---------------- | --------------------------------------------------------------------------------- |
-| name | string | 家族グループ名 |
-| masterKeyEncrypted | string | パスコード由来鍵でラップされたマスターキー（Base64） |
-| masterKeyIv | string | 上記ラップ処理のIV（Base64） |
-| masterKeySalt | string | パスコードからの鍵導出（PBKDF2）に使うソルト（Base64） |
-| kdfIterations | number | パスコード鍵導出（PBKDF2）の反復回数。作成・パスコード変更時点の値を記録し、復号時はこの値を動的に適用する（NFR-SEC-14） |
-| cryptoVersion | number | KDF・暗号化スキームのバージョン番号 |
-| recoveryMasterKeyEncrypted | string(optional) | リカバリーキー由来鍵でラップされたマスターキー（Base64、FR-CRYPT-06） |
-| recoveryMasterKeyIv | string(optional) | 上記リカバリーラップ処理のIV（Base64） |
-| recoveryMasterKeySalt | string(optional) | リカバリーキー鍵導出（PBKDF2）に使うソルト（Base64） |
-| recoveryCodeHash | string(optional) | 正規化リカバリーコードのSHA-256ハッシュ（サーバー側検証用、平文コードは非保存） |
-| recoveryKdfIterations | number(optional) | リカバリーキー鍵導出（PBKDF2）の反復回数（デフォルト300,000） |
-| recoveryCryptoVersion | number(optional) | リカバリーキー暗号化スキームのバージョン番号（デフォルト1） |
-| recoveryIssuedAt | number(optional) | リカバリーキット発行・再発行日時 |
-| recoveryIssuedByAccountId | Id<"users">(optional) | リカバリーキットを発行・再発行したユーザーアカウントID |
-| updatedAt | number | 更新日時（epoch ms） |
+| フィールド                 | 型                    | 説明                                                                                                                     |
+| -------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| name                       | string                | 家族グループ名                                                                                                           |
+| masterKeyEncrypted         | string                | パスコード由来鍵でラップされたマスターキー（Base64）                                                                     |
+| masterKeyIv                | string                | 上記ラップ処理のIV（Base64）                                                                                             |
+| masterKeySalt              | string                | パスコードからの鍵導出（PBKDF2）に使うソルト（Base64）                                                                   |
+| kdfIterations              | number                | パスコード鍵導出（PBKDF2）の反復回数。作成・パスコード変更時点の値を記録し、復号時はこの値を動的に適用する（NFR-SEC-14） |
+| cryptoVersion              | number                | KDF・暗号化スキームのバージョン番号                                                                                      |
+| recoveryMasterKeyEncrypted | string(optional)      | リカバリーキー由来鍵でラップされたマスターキー（Base64、FR-CRYPT-06）                                                    |
+| recoveryMasterKeyIv        | string(optional)      | 上記リカバリーラップ処理のIV（Base64）                                                                                   |
+| recoveryMasterKeySalt      | string(optional)      | リカバリーキー鍵導出（PBKDF2）に使うソルト（Base64）                                                                     |
+| recoveryCodeHash           | string(optional)      | 正規化リカバリーコードのSHA-256ハッシュ（サーバー側検証用、平文コードは非保存）                                          |
+| recoveryKdfIterations      | number(optional)      | リカバリーキー鍵導出（PBKDF2）の反復回数（デフォルト300,000）                                                            |
+| recoveryCryptoVersion      | number(optional)      | リカバリーキー暗号化スキームのバージョン番号（デフォルト1）                                                              |
+| recoveryIssuedAt           | number(optional)      | リカバリーキット発行・再発行日時                                                                                         |
+| recoveryIssuedByAccountId  | Id<"users">(optional) | リカバリーキットを発行・再発行したユーザーアカウントID                                                                   |
+| updatedAt                  | number                | 更新日時（epoch ms）                                                                                                     |
 
 #### recoveryOtps
 
-| フィールド   | 型                 | 説明                                                         |
-| ------------ | ------------------ | ------------------------------------------------------------ |
-| accountId    | Id<"users">        | 復元をリクエストしたPoohMaアカウントID                       |
-| familyId     | Id<"families">     | 復元対象の家族グループID                                     |
-| codeHash     | string             | 生成された6桁OTPのSHA-256ハッシュ値（平文保存禁止）          |
-| expiresAt    | number             | 認証コード有効期限（発行から10分）                           |
-| attempts     | number             | 入力試行回数（最大5回で失効）                                |
-| lastSentAt   | number             | 最終送信日時（60秒以内の再送レート制限制御）                 |
+| フィールド | 型             | 説明                                                |
+| ---------- | -------------- | --------------------------------------------------- |
+| accountId  | Id<"users">    | 復元をリクエストしたPoohMaアカウントID              |
+| familyId   | Id<"families"> | 復元対象の家族グループID                            |
+| codeHash   | string         | 生成された6桁OTPのSHA-256ハッシュ値（平文保存禁止） |
+| expiresAt  | number         | 認証コード有効期限（発行から10分）                  |
+| attempts   | number         | 入力試行回数（最大5回で失効）                       |
+| lastSentAt | number         | 最終送信日時（60秒以内の再送レート制限制御）        |
 
 インデックス: by\_accountId, by\_familyId\_accountId
 
@@ -219,34 +219,34 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 
 1つのFirebase User (`userId`) に対して複数のPoohMa Account（`_id: Id<"users">`）を保持可能（1:N）。各レコードが独立した所属家族（`familyId`）・表示名・プロファイル・暗号化境界を持ちます。
 
-| フィールド | 型 | 説明 |
-| ----------- | ---------------------- | ------------------------------------------------------------------- |
-| userId | string | Firebase UID（複数のusersレコードで同一の値を取りうる） |
-| email | string | メールアドレス |
-| displayName | string(optional) | 表示名（アカウント識別子としても機能。createAccountで必須、syncUserでは初期補完に使用） |
-| photoURL | string(optional) | プロフィール画像URL |
-| familyId | Id<families>(optional) | 所属家族グループ（アカウントごとに独立） |
-| familyRole | ("admin" \| "viewer") | 家族内ロール（"admin": ファミリー管理者, "viewer": メンバー） |
-| onboardingVersion | number(optional) | オンボーディング進捗バージョン（未開始: 0または未設定、完了: 1以上） |
-| emailNotificationSettings | object(optional) | メール配信設定（notifyRecordChanges, notifyFamilyActivity, notifyDataExport, notifySecuritySettings） |
-| createdAt | number | 作成日時 |
-| updatedAt | number | 更新日時 |
+| フィールド                | 型                     | 説明                                                                                                  |
+| ------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------- |
+| userId                    | string                 | Firebase UID（複数のusersレコードで同一の値を取りうる）                                               |
+| email                     | string                 | メールアドレス                                                                                        |
+| displayName               | string(optional)       | 表示名（アカウント識別子としても機能。createAccountで必須、syncUserでは初期補完に使用）               |
+| photoURL                  | string(optional)       | プロフィール画像URL                                                                                   |
+| familyId                  | Id<families>(optional) | 所属家族グループ（アカウントごとに独立）                                                              |
+| familyRole                | ("admin" \| "viewer")  | 家族内ロール（"admin": ファミリー管理者, "viewer": メンバー）                                         |
+| onboardingVersion         | number(optional)       | オンボーディング進捗バージョン（未開始: 0または未設定、完了: 1以上）                                  |
+| emailNotificationSettings | object(optional)       | メール配信設定（notifyRecordChanges, notifyFamilyActivity, notifyDataExport, notifySecuritySettings） |
+| createdAt                 | number                 | 作成日時                                                                                              |
+| updatedAt                 | number                 | 更新日時                                                                                              |
 
 インデックス: by\_userId, by\_email, by\_familyId
 
 #### familyMigrations
 
-| フィールド | 型 | 説明 |
-| ----------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| userId | string | 移行を実行したユーザーの Firebase UID |
-| accountId | Id<users> | 作成元 PoohMa アカウント ID |
-| action | "create" \| "join"(optional) | 移行アクション種別 |
-| sourceFamilyId | Id<families>(optional) | 移行元家族（未所属からの移行時はnull） |
-| targetFamilyId | Id<families> | 移行先家族 |
-| serviceRecordIds | Id<serviceRecords>\[] | 移行対象レコードIDのスナップショット |
-| status | "PREPARED" \| "COMPLETED" \| "EXPIRED" \| "ABORTED" | 移行処理の状態 |
-| createdAt | number | 作成日時 |
-| expiresAt | number | 有効期限（作成から30分後） |
+| フィールド       | 型                                                  | 説明                                   |
+| ---------------- | --------------------------------------------------- | -------------------------------------- |
+| userId           | string                                              | 移行を実行したユーザーの Firebase UID  |
+| accountId        | Id<users>                                           | 作成元 PoohMa アカウント ID            |
+| action           | "create" \| "join"(optional)                        | 移行アクション種別                     |
+| sourceFamilyId   | Id<families>(optional)                              | 移行元家族（未所属からの移行時はnull） |
+| targetFamilyId   | Id<families>                                        | 移行先家族                             |
+| serviceRecordIds | Id<serviceRecords>\[]                               | 移行対象レコードIDのスナップショット   |
+| status           | "PREPARED" \| "COMPLETED" \| "EXPIRED" \| "ABORTED" | 移行処理の状態                         |
+| createdAt        | number                                              | 作成日時                               |
+| expiresAt        | number                                              | 有効期限（作成から30分後）             |
 
 インデックス: by\_userId, by\_accountId, by\_status
 
@@ -254,80 +254,80 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 
 キックされたユーザーの旧家族マスターキー情報を一時退避するテーブル。被キックユーザーは旧パスコードを用いて個人所有レコード（`ownerType: "user"`）のみを新家族へ持ち出すことができる。有効期限（30日）経過または持ち出し完了・明示的破棄により削除される。
 
-| フィールド | 型 | 説明 |
-| ------------------ | ---------------------- | ----------------------------------------------------------------------------------- |
-| accountId | Id<"users"> | 被キックユーザーのアカウントID（users._id） |
-| userId | string | 被キックユーザーのFirebase UID（照会・監査用） |
-| oldFamilyId | Id<"families"> | キック元の家族ID |
-| oldFamilyName | string | キック元の家族名（表示用スナップショット） |
-| masterKeyEncrypted | string | 旧家族パスコード由来鍵でラップされたマスターキー（Base64） |
-| masterKeyIv | string | 上記ラップ処理のIV（Base64） |
-| masterKeySalt | string | 旧パスコード鍵導出（PBKDF2）のソルト（Base64） |
-| kdfIterations | number | 旧パスコード鍵導出（PBKDF2）の反復回数 |
-| cryptoVersion | number | 旧暗号化スキームのバージョン番号 |
-| createdAt | number | 作成日時（epoch ms） |
-| expiresAt | number | 有効期限日時（作成から30日後） |
+| フィールド         | 型             | 説明                                                       |
+| ------------------ | -------------- | ---------------------------------------------------------- |
+| accountId          | Id<"users">    | 被キックユーザーのアカウントID（users._id）                |
+| userId             | string         | 被キックユーザーのFirebase UID（照会・監査用）             |
+| oldFamilyId        | Id<"families"> | キック元の家族ID                                           |
+| oldFamilyName      | string         | キック元の家族名（表示用スナップショット）                 |
+| masterKeyEncrypted | string         | 旧家族パスコード由来鍵でラップされたマスターキー（Base64） |
+| masterKeyIv        | string         | 上記ラップ処理のIV（Base64）                               |
+| masterKeySalt      | string         | 旧パスコード鍵導出（PBKDF2）のソルト（Base64）             |
+| kdfIterations      | number         | 旧パスコード鍵導出（PBKDF2）の反復回数                     |
+| cryptoVersion      | number         | 旧暗号化スキームのバージョン番号                           |
+| createdAt          | number         | 作成日時（epoch ms）                                       |
+| expiresAt          | number         | 有効期限日時（作成から30日後）                             |
 
 インデックス: by\_accountId, by\_userId
 
 #### familyInvites
 
-| フィールド   | 型                      | 説明                                         |
-| ------------ | ----------------------- | -------------------------------------------- |
-| familyId     | Id<families>            | 招待対象の家族ID                             |
-| code         | string                  | 招待コード（UUID等のランダム文字列）         |
-| createdBy    | string                  | 発行者の Firebase UID                        |
-| createdAt    | number                  | 作成日時                                     |
-| expiresAt    | number                  | 有効期限日時（TTLに基づき算出）              |
-| revokedAt    | number(optional)        | 手動失効日時（設定時は即無効）               |
-| useCount     | number                  | この招待コード経由で作成された申請数（監査用）|
+| フィールド | 型               | 説明                                           |
+| ---------- | ---------------- | ---------------------------------------------- |
+| familyId   | Id<families>     | 招待対象の家族ID                               |
+| code       | string           | 招待コード（UUID等のランダム文字列）           |
+| createdBy  | string           | 発行者の Firebase UID                          |
+| createdAt  | number           | 作成日時                                       |
+| expiresAt  | number           | 有効期限日時（TTLに基づき算出）                |
+| revokedAt  | number(optional) | 手動失効日時（設定時は即無効）                 |
+| useCount   | number           | この招待コード経由で作成された申請数（監査用） |
 
 インデックス: by\_code, by\_familyId
 
 #### joinRequests
 
-| フィールド | 型 | 説明 |
-| --------------------- | ------------------------------------- | ---------------------------- |
-| familyId | Id<families> | 申請対象の家族 |
-| userId | string | 申請者の Firebase UID |
-| accountId | Id<users>(optional) | 申請元の PoohMa Account ID |
-| invitedByCode | Id<familyInvites>(optional) | 申請に利用された招待コードID（監査証跡） |
-| status | "pending" \| "approved" \| "rejected" | 申請状態 |
-| createdAt / updatedAt | number | 作成・更新日時 |
+| フィールド            | 型                                    | 説明                                     |
+| --------------------- | ------------------------------------- | ---------------------------------------- |
+| familyId              | Id<families>                          | 申請対象の家族                           |
+| userId                | string                                | 申請者の Firebase UID                    |
+| accountId             | Id<users>(optional)                   | 申請元の PoohMa Account ID               |
+| invitedByCode         | Id<familyInvites>(optional)           | 申請に利用された招待コードID（監査証跡） |
+| status                | "pending" \| "approved" \| "rejected" | 申請状態                                 |
+| createdAt / updatedAt | number                                | 作成・更新日時                           |
 
 インデックス: by\_familyId\_status, by\_userId\_status, by\_familyId\_userId, by\_accountId\_status, by\_familyId\_accountId, by\_invitedByCode
 
 #### serviceRecords
 
-| フィールド | 型 | 説明 |
-| --------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| stableId | string | CSVエクスポート・差分インポート突合用の安定識別子（UUID v4） |
-| title | string | サービス名 |
-| titleReading | string(optional) | 読み仮名（五十音インデックス用） |
-| sortKey | string | 五十音順・アルファベット順ソートキー（グループ順位 2 桁ゼロ埋めプレフィックス + NFKC/ひらがな正規化文字列） |
-| url | string(optional) | サービスURL |
-| ogpImage / ogpDescription | string(optional) | OGP自動取得結果 |
-| customIcon | string(optional) | ファビコン取得失敗時のフォールバック表示（絵文字＋カラーコード等、FR-REC-19） |
-| memo | string(optional) | メモ（最大10,000文字） |
-| ownerType | ("user" \| "family") | 所有者種別（"user": 個人所有, "family": 家族共有） |
-| ownerFamilyId | Id<families>(optional) | 共有レコードが属する家族ID（ownerType === "family" の場合） |
-| admins | Id<users>[] | レコードの追加管理者（PoohMa accountId）配列。ファミリー管理者（familyRole === "admin"）は動的に管理者権限を持つため本配列には含めず、個別管理者として任命された一般メンバー（または個人レコード作成者）のみを格納する |
-| userId | string | 作成者の Firebase UID |
-| accountId | Id<users> | 作成者の PoohMa Account ID（所有権・個人レコード境界） |
-| familyId | Id<families> | 暗号化スコープ・所属家族ID |
-| tags | string\[] | タグ |
-| isPinned | boolean | ピン留め状態（デフォルトfalse、FR-REC-18） |
-| isArchived | boolean | アーカイブ（非表示）状態（デフォルトfalse、FR-REC-16, Issue #154） |
-| archivedAt | number(optional) | アーカイブ退避日時（epoch ms） |
-| needsUpdate | boolean | 「要更新」フラグ（デフォルトfalse、FR-REC-17） |
-| updateRequestedBy | string(optional) | 更新リクエストを送ったユーザーID |
-| updateRequestedAt | number(optional) | 更新リクエスト日時 |
-| lastViewedAt | number(optional) | 最終ヒント閲覧日時（epoch ms）。`logRecordHintView` 実行時に更新 |
-| lastViewedByAccountId | Id<users>(optional) | 最終ヒント閲覧者のPoohMa Account ID |
-| updatedByAccountId | Id<users> | 最終更新を行ったPoohMa Account ID（`createRecord` / `updateRecord` 時に記録） |
-| revision | number | 楽観的ロック用リビジョン番号（0から開始、保存成功ごとに+1インクリメント） |
-| isSample | boolean(optional) | サンプルデータフラグ（オンボーディング用のサンプルレコードはtrue） |
-| updatedAt | number | 更新日時 |
+| フィールド                | 型                     | 説明                                                                                                                                                                                                                   |
+| ------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| stableId                  | string                 | CSVエクスポート・差分インポート突合用の安定識別子（UUID v4）                                                                                                                                                           |
+| title                     | string                 | サービス名                                                                                                                                                                                                             |
+| titleReading              | string(optional)       | 読み仮名（五十音インデックス用）                                                                                                                                                                                       |
+| sortKey                   | string                 | 五十音順・アルファベット順ソートキー（グループ順位 2 桁ゼロ埋めプレフィックス + NFKC/ひらがな正規化文字列）                                                                                                            |
+| url                       | string(optional)       | サービスURL                                                                                                                                                                                                            |
+| ogpImage / ogpDescription | string(optional)       | OGP自動取得結果                                                                                                                                                                                                        |
+| customIcon                | string(optional)       | ファビコン取得失敗時のフォールバック表示（絵文字＋カラーコード等、FR-REC-19）                                                                                                                                          |
+| memo                      | string(optional)       | メモ（最大10,000文字）                                                                                                                                                                                                 |
+| ownerType                 | ("user" \| "family")   | 所有者種別（"user": 個人所有, "family": 家族共有）                                                                                                                                                                     |
+| ownerFamilyId             | Id<families>(optional) | 共有レコードが属する家族ID（ownerType === "family" の場合）                                                                                                                                                            |
+| admins                    | Id<users>[]            | レコードの追加管理者（PoohMa accountId）配列。ファミリー管理者（familyRole === "admin"）は動的に管理者権限を持つため本配列には含めず、個別管理者として任命された一般メンバー（または個人レコード作成者）のみを格納する |
+| userId                    | string                 | 作成者の Firebase UID                                                                                                                                                                                                  |
+| accountId                 | Id<users>              | 作成者の PoohMa Account ID（所有権・個人レコード境界）                                                                                                                                                                 |
+| familyId                  | Id<families>           | 暗号化スコープ・所属家族ID                                                                                                                                                                                             |
+| tags                      | string\[]              | タグ                                                                                                                                                                                                                   |
+| isPinned                  | boolean                | ピン留め状態（デフォルトfalse、FR-REC-18）                                                                                                                                                                             |
+| isArchived                | boolean                | アーカイブ（非表示）状態（デフォルトfalse、FR-REC-16, Issue #154）                                                                                                                                                     |
+| archivedAt                | number(optional)       | アーカイブ退避日時（epoch ms）                                                                                                                                                                                         |
+| needsUpdate               | boolean                | 「要更新」フラグ（デフォルトfalse、FR-REC-17）                                                                                                                                                                         |
+| updateRequestedBy         | string(optional)       | 更新リクエストを送ったユーザーID                                                                                                                                                                                       |
+| updateRequestedAt         | number(optional)       | 更新リクエスト日時                                                                                                                                                                                                     |
+| lastViewedAt              | number(optional)       | 最終ヒント閲覧日時（epoch ms）。`logRecordHintView` 実行時に更新                                                                                                                                                       |
+| lastViewedByAccountId     | Id<users>(optional)    | 最終ヒント閲覧者のPoohMa Account ID                                                                                                                                                                                    |
+| updatedByAccountId        | Id<users>              | 最終更新を行ったPoohMa Account ID（`createRecord` / `updateRecord` 時に記録）                                                                                                                                          |
+| revision                  | number                 | 楽観的ロック用リビジョン番号（0から開始、保存成功ごとに+1インクリメント）                                                                                                                                              |
+| isSample                  | boolean(optional)      | サンプルデータフラグ（オンボーディング用のサンプルレコードはtrue）                                                                                                                                                     |
+| updatedAt                 | number                 | 更新日時                                                                                                                                                                                                               |
 
 インデックス: by_family_sortKey, by_family_isSample, by_family_isArchived, by_ownerType_accountId, by_ownerType_ownerFamilyId, by_userId, by_accountId, by_family_updatedAt, by_ownerType_accountId_updatedAt, by_family_stableId, by_stableId
 
@@ -340,18 +340,18 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 - **ヒント暗号化4フィールドの不可分整合性検証**: 暗号化パスワードヒントを登録・更新する際、エンベロープ暗号化の4要素（`passwordHint`, `passwordHintIv`, `passwordHintDekEncrypted`, `passwordHintDekIv`）が「すべて指定されている」または「すべて未指定である」ことを検証し、不整合なリクエスト（IV欠落やDEK欠落等）を拒否する。
 - **安全な部分更新（Partial Patch）**: `updateCredential` において平文フィールド（label, loginId 等）のみを更新する場合でも、既存の暗号化ヒント4フィールドを保持し、誤って消去される事故を防止する。
 
-| フィールド | 型 | 説明 |
-| ------------------------ | ---------------------- | ----------------------------------------- |
-| recordId | Id<serviceRecords> | 対象サービスレコード。`serviceRecords._id` を参照する |
-| stableId | string | CSVエクスポート・差分インポート突合用の安定識別子（UUID v4） |
-| label | string(optional) | 認証情報ラベル（平文） |
-| loginId | string(optional) | ログインID（平文でサーバーに保存される） |
-| passwordHint | string(optional) | 暗号化済みパスワードヒント（Base64、E2EE暗号化対象） |
-| passwordHintIv | string(optional) | 上記暗号化のIV |
-| passwordHintDekEncrypted | string(optional) | マスターキーでラップされたDEK |
-| passwordHintDekIv | string(optional) | DEKラップ処理のIV |
-| order | number(optional) | 同一サービスレコード内での表示順 |
-| updatedAt | number | 更新日時 |
+| フィールド               | 型                 | 説明                                                         |
+| ------------------------ | ------------------ | ------------------------------------------------------------ |
+| recordId                 | Id<serviceRecords> | 対象サービスレコード。`serviceRecords._id` を参照する        |
+| stableId                 | string             | CSVエクスポート・差分インポート突合用の安定識別子（UUID v4） |
+| label                    | string(optional)   | 認証情報ラベル（平文）                                       |
+| loginId                  | string(optional)   | ログインID（平文でサーバーに保存される）                     |
+| passwordHint             | string(optional)   | 暗号化済みパスワードヒント（Base64、E2EE暗号化対象）         |
+| passwordHintIv           | string(optional)   | 上記暗号化のIV                                               |
+| passwordHintDekEncrypted | string(optional)   | マスターキーでラップされたDEK                                |
+| passwordHintDekIv        | string(optional)   | DEKラップ処理のIV                                            |
+| order                    | number(optional)   | 同一サービスレコード内での表示順                             |
+| updatedAt                | number             | 更新日時                                                     |
 
 インデックス: by\_recordId, by_recordId_stableId, by_stableId
 
@@ -359,19 +359,19 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 
 レコードやクレデンシャルの作成・更新・削除、家族設定変更、メンバーシップ操作、リカバリ操作など、セキュリティ上重要な変更・権限変更・状態変更を記録する監査テーブル。閲覧系操作（ヒント閲覧等）はここに含まれず `viewLogs` に分離される。脱退・削除後のメンバー表示維持のため操作時点の表示名を `actorDisplayName` に保存する。3年（1095日）経過したログは `cleanupOldAuditLogsInternal` により自動削除される。
 
-| フィールド | 型 | 説明 |
-| --------- | --------------------- | --------- |
-| familyId | Id<families>(optional) | 家族共有レコード操作または家族内操作（ownerFamilyId が指定された個人操作等を含む）の場合に設定 |
-| accountId | Id<users>(optional) | 操作者のPoohMa Account ID（削除後は参照切れ考慮） |
-| userId | string | 操作者のFirebase UID |
-| actorDisplayName | string | 操作時点の表示名（脱退・削除後のログ表示維持用） |
-| recordId | Id<serviceRecords>(optional) | 対象レコードID（削除後も特定可能） |
-| ownerType | "user" \| "family" | 操作時点の所有種別 |
-| ownerFamilyId | Id<families>(optional) | ownerType === "family" の対象家族ID |
-| targetAccountId | Id<users>(optional) | ownerType === "user" の所有者Account ID |
-| action | string (リテラル共用体) | 操作種別 (`RECORD_CREATE`, `RECORD_UPDATE`, `RECORD_DELETE`, `CREDENTIAL_CREATE`, `CREDENTIAL_UPDATE`, `CREDENTIAL_DELETE`, `SHARE_SETTING_CHANGED`, `ADMIN_CHANGED`, `FAMILY_CREATE`, `FAMILY_UPDATE`, `FAMILY_MIGRATION`, `PASSCODE_ROTATED`, `INVITE_CREATE`, `INVITE_REVOKE`, `MEMBER_JOIN`, `MEMBER_LEAVE`, `MEMBER_REMOVE`, `MEMBER_ROLE_CHANGED`, `JOIN_REQUEST_REJECTED`, `RECOVERY_KIT_REGISTERED`, `RECOVERY_REDEEMED`, `ACCOUNT_DELETE`) |
-| metadata | object(optional) | 補足情報（targetTitle: レコード名, changedFields: 変更フィールド配列, detail: 付加情報） |
-| createdAt | number | 記録日時（epoch ms） |
+| フィールド       | 型                           | 説明                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ---------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| familyId         | Id<families>(optional)       | 家族共有レコード操作または家族内操作（ownerFamilyId が指定された個人操作等を含む）の場合に設定                                                                                                                                                                                                                                                                                                                                                      |
+| accountId        | Id<users>(optional)          | 操作者のPoohMa Account ID（削除後は参照切れ考慮）                                                                                                                                                                                                                                                                                                                                                                                                   |
+| userId           | string                       | 操作者のFirebase UID                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| actorDisplayName | string                       | 操作時点の表示名（脱退・削除後のログ表示維持用）                                                                                                                                                                                                                                                                                                                                                                                                    |
+| recordId         | Id<serviceRecords>(optional) | 対象レコードID（削除後も特定可能）                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ownerType        | "user" \| "family"           | 操作時点の所有種別                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ownerFamilyId    | Id<families>(optional)       | ownerType === "family" の対象家族ID                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| targetAccountId  | Id<users>(optional)          | ownerType === "user" の所有者Account ID                                                                                                                                                                                                                                                                                                                                                                                                             |
+| action           | string (リテラル共用体)      | 操作種別 (`RECORD_CREATE`, `RECORD_UPDATE`, `RECORD_DELETE`, `CREDENTIAL_CREATE`, `CREDENTIAL_UPDATE`, `CREDENTIAL_DELETE`, `SHARE_SETTING_CHANGED`, `ADMIN_CHANGED`, `FAMILY_CREATE`, `FAMILY_UPDATE`, `FAMILY_MIGRATION`, `PASSCODE_ROTATED`, `INVITE_CREATE`, `INVITE_REVOKE`, `MEMBER_JOIN`, `MEMBER_LEAVE`, `MEMBER_REMOVE`, `MEMBER_ROLE_CHANGED`, `JOIN_REQUEST_REJECTED`, `RECOVERY_KIT_REGISTERED`, `RECOVERY_REDEEMED`, `ACCOUNT_DELETE`) |
+| metadata         | object(optional)             | 補足情報（targetTitle: レコード名, changedFields: 変更フィールド配列, detail: 付加情報）                                                                                                                                                                                                                                                                                                                                                            |
+| createdAt        | number                       | 記録日時（epoch ms）                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 インデックス: by_family_createdAt（家族ログ取得）, by_recordId_createdAt（レコード別履歴）, by_targetAccountId_createdAt（個人レコード操作履歴）, by_userId_createdAt（退会後・問い合わせ対応時のユーザーUID検索）, by_createdAt（定期パージ用）。
 
@@ -379,38 +379,38 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 
 パスワードヒントなどの閲覧系イベントを記録するテーブル。Audit Log（セキュリティ変更履歴）のノイズ化を防ぎつつ、利用状況の確認や将来的な利用率可視化、CSVエクスポートでのマージ出力のために独立して保持される。180日経過したログは `cleanupOldViewLogsInternal` により自動削除される。
 
-| フィールド | 型 | 説明 |
-| --------- | --------------------- | --------- |
-| recordId | Id<serviceRecords> | 閲覧対象レコードID |
-| familyId | Id<families>(optional) | 家族共有レコードの場合の家族ID |
-| accountId | Id<users> | 閲覧者のPoohMa Account ID |
-| userId | string | 閲覧者のFirebase UID |
-| actorDisplayName | string | 閲覧時点の表示名（脱退・削除後の表示維持用） |
-| createdAt | number | 閲覧日時（epoch ms） |
+| フィールド       | 型                     | 説明                                         |
+| ---------------- | ---------------------- | -------------------------------------------- |
+| recordId         | Id<serviceRecords>     | 閲覧対象レコードID                           |
+| familyId         | Id<families>(optional) | 家族共有レコードの場合の家族ID               |
+| accountId        | Id<users>              | 閲覧者のPoohMa Account ID                    |
+| userId           | string                 | 閲覧者のFirebase UID                         |
+| actorDisplayName | string                 | 閲覧時点の表示名（脱退・削除後の表示維持用） |
+| createdAt        | number                 | 閲覧日時（epoch ms）                         |
 
 インデックス: by_recordId_createdAt（レコード別閲覧履歴）, by_familyId_createdAt（家族別閲覧履歴）, by_createdAt（定期パージ用）。
 
 #### recoveryOtps（FR-CRYPT-07）
 
-| フィールド   | 型                 | 説明                                                     |
-| ------------ | ------------------ | -------------------------------------------------------- |
-| accountId    | Id<users>          | 対象アカウントID                                         |
-| familyId     | Id<families>       | 所属家族グループID                                       |
-| codeHash     | string             | 6桁OTPのSHA-256ハッシュ（平文はサーバー非保持）          |
-| expiresAt    | number             | 有効期限日時（発行から10分）                             |
-| attempts     | number             | 試行回数（最大5回超過で無効化）                          |
-| lastSentAt   | number             | 再送レート制限用タイムスタンプ（60秒インターバル）       |
+| フィールド | 型           | 説明                                               |
+| ---------- | ------------ | -------------------------------------------------- |
+| accountId  | Id<users>    | 対象アカウントID                                   |
+| familyId   | Id<families> | 所属家族グループID                                 |
+| codeHash   | string       | 6桁OTPのSHA-256ハッシュ（平文はサーバー非保持）    |
+| expiresAt  | number       | 有効期限日時（発行から10分）                       |
+| attempts   | number       | 試行回数（最大5回超過で無効化）                    |
+| lastSentAt | number       | 再送レート制限用タイムスタンプ（60秒インターバル） |
 
 インデックス: by_accountId, by_familyId_accountId
 
 #### recoverySessions（FR-CRYPT-07）
 
-| フィールド        | 型                 | 説明                                                     |
-| ----------------- | ------------------ | -------------------------------------------------------- |
-| accountId         | Id<users>          | 対象アカウントID                                         |
-| familyId          | Id<families>       | 所属家族グループID                                       |
-| sessionTokenHash  | string             | ワンタイム認可セッショントークンのSHA-256ハッシュ       |
-| expiresAt         | number             | 有効期限日時（発行から10分）                             |
+| フィールド       | 型           | 説明                                              |
+| ---------------- | ------------ | ------------------------------------------------- |
+| accountId        | Id<users>    | 対象アカウントID                                  |
+| familyId         | Id<families> | 所属家族グループID                                |
+| sessionTokenHash | string       | ワンタイム認可セッショントークンのSHA-256ハッシュ |
+| expiresAt        | number       | 有効期限日時（発行から10分）                      |
 
 インデックス: by_accountId, by_familyId_accountId。OTP検証成功時に一回限りのセッショントークンを発行・記録し、新パスコードによるマスターキー再ラップ実行時に検証・即時消費（削除）する。
 
@@ -418,11 +418,11 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 
 レコードのリアルタイム同時編集検知とプレゼンス管理に用いる軽量セッションテーブル。
 
-| フィールド  | 型                  | 説明                                                              |
-| ----------- | ------------------- | ----------------------------------------------------------------- |
-| recordId    | Id<serviceRecords>  | 対象サービスレコード                                              |
-| accountId   | Id<users>           | 編集者のPoohMaアカウントID                                        |
-| updatedAt   | number              | 最終ハートビート時刻（epoch ms）。TTLは5分（300,000ms）             |
+| フィールド | 型                 | 説明                                                    |
+| ---------- | ------------------ | ------------------------------------------------------- |
+| recordId   | Id<serviceRecords> | 対象サービスレコード                                    |
+| accountId  | Id<users>          | 編集者のPoohMaアカウントID                              |
+| updatedAt  | number             | 最終ハートビート時刻（epoch ms）。TTLは5分（300,000ms） |
 
 インデックス: by_recordId, by_accountId, by_updatedAt, by_recordId_accountId。編集画面を開いている間30秒間隔でハートビート更新し、5分経過したセッションはクエリ側で自動失効扱いとする。保存完了時やキャンセル時に物理削除されるほか、放置された期限切れセッションは1分間隔の定期cron（cleanupExpiredEditingSessionsInternal）により自動削除される。
 
@@ -430,15 +430,15 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 
 ユーザーまたは未認証訪問者からのお問い合わせ情報。
 
-| フィールド | 型                                            | 説明                                           |
-| ---------- | --------------------------------------------- | ---------------------------------------------- |
-| name       | string                                        | 送信者名（1〜100文字）                         |
-| email      | string                                        | メールアドレス                                 |
-| category   | string                                        | お問い合わせ種別                               |
-| message    | string                                        | メッセージ本文（5〜3000文字）                  |
-| userId     | string(optional)                              | 送信者の Firebase UID（ログイン時）            |
-| createdAt  | number                                        | 送信日時（epoch ms）                           |
-| status     | "UNREAD" \| "READ" \| "RESOLVED"              | 対応ステータス                                 |
+| フィールド | 型                               | 説明                                |
+| ---------- | -------------------------------- | ----------------------------------- |
+| name       | string                           | 送信者名（1〜100文字）              |
+| email      | string                           | メールアドレス                      |
+| category   | string                           | お問い合わせ種別                    |
+| message    | string                           | メッセージ本文（5〜3000文字）       |
+| userId     | string(optional)                 | 送信者の Firebase UID（ログイン時） |
+| createdAt  | number                           | 送信日時（epoch ms）                |
+| status     | "UNREAD" \| "READ" \| "RESOLVED" | 対応ステータス                      |
 
 インデックス: by_createdAt, by_email_createdAt。同一メールアドレスによる短時間連投の抑止（レート制限）および一覧照会に使用。
 
@@ -446,13 +446,13 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 
 Chrome 拡張機能連携用の短命ワンタイム同期コードテーブル。Web 側で発行され、拡張機能側で検証・消費されると即座に物理削除される（認証・セッション同期方式の選定および Chrome Web Store 審査に関する位置付けは [ADR-009](./adr/009-extension-authentication-strategy.md) 参照）。Zero Token Exposure 原則に基づき、Web 側が一時格納した `customToken` は Content Script や DOM を経由せず、Background Service Worker が `redeemSyncToken` で Convex から直接引き取る。
 
-| フィールド | 型 | 説明 |
-| ---------- | --- | --- |
-| accountId | Id<users> | 発行元のアカウント ID |
-| nonce | string | 拡張機能が生成した暗号学的乱数（UUID v4） |
-| code | string | サーバー側で発行されたワンタイム短命コード（UUID v4） |
+| フィールド  | 型               | 説明                                                                              |
+| ----------- | ---------------- | --------------------------------------------------------------------------------- |
+| accountId   | Id<users>        | 発行元のアカウント ID                                                             |
+| nonce       | string           | 拡張機能が生成した暗号学的乱数（UUID v4）                                         |
+| code        | string           | サーバー側で発行されたワンタイム短命コード（UUID v4）                             |
 | customToken | string(optional) | バックチャネル引き渡し用の Firebase Custom Token（redeem 時に即時消費・物理削除） |
-| expiresAt | number | 有効期限（発行から 30 秒） |
+| expiresAt   | number           | 有効期限（発行から 30 秒）                                                        |
 
 インデックス: by_code_nonce, by_expiresAt。検証成功時の即時物理削除に加え、定期 cron（`cleanupExpiredSyncCodes`）により期限切れレコードが自動パージされる。
 
@@ -462,12 +462,12 @@ Chrome 拡張機能連携用の短命ワンタイム同期コードテーブル�
 
 PoohMa では、セッションの長期維持と安全なアクセス制御を両立するため、認証要素の責務を以下の4層に明確に分離します。
 
-| 認証要素 | 役割 | 保持期間 | 責務と位置付け |
-| --- | --- | --- | --- |
-| **Firebase Auth** | 長期ログイン状態の本体 | 数ヶ月単位（無期限） | **Single Source of Truth**。IndexedDB + LocalStorage 永続化によりブラウザ側で長期間維持。 |
-| **Firebase ID Token** | Convex バックエンドへの通信認証 | 1時間（SDK自動更新） | Convex への WebSocket/HTTP 通信時に付与され、Convex 側 OIDC 検証で直接認証。 |
-| **session Cookie** | SSR初期表示・Server Function用キャッシュ | 14日間（自動ローリング延長） | サーバー側補助セッション。Cookie の期限切れのみでログアウト扱いにしてはならない。 |
-| **Custom Token** | Client Auth 消失時のリカバリ | 一時発行（1回限り） | ブラウザストレージの揮発時に session Cookie から Client Auth を復旧するための非常用経路。 |
+| 認証要素              | 役割                                     | 保持期間                     | 責務と位置付け                                                                            |
+| --------------------- | ---------------------------------------- | ---------------------------- | ----------------------------------------------------------------------------------------- |
+| **Firebase Auth**     | 長期ログイン状態の本体                   | 数ヶ月単位（無期限）         | **Single Source of Truth**。IndexedDB + LocalStorage 永続化によりブラウザ側で長期間維持。 |
+| **Firebase ID Token** | Convex バックエンドへの通信認証          | 1時間（SDK自動更新）         | Convex への WebSocket/HTTP 通信時に付与され、Convex 側 OIDC 検証で直接認証。              |
+| **session Cookie**    | SSR初期表示・Server Function用キャッシュ | 14日間（自動ローリング延長） | サーバー側補助セッション。Cookie の期限切れのみでログアウト扱いにしてはならない。         |
+| **Custom Token**      | Client Auth 消失時のリカバリ             | 一時発行（1回限り）          | ブラウザストレージの揮発時に session Cookie から Client Auth を復旧するための非常用経路。 |
 
 ### 5.2 ログイン〜セッション確立・維持フロー
 
@@ -501,14 +501,14 @@ Convex 側は auth.config.ts の Issuer 設定 (securetoken.google.com/poohma) �
 
 ### 5.3 認可レベル（Convexカスタムビルダー: convex/customBuilders.ts）
 
-| ビルダー | チェック内容 | 用途 |
-| -------------------------------- | ----------------------------------------- | ------------------------- |
-| identityVerifiedQuery / Mutation | Firebase Identity の存在のみ検証 | ユーザー新規同期処理など |
-| authenticatedQuery / Mutation | Identity検証 + `resolveAccount` によるアカウント解決（所有権検証） | 一般的な認証必須API |
-| familyBoundQuery / Mutation | 上記 + 対象アカウントの `user.familyId` が設定されていること | 家族所属が前提の機能（招待承認、家族固有クエリ等） |
-| familyAdminQuery / Mutation | 上記 + 対象アカウントの `familyRole === "admin"` であること | 家族設定・メンバーロール変更・キック・暗号再暗号化準備・監査ログ取得等の管理者限定機能 |
-| recordAdminMutation | familyBound + 対象レコード（`args.id`）が存在し `requireAdminAccess` を満たすこと（`ctx.record` 注入） | レコード個別管理者追加・解除等のレコード管理者限定機能 |
-| systemAdminQuery / Mutation / Action | Identity検証 + `identity.email` が `ADMIN_EMAILS` に含まれること | システム管理者コンソール（@poohma/admin）専用API（統計・問い合わせ・お知らせ・ユーザー管理） |
+| ビルダー                             | チェック内容                                                                                           | 用途                                                                                         |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| identityVerifiedQuery / Mutation     | Firebase Identity の存在のみ検証                                                                       | ユーザー新規同期処理など                                                                     |
+| authenticatedQuery / Mutation        | Identity検証 + `resolveAccount` によるアカウント解決（所有権検証）                                     | 一般的な認証必須API                                                                          |
+| familyBoundQuery / Mutation          | 上記 + 対象アカウントの `user.familyId` が設定されていること                                           | 家族所属が前提の機能（招待承認、家族固有クエリ等）                                           |
+| familyAdminQuery / Mutation          | 上記 + 対象アカウントの `familyRole === "admin"` であること                                            | 家族設定・メンバーロール変更・キック・暗号再暗号化準備・監査ログ取得等の管理者限定機能       |
+| recordAdminMutation                  | familyBound + 対象レコード（`args.id`）が存在し `requireAdminAccess` を満たすこと（`ctx.record` 注入） | レコード個別管理者追加・解除等のレコード管理者限定機能                                       |
+| systemAdminQuery / Mutation / Action | Identity検証 + `identity.email` が `ADMIN_EMAILS` に含まれること                                       | システム管理者コンソール（@poohma/admin）専用API（統計・問い合わせ・お知らせ・ユーザー管理） |
 
 
 #### アカウント解決（resolveAccount）の仕組み
@@ -519,15 +519,14 @@ Convex 側は auth.config.ts の Issuer 設定 (securetoken.google.com/poohma) �
 
 一般メンバーが家族管理画面等の管理者専用機能にアクセスした際、単に操作ボタンを非活性化したり実UIの上にオーバーレイを重ねるだけでは、裏側で不要な Convex Query やフックが購読・実行されてしまうリスクがあります。
 そのため、PoohMa では共通コンポーネント `AdminRestrictedSection` を導入し、以下の二重保護を行います。
-
 1. **実コンポーネントのアンマウント（完全遮断）**: 一般メンバー表示時は children（実コンポーネント）をレンダリングせずアンマウントします。これにより実フック・Convex Query・イベントハンドラが端末上で一切稼働しません。
 2. **静的スケルトン ＋ 中央オーバーレイマスク**: 代替として、機能の外形を模した純粋な静的スケルトン（`pointer-events-none`, `aria-hidden="true"`, `blur`）を背景に配置し、中央にロックアイコンと「管理者機能」メッセージを重ねて描画します。
 3. **React Hooks ルール遵守のラッパー設計**: 実コンポーネントを `*Content` として分離し、最外層のラッパーコンポーネントが `isAdmin` に基づいて `AdminRestrictedSection` または `*Content` を排他的に描画することで、アーリーリターンによるフック呼び出し順序の不整合（Biome `useHookAtTopLevel`）を完全に排除します。
 
-1. `accountId` が明示的に渡された場合
+4. `accountId` が明示的に渡された場合
    - DB から当該 `users` レコードを取得。
    - `user.userId === identity.subject`（ログイン中 Firebase UID）であることを検証（IDOR 防止）。不一致の場合は `Unauthorized` 例外を送出。
-2. `accountId` が省略された場合
+5. `accountId` が省略された場合
    - ログイン中 Firebase UID に紐づく先頭の `users` レコードへ自動フォールバック（下位互換性確保）。
 
 生のConvex `query` / `mutation` を直接エクスポートすることは禁止し、必ず上記のカスタムビルダーを経由する。以下に実装例（ `convex/records.ts` の `updateRecord` ）を示す。
@@ -603,7 +602,7 @@ TanStack Start / ConvexReactClient の Mutation 実行時、認証トークン�
 
 ### 5.6 ログアウトとセッション復元制御（FR-AUTH-04）
 
-```txt
+````txt
 ログアウトフロー：
   1. クライアント側（UserMenu / FamilyComponent 等）で localStorage にログアウトフラグ（LOGOUT_FLAG_KEY = "poohma_logout"）を設定（他タブへは storage イベントで即時通知）
   2. Firebase Auth の signOut(auth) を実行
@@ -647,7 +646,7 @@ TanStack Start / ConvexReactClient の Mutation 実行時、認証トークン�
 3. データ抽出（convex/demo.ts: exportDemoRecordsInternal）:
    - GUI/CSVインポートで正常にブラウザ暗号化された実データを Convex DB から demoRecords.json のフォーマットで抽出する internal query。
    - `pnpm demo:export`（apps/web/scripts/export-demo-records.ts）によりローカル JSON をいつでも最新化可能。
-```
+````
 
 #### デモ環境 運用手順ガイド（Runbook）
 
@@ -675,6 +674,7 @@ TanStack Start / ConvexReactClient の Mutation 実行時、認証トークン�
 ### 5.8 監査ログCSVエクスポートとメール通知設定（convex/auditLogs.ts, convex/users.ts）
 
 #### 監査ログCSVエクスポート（exportFamilyAuditLogs）
+
 - **クエリ**: `exportFamilyAuditLogs = familyBoundQuery`
 - **引数**: `year: v.optional(v.number())`（JST基準の1年間、未指定時は全期間）
 - **セキュリティ・IDOR防止**: `familyBoundQuery` により、呼び出し元アカウントが所属する `familyId` のデータのみに厳格制限。
@@ -682,6 +682,7 @@ TanStack Start / ConvexReactClient の Mutation 実行時、認証トークン�
 - **クライアント処理**: `sanitizeCsvValue` で数式文字エスケープを施し、UTF-8 BOM を付与して CSV 生成。
 
 #### メール通知オプトアウト設定（updateEmailNotificationSettings）
+
 - **ミューテーション**: `updateEmailNotificationSettings = authenticatedMutation`
 - **引数**: `settings: { notifyRecordChanges?: boolean, notifyFamilyActivity?: boolean, notifyDataExport?: boolean, notifySecuritySettings?: boolean }`
 - **設計方針（KISS原則）**:
@@ -771,17 +772,17 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 
 暗号化コア処理は `@poohma/crypto` パッケージに集約され、Web フロントエンド（`apps/web`）および Chrome 拡張機能（`apps/extension`）で共通利用される。
 
-| 関数 / コンポーネント                               | 役割                                                                                  |
-| ------------------------------------------- | ----------------------------------------------------------------------------------- |
-| deriveKeyFromPasscode(passcode, salt)       | PBKDF2でパスコード導出鍵を生成                                                                    |
-| generateMasterKey() / generateDEK()         | AES-GCM鍵の新規生成                                                                         |
-| wrapMasterKey / unwrapMasterKey             | マスターキーのラップ／アンラップ。`unwrapMasterKey` は第4引数 `extractable?: boolean`（デフォルト true、拡張機能の非展開保護時は false）をサポート |
-| wrapDEK / unwrapDEK                         | DEKのラップ／アンラップ（マスターキーで）                                                                |
-| reWrapCredential / reEncryptCredentials     | 移行時のDEK再暗号化（旧マスターキーでアンラップし、新マスターキーで再ラップ）                                            |
-| encrypt / decrypt                           | AES-GCMによる汎用の暗号化／復号（IV自動生成）                                                           |
-| generateSalt                                | PBKDF2用ソルトの生成                                                                         |
-| evaluatePasscodeStrength(passcode)          | `@zxcvbn-ts` を用いたパスコード強度判定（最低10文字、zxcvbnスコア2以上、推測耐性チェック）                           |
-| PasscodeStrengthMeter                       | パスコード入力時の強度メーターUI（プログレスバー・強度ラベル表示）                                                  |
+| 関数 / コンポーネント                   | 役割                                                                                                                                               |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| deriveKeyFromPasscode(passcode, salt)   | PBKDF2でパスコード導出鍵を生成                                                                                                                     |
+| generateMasterKey() / generateDEK()     | AES-GCM鍵の新規生成                                                                                                                                |
+| wrapMasterKey / unwrapMasterKey         | マスターキーのラップ／アンラップ。`unwrapMasterKey` は第4引数 `extractable?: boolean`（デフォルト true、拡張機能の非展開保護時は false）をサポート |
+| wrapDEK / unwrapDEK                     | DEKのラップ／アンラップ（マスターキーで）                                                                                                          |
+| reWrapCredential / reEncryptCredentials | 移行時のDEK再暗号化（旧マスターキーでアンラップし、新マスターキーで再ラップ）                                                                      |
+| encrypt / decrypt                       | AES-GCMによる汎用の暗号化／復号（IV自動生成）                                                                                                      |
+| generateSalt                            | PBKDF2用ソルトの生成                                                                                                                               |
+| evaluatePasscodeStrength(passcode)      | `@zxcvbn-ts` を用いたパスコード強度判定（最低10文字、zxcvbnスコア2以上、推測耐性チェック）                                                         |
+| PasscodeStrengthMeter                   | パスコード入力時の強度メーターUI（プログレスバー・強度ラベル表示）                                                                                 |
 
 #### パスコード誤入力時の指数バックオフと一時ロックアウト（`PasscodeProvider.tsx`）
 
@@ -941,135 +942,135 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 
 ### 7.1 convex/users.ts
 
-| 関数 | 種別 | 認可 | 概要 |
-| -------------------- | ------------- | ---------------- | ----------------------------------------------------------------------------------------------------- |
-| syncUser | Mutation | identityVerified | ログイン時のユーザー情報同期（新規作成／UID引き継ぎ／プロフィール更新）。別UID引き継ぎ時は `serviceRecords.userId`、`joinRequests`、`familyMigrations` も新UIDへ付け替えて孤児化を防止する（所有権を示す `serviceRecords.accountId` は維持）。新規ログイン時はIP・位置情報等をもとにログイン通知メールをスケジュール送信 |
-| updateProfile | Mutation | authenticated | 表示名の更新 |
-| notifyBiometricEvent | Mutation | authenticated | 生体認証の登録・解除イベントを検知し、セキュリティ通知メールをスケジュール送信 |
-| deleteAccount | Mutation | authenticated | 退会処理（所有レコード削除、家族最終メンバー時は家族も削除）。退会完了通知メールを送信 |
-| getUserByFirebaseUid | InternalQuery | 内部限定 | UIDからユーザー＋所属家族情報、および紐づく全アカウント（各アカウントの所属家族情報含む）を取得（HTTP Action経由） |
-| getUserById | InternalQuery | 内部限定 | Convex内部IDからユーザー＋家族情報を取得 |
+| 関数                 | 種別          | 認可             | 概要                                                                                                                                                                                                                                                                                                                     |
+| -------------------- | ------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| syncUser             | Mutation      | identityVerified | ログイン時のユーザー情報同期（新規作成／UID引き継ぎ／プロフィール更新）。別UID引き継ぎ時は `serviceRecords.userId`、`joinRequests`、`familyMigrations` も新UIDへ付け替えて孤児化を防止する（所有権を示す `serviceRecords.accountId` は維持）。新規ログイン時はIP・位置情報等をもとにログイン通知メールをスケジュール送信 |
+| updateProfile        | Mutation      | authenticated    | 表示名の更新                                                                                                                                                                                                                                                                                                             |
+| notifyBiometricEvent | Mutation      | authenticated    | 生体認証の登録・解除イベントを検知し、セキュリティ通知メールをスケジュール送信                                                                                                                                                                                                                                           |
+| deleteAccount        | Mutation      | authenticated    | 退会処理（所有レコード削除、家族最終メンバー時は家族も削除）。退会完了通知メールを送信                                                                                                                                                                                                                                   |
+| getUserByFirebaseUid | InternalQuery | 内部限定         | UIDからユーザー＋所属家族情報、および紐づく全アカウント（各アカウントの所属家族情報含む）を取得（HTTP Action経由）                                                                                                                                                                                                       |
+| getUserById          | InternalQuery | 内部限定         | Convex内部IDからユーザー＋家族情報を取得                                                                                                                                                                                                                                                                                 |
 
 ### 7.2 convex/families.ts
 
-| 関数 | 種別 | 認可 | 概要 |
-| -------------------------------------- | ---------------- | ------------- | --------------------------------------------------------------------------------------------------------------------- |
-| getFamilyMembers | Query | authenticated | 自分の所属家族のメンバー一覧取得 |
-| createFamily | Mutation | authenticated | 家族グループ新規作成＋通知メール送信 |
-| getFamilyInfoByFamilyId | Query | authenticated | 家族IDから家族の暗号鍵情報を取得（メンバー or 承認済み申請者のみ） |
-| getFamilyPublicInfo | Query | authenticated | 招待コードから家族名等の公開情報のみ取得 |
-| createJoinRequest | Mutation | authenticated | 参加申請の送信＋既存メンバーへの通知メール |
-| cancelJoinRequest | Mutation | authenticated | 自分の保留中申請のキャンセル |
-| getMyJoinRequest | Query | authenticated | 自分の申請状況取得 |
-| dismissRejectedRequest | Mutation | authenticated | 却下された申請の削除（確認） |
-| getPendingRequests | Query | familyBound | 自家族への保留中申請一覧 |
-| approveJoinRequest / rejectJoinRequest | Mutation | familyAdmin | 申請の承認／却下＋通知メール（ファミリー管理者のみ実行可能） |
-| prepareFamilyMigration | Mutation | authenticated | 家族移行の準備（PREPARED状態の作成とレコードIDスナップショットの保持） |
-| getMigrationForEncryption | Query | authenticated | 移行対象データ（暗号化済みDEK等）の取得 |
-| commitFamilyMigration | Mutation | authenticated | 移行の確定（再暗号化データの反映）。prepare時点とcommit時点のレコード一覧を照合する楽観的ロック（競合検知）を適用 |
-| abortFamilyMigration | Mutation | authenticated | 移行の中断 |
-| rotatePasscode | Mutation | familyAdmin | パスコードのみの変更（masterKeyEncrypted/Iv/Salt/kdfIterationsのみ更新、ファミリー管理者のみ、6.5） |
-| issueRecoveryKey | Mutation | familyBound | リカバリーキーの発行／再発行（masterKeyRecoveryEncrypted等を保存、6.6） |
-| recoverWithRecoveryKey | Mutation | authenticated | リカバリーキー経由でのマスターキー復元後、新パスコードでの再wrap結果を保存（6.6） |
-| getRecordsForReEncryption | Query | familyAdmin | 再暗号化対象データ取得（ファミリー管理者のみ、家族所属前提） |
-| createFamilyInvite | Mutation | familyAdmin | 有効期限付き招待コードの発行（TTL: 15分〜30日、デフォルト7日、ファミリー管理者のみ） |
-| revokeFamilyInvite | Mutation | familyAdmin | 自家族の招待コードの手動失効（ファミリー管理者のみ） |
-| getFamilyInvites | Query | familyAdmin | 自家族の招待コード一覧取得（ステータス: active/expired/revoked付き、ファミリー管理者のみ） |
-| updateMemberRole | Mutation | familyAdmin | メンバーのロール（admin/viewer）の更新。ファミリー管理者のみ実行可能。家族内に最低1名のファミリー管理者が残るよう検証（最後の管理者の降格を防止） |
-| updateFamilyName | Mutation | familyAdmin | 家族グループ名の変更。ファミリー管理者のみ実行可能。前後の空白トリム・文字数（1〜100文字）バリデーションを適用（Issue #177） |
-| kickMember | Mutation | familyAdmin | メンバーのキック（強制削除）。ファミリー管理者のみ実行可能。最後のファミリー管理者のキックは防止。Export Vaultへのマスターキー退避（TTL: 30日）、admins調停、所属解除、通知メール送信（6.7） |
-| getMyPendingExportVault | Query | authenticated | 被キックユーザーの有効なExport Vault取得（期限切れ時はnull） |
-| abandonPendingExportVault | Mutation | authenticated | 被キックユーザーによるExport Vaultの明示的破棄（データ持ち出し放棄） |
-| cleanupExpiredMigrationsInternal | InternalMutation | 内部限定（Cron） | 期限切れ移行データの自動クリーンアップ |
-| cleanupExpiredFamilyInvitesInternal | InternalMutation | 内部限定（Cron） | 30日以上前の期限切れ・失効済み招待コードの自動削除 |
-| cleanupExpiredExportVaultsInternal | InternalMutation | 内部限定（Cron） | 期限切れExport Vaultの自動クリーンアップ |
+| 関数                                   | 種別             | 認可             | 概要                                                                                                                                                                                         |
+| -------------------------------------- | ---------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| getFamilyMembers                       | Query            | authenticated    | 自分の所属家族のメンバー一覧取得                                                                                                                                                             |
+| createFamily                           | Mutation         | authenticated    | 家族グループ新規作成＋通知メール送信                                                                                                                                                         |
+| getFamilyInfoByFamilyId                | Query            | authenticated    | 家族IDから家族の暗号鍵情報を取得（メンバー or 承認済み申請者のみ）                                                                                                                           |
+| getFamilyPublicInfo                    | Query            | authenticated    | 招待コードから家族名等の公開情報のみ取得                                                                                                                                                     |
+| createJoinRequest                      | Mutation         | authenticated    | 参加申請の送信＋既存メンバーへの通知メール                                                                                                                                                   |
+| cancelJoinRequest                      | Mutation         | authenticated    | 自分の保留中申請のキャンセル                                                                                                                                                                 |
+| getMyJoinRequest                       | Query            | authenticated    | 自分の申請状況取得                                                                                                                                                                           |
+| dismissRejectedRequest                 | Mutation         | authenticated    | 却下された申請の削除（確認）                                                                                                                                                                 |
+| getPendingRequests                     | Query            | familyBound      | 自家族への保留中申請一覧                                                                                                                                                                     |
+| approveJoinRequest / rejectJoinRequest | Mutation         | familyAdmin      | 申請の承認／却下＋通知メール（ファミリー管理者のみ実行可能）                                                                                                                                 |
+| prepareFamilyMigration                 | Mutation         | authenticated    | 家族移行の準備（PREPARED状態の作成とレコードIDスナップショットの保持）                                                                                                                       |
+| getMigrationForEncryption              | Query            | authenticated    | 移行対象データ（暗号化済みDEK等）の取得                                                                                                                                                      |
+| commitFamilyMigration                  | Mutation         | authenticated    | 移行の確定（再暗号化データの反映）。prepare時点とcommit時点のレコード一覧を照合する楽観的ロック（競合検知）を適用                                                                            |
+| abortFamilyMigration                   | Mutation         | authenticated    | 移行の中断                                                                                                                                                                                   |
+| rotatePasscode                         | Mutation         | familyAdmin      | パスコードのみの変更（masterKeyEncrypted/Iv/Salt/kdfIterationsのみ更新、ファミリー管理者のみ、6.5）                                                                                          |
+| issueRecoveryKey                       | Mutation         | familyBound      | リカバリーキーの発行／再発行（masterKeyRecoveryEncrypted等を保存、6.6）                                                                                                                      |
+| recoverWithRecoveryKey                 | Mutation         | authenticated    | リカバリーキー経由でのマスターキー復元後、新パスコードでの再wrap結果を保存（6.6）                                                                                                            |
+| getRecordsForReEncryption              | Query            | familyAdmin      | 再暗号化対象データ取得（ファミリー管理者のみ、家族所属前提）                                                                                                                                 |
+| createFamilyInvite                     | Mutation         | familyAdmin      | 有効期限付き招待コードの発行（TTL: 15分〜30日、デフォルト7日、ファミリー管理者のみ）                                                                                                         |
+| revokeFamilyInvite                     | Mutation         | familyAdmin      | 自家族の招待コードの手動失効（ファミリー管理者のみ）                                                                                                                                         |
+| getFamilyInvites                       | Query            | familyAdmin      | 自家族の招待コード一覧取得（ステータス: active/expired/revoked付き、ファミリー管理者のみ）                                                                                                   |
+| updateMemberRole                       | Mutation         | familyAdmin      | メンバーのロール（admin/viewer）の更新。ファミリー管理者のみ実行可能。家族内に最低1名のファミリー管理者が残るよう検証（最後の管理者の降格を防止）                                            |
+| updateFamilyName                       | Mutation         | familyAdmin      | 家族グループ名の変更。ファミリー管理者のみ実行可能。前後の空白トリム・文字数（1〜100文字）バリデーションを適用（Issue #177）                                                                 |
+| kickMember                             | Mutation         | familyAdmin      | メンバーのキック（強制削除）。ファミリー管理者のみ実行可能。最後のファミリー管理者のキックは防止。Export Vaultへのマスターキー退避（TTL: 30日）、admins調停、所属解除、通知メール送信（6.7） |
+| getMyPendingExportVault                | Query            | authenticated    | 被キックユーザーの有効なExport Vault取得（期限切れ時はnull）                                                                                                                                 |
+| abandonPendingExportVault              | Mutation         | authenticated    | 被キックユーザーによるExport Vaultの明示的破棄（データ持ち出し放棄）                                                                                                                         |
+| cleanupExpiredMigrationsInternal       | InternalMutation | 内部限定（Cron） | 期限切れ移行データの自動クリーンアップ                                                                                                                                                       |
+| cleanupExpiredFamilyInvitesInternal    | InternalMutation | 内部限定（Cron） | 30日以上前の期限切れ・失効済み招待コードの自動削除                                                                                                                                           |
+| cleanupExpiredExportVaultsInternal     | InternalMutation | 内部限定（Cron） | 期限切れExport Vaultの自動クリーンアップ                                                                                                                                                     |
 
 ### 7.3 convex/records.ts
 
-| 関数 | 種別 | 認可 | 概要 |
-| ----------------------------------------------------------------- | ------------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| getRecords | Query | authenticated | 一覧取得。家族所属時は by\_family\_sortKey インデックスで同一家族レコードを取得し、非所属時は by\_ownerType\_accountId で個人レコードを取得。フルテーブルスキャンを完全排除（Issue #137）。検索・タグ・所有者フィルタ・並び替え・取得上限（limit）に対応。表示ステータスフィルタ（archiveStatus: "active" \| "archived" \| "all"）をインメモリで適用し、既定で "active"（isArchived=false）のみ返す。credentials読み取りは有界並行（32件バッチ）で実行 |
-| getRecordsPaginated | Query | authenticated | ページネーション対応の一覧取得（Convex usePaginatedQuery準拠）。表示ステータスフィルタ（archiveStatus）対応。ページ内レコードに対してのみcredentialsを有界並行バッチで結合し、同時I/O上限を回避 |
-| getRecordDetail | Query | authenticated | 詳細取得（rls.tsによるrequireContentAccess制御）。adminUsersをファミリー管理者＋admins配列から動的マージして返却。取得時にrecordAccessLogへVIEWEDを記録し、lastViewedAt/Byを更新 |
-| getAvailableTags | Query | authenticated | 閲覧可能レコードから使用中タグ一覧を抽出（by\_family\_sortKey経由） |
-| getOwnedRecords | Query | authenticated | 自分が管理可能な全レコード取得（個人レコード＋自分が管理者の共有レコード、CSVエクスポート用） |
-| fetchRecordsForExport | Mutation | authenticated | CSVエクスポート用レコード一括取得（stableId、isArchived含む。サーバー側でCSVエクスポート通知メールもスケジュール送信） |
-| shareRecord | Mutation | familyBound | ワンタップで個人レコードを家族共有レコード（ownerType: "family"）に昇格。共有者が閲覧者の場合はadminsに追加、ファミリー管理者の場合は空配列（共有変更通知メール送信） |
-| unshareRecord | Mutation | familyBound | ワンタップで共有レコードを個人レコード（ownerType: "user", admins: []）に戻す（管理者限定・共有変更通知メール送信） |
-| addRecordAdmin / removeRecordAdmin | Mutation | recordAdmin | 共有レコードの個別管理者（一般メンバー）の追加・解除（管理者限定・管理者変更通知メール送信。ファミリー管理者の冗長追加は防止） |
-| bulkSetRecordAdmin | Mutation | familyBound | 選択した共有レコード群に対して個別管理者の追加／解除を一括適用（管理者限定） |
-| bulkShareRecords / bulkUnshareRecords | Mutation | familyBound | 選択した個人レコードの一括共有 / 共有レコードの一括共有解除（isRecordAdminで認可検証） |
-| getRecordsForDiffImport | Query | authenticated | CSV差分インポート突合用にアクセス可能なレコード一覧を軽量取得（編集可否を示す `canEdit` 付与、isArchived含む、暗号化フィールドは除外、最小権限原則） |
-| applyImportDiff | Mutation | familyBound | CSV差分プレビューで承認された新規登録・更新を一括反映（isArchived対応、家族境界・管理者認可検証、非空フィールドのみ更新、監査ログ記録） |
-| createRecord | Mutation | familyBound | レコード新規作成（zodによるサーバー再検証、sortKey自動算出、ownerType: "user" \| "family"、credentials最大10件チェック、stableId自動生成、revision: 0初期化） |
-| updateRecord | Mutation | familyBound | レコード更新（requireAdminAccessチェックにより閲覧専用メンバーによる更新を防止、sortKey再算出、共有解除時は管理者権限を要求、revisionによる楽観的ロック競合検証、forceフラグによる強制上書き、完了時セッション自動削除） |
-| deleteRecord / deleteRecords | Mutation | familyBound | 単体／一括削除（requireAdminAccessチェック、非管理者の共有レコード削除を防止） |
-| createCredential / updateCredential / deleteCredential | Mutation | familyBound | 個別クレデンシャルの追加・更新・削除（requireAdminAccess認可、監査ログ記録） |
-| importRecords | Mutation | familyBound | CSVインポート（全件新規作成、最大500件、家族内メールアドレスの厳格突合、行ごとのバリデーション結果を返却、stableId自動生成、revision: 0初期化） |
-| bulkUpdateRecords | Mutation | familyBound | 一括タグ付与／所有設定変更（所有設定変更は確認モーダルを経由） |
-| togglePin | Mutation | familyBound | isPinnedの切り替え（FR-REC-18） |
-| archiveRecord / unarchiveRecord | Mutation | familyBound | 対象レコードのアーカイブ／利用再開（isArchived, archivedAtの更新、管理者限定、監査ログ記録、FR-REC-16, Issue #154） |
-| bulkArchiveRecords / bulkUnarchiveRecords | Mutation | familyBound | 選択した複数レコードの一括アーカイブ／一括利用再開（管理者権限のあるレコードのみ適用、非管理者共有レコードは除外アラート、監査ログ記録） |
-| requestUpdate | Mutation | familyBound | needsUpdate等を設定し、オーナーへ通知メールを送信（FR-REC-17） |
-| resolveUpdateRequest | Mutation | familyBound | レコード編集保存時にneedsUpdateを自動解除 |
-| getTagManagementList | Query | familyBound | 閲覧可能な全レコードからタグごとの統計（総数、管理可能件数、閲覧専用件数）を集計・ソートして取得（FR-REC-22, Issue #153） |
-| previewTagOperation | Query | familyBound | タグの変更・統合（N → 1）実行前の影響範囲（更新対象件数、権限なしスキップ件数、重複排除件数）をプレビュー取得（FR-REC-22, Issue #153） |
-| mergeOrRenameTags | Mutation | familyBound | タグの変更・統合（N → 1）を実行。操作者が管理権限（isRecordAdmin）を持つレコードのみ更新し、権限のないレコードはスキップ、Setによる重複排除、監査ログ記録（FR-REC-22, Issue #153） |
-| bulkRemoveTags | Mutation | familyBound | 選択した複数レコードから指定したタグを一括で外す（ダッシュボード用）。管理権限のあるレコードのみ更新、監査ログ記録（FR-REC-22, Issue #153） |
-| getRecordAccessLog | Query | authenticated | 対象レコードのrecordAccessLogをタイムラインとして取得（rls.tsチェック、FR-REC-16） |
-| startEditingSession / heartbeatEditingSession / endEditingSession | Mutation | familyBound | recordEditingSessionsの作成・更新・削除（FR-REC-15、TTL 5分、ハートビート30秒） |
-| getActiveEditors | Query | authenticated | 対象レコードを編集中のユーザー一覧を取得（Convexのリアクティブクエリでクライアントが購読、TTL 5分超過分は自動除外） |
-| cleanupExpiredEditingSessionsInternal | InternalMutation | internal（Cron） | 5分TTLを超過した期限切れ編集セッションの定期クリーンアップ（1分間隔cronから実行、1回最大500件のバッチ削除でトランザクション上限を回避） |
-| logRecordHintView | Mutation | familyBound | パスワードヒント閲覧イベントの記録。`serviceRecords.lastViewedAt` / `lastViewedByAccountId` を更新し、`viewLogs` に記録する（auditLogs には混入させない） |
-| getRecordViewLogs | Query | authenticated | 単一レコードの閲覧履歴タイムラインを取得（`by_recordId_createdAt` インデックス使用） |
-| getFamilyAuditLogs | Query | familyBound | 家族全体の監査ログをページネーションで取得（`by_family_createdAt` インデックス使用、降順）。actorDisplayNameをDBから最新化して返す |
-| getRecordAuditLogs | Query | authenticated | 単一レコードの変更履歴タイムラインを取得（最大50件、`by_recordId_createdAt` インデックス使用） |
-| getFamilyAuditAndViewsForExport | Query | familyAdmin | CSVエクスポート用：家族の変更系監査ログと閲覧ログを統合し降順で取得（ファミリー管理者限定） |
-| getStaleRecords | Query | authenticated | 指定日数（デフォルト180日）以上更新されていないレコードを取得（サンプルレコード除外） |
-| cleanupOldAuditLogsInternal | InternalMutation | internal（Cron） | 3年（1095日）以上経過した監査ログを削除（24時間間隔cronから実行、1回100件バッチ、件数上限到達時は再帰実行） |
-| cleanupOldViewLogsInternal | InternalMutation | internal（Cron） | 180日以上経過した閲覧ログを削除（24時間間隔cronから実行、1回100件バッチ、件数上限到達時は再帰実行） |
+| 関数                                                              | 種別             | 認可             | 概要                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ----------------------------------------------------------------- | ---------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| getRecords                                                        | Query            | authenticated    | 一覧取得。家族所属時は by\_family\_sortKey インデックスで同一家族レコードを取得し、非所属時は by\_ownerType\_accountId で個人レコードを取得。フルテーブルスキャンを完全排除（Issue #137）。検索・タグ・所有者フィルタ・並び替え・取得上限（limit）に対応。表示ステータスフィルタ（archiveStatus: "active" \| "archived" \| "all"）をインメモリで適用し、既定で "active"（isArchived=false）のみ返す。credentials読み取りは有界並行（32件バッチ）で実行 |
+| getRecordsPaginated                                               | Query            | authenticated    | ページネーション対応の一覧取得（Convex usePaginatedQuery準拠）。表示ステータスフィルタ（archiveStatus）対応。ページ内レコードに対してのみcredentialsを有界並行バッチで結合し、同時I/O上限を回避                                                                                                                                                                                                                                                        |
+| getRecordDetail                                                   | Query            | authenticated    | 詳細取得（rls.tsによるrequireContentAccess制御）。adminUsersをファミリー管理者＋admins配列から動的マージして返却。取得時にrecordAccessLogへVIEWEDを記録し、lastViewedAt/Byを更新                                                                                                                                                                                                                                                                       |
+| getAvailableTags                                                  | Query            | authenticated    | 閲覧可能レコードから使用中タグ一覧を抽出（by\_family\_sortKey経由）                                                                                                                                                                                                                                                                                                                                                                                    |
+| getOwnedRecords                                                   | Query            | authenticated    | 自分が管理可能な全レコード取得（個人レコード＋自分が管理者の共有レコード、CSVエクスポート用）                                                                                                                                                                                                                                                                                                                                                          |
+| fetchRecordsForExport                                             | Mutation         | authenticated    | CSVエクスポート用レコード一括取得（stableId、isArchived含む。サーバー側でCSVエクスポート通知メールもスケジュール送信）                                                                                                                                                                                                                                                                                                                                 |
+| shareRecord                                                       | Mutation         | familyBound      | ワンタップで個人レコードを家族共有レコード（ownerType: "family"）に昇格。共有者が閲覧者の場合はadminsに追加、ファミリー管理者の場合は空配列（共有変更通知メール送信）                                                                                                                                                                                                                                                                                  |
+| unshareRecord                                                     | Mutation         | familyBound      | ワンタップで共有レコードを個人レコード（ownerType: "user", admins: []）に戻す（管理者限定・共有変更通知メール送信）                                                                                                                                                                                                                                                                                                                                    |
+| addRecordAdmin / removeRecordAdmin                                | Mutation         | recordAdmin      | 共有レコードの個別管理者（一般メンバー）の追加・解除（管理者限定・管理者変更通知メール送信。ファミリー管理者の冗長追加は防止）                                                                                                                                                                                                                                                                                                                         |
+| bulkSetRecordAdmin                                                | Mutation         | familyBound      | 選択した共有レコード群に対して個別管理者の追加／解除を一括適用（管理者限定）                                                                                                                                                                                                                                                                                                                                                                           |
+| bulkShareRecords / bulkUnshareRecords                             | Mutation         | familyBound      | 選択した個人レコードの一括共有 / 共有レコードの一括共有解除（isRecordAdminで認可検証）                                                                                                                                                                                                                                                                                                                                                                 |
+| getRecordsForDiffImport                                           | Query            | authenticated    | CSV差分インポート突合用にアクセス可能なレコード一覧を軽量取得（編集可否を示す `canEdit` 付与、isArchived含む、暗号化フィールドは除外、最小権限原則）                                                                                                                                                                                                                                                                                                   |
+| applyImportDiff                                                   | Mutation         | familyBound      | CSV差分プレビューで承認された新規登録・更新を一括反映（isArchived対応、家族境界・管理者認可検証、非空フィールドのみ更新、監査ログ記録）                                                                                                                                                                                                                                                                                                                |
+| createRecord                                                      | Mutation         | familyBound      | レコード新規作成（zodによるサーバー再検証、sortKey自動算出、ownerType: "user" \| "family"、credentials最大10件チェック、stableId自動生成、revision: 0初期化）                                                                                                                                                                                                                                                                                          |
+| updateRecord                                                      | Mutation         | familyBound      | レコード更新（requireAdminAccessチェックにより閲覧専用メンバーによる更新を防止、sortKey再算出、共有解除時は管理者権限を要求、revisionによる楽観的ロック競合検証、forceフラグによる強制上書き、完了時セッション自動削除）                                                                                                                                                                                                                               |
+| deleteRecord / deleteRecords                                      | Mutation         | familyBound      | 単体／一括削除（requireAdminAccessチェック、非管理者の共有レコード削除を防止）                                                                                                                                                                                                                                                                                                                                                                         |
+| createCredential / updateCredential / deleteCredential            | Mutation         | familyBound      | 個別クレデンシャルの追加・更新・削除（requireAdminAccess認可、監査ログ記録）                                                                                                                                                                                                                                                                                                                                                                           |
+| importRecords                                                     | Mutation         | familyBound      | CSVインポート（全件新規作成、最大500件、家族内メールアドレスの厳格突合、行ごとのバリデーション結果を返却、stableId自動生成、revision: 0初期化）                                                                                                                                                                                                                                                                                                        |
+| bulkUpdateRecords                                                 | Mutation         | familyBound      | 一括タグ付与／所有設定変更（所有設定変更は確認モーダルを経由）                                                                                                                                                                                                                                                                                                                                                                                         |
+| togglePin                                                         | Mutation         | familyBound      | isPinnedの切り替え（FR-REC-18）                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| archiveRecord / unarchiveRecord                                   | Mutation         | familyBound      | 対象レコードのアーカイブ／利用再開（isArchived, archivedAtの更新、管理者限定、監査ログ記録、FR-REC-16, Issue #154）                                                                                                                                                                                                                                                                                                                                    |
+| bulkArchiveRecords / bulkUnarchiveRecords                         | Mutation         | familyBound      | 選択した複数レコードの一括アーカイブ／一括利用再開（管理者権限のあるレコードのみ適用、非管理者共有レコードは除外アラート、監査ログ記録）                                                                                                                                                                                                                                                                                                               |
+| requestUpdate                                                     | Mutation         | familyBound      | needsUpdate等を設定し、オーナーへ通知メールを送信（FR-REC-17）                                                                                                                                                                                                                                                                                                                                                                                         |
+| resolveUpdateRequest                                              | Mutation         | familyBound      | レコード編集保存時にneedsUpdateを自動解除                                                                                                                                                                                                                                                                                                                                                                                                              |
+| getTagManagementList                                              | Query            | familyBound      | 閲覧可能な全レコードからタグごとの統計（総数、管理可能件数、閲覧専用件数）を集計・ソートして取得（FR-REC-22, Issue #153）                                                                                                                                                                                                                                                                                                                              |
+| previewTagOperation                                               | Query            | familyBound      | タグの変更・統合（N → 1）実行前の影響範囲（更新対象件数、権限なしスキップ件数、重複排除件数）をプレビュー取得（FR-REC-22, Issue #153）                                                                                                                                                                                                                                                                                                                 |
+| mergeOrRenameTags                                                 | Mutation         | familyBound      | タグの変更・統合（N → 1）を実行。操作者が管理権限（isRecordAdmin）を持つレコードのみ更新し、権限のないレコードはスキップ、Setによる重複排除、監査ログ記録（FR-REC-22, Issue #153）                                                                                                                                                                                                                                                                     |
+| bulkRemoveTags                                                    | Mutation         | familyBound      | 選択した複数レコードから指定したタグを一括で外す（ダッシュボード用）。管理権限のあるレコードのみ更新、監査ログ記録（FR-REC-22, Issue #153）                                                                                                                                                                                                                                                                                                            |
+| getRecordAccessLog                                                | Query            | authenticated    | 対象レコードのrecordAccessLogをタイムラインとして取得（rls.tsチェック、FR-REC-16）                                                                                                                                                                                                                                                                                                                                                                     |
+| startEditingSession / heartbeatEditingSession / endEditingSession | Mutation         | familyBound      | recordEditingSessionsの作成・更新・削除（FR-REC-15、TTL 5分、ハートビート30秒）                                                                                                                                                                                                                                                                                                                                                                        |
+| getActiveEditors                                                  | Query            | authenticated    | 対象レコードを編集中のユーザー一覧を取得（Convexのリアクティブクエリでクライアントが購読、TTL 5分超過分は自動除外）                                                                                                                                                                                                                                                                                                                                    |
+| cleanupExpiredEditingSessionsInternal                             | InternalMutation | internal（Cron） | 5分TTLを超過した期限切れ編集セッションの定期クリーンアップ（1分間隔cronから実行、1回最大500件のバッチ削除でトランザクション上限を回避）                                                                                                                                                                                                                                                                                                                |
+| logRecordHintView                                                 | Mutation         | familyBound      | パスワードヒント閲覧イベントの記録。`serviceRecords.lastViewedAt` / `lastViewedByAccountId` を更新し、`viewLogs` に記録する（auditLogs には混入させない）                                                                                                                                                                                                                                                                                              |
+| getRecordViewLogs                                                 | Query            | authenticated    | 単一レコードの閲覧履歴タイムラインを取得（`by_recordId_createdAt` インデックス使用）                                                                                                                                                                                                                                                                                                                                                                   |
+| getFamilyAuditLogs                                                | Query            | familyBound      | 家族全体の監査ログをページネーションで取得（`by_family_createdAt` インデックス使用、降順）。actorDisplayNameをDBから最新化して返す                                                                                                                                                                                                                                                                                                                     |
+| getRecordAuditLogs                                                | Query            | authenticated    | 単一レコードの変更履歴タイムラインを取得（最大50件、`by_recordId_createdAt` インデックス使用）                                                                                                                                                                                                                                                                                                                                                         |
+| getFamilyAuditAndViewsForExport                                   | Query            | familyAdmin      | CSVエクスポート用：家族の変更系監査ログと閲覧ログを統合し降順で取得（ファミリー管理者限定）                                                                                                                                                                                                                                                                                                                                                            |
+| getStaleRecords                                                   | Query            | authenticated    | 指定日数（デフォルト180日）以上更新されていないレコードを取得（サンプルレコード除外）                                                                                                                                                                                                                                                                                                                                                                  |
+| cleanupOldAuditLogsInternal                                       | InternalMutation | internal（Cron） | 3年（1095日）以上経過した監査ログを削除（24時間間隔cronから実行、1回100件バッチ、件数上限到達時は再帰実行）                                                                                                                                                                                                                                                                                                                                            |
+| cleanupOldViewLogsInternal                                        | InternalMutation | internal（Cron） | 180日以上経過した閲覧ログを削除（24時間間隔cronから実行、1回100件バッチ、件数上限到達時は再帰実行）                                                                                                                                                                                                                                                                                                                                                    |
 
 ### 7.4 convex/actions.ts（Node runtime, "use node"）
 
-| 関数 | 種別 | 認可 | 概要 |
-| -------------------------------- | ---------------- | -------------------- | -------------------------------------- |
-| getOgpInfo | Action | 要ログイン（内部でidentity検証） | 指定URLのOGP情報取得（SSRF対策済みfetch＋cheerio解析） |
-| getFurigana | Action | 要ログイン | Yahoo!テキスト解析APIによるふりがな取得 |
-| sendEmailReq / sendTemplatedEmailInternal | (Internal)Action | 内部限定 | Resend経由のメール送信（React EmailテンプレートのHTML化・配信）。環境変数 `DISABLE_EMAIL_DELIVERY=true` の場合は外部配信をスキップし成功扱いとする |
+| 関数                                      | 種別             | 認可                             | 概要                                                                                                                                               |
+| ----------------------------------------- | ---------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| getOgpInfo                                | Action           | 要ログイン（内部でidentity検証） | 指定URLのOGP情報取得（SSRF対策済みfetch＋cheerio解析）                                                                                             |
+| getFurigana                               | Action           | 要ログイン                       | Yahoo!テキスト解析APIによるふりがな取得                                                                                                            |
+| sendEmailReq / sendTemplatedEmailInternal | (Internal)Action | 内部限定                         | Resend経由のメール送信（React EmailテンプレートのHTML化・配信）。環境変数 `DISABLE_EMAIL_DELIVERY=true` の場合は外部配信をスキップし成功扱いとする |
 
 ### 7.5 convex/http.ts
 
-| エンドポイント | メソッド | 認証 | 概要 |
-| --------------------- | ---- | ------------------------------------------------ | -------------------------------------- |
-| /getUserByFirebaseUid | POST | x-internal-secret ヘッダー（CONVEX\_INTERNAL\_SECRET） | サーバーサイド (getAuthUser) からのユーザー情報取得専用API |
+| エンドポイント        | メソッド | 認証                                                   | 概要                                                       |
+| --------------------- | -------- | ------------------------------------------------------ | ---------------------------------------------------------- |
+| /getUserByFirebaseUid | POST     | x-internal-secret ヘッダー（CONVEX\_INTERNAL\_SECRET） | サーバーサイド (getAuthUser) からのユーザー情報取得専用API |
 
 ### 7.6 Server Functions (src/services/)
 
-| 関数 | ファイル | メソッド | 認可・検証 | 概要 |
-| ---------------------------- | --------------------- | ---- | ------------------------- | ------------------------------------------------------- |
-| syncUser | auth.functions.ts | POST | Firebase IDトークン検証 | ログイン時のユーザー同期・セッションCookie発行・ログイン通知送信トリガー |
-| refreshSessionCookie | auth.functions.ts | POST | Firebase IDトークン検証（失効検証含む） | セッションCookieの自動ローリング延長（DB書き込み・ログイン通知は行わない） |
-| getAuthUser | auth.functions.ts | GET | セッションCookie検証 | 現在ログイン中のユーザーおよび所属家族情報取得（紐づくアカウントと各家族情報を含む） |
-| getCustomTokenFromSession | auth.functions.ts | POST | セッションCookie検証 | セッションCookieからFirebaseカスタムトークンを再発行（セッション復旧用） |
-| logout | auth.functions.ts | POST | セッションCookie失効 | ログアウト処理（Cookie削除＋トークン失効） |
-| getClientRequestContext | security.functions.ts | GET | なし | 接続元のIPアドレス・User-Agent・GeoIP位置情報の取得 |
-| fetchNewsListServer | cms.functions.ts | GET | なし | microCMSからのお知らせ一覧取得（SSR・TanStack Query） |
-| fetchNewsDetailServer | cms.functions.ts | GET | なし | microCMSからのお知らせ詳細取得（SSR・TanStack Query） |
+| 関数                      | ファイル              | メソッド | 認可・検証                              | 概要                                                                                 |
+| ------------------------- | --------------------- | -------- | --------------------------------------- | ------------------------------------------------------------------------------------ |
+| syncUser                  | auth.functions.ts     | POST     | Firebase IDトークン検証                 | ログイン時のユーザー同期・セッションCookie発行・ログイン通知送信トリガー             |
+| refreshSessionCookie      | auth.functions.ts     | POST     | Firebase IDトークン検証（失効検証含む） | セッションCookieの自動ローリング延長（DB書き込み・ログイン通知は行わない）           |
+| getAuthUser               | auth.functions.ts     | GET      | セッションCookie検証                    | 現在ログイン中のユーザーおよび所属家族情報取得（紐づくアカウントと各家族情報を含む） |
+| getCustomTokenFromSession | auth.functions.ts     | POST     | セッションCookie検証                    | セッションCookieからFirebaseカスタムトークンを再発行（セッション復旧用）             |
+| logout                    | auth.functions.ts     | POST     | セッションCookie失効                    | ログアウト処理（Cookie削除＋トークン失効）                                           |
+| getClientRequestContext   | security.functions.ts | GET      | なし                                    | 接続元のIPアドレス・User-Agent・GeoIP位置情報の取得                                  |
+| fetchNewsListServer       | cms.functions.ts      | GET      | なし                                    | microCMSからのお知らせ一覧取得（SSR・TanStack Query）                                |
+| fetchNewsDetailServer     | cms.functions.ts      | GET      | なし                                    | microCMSからのお知らせ詳細取得（SSR・TanStack Query）                                |
 
 ### 7.7 convex/contacts.ts
 
-| 関数                  | 種別           | 認可       | 概要                                                                                         |
-| --------------------- | -------------- | ---------- | -------------------------------------------------------------------------------------------- |
-| createContact         | Mutation       | 公開       | お問い合わせ送信（Honeypot、Zod整合バリデーション、@convex-dev/rate-limiterトークンバケット、同一メール短時間連投制限、管理者メール通知予約） |
-| sendNotificationEmail | InternalAction | 内部限定   | 管理者（ADMIN_EMAIL）宛てにお問い合わせ受領通知メールを配信（送信者をreplyToに設定）        |
+| 関数                  | 種別           | 認可     | 概要                                                                                                                                          |
+| --------------------- | -------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| createContact         | Mutation       | 公開     | お問い合わせ送信（Honeypot、Zod整合バリデーション、@convex-dev/rate-limiterトークンバケット、同一メール短時間連投制限、管理者メール通知予約） |
+| sendNotificationEmail | InternalAction | 内部限定 | 管理者（ADMIN_EMAIL）宛てにお問い合わせ受領通知メールを配信（送信者をreplyToに設定）                                                          |
 
 ### 7.8 convex/extensionAuth.ts
 
-| 関数 | 種別 | 認可 | 概要 |
-| ---------------------------------- | ---------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| issueSyncToken | Mutation | authenticated | 拡張機能連携用の短命同期コード（Sync Code）を発行（TTL: 30秒、Nonce・Custom Token保持） |
-| redeemSyncToken | Mutation | 公開 | 拡張機能 Background から Nonce + Code で引き換え。即時物理削除・有効期限検証・ユーザーアカウントと全サブアカウント（各家族メタデータ付与）返却 |
-| cleanupExpiredSyncCodesInternal | InternalMutation | 内部限定（Cron） | 期限切れ同期コードの定期クリーンアップ |
+| 関数                            | 種別             | 認可             | 概要                                                                                                                                           |
+| ------------------------------- | ---------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| issueSyncToken                  | Mutation         | authenticated    | 拡張機能連携用の短命同期コード（Sync Code）を発行（TTL: 30秒、Nonce・Custom Token保持）                                                        |
+| redeemSyncToken                 | Mutation         | 公開             | 拡張機能 Background から Nonce + Code で引き換え。即時物理削除・有効期限検証・ユーザーアカウントと全サブアカウント（各家族メタデータ付与）返却 |
+| cleanupExpiredSyncCodesInternal | InternalMutation | 内部限定（Cron） | 期限切れ同期コードの定期クリーンアップ                                                                                                         |
 
 ## 8. 画面設計・ルーティング設計
 
@@ -1128,15 +1129,14 @@ TanStack QueryとConvexは双方がキャッシュ機構を持つため、責務
 
 役割分担：
 
-| 領域 | 担当技術 | 対象データ | 役割 |
-| --------------- | ---------------- | ------------------------------------------------ | ----------------------------------------------- |
-| 認証状態・ルート保護 | Firebase Auth（useAuth / AuthGuard） | 認証状態、Firebase User、IDトークン | 長期ログイン状態の本体（Single Source of Truth）、ルート保護 |
-| 初期スナップショット・CMS | TanStack Query | SSR初期スナップショット（Cookieベース）、UI設定、CMSデータ（FAQ・規約等の静的コンテンツ） | SSR時の初期データ解決、低頻度更新の外部コンテンツのキャッシュ |
-| アプリケーションデータ | Convex（useQuery） | serviceRecords、家族情報、参加申請状態など | リアルタイムデータ同期。信頼できる唯一の情報源（Single Source of Truth） |
-| 未保存フォームドラフト | localStorage（useRecordForm / auth-recovery） | 暗号化済みレコード入力値（poohma_draft_*） | iOSメモリ解放耐性・再認証後の入力復元。24h TTL、タブ複製衝突自律回避 |
+| 領域                      | 担当技術                                      | 対象データ                                                                                | 役割                                                                     |
+| ------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 認証状態・ルート保護      | Firebase Auth（useAuth / AuthGuard）          | 認証状態、Firebase User、IDトークン                                                       | 長期ログイン状態の本体（Single Source of Truth）、ルート保護             |
+| 初期スナップショット・CMS | TanStack Query                                | SSR初期スナップショット（Cookieベース）、UI設定、CMSデータ（FAQ・規約等の静的コンテンツ） | SSR時の初期データ解決、低頻度更新の外部コンテンツのキャッシュ            |
+| アプリケーションデータ    | Convex（useQuery）                            | serviceRecords、家族情報、参加申請状態など                                                | リアルタイムデータ同期。信頼できる唯一の情報源（Single Source of Truth） |
+| 未保存フォームドラフト    | localStorage（useRecordForm / auth-recovery） | 暗号化済みレコード入力値（poohma_draft_*）                                                | iOSメモリ解放耐性・再認証後の入力復元。24h TTL、タブ複製衝突自律回避     |
 
 基本原則：
-
 1. **二重キャッシュの禁止** ：Convexが提供するアプリケーションデータは、ConvexのWebSocket経由のリアクティブ同期によって常に最新状態が保たれる。これをTanStack Queryで再度フェッチ・ラップしてキャッシュすることは、他端末での編集が即時反映されない等のデータ不整合と、不要なHTTPリクエストを招くため厳禁とする。
 2. **描画品質（チラツキ防止）の担保** ：Convexのデータ取得が開始してから完了するまでの遷移期間に画面がちらつかないよう、コンポーネントは `usePersistentQuery` フックを介してメモリ上にフォールバックキャッシュ（直近取得結果、最大1,000件、NFR-PERF-02）を保持する。
 3. **セッションクリーンアップ** ：ログアウト時は、TanStack Queryのキャッシュ（ `queryClient.clear()` ）と `usePersistentQuery` のインメモリキャッシュの両方を即時にクリアし、アカウント間でのデータ残存・露出を防ぐ。
@@ -1152,7 +1152,6 @@ TanStack QueryとConvexは双方がキャッシュ機構を持つため、責務
 ### 8.5 ビジュアルデザインシステム（概要）
 
 PoohMaのUIは、Vercelのデザインシステム（Geist）を参考にしたビジュアル仕様に基づく。詳細なトークン定義は別紙のUIデザインシステム仕様書（0章の命名注記を参照）を参照し、ここでは実装上の要点のみを示す。
-
 - **タイポグラフィ** ：Geist Sans／Geist Mono（ `@fontsource/geist-sans`, `@fontsource/geist-mono` ）。見出しはネガティブなレタースペーシング（表示サイズで-2.4px〜-2.88px）を用いる。ウェイトは400（本文）／500（UI・操作）／600（見出し）の3段階に限定する。
 - **Shadow-as-border技法** ：カード・ボタン等の境界線には、通常のCSS `border` ではなく `box-shadow: 0px 0px 0px 1px rgba(0,0,0,0.08)` （ゼロオフセット・ゼロブラーの1pxシャドウ）を用いる。
 - **カラーパレット** ：基本はアクロマティック（ `#171717` 〜 `#ffffff` のグレースケール）とし、ブランドカラー（オレンジ系。LPデザイン定義書に別途規定）はCTA等の重要な操作にのみ点で使用する。
@@ -1291,14 +1290,14 @@ fetchSafeBuffer() (convex/actions.ts):
 
 ## 11. 入力バリデーション設計（src/utils/schemas.ts, zod）
 
-| スキーマ | 用途 |
-| ------------------------- | --------------------------------------------------------------------------------------------------------- |
-| AeadDataSchema | IV（16文字Base64）・暗号文（Base64、最小長22）の形式チェック共通部品 |
-| CredentialInputSchema | 認証情報の文字数上限、ヒント／IV／DEKの整合性チェック（片方のみ存在はエラー） |
-| RecordInputSchema | サービスレコード全体（タイトル必須255文字以内、URL形式、メモ10,000文字以内、 `credentials` 配列は `MAX_CREDENTIALS_PER_RECORD = 10` で上限を明示、 `tags` 配列は `MAX_TAGS_PER_RECORD = 20` で上限を明示） |
-| CreateFamilyInputSchema | 家族名必須、マスターキー暗号化データ・ソルトの形式チェック、パスコード強度要件（最低文字数10文字・zxcvbnスコア2以上、NFR-SEC-13）はクライアント側の入力時点でも検証する |
-| ChangeFamilyInputSchema | create/joinで分岐する必須項目チェック、認証情報配列の整合性チェック |
-| RotatePasscodeInputSchema | 新パスコードの強度要件チェック、マスターキー再ラップデータの形式チェック（新設） |
+| スキーマ                  | 用途                                                                                                                                                                                                       |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AeadDataSchema            | IV（16文字Base64）・暗号文（Base64、最小長22）の形式チェック共通部品                                                                                                                                       |
+| CredentialInputSchema     | 認証情報の文字数上限、ヒント／IV／DEKの整合性チェック（片方のみ存在はエラー）                                                                                                                              |
+| RecordInputSchema         | サービスレコード全体（タイトル必須255文字以内、URL形式、メモ10,000文字以内、 `credentials` 配列は `MAX_CREDENTIALS_PER_RECORD = 10` で上限を明示、 `tags` 配列は `MAX_TAGS_PER_RECORD = 20` で上限を明示） |
+| CreateFamilyInputSchema   | 家族名必須、マスターキー暗号化データ・ソルトの形式チェック、パスコード強度要件（最低文字数10文字・zxcvbnスコア2以上、NFR-SEC-13）はクライアント側の入力時点でも検証する                                    |
+| ChangeFamilyInputSchema   | create/joinで分岐する必須項目チェック、認証情報配列の整合性チェック                                                                                                                                        |
+| RotatePasscodeInputSchema | 新パスコードの強度要件チェック、マスターキー再ラップデータの形式チェック（新設）                                                                                                                           |
 
 これらのスキーマは src/utils/schemas.ts に定義され、Convex側（records.ts）でも
 convex用にID型を拡張した上でそのまま再利用し、クライアント・サーバーの二重検証を実現している。
@@ -1336,22 +1335,24 @@ convex/crons.ts に登録されている定期ジョブ一覧:
 
 ## 13. 外部サービス連携設計
 
-| サービス | 用途 | 認証方式 |
-| ----------------------- | ---------------------------- | -------------------------------------- |
-| Firebase Authentication | Googleログイン、IDトークン発行 | クライアントSDK（Google OAuth） |
-| Firebase Admin SDK | IDトークン検証、セッションCookie発行・検証 | サービスアカウント（環境変数 or JSONファイル） |
-| Convex | DB・ビジネスロジック実行基盤 | Firebase IDトークンをそのまま信頼（auth.config.ts） |
-| microCMS | FAQ・利用規約・プライバシーポリシーの コンテンツ管理 | APIキー（サーバーサイドのみ） |
-| Resend | 通知メール送信 | APIキー |
-| Yahoo!テキスト解析API | サービス名からのふりがな自動生成 | アプリケーションID |
-| Cloudflare Workers / R2 | Convexデータの定期自動バックアップ（日次） | Cloudflare Secret（`CONVEX_DEPLOY_KEY`） |
+| サービス                | 用途                                                 | 認証方式                                            |
+| ----------------------- | ---------------------------------------------------- | --------------------------------------------------- |
+| Firebase Authentication | Googleログイン、IDトークン発行                       | クライアントSDK（Google OAuth）                     |
+| Firebase Admin SDK      | IDトークン検証、セッションCookie発行・検証           | サービスアカウント（環境変数 or JSONファイル）      |
+| Convex                  | DB・ビジネスロジック実行基盤                         | Firebase IDトークンをそのまま信頼（auth.config.ts） |
+| microCMS                | FAQ・利用規約・プライバシーポリシーの コンテンツ管理 | APIキー（サーバーサイドのみ）                       |
+| Resend                  | 通知メール送信                                       | APIキー                                             |
+| Yahoo!テキスト解析API   | サービス名からのふりがな自動生成                     | アプリケーションID                                  |
+| Cloudflare Workers / R2 | Convexデータの定期自動バックアップ（日次）           | Cloudflare Secret（`CONVEX_DEPLOY_KEY`）            |
 
 ## 14. CSVエクスポート・インポート仕様
 
 ### 14.1 概要・目的
+
 ユーザーが登録したサービスレコードおよび付随するクレデンシャル（最大10件/行）を一括で手元にバックアップ（CSVエクスポート）し、必要に応じて編集した上で再度取り込むことで既存レコードの一括差分更新（UPDATE）や新規追加（CREATE）を安全に行える機能。
 
 ### 14.2 CSVフォーマット・列定義
+
 - **ファイル形式**: UTF-8 BOM付きCSV（Excelでの文字化けを防止）。
 - **列順序（位置）**:
   - **CSVエクスポートの出力列順**: `RecordId` を先頭列に固定して出力（FR-CSV-01）。
@@ -1371,17 +1372,19 @@ convex/crons.ts に登録されている定期ジョブ一覧:
 - **未知の列**: 定義外の列が存在しても無視（スキップ）して処理を継続。
 
 ### 14.3 差分判定・更新マトリクス
-| 条件 | 判定 | 処理内容 |
-| :--- | :---: | :--- |
-| `RecordId` が空 または 列なし | **CREATE** | 新規レコードとして登録（`stableId` を自動生成、OGP/ふりがな取得、ヒント暗号化） |
-| `RecordId` があり、DBに存在する | **UPDATE / SKIP** | 各フィールドを比較。差分があれば UPDATE、全比較項目が一致する場合または更新対象の非空フィールドがない場合は SKIP。空セルは各フィールドで既存値を維持 |
-| `RecordId` があり、DBに存在しない | **ERROR** | エラー理由:「指定された RecordId のレコードが見つかりません」 |
-| CSV内で同一の `RecordId` が重複 | **ERROR** | エラー理由:「CSV内で RecordId が重複しています」 |
-| `CredentialId` が別のレコードに属している | **ERROR** | エラー理由:「CredentialId が別のレコードに紐づいています」 |
-| `CredentialId` が空で Label/Login/Hint あり | **CREATE (Cred)** | 既存レコード配下に新規クレデンシャルを追加 |
-| `CredentialId` があり、当該レコードに属する | **UPDATE / SKIP (Cred)** | クレデンシャル項目の差分を判定。空セルは既存値を維持 |
+
+| 条件                                        |           判定           | 処理内容                                                                                                                                             |
+| :------------------------------------------ | :----------------------: | :--------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RecordId` が空 または 列なし               |        **CREATE**        | 新規レコードとして登録（`stableId` を自動生成、OGP/ふりがな取得、ヒント暗号化）                                                                      |
+| `RecordId` があり、DBに存在する             |    **UPDATE / SKIP**     | 各フィールドを比較。差分があれば UPDATE、全比較項目が一致する場合または更新対象の非空フィールドがない場合は SKIP。空セルは各フィールドで既存値を維持 |
+| `RecordId` があり、DBに存在しない           |        **ERROR**         | エラー理由:「指定された RecordId のレコードが見つかりません」                                                                                        |
+| CSV内で同一の `RecordId` が重複             |        **ERROR**         | エラー理由:「CSV内で RecordId が重複しています」                                                                                                     |
+| `CredentialId` が別のレコードに属している   |        **ERROR**         | エラー理由:「CredentialId が別のレコードに紐づいています」                                                                                           |
+| `CredentialId` が空で Label/Login/Hint あり |    **CREATE (Cred)**     | 既存レコード配下に新規クレデンシャルを追加                                                                                                           |
+| `CredentialId` があり、当該レコードに属する | **UPDATE / SKIP (Cred)** | クレデンシャル項目の差分を判定。空セルは既存値を維持                                                                                                 |
 
 ### 14.4 セキュリティ・E2EE・整合性保護
+
 - **空セルによる値保護**: CSVのセルが空（未入力）の場合は**既存の値を維持（SKIP）** し、意図しないデータ消去を防止する。
 - **削除の非サポート**: CSVから行やクレデンシャルを削除しても、DB上のデータは**削除しない**（削除はアプリUIから明示的に実行）。
 - **E2EE整合性**:
@@ -1390,6 +1393,7 @@ convex/crons.ts に登録されている定期ジョブ一覧:
 - **認可検証**: `applyImportDiff` 内で、実行ユーザーが所属する家族境界および管理者権限（`requireAdminAccess`）をレコードごとに厳密に検証。
 
 ### 14.5 一括データ管理画面（`/settings/bulk`）とプレビューUI・Code Splitting
+
 - **単独ページ化（`routes/(app)/settings/bulk.tsx`）**:
   - 全画面共通メニュー（`UserMenu`）から重いインポート・エクスポート処理および仮想スクロールUIを完全に切り離し、専用の一括データ管理画面 `/settings/bulk` を提供。
   - 設定一覧画面（`/settings/`）および `UserMenu` からダイレクトに遷移可能。
@@ -1415,39 +1419,39 @@ convex/crons.ts に登録されている定期ジョブ一覧:
 
 ### クライアント（src/env/client.ts, VITE_プレフィックス）
 
-| 変数名 | 必須 | 説明 |
-| ------------------------------- | -- | -------------------- |
-| VITE_APP_TITLE | 任意 | アプリタイトル |
-| VITE_FIREBASE_API_KEY | 必須 | Firebase APIキー |
-| VITE_FIREBASE_AUTH_DOMAIN | 必須 | Firebase Authドメイン |
-| VITE_FIREBASE_PROJECT_ID | 必須 | FirebaseプロジェクトID |
-| VITE_FIREBASE_STORAGE_BUCKET | 必須 | Firebase Storageバケット |
-| VITE_CONVEX_URL | 必須 | ConvexデプロイURL |
-| VITE_SITE_URL | 任意 | アプリの公開サイトURL（デフォルト: https://poohma.ciderlabs.link） |
+| 変数名                       | 必須 | 説明                                                               |
+| ---------------------------- | ---- | ------------------------------------------------------------------ |
+| VITE_APP_TITLE               | 任意 | アプリタイトル                                                     |
+| VITE_FIREBASE_API_KEY        | 必須 | Firebase APIキー                                                   |
+| VITE_FIREBASE_AUTH_DOMAIN    | 必須 | Firebase Authドメイン                                              |
+| VITE_FIREBASE_PROJECT_ID     | 必須 | FirebaseプロジェクトID                                             |
+| VITE_FIREBASE_STORAGE_BUCKET | 必須 | Firebase Storageバケット                                           |
+| VITE_CONVEX_URL              | 必須 | ConvexデプロイURL                                                  |
+| VITE_SITE_URL                | 任意 | アプリの公開サイトURL（デフォルト: https://poohma.ciderlabs.link） |
 
 ### サーバー（src/env/server.ts）
 
-| 変数名 | 必須 | 説明 |
-| --------------------------------- | -- | ------------------------------------------------- |
-| SERVER_URL | 任意 | サーバーURL |
-| MICROCMS_SERVICE_DOMAIN | 必須 | microCMSサービスドメイン |
-| MICROCMS_API_KEY | 必須 | microCMS APIキー |
-| CONVEX_INTERNAL_SECRET | 必須 | Convex HTTP Action（内部API）保護用シークレット |
+| 変数名                          | 必須 | 説明                                                     |
+| ------------------------------- | ---- | -------------------------------------------------------- |
+| SERVER_URL                      | 任意 | サーバーURL                                              |
+| MICROCMS_SERVICE_DOMAIN         | 必須 | microCMSサービスドメイン                                 |
+| MICROCMS_API_KEY                | 必須 | microCMS APIキー                                         |
+| CONVEX_INTERNAL_SECRET          | 必須 | Convex HTTP Action（内部API）保護用シークレット          |
 | ABSTRACT_IP_GEOLOCATION_API_KEY | 必須 | Abstract API GeoIP（ログイン・監査メール位置情報取得用） |
 
 ### その他（Convex実行環境）
 
-| 変数名 | 説明 |
-| ------------------------------------------------------------ | ---------------------------------------------- |
-| FIREBASE_SERVICE_ACCOUNT / FIREBASE_ADMINSDK_CREDENTIALS | Firebase Admin初期化用サービスアカウント（JSON文字列 or ファイルパス） |
-| RESEND_API_KEY / RESEND_MAIL_FROM | メール送信設定 |
-| DISABLE_EMAIL_DELIVERY | （任意）外部メール配送スキップフラグ。`true` の場合、E2Eテスト時等にResendへの外部配信を行わず成功扱いとする |
-| YAHOO_CLIENT_ID | ふりがな取得API用アプリケーションID |
+| 変数名                                                   | 説明                                                                                                         |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| FIREBASE_SERVICE_ACCOUNT / FIREBASE_ADMINSDK_CREDENTIALS | Firebase Admin初期化用サービスアカウント（JSON文字列 or ファイルパス）                                       |
+| RESEND_API_KEY / RESEND_MAIL_FROM                        | メール送信設定                                                                                               |
+| DISABLE_EMAIL_DELIVERY                                   | （任意）外部メール配送スキップフラグ。`true` の場合、E2Eテスト時等にResendへの外部配信を行わず成功扱いとする |
+| YAHOO_CLIENT_ID                                          | ふりがな取得API用アプリケーションID                                                                          |
 
 ### バックアップ環境（Cloudflare Workers Secret: workers/backup）
 
-| 変数名 | 説明 |
-| --- | --- |
+| 変数名              | 説明                                                                                                               |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `CONVEX_DEPLOY_KEY` | Convex Deploy Key（`prod:...` 形式）。Cloudflare Secrets で暗号化保存（`wrangler secret put CONVEX_DEPLOY_KEY`）。 |
 
 ## 16. デプロイ構成
@@ -1478,4 +1482,3 @@ convex/crons.ts に登録されている定期ジョブ一覧:
 
 - 家族移行のPREPARED状態が複数端末から同時実行された場合の競合制御（同一ユーザーの既存PREPAREDを都度EXPIRED化する方式に加え、`commitFamilyMigration` での楽観的ロック検証がIssue #190で対応済み。Web Worker + IndexedDB による耐障害性向上は計画中）。
 - 複数家族（マルチ・ワークスペース）対応：要件定義書10章の検討課題のとおり、現行は1ユーザー1家族グループ（users.familyIdが単一値）を前提としたスキーマ・認可設計（5.3のfamilyBoundQuery/Mutation等）となっている。対応する場合はusersテーブルの家族所属を配列化し、家族切替時にどのfamilyIdをコンテキストとして扱うか（アクティブ家族の概念）を含めた設計見直しが必要。
-

@@ -6,14 +6,14 @@ PoohMa におけるテストアーキテクチャ、テスト作成パターン�
 
 ## 1. テスト構成とツールスタック
 
-| 対象 | ツール | 役割 |
-| --- | --- | --- |
-| バックエンド関数 (Convex) | `convex-test` + `vitest` | Schema, customBuilders, RLS, DB トランザクション、スケジューラのインメモリ結合テスト |
-| 暗号化 / E2EE / ユーティリティ | `vitest` + Web Crypto API (Node 20+ 組み込み) | PBKDF2 鍵導出、DEK/MasterKey ラップ、ソートキー生成、バリデーション |
-| フロントエンド UI / Hooks | `@testing-library/react` + `vitest` | `PasscodeProvider`, `AccountProvider`, フォームバリデーション等のコンポーネントテスト |
-| 暗号・WebAuthn PRF サブシステム (Browser E2E) | `@vitest/browser-playwright` + Chromium (CDP) | 実ブラウザ Web Crypto API、CDP Virtual Authenticator (PRF拡張)、PasscodeProvider 実UI結合、再暗号化フロー |
-| Chrome 拡張機能 (`apps/extension`) | `vitest` (Node環境) | URL正規化・PoohMaオリジン検証、認証・マルチアカウントストレージ、パスコード誤入力バックオフ、PSL URL照合の単体テスト |
-| ユーザー導線フルスタック E2E (Staging) | `@playwright/test` + Firebase Admin SDK カスタムトークン | ステージング実環境に対するログインブートストラップ、初期設定・レコード暗号化保存〜復号の貫通検証 |
+| 対象                                          | ツール                                                   | 役割                                                                                                                 |
+| --------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| バックエンド関数 (Convex)                     | `convex-test` + `vitest`                                 | Schema, customBuilders, RLS, DB トランザクション、スケジューラのインメモリ結合テスト                                 |
+| 暗号化 / E2EE / ユーティリティ                | `vitest` + Web Crypto API (Node 20+ 組み込み)            | PBKDF2 鍵導出、DEK/MasterKey ラップ、ソートキー生成、バリデーション                                                  |
+| フロントエンド UI / Hooks                     | `@testing-library/react` + `vitest`                      | `PasscodeProvider`, `AccountProvider`, フォームバリデーション等のコンポーネントテスト                                |
+| 暗号・WebAuthn PRF サブシステム (Browser E2E) | `@vitest/browser-playwright` + Chromium (CDP)            | 実ブラウザ Web Crypto API、CDP Virtual Authenticator (PRF拡張)、PasscodeProvider 実UI結合、再暗号化フロー            |
+| Chrome 拡張機能 (`apps/extension`)            | `vitest` (Node環境)                                      | URL正規化・PoohMaオリジン検証、認証・マルチアカウントストレージ、パスコード誤入力バックオフ、PSL URL照合の単体テスト |
+| ユーザー導線フルスタック E2E (Staging)        | `@playwright/test` + Firebase Admin SDK カスタムトークン | ステージング実環境に対するログインブートストラップ、初期設定・レコード暗号化保存〜復号の貫通検証                     |
 
 ---
 
@@ -155,7 +155,6 @@ it("一般ユーザーによるアクセス拒否と管理者によるアクセ�
 ## 3. 暗号化 (E2EE) のテストパターン
 
 Node.js 環境の `globalThis.crypto.subtle` を用いて、ブラウザと同一の Web Crypto API ロジックを検証する。
-
 - `crypto.spec.ts`: PBKDF2 反復回数、MasterKey/DEK のラップ＆アンラップ、不正なソルトや破損データ時のエラーハンドリングを網羅。
 - `recovery-kit.spec.ts`: Crockford's Base32 リカバリーコードの正規化、類似文字（O/0, I/1）置換、ハッシュ照合のテスト。
 
@@ -164,7 +163,6 @@ Node.js 環境の `globalThis.crypto.subtle` を用いて、ブラウザと同�
 ## 4. UI / Provider のテストパターン
 
 `PasscodeProvider` や `AccountProvider` のように複雑なライフサイクル・揮発性メモリを持つコンポーネントは `@testing-library/react` の `renderHook` や `act` を用いてテストする。
-
 - パスコード誤入力時の指数バックオフ（3回失敗後のロックアウトタイマー）
 - アカウント切り替え時の MasterKey リセット検証
 - WebAuthn 非対応環境における graceful fallback 動作
@@ -172,7 +170,7 @@ Node.js 環境の `globalThis.crypto.subtle` を用いて、ブラウザと同�
 ---
 
 ## 5. テスト実行ルール
- 
+
 - **単体・統合・Browser E2E テスト一括実行**: `pnpm test`（Nodeユニット、Storybook、`browser-e2ee` プロジェクトが全件実行される）
 - **Browser E2E 単体実行**: `pnpm --filter @poohma/web test:browser`（Chromium 上で Web Crypto / WebAuthn PRF / PasscodeProvider / 再暗号化を高速実行）
 - **Full-Stack E2E 実行 (Playwright on Staging)**: `pnpm test:e2e`（ルートオーケストレーションで `preview:setup` → `build:e2e-bridge` → Playwright 実行）
@@ -189,6 +187,7 @@ Node.js 環境の `globalThis.crypto.subtle` を用いて、ブラウザと同�
 ## 6. フルスタック E2E テストパターン (`@playwright/test`)
 
 ### Origin-scoped 保護バイパスフィクスチャ
+
 ステージング環境（Vercel Deployment Protection、および将来的なデプロイ基盤移行に備えた事前対応としての Cloudflare Access）での自動テスト実行時、`playwright.config.ts` の `use.extraHTTPHeaders` にグローバルにバイパスヘッダーを設定してはならない（Google Identity Toolkit などの外部 API への fetch にも付与され、CORS プリフライト拒否で認証失敗となる）。
 
 必ず `apps/web/e2e/support/test-fixtures.ts` を経由し、対象オリジン（`baseURL`）宛ての通信のみにヘッダーを注入する:
@@ -214,7 +213,9 @@ export const test = base.extend({
       if (targetOrigin && new URL(requestUrl).origin === targetOrigin) {
         const headers = {
           ...request.headers(),
-          ...(bypassSecret ? { "x-vercel-protection-bypass": bypassSecret } : {}),
+          ...(bypassSecret
+            ? { "x-vercel-protection-bypass": bypassSecret }
+            : {}),
           ...(cfId && cfSecret
             ? {
                 "CF-Access-Client-Id": cfId,
@@ -234,6 +235,7 @@ export const test = base.extend({
 ```
 
 ### テストスイート構成と並列ワーカー分離アーキテクチャ
+
 - `public-routes.spec.ts`: LP、利用規約、プライバシーポリシー、未認証ガード（`/dashboard` / `/family` から `/login` へのリダイレクト）
 - `auth.setup.ts`: Firebase Admin SDK カスタムトークン発行と Bridge IIFE によるブラウザ `signInWithCustomToken`、Worker 0 用の認証ストレージ（`e2e/.auth/e2e-user.json`）保存
 - `dashboard.spec.ts`: ログイン済みアクセス、認証済み状態での `/login` からの自動リダイレクト、`/family` / `/settings` 等への画面遷移と見出し検証、および `/records/new` 登録フォーム検証（各テストが独立して家族所属状態を確定）
@@ -249,7 +251,6 @@ export const test = base.extend({
 #### `tests/convex-audit-logs.spec.ts`（バックエンド統合テスト）
 
 `convex-test` を用いた監査ログ機能の結合テストスイート。以下の観点を検証する：
-
 - **Zero-Knowledge保証**: `auditLogs.metadata` に平文ヒントや暗号資材（passwordHint, passwordHintIv, DEK等）が記録されないこと
 - **監査ログ生成**: createRecord / updateRecord / logRecordHintView 実行時にログが生成されること
 - **アクセス制御（IDOR防止）**: 他家族のメンバーが `getFamilyAuditLogs` / `getRecordAuditLogs` で他家族のログを取得できないこと
@@ -258,7 +259,6 @@ export const test = base.extend({
 ### E2E テスト実行前のバックエンド反映ルールと Preview Deployment 分離
 
 Playwright E2E テストは、環境汚染とメールクォータ消費を防止するため、**E2E 専用の Convex Preview Deployment（`preview/e2e-test`）を動的に構築・再利用**して実行する。
-
 - **自動セットアップフロー (`pnpm test:e2e`)**:
   1. `pnpm server preview:setup`:
      - `packages/backend/scripts/setup-preview.ts` が実行される。
@@ -269,8 +269,8 @@ Playwright E2E テストは、環境汚染とメールクォータ消費を防�
   2. `pnpm web test:e2e`:
      - 内部で `build:e2e-bridge`（Firebase Custom Token 用ブラウザブリッジのビルド）を実行後、Playwright を起動。
   3. `playwright test`:
-      - ローカルではポート 3100（`reuseExistingServer: false`）で専用 Vite サーバーを起動し、通常の開発サーバー（ポート 3000）を起動したままでも衝突・混同なく独立テスト。
-      - CI（`deploy-staging.yml`）では `deploy-staging`（通常 Convex URL → 固定 alias 割り当て）と `deploy-e2e`（Convex Preview URL → E2E 専用デプロイ）を**並列ジョブ**として実行。E2E テストは `deploy-e2e` が発行する動的 `DEPLOY_URL` に対してのみ実行され、ステージング固定 alias に E2E 用環境変数が混入しない。
+     - ローカルではポート 3100（`reuseExistingServer: false`）で専用 Vite サーバーを起動し、通常の開発サーバー（ポート 3000）を起動したままでも衝突・混同なく独立テスト。
+       - CI（`deploy-staging.yml`）では `deploy-staging`（通常 Convex URL → 固定 alias 割り当て）と `deploy-e2e`（Convex Preview URL → E2E 専用デプロイ）を**並列ジョブ**として実行。E2E テストは `deploy-e2e` が発行する動的 `DEPLOY_URL` に対してのみ実行され、ステージング固定 alias に E2E 用環境変数が混入しない。
 - **Preview 環境の完全初期化 (`pnpm test:e2e:clean`)**:
   - テストデータを完全にゼロクリアしたい場合は、`pnpm test:e2e:clean`（または `pnpm server preview:setup:clean`）を実行すると、Preview Deployment が一旦削除・再作成される。
 - **スキーマや関数の変更時の注意**:
@@ -281,7 +281,6 @@ Playwright E2E テストは、環境汚染とメールクォータ消費を防�
 ## 7. テスト実装時のプロダクションコード変更原則
 
 テスト実装・E2E作成中にテストが失敗した場合や不具合が発生した際は、以下の原則を厳守すること:
-
 1. **安易なプロダクションコードの改変禁止**:
    - 失敗が発生した際、プロダクションコードを即座に修正してはならない。まずテストコード側の待機処理、アサーション方法、フィクスチャの改善・調整で解決できないかを最優先で試みる。
 2. **プロダクションコード修正時の事前許可**:
@@ -303,7 +302,6 @@ Playwright E2E テストは、環境汚染とメールクォータ消費を防�
 ## 9. コミット前の動的テスト（E2E / `pnpm test:e2e`）によるローカル検証義務
 
 AI Agent がコード変更を行う際、静的検証（`pnpm check` や `pnpm typecheck`）および Vitest ユニットテスト（`pnpm test`）のみで作業を完了とし、コミット・プッシュしてはならない。
-
 - **義務の対象**:
   - UI 挙動の変更、新規機能・導線の追加
   - 認証・認可・セッション制御
@@ -327,4 +325,3 @@ AI Agent がコード変更を行う際、静的検証（`pnpm check` や `pnpm 
 - **対処法**:
   - 単一ファイルや特定スイートの動作確認時は、カバレッジ閾値判定をバイパスするため `--coverage.enabled=false` を付与して実行する。
   - プロジェクト全体の網羅率検証は、カバレッジ付きの一括実行スクリプト（`pnpm test` または `pnpm test:coverage`）で全ファイルを網羅走査して確認する。
-

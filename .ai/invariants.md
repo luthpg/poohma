@@ -236,3 +236,9 @@
   - `${{ github.event_name }}` や `${{ github.sha }}`、`${{ github.event.pull_request.number }}` などの GitHub コンテキスト式やステップ出力を `run:` のシェルスクリプト内に直接埋め込んではならない。
   - PR Job Summary 生成等のサマリー書き込みステップも含め、シェルの特殊文字や意図せぬ改行・クォート破壊によるコマンドインジェクション（CWE-78）や zizmor / CodeQL 指摘の原因となる。
   - 必ずステップレベルの `env:` でシェル変数（例: `EVENT_NAME: ${{ github.event_name }}`, `PR_NUMBER: ${{ github.event.pull_request.number }}`）として定義し、スクリプト内からは `"$EVENT_NAME"` として安全に参照すること。
+
+### Biome フォーマットによるワークフロー YAML の整形と actionlint 整合性維持
+
+- **Biome フォーマッターとワークフロー構文の互換性**:
+  - Biome 2.6 以降、`.github/workflows/*.yml` を含む YAML ファイルも自動フォーマット（クォートの統一、インデント等）の対象となる。
+  - フォーマット実施後も GitHub Actions 式（`${{ ... }}`）やシングルクォート・ダブルクォートの解釈に破壊が生じていないか、ワークフロー変更・整形時は必ずコミット前にローカルで `pnpm lint:workflows`（actionlint + shellcheck）を実行し、構文妥当性を検証すること。

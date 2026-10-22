@@ -204,8 +204,23 @@ if (!pnpmExecPath) throw new Error("npm_execpath is missing");
 
 execFileSync(
   process.execPath,
-  [pnpmExecPath, "exec", "convex", "env", "set", "--force", "--from-file", filePath, "--deployment", deploymentName],
-  { cwd: backendDir, env: { ...process.env, CONVEX_DEPLOY_KEY: previewKey }, stdio: "inherit" }
+  [
+    pnpmExecPath,
+    "exec",
+    "convex",
+    "env",
+    "set",
+    "--force",
+    "--from-file",
+    filePath,
+    "--deployment",
+    deploymentName,
+  ],
+  {
+    cwd: backendDir,
+    env: { ...process.env, CONVEX_DEPLOY_KEY: previewKey },
+    stdio: "inherit",
+  },
 );
 ```
 `process.execPath`（Node.js バイナリ）から `pnpmExecPath` を引数配列として直接起動することで、シェル展開の介在余地を根本から排除する。
@@ -285,4 +300,3 @@ Monorepo 配下に新しいパッケージ（例: Chrome 拡張機能 `apps/exte
 6. **インラインスクリプト内への GitHub 式直接埋め込み禁止（Template Injection 対策）**:
    - `run:` スクリプトブロック内に `${{ github.event_name }}` や `${{ github.sha }}`、`${{ github.event.pull_request.number }}` などの GitHub 式を直接展開すると、シェルエスケープの破壊や zizmor / CodeQL による script injection 脆弱性（CWE-78）指摘の原因となる。
    - PR Job Summary 生成ステップ（`$GITHUB_STEP_SUMMARY`）等も含め、すべてのコンテキスト値はステップレベルの `env:` でシェル変数（例: `PR_NUMBER: ${{ github.event.pull_request.number }}`）として安全に注入し、スクリプト内では `"$PR_NUMBER"` として参照すること。
-

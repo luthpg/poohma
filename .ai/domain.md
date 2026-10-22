@@ -168,14 +168,14 @@ flowchart TD
 
 管理者判定（`isRecordAdmin`）は、**ファミリー管理者（`familyRole === "admin"`）** または **対象レコードの `admins` 配列に含まれる個別管理者** のいずれかを満たす場合に成立する（動的マージ ACL）。
 
-| 操作 | 個人レコード (`ownerType: "user"`) | 共有レコード (`ownerType: "family"`) |
-| --- | --- | --- |
-| **閲覧・復号** | 所有アカウント (`accountId === user._id`) のみ | 同一 Family に所属する全メンバー（`viewer` 含む） |
-| **編集 (タイトル/メモ/タグ等)** | 所有アカウントのみ | レコード管理者（ファミリー管理者または個別管理者）のみ |
-| **ヒント更新 (DEK再暗号化)** | 所有アカウントのみ | レコード管理者（ファミリー管理者または個別管理者）のみ |
-| **共有解除 (個人へ戻す)** | 対象外 | レコード管理者のみ |
-| **管理者変更 (admins追加/解除)** | 対象外 | レコード管理者のみ（ファミリー管理者は全レコード管理権限を持つためadmins追加不要） |
-| **削除** | 所有アカウントのみ | レコード管理者のみ |
+| 操作                             | 個人レコード (`ownerType: "user"`)             | 共有レコード (`ownerType: "family"`)                                               |
+| -------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------- |
+| **閲覧・復号**                   | 所有アカウント (`accountId === user._id`) のみ | 同一 Family に所属する全メンバー（`viewer` 含む）                                  |
+| **編集 (タイトル/メモ/タグ等)**  | 所有アカウントのみ                             | レコード管理者（ファミリー管理者または個別管理者）のみ                             |
+| **ヒント更新 (DEK再暗号化)**     | 所有アカウントのみ                             | レコード管理者（ファミリー管理者または個別管理者）のみ                             |
+| **共有解除 (個人へ戻す)**        | 対象外                                         | レコード管理者のみ                                                                 |
+| **管理者変更 (admins追加/解除)** | 対象外                                         | レコード管理者のみ（ファミリー管理者は全レコード管理権限を持つためadmins追加不要） |
+| **削除**                         | 所有アカウントのみ                             | レコード管理者のみ                                                                 |
 
 ---
 
@@ -225,7 +225,6 @@ flowchart TD
 ## 5. レコード制約・バリデーション境界 (Constraints & Limits)
 
 巨大ドキュメント生成防止およびUI・DB・CSVインポート間の整合性担保のため、以下の制約を設けている。
-
 - **認証情報項目数 (`credentials`)**: 最大 10 件 (`MAX_CREDENTIALS_PER_RECORD = 10`)
   - UI追加制御、Zodスキーマ、Convexミューテーション、CSVエクスポート・インポートの列定義（1〜10）で統一。
 - **タグ数 (`tags`)**: 最大 20 個 (`MAX_TAGS_PER_RECORD = 20`)
@@ -243,16 +242,15 @@ flowchart TD
 
 `contacts` テーブルはユーザーからのお問い合わせを格納する単純な書き込み専用テーブル。アクセス制御は不要（認証不要で送信可能）で、読み取りは管理者運用のみを想定。
 
-| フィールド | 型 | 説明 |
-| --- | --- | --- |
-| `name` | string | 送信者名 |
-| `email` | string | 送信者メールアドレス |
-| `category` | string | お問い合わせ種別 |
-| `message` | string | 本文（最大3000文字） |
-| `userId` | string? | Firebase UID（ログイン中の場合のみ） |
-| `createdAt` | number | 送信日時（Unix ms） |
-| `status` | `UNREAD`\|`READ`\|`RESOLVED` | 管理ステータス（初期値: `UNREAD`） |
-
+| フィールド  | 型                           | 説明                                 |
+| ----------- | ---------------------------- | ------------------------------------ |
+| `name`      | string                       | 送信者名                             |
+| `email`     | string                       | 送信者メールアドレス                 |
+| `category`  | string                       | お問い合わせ種別                     |
+| `message`   | string                       | 本文（最大3000文字）                 |
+| `userId`    | string?                      | Firebase UID（ログイン中の場合のみ） |
+| `createdAt` | number                       | 送信日時（Unix ms）                  |
+| `status`    | `UNREAD`\|`READ`\|`RESOLVED` | 管理ステータス（初期値: `UNREAD`）   |
 - **スパム・乱用対策**:
   - **Honeypot**: 非表示フィールド（`hpConfirm`）による単純ボット排除
   - **グローバル/バースト制限**: Convex公式 `@convex-dev/rate-limiter` によるトークンバケット制限（1分間に最大5件回復、キャパシティ10件）
@@ -267,16 +265,15 @@ flowchart TD
 
 お知らせはConvexではなくmicroCMSで管理。`NewsContent` 型（`cms.server.ts`）と同義の `InfoContent` エイリアスも提供。
 
-| フィールド | 型 | 説明 |
-| --- | --- | --- |
-| `id` | string | microCMS コンテンツID |
-| `slug` | string | URLスラッグ |
-| `title` | string | お知らせタイトル |
-| `content` | string | リッチテキスト（HTML文字列） |
-| `published_at` | string? | カスタム公開日時フィールド |
-| `thumbnail` | `{url, width, height}`? | サムネイル画像 |
-| `publishedAt` | string | microCMS標準公開日時（MicroCMSBase） |
-
+| フィールド     | 型                      | 説明                                 |
+| -------------- | ----------------------- | ------------------------------------ |
+| `id`           | string                  | microCMS コンテンツID                |
+| `slug`         | string                  | URLスラッグ                          |
+| `title`        | string                  | お知らせタイトル                     |
+| `content`      | string                  | リッチテキスト（HTML文字列）         |
+| `published_at` | string?                 | カスタム公開日時フィールド           |
+| `thumbnail`    | `{url, width, height}`? | サムネイル画像                       |
+| `publishedAt`  | string                  | microCMS標準公開日時（MicroCMSBase） |
 - **取得関数**: `fetchNewsListServer`（`info` エンドポイント、最大20件、`-publishedAt,-createdAt` 順）/ `fetchNewsDetailServer`（IDで1件取得）
 - **キャッシュ**: `staleTime = 5分`（NEWS_STALE_TIME）
 - **表示**: ヘッダーベル（`NewsBell` + Popover、未読バッジ付き）/ ユーザーメニュー / `/news` 一覧・`/news/$id` 詳細ページ（公開ルート）
@@ -290,14 +287,14 @@ flowchart TD
 
 ### 記録トリガー・操作種別
 
-| action | トリガー | familyId | targetAccountId |
-| --- | --- | --- | --- |
-| `RECORD_CREATE` | `createRecord` | ownerType=familyのとき | ownerType=userのとき |
-| `RECORD_UPDATE` | `updateRecord` | ownerType=familyのとき | ownerType=userのとき |
-| `RECORD_DELETE` | `deleteRecord` / `deleteRecords` | ownerType=familyのとき | ownerType=userのとき |
-| `HINT_VIEW` | `logRecordHintView` | ownerType=familyのとき | ownerType=userのとき |
-| `SHARE_SETTING_CHANGED` | `shareRecord` / `unshareRecord` | 常にfamilyIdあり | - |
-| `ADMIN_CHANGED` | `addRecordAdmin` / `removeRecordAdmin` | 常にfamilyIdあり | - |
+| action                  | トリガー                               | familyId               | targetAccountId      |
+| ----------------------- | -------------------------------------- | ---------------------- | -------------------- |
+| `RECORD_CREATE`         | `createRecord`                         | ownerType=familyのとき | ownerType=userのとき |
+| `RECORD_UPDATE`         | `updateRecord`                         | ownerType=familyのとき | ownerType=userのとき |
+| `RECORD_DELETE`         | `deleteRecord` / `deleteRecords`       | ownerType=familyのとき | ownerType=userのとき |
+| `HINT_VIEW`             | `logRecordHintView`                    | ownerType=familyのとき | ownerType=userのとき |
+| `SHARE_SETTING_CHANGED` | `shareRecord` / `unshareRecord`        | 常にfamilyIdあり       | -                    |
+| `ADMIN_CHANGED`         | `addRecordAdmin` / `removeRecordAdmin` | 常にfamilyIdあり       | -                    |
 
 ### データ保持・クリーンアップ
 
@@ -372,7 +369,6 @@ PoohMa では、CSVエクスポート・インポートを単なるバックア�
 ### 11.1 メール通知設定の用途別分離
 
 ユーザーのノイズ低減とセキュリティ担保を両立するため、通知を「必須（MUST）」と「オプトアウト可能」に厳格分類。
-
 - **オプトアウト不可（強制送信）**:
   - `recoveryOtp`（リカバリー認証コード）
   - `newDeviceLogin`（新端末ログイン検知）
@@ -414,15 +410,16 @@ PoohMa では、過去の機能拡張に伴い暫定的に `v.optional()` とさ
 
 ### 13.1 必須化されたフィールド一覧
 
-| テーブル | 必須化されたフィールド | 整合性保証と初期値ルール |
-| :--- | :--- | :--- |
-| `families` | `masterKeyEncrypted`, `masterKeyIv`, `masterKeySalt`, `kdfIterations`, `cryptoVersion` | 家族作成時に暗号資材・KDFメタデータをアトミックに初期化。レガシー家族はバックフィル完了済み。 |
-| `users` | `createdAt` | アカウント作成（`createAccount` / `syncUser`）時に `Date.now()` で初期化。 |
-| `serviceRecords` | `familyId`, `sortKey`, `ownerType`, `admins`, `revision`, `updatedByAccountId` | レコード作成・インポート時に必須。共有設定変更・資格情報変更等の全 mutation で `updatedAt`, `revision`, `updatedByAccountId` がアトミックに同期更新される。 |
-| `pendingExportVaults` | `kdfIterations`, `cryptoVersion` | 被キック時の Vault 生成時に旧家族の KDF メタデータを完全退避。 |
-| `credentials` | `stableId` | レコード内クレデンシャルの安定識別子として作成時に UUID v4 を自動採番。 |
+| テーブル              | 必須化されたフィールド                                                                 | 整合性保証と初期値ルール                                                                                                                                    |
+| :-------------------- | :------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `families`            | `masterKeyEncrypted`, `masterKeyIv`, `masterKeySalt`, `kdfIterations`, `cryptoVersion` | 家族作成時に暗号資材・KDFメタデータをアトミックに初期化。レガシー家族はバックフィル完了済み。                                                               |
+| `users`               | `createdAt`                                                                            | アカウント作成（`createAccount` / `syncUser`）時に `Date.now()` で初期化。                                                                                  |
+| `serviceRecords`      | `familyId`, `sortKey`, `ownerType`, `admins`, `revision`, `updatedByAccountId`         | レコード作成・インポート時に必須。共有設定変更・資格情報変更等の全 mutation で `updatedAt`, `revision`, `updatedByAccountId` がアトミックに同期更新される。 |
+| `pendingExportVaults` | `kdfIterations`, `cryptoVersion`                                                       | 被キック時の Vault 生成時に旧家族の KDF メタデータを完全退避。                                                                                              |
+| `credentials`         | `stableId`                                                                             | レコード内クレデンシャルの安定識別子として作成時に UUID v4 を自動採番。                                                                                     |
 
 ### 13.2 整合性保証の原則
+
 1. **アプリ側フォールバックの排除**: スキーマで必須化されたフィールドに対して、ビジネスロジック内で `field ?? fallback` や `if (!field)` のような不要な防御コードを記述しない（KISS 原則）。
 2. **監査ログ・更新者追跡の同期**: `serviceRecords` を変更する全 mutation（`shareRecord`, `unshareRecord`, `addRecordAdmin`, `removeRecordAdmin`, `createCredential`, `updateCredential`, `deleteCredential`, `reorderCredentials` 等）において、`updatedAt` のみならず `revision: record.revision + 1` および `updatedByAccountId: ctx.user._id` を漏れなく同期更新する。
 
@@ -445,6 +442,3 @@ flowchart TD
 - **短命 TTL（30秒）**: 不正傍受や放置による悪用を防ぐため、発行から30秒で自動失効（Crons による定期パージ対象）。
 - **Single-Use（使い捨て・即時物理削除）**: `redeemSyncToken` で検証成功した瞬間にレコードを物理削除し、リプレイ攻撃や横取りを完全排除。
 - **nonce バインディング**: 拡張機能が生成した `nonce` と同期コードをペアで検証することで、第三者画面からの不正な連携リクエストを遮断。
-
-
-

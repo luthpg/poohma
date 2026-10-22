@@ -6,11 +6,11 @@ Convex バックエンド開発における落とし穴と回避法です。
 
 ### `convex dev` の常駐プロセスと開発環境へのワンショット反映 (`--once`)
 
-- **問題**: 
+- **問題**:
   - `convex dev` は通常ファイル変更監視モードで常駐するため、AI Agent 実行時にプロセスが終了しなくなる。
   - 一方で `pnpm convex:codegen` だけを実行すると、ローカルの型定義は更新されるが **Convex 開発クラウドインスタンス（`dev:...`）には関数やスキーマがプッシュされない**。そのため、実バックエンドと通信する E2E テスト（Playwright）を実行した際に `Could not find public function for '...'` でテストが全滅する罠に陥る。
   - また、`pnpm convex:deploy` / `pnpm convex:sync` は本番（production）デプロイまたは `CONVEX_DEPLOY_KEY` 設定環境向けであり、ローカル開発環境（`dev:...`）への反映には使えない。
-- **回避法**: 
+- **回避法**:
   - 開発環境（`dev:...`）に関数・スキーマの変更をワンショットで安全に反映し、型定義を生成するには **`convex dev --once`**（`pnpm convex:dev:once` または `pnpm -F @poohma/backend exec convex dev --once`）を使用する。常駐せずにデプロイとコード生成を完了できる。
   - E2E テスト実行前やローカル検証前にバックエンドのスキーマ・関数を変更した場合は、必ず事前に `convex dev --once` を実行すること。
 
@@ -188,7 +188,3 @@ Convex バックエンド開発における落とし穴と回避法です。
 - **関連実装 (Related Code References)**:
   - `packages/backend/tests/test-helpers.ts`
   - `packages/backend/tests/convex-users-auth.spec.ts`
-
-
-
-

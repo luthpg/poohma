@@ -138,7 +138,7 @@ export function OnboardingTour({
               "driver-popover-btn-disabled",
             );
             popover.previousButton.style.pointerEvents = "auto";
-            popover.previousButton.innerText = singleStepPrevBtnText;
+            popover.previousButton.textContent = singleStepPrevBtnText;
           }
         },
       });

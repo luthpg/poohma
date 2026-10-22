@@ -67,6 +67,7 @@ Playwright E2E テストおよびフロントエンド遷移における落と�
 
 - **問題**: ログアウト完了や未認証状態を確認するため、テストコードから保護ルート（`/family` など）へ直接 `page.goto` する際、アプリ側の未認証ガード（`apps/web/src/routes/(app)/route.tsx`）が即座に `/login` へのクライアントサイド遷移を実行すると、HTML ロード完了前にナビゲーションが中断され、Playwright で `page.goto: net::ERR_ABORTED` 例外が発生してテストがタイムアウト・失敗する。
 - **回避法**: 未認証ガードでリダイレクトされることが期待されるルートへの直接アクセス検証（`apps/web/e2e/logout.spec.ts` 等）では、`Promise.all` を用いて `/login` への遷移完了待機と `page.goto` の中断例外（`ERR_ABORTED`）の許容を同時に行う。
+
   ```typescript
   await Promise.all([
     page.waitForURL((url) => url.pathname === "/login", { timeout: 20000 }),
@@ -128,9 +129,3 @@ Playwright E2E テストおよびフロントエンド遷移における落と�
 - **回避法**:
   - Convex パージ処理の戻り値を `Promise<number | null>` とし、正常終了（削除件数 0 件を含む）と異常終了（`null`）を厳格に区別する。
   - Convex パージが成功した UID（`deleted !== null`）のみ Firebase ユーザーを削除し、パージ失敗時は Firebase ユーザーを意図的に保持する。これにより、次回以降の実行（`auth.setup.ts` や `auth.teardown.ts`）で `listStaleE2ETestUids` から自動的に再検出され、Convex データの確実な後続クリーンアップが行われる。
-
-
-
-
-
-

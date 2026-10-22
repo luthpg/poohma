@@ -35,4 +35,3 @@ Issue #132 への対応として、招待は「有効期限付きの招待コー
 
 - [Test Strategy](../testing.md)
 - [Threat Model](../security/threat-model.md)
-

@@ -116,4 +116,3 @@ flowchart TD
   - 対象フィールドを扱う Mutations, Queries, UI から、旧データ補完コード（`record.field ?? fallback` や `if (!record.field)`）を削除し、必須前提のシンプルなコードへ刷新する。
 - **品質検証**:
   - `pnpm typecheck`, `pnpm check`, `pnpm test`, `pnpm test:e2e` を実行し、全件合格を確認する。
-

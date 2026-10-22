@@ -16,7 +16,9 @@ import { requireContentAccess } from "./rls";
 export const updateRecord = familyBoundMutation({
   args: {
     id: v.id("serviceRecords"),
-    data: v.object({ /* ... */ }),
+    data: v.object({
+      /* ... */
+    }),
   },
   handler: async (ctx, args) => {
     // ctx.user, ctx.identity, ctx.familyId が自動解決・保証されている
@@ -69,7 +71,11 @@ requireAdminAccess(ctx.user, record);
 ヒント本体（暗号化テキスト）の再復号は行わず、**DEK のラップのみを旧マスターキーから新マスターキーへ付け替える**ことで、計算コストと平文漏洩リスクを最小化する。
 
 ```typescript
-const dek = await unwrapDEK(cred.passwordHintDekEncrypted, cred.passwordHintDekIv, oldMasterKey);
+const dek = await unwrapDEK(
+  cred.passwordHintDekEncrypted,
+  cred.passwordHintDekIv,
+  oldMasterKey,
+);
 const dekWrapped = await wrapDEK(dek, newMasterKey);
 ```
 
@@ -89,7 +95,9 @@ export const syncUser = createServerFn({ method: "POST" })
   .handler(async ({ data: { idToken } }) => {
     const convexClient = createConvexClient();
     convexClient.setAuth(idToken);
-    return await convexClient.mutation(api.users.syncUser, { /* ... */ });
+    return await convexClient.mutation(api.users.syncUser, {
+      /* ... */
+    });
   });
 ```
 
@@ -127,7 +135,6 @@ window.addEventListener("storage", (e) => {
 ## 6. アカウント切り替え時の状態・キャッシュ破棄パターン (`AccountProvider.tsx`, `PasscodeProvider.tsx`)
 
 同一ブラウザでのアカウント切り替え時に前アカウントの機密データやクエリ結果が残存することを防ぐ。
-
 1. `PasscodeProvider`: `accountId` の変更を検知して `masterKey` を `null` にリセット（再ロック）。
 2. `AccountProvider`: 切り替え時にローカルメモリキャッシュの破棄（`clearQueryCache()`）と TanStack Query の無効化・再取得（`await queryClient.invalidateQueries()`）を実行。
 
@@ -136,7 +143,6 @@ window.addEventListener("storage", (e) => {
 ## 7. 五十音・アルファベット正規化ソートキー生成パターン (`src/utils/index-group.ts`)
 
 日本語・英数字混在レコードを五十音グループ（あ〜わ、英数、記号）順に正確にインデックスクエリするためのパターン。
-
 - サービス名・読み仮名からグループ順位プレフィックス（2桁ゼロ埋め数字）+ NFKC正規化文字列を合成して `sortKey` を生成。
 - Convex のインデックス `by_family_sortKey` により、サーバー側でフルテーブルスキャンなしにソート済み取得を実現。
 
@@ -155,7 +161,11 @@ test("authenticated user can create record", async () => {
   const t = convexTest(schema);
   const userId = "firebase-uid-123";
   const user = await t.run(async (ctx) => {
-    return await ctx.db.insert("users", { userId, email: "test@example.com", updatedAt: Date.now() });
+    return await ctx.db.insert("users", {
+      userId,
+      email: "test@example.com",
+      updatedAt: Date.now(),
+    });
   });
 
   const asUser = t.withIdentity({ subject: userId });
@@ -174,7 +184,6 @@ test("authenticated user can create record", async () => {
 ## 9. ドキュメント横断セルフレビュー・パターン（CodeRabbit 指摘防止）
 
 PoohMa の仕様書（`code-design.md`, `security-model.md`, `requirements.md`）は多面的な構成（データモデル、フロー、API一覧、状態管理、セキュリティ境界）になっているため、コード変更時は以下のチェックリストでドキュメント全体を横断検索して整合性を確認する。
-
 1. **データモデル変更時**:
    - `accountId` vs `userId` の所有関係やテーブル構造を変更した際は、`code-design.md` の「4.1 ER概要」「4.2 テーブル定義」と `.ai/domain.md` を更新する。
 2. **API・関数変更時**:
@@ -191,12 +200,20 @@ PoohMa の仕様書（`code-design.md`, `security-model.md`, `requirements.md`�
 ```typescript
 async function syncSessionCookieInBackground(user: FirebaseUser) {
   // 1. 開始前ガード
-  if (!auth?.currentUser || auth.currentUser.uid !== user.uid || localStorage.getItem(LOGOUT_FLAG_KEY)) {
+  if (
+    !auth?.currentUser ||
+    auth.currentUser.uid !== user.uid ||
+    localStorage.getItem(LOGOUT_FLAG_KEY)
+  ) {
     return;
   }
   const idToken = await user.getIdToken();
   // 2. 非同期処理完了後（書き込み直前）の再ガード
-  if (!auth?.currentUser || auth.currentUser.uid !== user.uid || localStorage.getItem(LOGOUT_FLAG_KEY)) {
+  if (
+    !auth?.currentUser ||
+    auth.currentUser.uid !== user.uid ||
+    localStorage.getItem(LOGOUT_FLAG_KEY)
+  ) {
     return;
   }
   await refreshSessionCookie({ data: { idToken } });
@@ -208,7 +225,6 @@ async function syncSessionCookieInBackground(user: FirebaseUser) {
 ## 11. モバイルキーボード回避型インラインサジェストUIパターン (`TagInput`)
 
 モバイル端末において、ポップオーバー（Combobox）方式のサジェストはソフトウェアキーボード（OSK）によって覆い隠されやすく、フォーカス操作が必須となるため入力体験を損ないやすい。
-
 - **インライン候補チップ**: 入力欄の直下に横スクロール可能なチップ行を常時表示し、キーボード非展開のまま1タップで追加・削除を可能にする。
 - **選択状態の前方ソート**: 選択されたタグを前方にソートして描画することで、現在の選択状態の把握と解除操作を迅速化する。
 - **フォーカス維持 (`onMouseDown: e.preventDefault()`)**: チップタップ時にテキスト入力欄からフォーカスが外れるのを防ぎ、`onBlur` による下書き未確定文字列の意図しない自動タグ化を防止する。
@@ -219,7 +235,6 @@ async function syncSessionCookieInBackground(user: FirebaseUser) {
 ## 12. 多段 Sticky Section Headers パターン (`RecordForm`)
 
 グローバルナビゲーションが `sticky top-0 h-16` で固定されている画面において、縦に長い入力フォームのセクション見出しを連動固定するパターン。
-
 - **オフセット連動 (`top-16 z-10`)**: 各セクションの見出しバーを `sticky top-16 z-10` かつ背景色（`bg-card/95 backdrop-blur`）に指定する。
 - **自然なスライド切り替え**: CSS の `sticky` は親の `<section>` 要素のスクロール領域に拘束されるため、JavaScript での座標計算を行わずとも、次のセクションがスクロールインすると前のセクションヘッダーが自然に押し出されて切り替わる。
 - **操作アクションの常時視認**: アカウント情報の「+ 追加する」ボタンなどをセクションヘッダー内に配置することで、項目が多数（最大10件）増えても画面外に流れず、いつでも追加操作が可能になる。
@@ -241,7 +256,7 @@ async function syncSessionCookieInBackground(user: FirebaseUser) {
 ### 2. 楽観的ロック（Hard Invariant: `updateRecord`）
 
 - **リビジョン番号（`revision`）突合**: クライアントは編集開始時に保持した `revision`（0から開始する単調増加整数）を渡して保存する。DBの現在の `record.revision ?? 0` と一致しない場合、`CONFLICT` エラーを送出し、先行保存データを無警告で上書きする事故を防ぐ。保存成功時にサーバー側で `revision + 1` を採番する。
-- **スクロール追従競合通知 & 競合解決UI**: 
+- **スクロール追従競合通知 & 競合解決UI**:
   - フォームが縦に長くスクロールしても見落とさないよう、他メンバーが更新した瞬間（`isRecordStale`）に画面端へ消えないトースト（`duration: Infinity`）がアニメーション出現し、「最新を読み込む」アクションボタンで即座にワンタップ再読み込みできる。
   - 保存ボタン押下時にも競合（`CONFLICT`）を検知した場合はモーダルダイアログを表示し、(1)「最新の内容を読み込む」（フォーム最新化・編集終了）、(2)「上書き保存する」（`force: true` による強制保存）のいずれかをユーザーに明示的に選択させる。
 - **保存完了時の自動解放**: `updateRecord` 成功時に、実行者の編集セッションレコードをサーバー側で自動クリーンアップする。
@@ -300,7 +315,7 @@ import { logAuditEvent } from "./auditLogs";
 
 // records.ts 内の Mutation
 await logAuditEvent(ctx, {
-  actor: ctx.user,           // Doc<"users"> - actorDisplayName を自動抽出
+  actor: ctx.user, // Doc<"users"> - actorDisplayName を自動抽出
   recordId: args.id,
   ownerType: "family",
   ownerFamilyId: ctx.user.familyId,
@@ -353,16 +368,18 @@ export async function asyncMapBounded<T, U>(
 PoohMa はITリテラシーを問わず家族全員が利用するサービスであるため、技術用語・開発者用語の露出を避け、直感的で安心感のある表現に統一する。
 
 ### 1. 用語の置き換えガイドライン
-| 内部・技術用語 | UI上の推奨表現 | 理由・文脈 |
-| :--- | :--- | :--- |
-| **OGP / OGP取得** | サイト情報 / サイト情報を更新 | 非技術者には「OGP」の意味が伝わらないため |
-| **復号 / 復号中** | 読み込み / ロック解除 / 表示中 | 暗号処理の詳細ではなく、ユーザー目線の動作を表現 |
-| **競合 (Conflict)** | 他のご家族の更新と重複 / 上書きの可能性 | 同時編集時の注意をご家族目線で分かりやすく伝える |
-| **マスターキー** | 家族データ / 暗号鍵 / 家族専用キー | 内部暗号概念の露出を控え、保護対象または用途を明示 |
-| **セッション終了** | ログアウトしてログイン画面に戻る | 状態変化を自然な日本語動詞で表現 |
-| **CSVエクスポート** | CSVファイルをダウンロード / 手元に保存 | 操作結果（手元に保存されること）を強調 |
+
+| 内部・技術用語      | UI上の推奨表現                          | 理由・文脈                                         |
+| :------------------ | :-------------------------------------- | :------------------------------------------------- |
+| **OGP / OGP取得**   | サイト情報 / サイト情報を更新           | 非技術者には「OGP」の意味が伝わらないため          |
+| **復号 / 復号中**   | 読み込み / ロック解除 / 表示中          | 暗号処理の詳細ではなく、ユーザー目線の動作を表現   |
+| **競合 (Conflict)** | 他のご家族の更新と重複 / 上書きの可能性 | 同時編集時の注意をご家族目線で分かりやすく伝える   |
+| **マスターキー**    | 家族データ / 暗号鍵 / 家族専用キー      | 内部暗号概念の露出を控え、保護対象または用途を明示 |
+| **セッション終了**  | ログアウトしてログイン画面に戻る        | 状態変化を自然な日本語動詞で表現                   |
+| **CSVエクスポート** | CSVファイルをダウンロード / 手元に保存  | 操作結果（手元に保存されること）を強調             |
 
 ### 2. `JpText` による句点自動改行と BudouX の併用
+
 スマートフォンの小画面で長文が文字の塊（壁）になることを防ぐため、`JpText`（BudouX）を活用する。
 - **句点分割**: 文末以外の句点（`。`）の直後に改行を挿入し、一文ごとに `<br />` を生成。
 - **自然な折り返し**: 各文の内部では BudouX が `<wbr />` を挿入し、単語の途中での不自然な改行を防止。
@@ -376,14 +393,17 @@ PoohMa はITリテラシーを問わず家族全員が利用するサービス�
 最大500行のCSVデータを取り込み、既存データとの差分を安全に検知・プレビュー確認・一括反映するためのパターン。
 
 ### 1. 柔軟なCSVパースとヘッダーマッピング
+
 - **順不同・列位置可変**: PapaParse の `header: true` を使用し、列の物理的な順序に関わらず1行目のヘッダー名でマッピング。
 - **ヘッダー名トリム**: `transformHeader: (h) => h.trim()` により前後の空白を除去して完全一致比較。未知の列はスキップ。
 - **クレデンシャル列グループ化**: `CredentialId{n}`, `Label{n}`, `LoginID{n}`, `PasswordHint{n}`（`n` = 1〜10）の番号サフィックスからグループを構築。
 
 ### 2. 最小権限の差分突合 (`getRecordsForDiffImport`)
+
 - 突合に必要な平文メタデータ（`stableId`, `title`, `url`, `memo`, `ownerType`, `adminEmails`, `tags`, `credentials.stableId/label/loginId/hasPasswordHint`）のみを取得。暗号化フィールド（密文・IV・DEK）は取得せず、帯域とクライアント負荷を最小化。
 
 ### 3. E2EE整合性と空セル値保護
+
 - **空セル値維持 (SKIP)**: CSV側のセルが空の場合は既存値を維持し、誤操作によるデータ消去を防止。
 - **PasswordHint の暗号化最適化**:
   - CSV側のヒントが空: 暗号化をスキップし既存暗号化データを維持（パスコード入力不要）。
@@ -391,6 +411,7 @@ PoohMa はITリテラシーを問わず家族全員が利用するサービス�
 - **UIブロック防止 (ADR-007)**: `processInChunks`（10件単位で `setTimeout(0)` によるマクロタスク yield）により、Web Worker なしでも 60fps の応答性とプログレスバー・トースト表示を両立。
 
 ### 4. 仮想スクロールプレビュー最適化と横スクロール完全一致 (`CsvImportPreviewTable.tsx`)
+
 - **ヘッダー・ボディ横スクロール完全一致構造**:
   - ヘッダーと行リストを別々のスクロールコンテナに分割すると、スクロール同期にラグやズレが発生する。
   - **単一スクロールコンテナ（`parentRef`）直下に最小幅ラッパー（`min-w-[850px]`）を配置し、その中に `sticky top-0 z-10` のヘッダーと仮想アイテム行コンテナ（`translateY`）を同居させる**。
@@ -401,12 +422,14 @@ PoohMa はITリテラシーを問わず家族全員が利用するサービス�
 - **行単位の制御**: 行ごとの「反映する」チェックボックスおよび「エラー行以外を反映」トグルによる柔軟な反映制御。
 
 ### 5. 全画面共通コンポーネントの Code Splitting パターン (`UserMenu.tsx` → `/settings/bulk`)
+
 - 全画面（ダッシュボード、レコード詳細、設定等）で常時マウントされる共通ヘッダー・メニュー（`UserMenu`）に、CSV解析（`papaparse`）や仮想化（`@tanstack/react-virtual`）などの特定業務専用の重いライブラリを直接含めない。
 - 業務機能を専用ルート（`/settings/bulk`）に分離し、メニュー側はシンプルな `<Link to="/settings/bulk">` のみに留める。
 - 専用画面内でも、初期表示が不要な重いテーブルコンポーネントは `React.lazy` と `Suspense` で遅延ロードする。
 - この分離により、共通メニューのチャンクサイズを **92.30 kB → 37.52 kB（約60%削減）** し、アプリ全体の初期表示速度とTBT（Total Blocking Time）を劇的に改善できる。
 
 ### 6. 安全な一括反映 (`applyImportDiff`)
+
 - 家族境界および管理者権限（`requireAdminAccess`）をレコードごとに厳密に検証。
 - 更新対象の非空フィールドのみ `db.patch` し、監査ログ（`RECORD_UPDATE`）を記録。
 
@@ -417,22 +440,26 @@ PoohMa はITリテラシーを問わず家族全員が利用するサービス�
 E2EE リカバリーキットなどの重要ドキュメントをクライアントサイドでPDF生成する際、日本語テキストの選択・コピー・検索性を担保しつつ、初期バンドルサイズと通信量を最小化するパターン。
 
 ### 1. ライブラリ選定 (`@cantoo/pdf-lib` + `@cantoo/fontkit`)
+
 - オリジナルの `pdf-lib` はメンテが停滞しており、Vite / ESM 環境で fontkit 連携時に問題が生じやすい。
 - モダンなフォーク版である `@cantoo/pdf-lib` と `@cantoo/fontkit` を採用することで、TypeScript 型定義を維持しながら安定したカスタムフォント埋め込みを実現する。
 
 ### 2. 静的フォント配置とオンデマンド動的ロード
+
 - 日本語フォント（`NotoSansJP-Regular.ttf`）は `apps/web/public/fonts/` に静的アセットとして配置。
 - 通常のページ遷移やアプリ起動時にはロードせず、PDF生成関数（`generateRecoveryKitPdf`）実行時のみ `loadNotoSansJpFont()` でオンデマンド取得（ブラウザでは `fetch`、Node.js/テストでは `fs`）。
 - 取得したバイナリはモジュール内メモリ（`cachedFontBytes`）にキャッシュし、同一セッションでの再発行時の重複通信を防止。
 
 ### 3. サブセット埋め込み (`subset: true`) による超軽量PDF
+
 - `const customFont = await pdfDoc.embedFont(fontBytes, { subset: true });`
 - フォント全体（数MB）ではなく、実際にPDF内で使用された文字のグリフデータのみを抽出して埋め込む。
 - これにより、生成されるPDF成果物のファイルサイズは**わずか数十KBの超軽量**に抑えられ、ダウンロードや共有、Google Drive保存も瞬時に完了する。
 
 ### 4. 堅牢なフォールバック設計
+
 - 万が一ネットワークエラー等でフォント取得に失敗した場合でも、標準フォント（Helvetica）と `sanitizeWinAnsiText` による ASCII 代替描画へ自然にフォールバックし、例外でユーザー操作がブロックされるのを防ぐ。
 
 ### 5. メタデータ幅制限と動的スケーリング・省略
-- 長い家族名やメールアドレスが枠外（ページ端）へ突き抜けるのを防ぐため、`maxWidth` オプションでフォントサイズを動的縮小（最小 7pt）。極端に長い文字列は末尾を `...` で安全に省略し、常に枠内に収まるよう保護する。
 
+- 長い家族名やメールアドレスが枠外（ページ端）へ突き抜けるのを防ぐため、`maxWidth` オプションでフォントサイズを動的縮小（最小 7pt）。極端に長い文字列は末尾を `...` で安全に省略し、常に枠内に収まるよう保護する。

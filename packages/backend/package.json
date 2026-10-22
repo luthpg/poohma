@@ -27,23 +27,23 @@
     }
   },
   "dependencies": {
-    "@convex-dev/rate-limiter": "^0.4.0",
+    "@convex-dev/rate-limiter": "^0.4.2",
     "@poohma/shared": "workspace:*",
-    "@react-email/render": "^2.1.0",
+    "@react-email/render": "2.1.1",
     "cheerio": "^1.2.0",
-    "convex": "^1.46.0",
-    "convex-helpers": "^0.1.124",
-    "dotenv": "^17.4.2",
-    "resend": "^6.31.0",
-    "zod": "^4.6.5"
+    "convex": "^1.47.0",
+    "convex-helpers": "^0.1.128",
+    "dotenv": "^18.0.8",
+    "resend": "^6.34.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.15",
-    "@types/node": "^26.6.3",
-    "@vitest/coverage-v8": "^5.0.3",
-    "convex-test": "^0.0.60",
-    "tsx": "^4.23.13",
+    "@biomejs/biome": "^2.6.2",
+    "@types/node": "^26.6.5",
+    "@vitest/coverage-v8": "5.0.5",
+    "convex-test": "^0.0.63",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
-    "vitest": "5.0.3"
+    "vitest": "5.0.5"
   }
 }

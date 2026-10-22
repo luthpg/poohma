@@ -25,10 +25,12 @@ PowerShell 7 (pwsh / Windows) 環境における落とし穴と回避法です�
   - また、.NET の `[System.Text.Encoding]::UTF8` をそのまま使って一時ファイルを作成すると、デフォルトで **UTF-8 with BOM**（バイト順マーク: `EF BB BF`）が付与される。これを `git commit -F` や `gh pr create --body-file` で渡すと、コミット件名や PR 本文の先頭に不可視の BOM 文字（`\uFEFF`）が混入し、ツールによって不要文字や文字化けの原因となる。
 - **回避法**:
   - 必ず **BOM なし UTF-8 一時ファイルを経由** して実行する。
+
   ```powershell
   $utf8NoBom = New-Object System.Text.UTF8Encoding $false
   [System.IO.File]::WriteAllText($tmpFile, $text, $utf8NoBom)
   ```
+
   - 詳細は [`.ai/workflows/git-workflow.md`](../workflows/git-workflow.md) を参照。
 
 ---
@@ -65,5 +67,3 @@ PowerShell 7 (pwsh / Windows) 環境における落とし穴と回避法です�
 
 - **問題**: pnpm スクリプト内から子プロセスでさらに pnpm を実行する際、`execFileSync(process.execPath, [process.env.npm_execpath, ...args])` というイディオム（Node.js で `npm_execpath` の `.js` / `.cjs` を起動する書き方）を使うと、Windows の pnpm v12 環境では `npm_execpath` が `pnpm.exe`（ネイティブバイナリ）となるため、Node.js が `TypeError [ERR_UNKNOWN_FILE_EXTENSION]: Unknown file extension ".exe"` を投げてクラッシュする。
 - **回避法**: `pnpmExecPath` が `/\.[cm]?js$/i` で終わる JavaScript スクリプトであるか判定し、`.js` であれば `node <pnpmExecPath>`、`.exe` 等のバイナリであれば直接 `execFileSync(pnpmExecPath, args)` で実行する共通ヘルパー関数 `runPnpm` を経由する。
-
-
