@@ -98,8 +98,10 @@ function RecoveryPageComponent() {
         return;
       }
 
-      const apiKey = env.VITE_FIREBASE_API_KEY;
-      const appId = env.VITE_FIREBASE_PROJECT_ID;
+      const apiKey =
+        env.VITE_GOOGLE_PICKER_API_KEY || env.VITE_FIREBASE_API_KEY;
+      const appId =
+        env.VITE_GOOGLE_CLOUD_PROJECT_NUMBER || env.VITE_FIREBASE_PROJECT_ID;
 
       const pickRes = await showGoogleDrivePdfPicker({
         accessToken,

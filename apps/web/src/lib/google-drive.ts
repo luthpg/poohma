@@ -335,7 +335,7 @@ export async function downloadFileFromGoogleDrive({
 }): Promise<Blob | null> {
   try {
     const res = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&supportsAllDrives=true`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,

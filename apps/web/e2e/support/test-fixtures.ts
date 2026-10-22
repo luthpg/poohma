@@ -111,7 +111,9 @@ export async function authenticateIdentityInPage(
   }
 
   await page
-    .locator("main, header, [role='main']")
+    .locator(
+      "main, header:not([data-tsd-surface]):not([aria-label*='Devtools']), [role='main']",
+    )
     .first()
     .waitFor({ state: "visible", timeout: 15000 });
 

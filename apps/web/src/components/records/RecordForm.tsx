@@ -23,7 +23,7 @@ import {
   Lock,
   Users,
 } from "lucide-react";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { SessionExpiredDialog } from "@/components/auth/SessionExpiredDialog";
 import { Spinner } from "@/components/ui/spinner";
 import { TagInput } from "@/components/ui/tag-input";
@@ -81,6 +81,33 @@ export function RecordForm({
     if (oldIndex !== -1 && newIndex !== -1) {
       form.reorderCredentials(oldIndex, newIndex);
     }
+  };
+
+  const credentialsListRef = useRef<HTMLDivElement>(null);
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (scrollTimerRef.current) {
+        clearTimeout(scrollTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handleAddCredential = () => {
+    form.addCredential();
+    if (scrollTimerRef.current) {
+      clearTimeout(scrollTimerRef.current);
+    }
+    // DOM反映を待機したのち、追加された最後の枠へスムーズにスクロール
+    scrollTimerRef.current = setTimeout(() => {
+      const container = credentialsListRef.current;
+      if (!container) return;
+      const lastItem = container.lastElementChild as HTMLElement | null;
+      if (lastItem) {
+        lastItem.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
+      }
+    }, 120);
   };
 
   const getModifiedClass = (field: string) => {
@@ -270,7 +297,7 @@ export function RecordForm({
           </h2>
           <button
             type="button"
-            onClick={form.addCredential}
+            onClick={handleAddCredential}
             disabled={values.credentials.length >= MAX_CREDENTIALS_PER_RECORD}
             className="inline-flex items-center min-h-[44px] px-2.5 py-1.5 text-[14px] font-medium text-orange-500 hover:text-orange-600 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
           >
@@ -288,7 +315,7 @@ export function RecordForm({
             items={values.credentials.map((c, i) => c.id ?? `cred-${i}`)}
             strategy={verticalListSortingStrategy}
           >
-            <div className="space-y-6">
+            <div ref={credentialsListRef} className="space-y-6">
               {values.credentials.map((cred, index) => (
                 <SortableCredentialItem
                   key={cred.id ?? `cred-${index}`}
