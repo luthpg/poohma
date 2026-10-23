@@ -61,14 +61,14 @@
 2. **Static Check / Lint / Format**: `pnpm check`
 3. **Test (Unit / Integration)**: `pnpm test`
 4. **Build Check**: `pnpm build`
-5. **E2E Test (Dynamic Verification)**: `pnpm test:e2e`
+5. **E2E Test (Dynamic Verification)**: `pnpm test:e2e`（またはクラウド枠を消費しないローカルConvex実行: `pnpm test:e2e:local`）
 6. **Workflow Lint**: `pnpm lint:workflows`（Docker経由で actionlint を実行）
 7. **Knowledge Ref Check**: `pnpm check:knowledge`（.ai/ 内のコード参照切れ・陳腐化検証）
 8. **Doc-Sync Check**: `pnpm check:doc-sync`（git差分からのドキュメント更新要否判定）
 9. **Full Pipeline**: `pnpm verify`（上記1〜4を一括順次実行）
 
 > **Important (動的テスト・ワークフロー検証義務)**:
-> - UI、認証、E2EE暗号化、Convex、CSV等の変更時は、静的チェックのみでコミットせず、必ずローカルで `pnpm test:e2e` を合格させてからコミットすること。Convex 変更時は事前に `pnpm convex:dev:once` を実行すること。
+> - UI、認証、E2EE暗号化、Convex、CSV等の変更時は、静的チェックのみでコミットせず、必ずローカルで `pnpm test:e2e` または `pnpm test:e2e:local` を合格させてからコミットすること。Convex 変更時は事前に `pnpm convex:dev:once` を実行すること。
 > - GitHub Actions ワークフロー（`.github/workflows/`）変更時は、コミット前に必ずローカルで `pnpm lint:workflows` を実行し合格を確認すること。
 > - コミット前には `pnpm check:doc-sync` および `pnpm check:knowledge` を活用し、ドキュメント同期漏れや参照切れがないことを確認すること。
 

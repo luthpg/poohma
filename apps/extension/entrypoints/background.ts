@@ -109,11 +109,22 @@ export async function syncSessionState(): Promise<boolean> {
 
     const authedConvex = new ConvexHttpClient(env.VITE_CONVEX_URL);
     authedConvex.setAuth(token);
+    const targetAccountId = storage.activeAccountId || storage.user._id;
     const latest = await authedConvex.query(api.extensionAuth.getSessionState, {
-      accountId: (storage.activeAccountId || storage.user._id) as Id<"users">,
+      accountId: targetAccountId as Id<"users">,
     });
 
     if (!latest) return false;
+
+    // 非同期取得完了後に現在のセッション状態を再検証（ログアウトやアカウント切り替えとの競合・ゾンビ復活を防止）
+    const currentStorage = await getAuthStorage();
+    if (
+      !currentStorage.user ||
+      (currentStorage.activeAccountId || currentStorage.user._id) !==
+        targetAccountId
+    ) {
+      return false;
+    }
 
     await chrome.storage.local.set({
       user: latest.user,

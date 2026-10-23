@@ -1799,6 +1799,7 @@ describe("2.1 家族管理とE2EE鍵ローテーションの統合テスト (Con
         expiredMigrationId = await ctx.db.insert("familyMigrations", {
           userId: "user_cron_test",
           accountId: userAccId,
+          action: "create",
           targetFamilyId: expiredFamilyId,
           serviceRecordIds: [],
           status: "PREPARED",
@@ -3033,13 +3034,159 @@ describe("2.1.13 メンバーキック機能とExport Vault（E2EEデータ持�
       "Access denied: You must be approved to join this family",
     );
 
-    // 7. 検証: commitFamilyMigration を直接実行しようとしても拒絶されること
+    // 7. 検証: commitFamilyMigration を直接実行しようとしても拒絶されること（EXPIREDによる拒絶）
     await expect(
       userB.mutation(api.families.commitFamilyMigration, {
         migrationId: ghostMigrationId,
         credentials: [],
       }),
-    ).rejects.toThrow();
+    ).rejects.toThrow("Migration is not in PREPARED status");
+  });
+
+  it("PREPARED状態の移行が存在しても、参加申請が失効・削除されている場合はcommitFamilyMigrationが拒絶されること", async () => {
+    const t = convexTest(schema, modules);
+
+    let familyId!: Id<"families">;
+    let userBId!: Id<"users">;
+    let migrationId!: Id<"familyMigrations">;
+
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "田中家",
+        masterKeyEncrypted: "encKey",
+        masterKeyIv: "iv",
+        masterKeySalt: "salt",
+        updatedAt: Date.now(),
+      });
+      userBId = await ctx.db.insert("users", {
+        userId: "uid_b_independent",
+        email: "user_b_ind@example.com",
+        displayName: "User B Ind",
+        familyRole: "viewer",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+
+      // 参加申請を作成し、その後削除（失効状態を模擬）
+      migrationId = await ctx.db.insert("familyMigrations", {
+        userId: "uid_b_independent",
+        accountId: userBId,
+        action: "join",
+        targetFamilyId: familyId,
+        serviceRecordIds: [],
+        status: "PREPARED",
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 30 * 60 * 1000,
+      });
+    });
+
+    const userB = t.withIdentity({
+      subject: "uid_b_independent",
+      issuer: "https://securetoken.google.com/poohma-staging",
+    });
+
+    // 承認済み申請が存在しないため Unauthorized エラーになること
+    await expect(
+      userB.mutation(api.families.commitFamilyMigration, {
+        migrationId,
+        credentials: [],
+      }),
+    ).rejects.toThrow("Unauthorized: Approved join request is no longer valid");
+  });
+
+  it("同一Firebase UIDを持つ別アカウントの参加申請はkickMemberで巻き添え削除されないこと", async () => {
+    const t = convexTest(schema, modules);
+
+    let familyId!: Id<"families">;
+    let accountB1Id!: Id<"users">;
+    let accountB2Id!: Id<"users">;
+    let siblingRequestId!: Id<"joinRequests">;
+
+    await t.run(async (ctx) => {
+      familyId = await ctx.db.insert("families", {
+        ...mockCryptoMaterials,
+        name: "田中家",
+        masterKeyEncrypted: "encKey",
+        masterKeyIv: "iv",
+        masterKeySalt: "salt",
+        updatedAt: Date.now(),
+      });
+      await ctx.db.insert("users", {
+        userId: "uid_admin_sibling",
+        email: "admin_sibling@example.com",
+        displayName: "Admin",
+        familyId,
+        familyRole: "admin",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+
+      // 同一UIDを持つ2つのアカウント
+      accountB1Id = await ctx.db.insert("users", {
+        userId: "uid_b_shared",
+        email: "b1@example.com",
+        displayName: "Account B1",
+        familyId,
+        familyRole: "viewer",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      accountB2Id = await ctx.db.insert("users", {
+        userId: "uid_b_shared",
+        email: "b2@example.com",
+        displayName: "Account B2",
+        familyRole: "viewer",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+
+      // B1（除名対象）の申請
+      await ctx.db.insert("joinRequests", {
+        familyId,
+        userId: "uid_b_shared",
+        accountId: accountB1Id,
+        status: "approved",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+
+      // B2（別アカウント）の申請
+      siblingRequestId = await ctx.db.insert("joinRequests", {
+        familyId,
+        userId: "uid_b_shared",
+        accountId: accountB2Id,
+        status: "pending",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+    });
+
+    const admin = t.withIdentity({
+      subject: "uid_admin_sibling",
+      issuer: "https://securetoken.google.com/poohma-staging",
+    });
+
+    // B1 をキック
+    await admin.mutation(api.families.kickMember, {
+      targetAccountId: accountB1Id,
+    });
+
+    // B2 の申請が残っていることを検証
+    await t.run(async (ctx) => {
+      const siblingReq = await ctx.db.get(siblingRequestId);
+      expect(siblingReq).not.toBeNull();
+      expect(siblingReq?.accountId).toEqual(accountB2Id);
+
+      // B1 の申請は削除されていること
+      const b1Reqs = await ctx.db
+        .query("joinRequests")
+        .withIndex("by_familyId_accountId", (q) =>
+          q.eq("familyId", familyId).eq("accountId", accountB1Id),
+        )
+        .collect();
+      expect(b1Reqs).toHaveLength(0);
+    });
   });
 
   it("自分自身（または自分の別アカウント）をキックしようとすると拒否されること", async () => {

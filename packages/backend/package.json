@@ -11,6 +11,8 @@
     "test": "vitest run --coverage",
     "preview:setup": "tsx scripts/setup-preview.ts",
     "preview:setup:clean": "tsx scripts/setup-preview.ts --clean",
+    "convex:local:setup": "tsx scripts/setup-local-convex.ts",
+    "convex:local:stop": "tsx scripts/stop-local-convex.ts",
     "demo:export": "tsx scripts/export-demo-records.ts",
     "auth:switch": "tsx scripts/switch-auth-config.ts"
   },

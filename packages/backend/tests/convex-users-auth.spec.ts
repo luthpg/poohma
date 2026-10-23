@@ -218,6 +218,7 @@ describe("users.ts & customBuilders.ts / 認証・認可・セキュリティ境
         migrationId = await ctx.db.insert("familyMigrations", {
           userId: "old_firebase_uid",
           accountId: oldAccId1,
+          action: "join",
           targetFamilyId: familyId,
           serviceRecordIds: [recordId],
           status: "PREPARED",

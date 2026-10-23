@@ -3,13 +3,19 @@ import { setResponseHeader } from "@tanstack/react-start/server";
 import { env as clientEnv } from "@/env/client";
 import { env as serverEnv } from "@/env/server";
 
-const convexHost = (() => {
+const convexUrlObj = (() => {
   try {
-    return new URL(clientEnv.VITE_CONVEX_URL).host;
+    return new URL(clientEnv.VITE_CONVEX_URL);
   } catch {
-    return "";
+    return null;
   }
 })();
+
+const convexHost = convexUrlObj?.host ?? "";
+const isLocalConvex =
+  convexUrlObj?.hostname === "127.0.0.1" ||
+  convexUrlObj?.hostname === "localhost" ||
+  convexUrlObj?.protocol === "http:";
 
 const cspMiddleware = createMiddleware().server(({ next, request }) => {
   if (request.method !== "GET") {
@@ -34,7 +40,7 @@ const cspMiddleware = createMiddleware().server(({ next, request }) => {
     "object-src 'none'",
     "manifest-src 'self'",
     "worker-src 'self'",
-    "upgrade-insecure-requests",
+    ...(isLocalConvex ? [] : ["upgrade-insecure-requests"]),
     ...(isPreview
       ? [
           `script-src 'strict-dynamic' 'nonce-${nonce}' https://vercel.live`,
@@ -45,7 +51,11 @@ const cspMiddleware = createMiddleware().server(({ next, request }) => {
       : [
           `script-src 'strict-dynamic' 'nonce-${nonce}'`,
           "connect-src 'self'" +
-            (convexHost ? ` wss://${convexHost} https://${convexHost}` : "") +
+            (convexHost
+              ? isLocalConvex
+                ? ` ws://${convexHost} http://${convexHost}`
+                : ` wss://${convexHost} https://${convexHost}`
+              : "") +
             " https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://www.googleapis.com https://apis.google.com",
         ]),
   ].join("; ");

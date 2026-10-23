@@ -23,7 +23,9 @@ PoohMaは、フロントエンドとサーバーサイド処理を単一のTanSt
 - `packages/knowledge-tools`: 知見運用・AI 開発基盤ツール
 - `workers/backup`: Cloudflare Workers バックアップワーカー
 
-システム全体の E2E テストは、モノレポルートのオーケストレーション（`pnpm test:e2e`）により「バックエンドの Preview 環境プロビジョニング（`@poohma/backend`）」→「ブラウザブリッジのビルド（`@poohma/web`）」→「Playwright 実行（`@poohma/web`）」の順で責務境界を保って実行される。
+システム全体の E2E テストは、モノレポルートのオーケストレーションにより「バックエンドのプロビジョニング（`@poohma/backend`）」→「ブラウザブリッジのビルド（`@poohma/web`）」→「Playwright 実行（`@poohma/web`）」の順で責務境界を保って実行される：
+- **Preview Deployment 実行 (`pnpm test:e2e`)**: CI パイプライン（`deploy-staging.yml`）およびステージング環境向けの動的 Preview Deployment（`preview/e2e-test`）を用いた結合検証。
+- **ローカル Self-hosted 実行 (`pnpm test:e2e:local`)**: 開発時の反復テストにおいて Convex 無料プランの月間枠（Usage Limit）枯渇を防止するため、Docker による Local Convex Backend（`ghcr.io/convex/convex-backend`、`http://127.0.0.1:3210`）を自動起動 → コード・スキーマデプロイ → テスト実行 → 自動停止クリーンアップを一括実行するテスト戦略。
 
 認証はFirebase Authenticationを用い、コンテンツ管理はmicroCMS、メール送信はResendを利用する。
 
@@ -241,7 +243,7 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 | ---------------- | --------------------------------------------------- | -------------------------------------- |
 | userId           | string                                              | 移行を実行したユーザーの Firebase UID  |
 | accountId        | Id<users>                                           | 作成元 PoohMa アカウント ID            |
-| action           | "create" \| "join"(optional)                        | 移行アクション種別                     |
+| action           | "create" \| "join"                                  | 移行アクション種別（必須）             |
 | sourceFamilyId   | Id<families>(optional)                              | 移行元家族（未所属からの移行時はnull） |
 | targetFamilyId   | Id<families>                                        | 移行先家族                             |
 | serviceRecordIds | Id<serviceRecords>\[]                               | 移行対象レコードIDのスナップショット   |

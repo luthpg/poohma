@@ -72,8 +72,13 @@ export async function purgeAllTestData(
   if (!convexUrl) {
     throw new Error("VITE_CONVEX_URL が設定されていません");
   }
-  if (!convexUrl.startsWith("https://")) {
-    throw new Error("VITE_CONVEX_URL は HTTPS プロトコルである必要があります");
+  const isLocal =
+    convexUrl.startsWith("http://127.0.0.1:") ||
+    convexUrl.startsWith("http://localhost:");
+  if (!convexUrl.startsWith("https://") && !isLocal) {
+    throw new Error(
+      "VITE_CONVEX_URL は HTTPS プロトコルまたはローカルアドレスである必要があります",
+    );
   }
 
   let totalDeleted = 0;

@@ -60,7 +60,7 @@ flowchart TD
 - **承認時**: ファミリー管理者（`familyAdminMutation`）が承認（`approveJoinRequest`）すると、対象アカウントの `user.familyId` が更新され、申請者に通知（一般メンバーは一覧確認のみ可能）。
 - **拒否・取り下げ時**: ファミリー管理者による拒否（`rejectJoinRequest`）または申請者自身によるキャンセル（`cancelJoinRequest`）により `rejected` となり、家族へのアクセス権は付与されない。
 - **参加完了後**: 申請者は家族パスコードを入力してマスターキーをロック解除し、家族内での利用を開始する。
-- **除名（キック）時の無効化**: メンバー除名（`kickMember`）実行時は、過去に承認・作成された当該ユーザーの全参加申請（`joinRequests`）を DB から物理削除し、進行中の未完了家族移行（`familyMigrations`）を即座に `EXPIRED` に失効させる。また、家族移行確定時（`commitFamilyMigration`）にも現在有効な承認済み申請が存在することを必須再検証し、除名後の無承認復帰を完全に遮断する。
+- **除名（キック）時の無効化**: メンバー除名（`kickMember`）実行時は、当該家族に対する被除名アカウントの参加申請（`accountId === targetUser._id`、または旧形式の `accountId === undefined` かつ `userId === targetUser.userId`）を DB から物理削除し（同一 Firebase UID を持つ別サブアカウントの有効な申請は誤削除から保護）、進行中の未完了家族移行（`familyMigrations`）を即座に `EXPIRED` に失効させる。また、家族移行確定時（`commitFamilyMigration`）にも `action === "join"` の場合は現在有効な承認済み申請が存在することを必須再検証して消費し、除名後の無承認復帰を完全に遮断する。
 
 ---
 
@@ -80,8 +80,9 @@ flowchart TD
   - `EXPIRED`: 30 分以内に完了せず失効（Crons による定期クリーンアップ対象）。
   - `ABORTED`: ユーザーによる手動中断。
 - **アクション種別 (`action`)**:
+  - スキーマ（`packages/backend/convex/schema.ts`）にて必須化（`v.union(v.literal("create"), v.literal("join"))`）。
   - `create`: 新規家族グループの作成に伴う移行。コミット時に操作者を管理者（`admin`）として設定。
-  - `join`: 既存家族グループへの参加に伴う移行。コミット時に操作者を一般メンバー（`viewer`）として設定。未指定時は既存家族の有無やメンバー数から自動判別。
+  - `join`: 既存家族グループへの参加に伴う移行。コミット時に操作者を一般メンバー（`viewer`）として設定し、有効な承認済み参加申請の存在を必須検証して消費。
 
 ---
 

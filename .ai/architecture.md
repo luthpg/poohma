@@ -20,7 +20,8 @@ poohma/
 ├── packages/
 │   ├── backend/           # @poohma/backend (Convex BaaS バックエンド)
 │   │   ├── convex/        # schema, functions, RLS, customBuilders, admin/
-│   │   ├── scripts/       # setup-preview, export-demo-records
+│   │   ├── docker-compose.local.yml # ローカル Self-hosted Convex Docker 構成
+│   │   ├── scripts/       # setup-preview, setup-local-convex, stop-local-convex, export-demo-records
 │   │   └── tests/         # バックエンド結合テスト (convex-test)
 │   ├── shared/            # @poohma/shared (共通モジュール・部品)
 │   │   └── src/           # schemas, url-safety, index-group, emails
@@ -83,7 +84,7 @@ poohma/
 - `convex.config.ts`: Convex Components 設定（`@convex-dev/rate-limiter` の登録）
 - `auditLogs.ts`: 監査ログ書き込みヘルパー（`logAuditEvent` 関数）および監査ログCSVエクスポート用クエリ（`exportFamilyAuditLogs`、年指定・全期間、JST期間計算、IDOR防止）。
 - `records.ts`: サービスレコード CRUD、検索（半角・全角スペース区切りの複数単語による横断 AND 検索、NFKC正規化による表記揺れ吸収、読み仮名・URL・タグ名・メモ・ID横断検索）、タグ、一括操作（共有/解除/個別管理者一括設定 `bulkSetRecordAdmin`/一括アーカイブ `bulkArchiveRecords`/一括利用再開 `bulkUnarchiveRecords`）、アーカイブと利用再開（`archiveRecord`, `unarchiveRecord`, `archiveStatus` フィルター）、同時編集セッション管理（`recordEditingSessions`、1分cron上限500件バッチ自動削除）、`updateRecord` revision方式楽観的ロック競合防止（FR-REC-15）、**監査ログ記録**（RECORD_CREATE/UPDATE/DELETE/HINT_VIEW/SHARE_SETTING_CHANGED/ADMIN_CHANGED/RECORD_ARCHIVE/RECORD_UNARCHIVE → `auditLogs` テーブル）、`getFamilyAuditLogs`/`getRecordAuditLogs`/`getStaleRecords`、ページネーション対応クエリ（`getRecordsPaginated`）、監査ログ自動クリーンアップ（3年/1095日保持、閲覧ログは180日保持cron）
-- `families.ts`: 家族グループ、家族招待（`familyInvites`）、参加申請（`joinRequests`、保留中申請取得 `getPendingRequests`）、家族移行（`familyMigrations`、参加コミット時の有効申請必須再検証）、パスコードローテーション、メンバーロール変更（`updateMemberRole`）、メンバーキック・データ持ち出し（`pendingExportVaults`、キック時の参加申請物理削除・未完了移行の即時失効）
+- `families.ts`: 家族グループ、家族招待（`familyInvites`）、参加申請（`joinRequests`、保留中申請取得 `getPendingRequests`）、家族移行（`familyMigrations`、action 必須化、参加コミット時の有効申請必須再検証・消費）、パスコードローテーション、メンバーロール変更（`updateMemberRole`）、メンバーキック・データ持ち出し（`pendingExportVaults`、キック時の対象アカウント参加申請物理削除・同一UID別アカウント申請保護・未完了移行の即時失効）
 - `users.ts`: ユーザー同期、アカウント作成・切り替え・削除、メール通知設定更新（`updateEmailNotificationSettings`）、ログイン履歴記録、SSR用ユーザー/アカウント（family暗号化メタデータ含む）取得
 - `contacts.ts`: お問い合わせ受付（`createContact` mutation）、Honeypot スパム防御、多層レート制限（①Convex公式 `@convex-dev/rate-limiter` トークンバケット ＋ ②同一メール短時間連投制限 `by_email_createdAt`）、管理者メール通知（`sendNotificationEmail` internalAction、`ADMIN_EMAIL` 宛て Resend 送信、replyTo: 問い合わせ者メール）
 - `extensionAuth.ts`: Chrome 拡張機能連携用の短命同期コード発行（`issueSyncToken`）・検証引き換え（`redeemSyncToken`、全サブアカウント一覧 `accounts`、家族暗号メタデータ、および `customToken` のバックチャネル返却、Zero Token Exposure、Single-Use即時物理削除）、拡張機能セッション暗号メタデータ同期（`getSessionState`、パスコード変更後のRe-wrap自動追従）、期限切れコード定期パージ（`cleanupExpiredSyncCodes`）

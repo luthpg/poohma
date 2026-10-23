@@ -719,44 +719,43 @@ export const commitFamilyMigration = authenticatedMutation({
       });
     }
 
-    const approvedRequest =
-      (await ctx.db
-        .query("joinRequests")
-        .withIndex("by_familyId_accountId", (q) =>
-          q.eq("familyId", migration.targetFamilyId).eq("accountId", user._id),
-        )
-        .filter((q) => q.eq(q.field("status"), "approved"))
-        .first()) ||
-      (await ctx.db
-        .query("joinRequests")
-        .withIndex("by_familyId_userId", (q) =>
-          q.eq("familyId", migration.targetFamilyId).eq("userId", user.userId),
-        )
-        .filter((q) =>
-          q.and(
-            q.eq(q.field("status"), "approved"),
-            q.eq(q.field("accountId"), undefined),
-          ),
-        )
-        .first());
+    if (migration.action === "join") {
+      const approvedRequest =
+        (await ctx.db
+          .query("joinRequests")
+          .withIndex("by_familyId_accountId", (q) =>
+            q
+              .eq("familyId", migration.targetFamilyId)
+              .eq("accountId", user._id),
+          )
+          .filter((q) => q.eq(q.field("status"), "approved"))
+          .first()) ||
+        (await ctx.db
+          .query("joinRequests")
+          .withIndex("by_familyId_userId", (q) =>
+            q
+              .eq("familyId", migration.targetFamilyId)
+              .eq("userId", user.userId),
+          )
+          .filter((q) =>
+            q.and(
+              q.eq(q.field("status"), "approved"),
+              q.eq(q.field("accountId"), undefined),
+            ),
+          )
+          .first());
 
-    if (migration.action === "join" && !approvedRequest) {
-      throw new Error("Unauthorized: Approved join request is no longer valid");
-    }
+      if (!approvedRequest) {
+        throw new Error(
+          "Unauthorized: Approved join request is no longer valid",
+        );
+      }
 
-    if (approvedRequest) {
       await ctx.db.delete(approvedRequest._id);
     }
 
     // 移行確定時の権限設定: 新規家族作成なら admin、既存家族参加なら viewer
-    const targetRole =
-      migration.action === "create"
-        ? "admin"
-        : migration.action === "join"
-          ? "viewer"
-          : approvedRequest
-            ? "viewer"
-            : "admin";
+    const targetRole = migration.action === "create" ? "admin" : "viewer";
 
     await ctx.db.patch(user._id, {
       familyId: migration.targetFamilyId,
@@ -1685,7 +1684,9 @@ export const kickMember = familyAdminMutation({
       )
       .collect();
     for (const req of relatedJoinRequestsByUserId) {
-      await ctx.db.delete(req._id);
+      if (req.accountId === undefined || req.accountId === targetUser._id) {
+        await ctx.db.delete(req._id);
+      }
     }
 
     // 3.2 当該家族に関連する未完了マイグレーション（PREPARED）を失効
