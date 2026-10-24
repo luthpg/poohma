@@ -273,6 +273,13 @@ Playwright E2E テストは、環境汚染とメールクォータ消費を防�
        - CI（`deploy-staging.yml`）では `deploy-staging`（通常 Convex URL → 固定 alias 割り当て）と `deploy-e2e`（Convex Preview URL → E2E 専用デプロイ）を**並列ジョブ**として実行。E2E テストは `deploy-e2e` が発行する動的 `DEPLOY_URL` に対してのみ実行され、ステージング固定 alias に E2E 用環境変数が混入しない。
 - **Preview 環境の完全初期化 (`pnpm test:e2e:clean`)**:
   - テストデータを完全にゼロクリアしたい場合は、`pnpm test:e2e:clean`（または `pnpm server preview:setup:clean`）を実行すると、Preview Deployment が一旦削除・再作成される。
+- **ローカル Convex 実行戦略による Usage Limit（月間枠）保護 (`pnpm test:e2e:local`)**:
+  - E2E テストは短時間に大量の DB クエリ・ミューテーションを発生させるため、開発時の反復実行によって Convex 無料プランの月間枠（Usage Limit）が圧迫される懸念がある。
+  - そのため、Docker（`ghcr.io/convex/convex-backend`）を用いた Self-hosted Local Backend 実行基盤を配備している：
+    - `pnpm test:e2e:local` は、Docker コンテナの起動 → admin key 取得 → 最新スキーマ・関数のローカルデプロイ → `DISABLE_EMAIL_DELIVERY=true` 設定 → `apps/web/e2e/.env.e2e-local` 書き出し → Playwright E2E テスト実行 → テスト完了後のコンテナ停止・環境変数クリーンアップ（`convex:local:stop`）までを完全に自動ワンショットで一括実行する。
+    - Playwright は `e2e/.env.e2e-local` が存在する場合に最優先でローカル Convex インスタンスを対象とするため、Convex クラウド枠を一切消費せずにローカル E2E テストを実行できる。
+    - 単体でコンテナを立ち上げたまま反復デバッグしたい場合は `pnpm convex:local:setup`、終了時は `pnpm convex:local:stop` を手動実行することも可能。
+    - ※ GitHub Actions CI では、従来通り安定した Preview Deployment（`preview/e2e-test`）が利用される。
 - **スキーマや関数の変更時の注意**:
   - `preview:setup` は内部で `convex deploy` を実行するため、コード変更は自動的に Preview Deployment へ反映される。手動での `convex dev --once` は不要。
 

@@ -70,6 +70,13 @@
 - **`session` Cookie は SSR 初期表示およびサーバー処理用の補助セッション・キャッシュ**に過ぎない。**Cookie の期限切れ（14日）のみを理由に未認証としてログアウトさせてはならない**。
 - `(app)` ルートの保護等の画面アクセス判定は、Cookie 由来のデータではなくクライアントの Firebase Auth 状態（`useAuth().isAuthenticated`）を判定基準としなければならない。
 - Session Cookie が未発行または失効している場合でも、Firebase Auth が認証中であればバックグラウンドで自動的に `refreshSessionCookie` を呼び出し、Cookie をローリング延長・再同期しなければならない（DB更新やログイン通知は行わない）。
+- **拡張機能セッションの Web 設計準拠**: 拡張機能の長期ログイン維持も Web 側と同一の原則に従い、ブラウザローカルに安全に保存された **Refresh Token のみを Single Source of Truth** とする。初回連携時に発行されたワンタイムの引き換え用 Custom Token は交換成功後に即時破棄し、ローカルストレージに永続保持・再利用してはならない。
+
+### 環境分離と単一認証プロバイダーの不変条件
+
+- **デプロイ環境ごとに信頼する Firebase プロジェクト（`applicationID` / `domain`）は必ず 1 つに限定する**。
+- 本番 Convex デプロイメントにステージングの認証プロバイダー（`poohma-staging`）を混入させてはならない。本番 CI（`deploy-production.yml`）でのデプロイ時は、本番専用プロバイダー（`poohma`）に確定切り替えを行ってからデプロイする。
+- 環境境界を破壊する複数発行元の安易な同時信頼を禁止する。
 
 ---
 
@@ -85,6 +92,7 @@
 
 - 家族移行は 2 段階（`PREPARED` → クライアント側で新マスターキーによる DEK 再ラップ → `COMPLETED`）で管理する。
 - 移行完了時には、移行対象レコードの `familyId` および DEK ラップデータがすべて新家族のマスターキーに更新され、古い家族の鍵で復号不能な状態を残してはならない。
+- `commitFamilyMigration` での既存家族参加（`action === "join"`）時は、現在も有効な承認済み申請（`status: "approved"` の `joinRequests`）が存在することを必須再検証とし、途中で除名・失効された場合の移行確定を完全に拒否する。
 
 ### アカウント削除・退会時の整合性とカスケード削除の完全性
 
@@ -93,11 +101,12 @@
 - 退会時は、ユーザーが個人所有する全レコード（共有設定の有無に関わらず）を上記カスケード削除により削除する。
 - 退会ユーザーが家族の最後の 1 人であった場合、孤立した家族グループ（`families`）レコード自体も必ず削除する。
 
-### メンバーキックと Export Vault の不変条件
+### メンバーキックと参加権限失効の不変条件
 
 - **共有レコード（`ownerType: "family"`）の不可侵性**: 家族共有レコードは家族全体の資産であり、キックされたユーザーが持ち出したり削除することは絶対に許されない。キックされたユーザーが共有レコードの唯一の管理者であった場合は、`reconcileAdminsOnLeave` により残存メンバーへ管理者権限が自動移譲されなければならない。
 - **個人所有レコード（`ownerType: "user"`）の持ち出し保証**: 被キックユーザーの個人所有レコードは作成者の個人資産として保護される。キック実行時に Convex サーバーは旧家族の暗号化マスターキー情報（`masterKeyEncrypted`, `masterKeyIv`, `masterKeySalt`, `kdfIterations`, `cryptoVersion`）を `pendingExportVaults` へ原子的に退避する。
 - **平文非保持の徹底**: `pendingExportVaults` に保存されるのは暗号化されたマスターキー情報のみであり、サーバーはマスターキーやパスコードの平文を一切受け取らない・保存しない。
+- **参加承認・マイグレーションの即時失効**: キック実行時は、被除名アカウントおよび当該家族に紐づくすべての参加申請（`joinRequests`）を物理削除し、未完了の家族移行（`familyMigrations`）を即座に `EXPIRED` として失効させる。過去の承認履歴を悪用した無承認復帰や暗号メタデータ照会（`getFamilyInfoByFamilyId`）を技術的に完全遮断する。
 - **Export Vault の確実な破棄**: `pendingExportVaults` は 30日の有効期限（`expiresAt`）を持ち、移行完了時（`commitFamilyMigration`）、ユーザーによる明示的破棄（`abandonPendingExportVault`）、または定期クロンジョブ（`cleanupExpiredExportVaultsInternal`）によって確実に物理削除されなければならない。
 
 ### 家族ロールと最後の管理者保護
@@ -242,3 +251,12 @@
 - **Biome フォーマッターとワークフロー構文の互換性**:
   - Biome 2.6 以降、`.github/workflows/*.yml` を含む YAML ファイルも自動フォーマット（クォートの統一、インデント等）の対象となる。
   - フォーマット実施後も GitHub Actions 式（`${{ ... }}`）やシングルクォート・ダブルクォートの解釈に破壊が生じていないか、ワークフロー変更・整形時は必ずコミット前にローカルで `pnpm lint:workflows`（actionlint + shellcheck）を実行し、構文妥当性を検証すること。
+
+### Playwright E2E テストのコンテナ実行とバージョン動的同期
+
+- **公式コンテナ利用による OS 依存インストールの 0 秒化**:
+  - GitHub Actions で Playwright E2E テストを実行する際、VM 上で毎回 `playwright install-deps`（apt-get）を走らせると数分〜5分以上の遅延が生じるため、ブラウザおよび OS 共有ライブラリが最初から組み込まれている Playwright 公式 Docker コンテナ（`mcr.microsoft.com/playwright`）上でジョブを実行すること。
+- **package.json での固定バージョン管理と jq による動的同期（Single Source of Truth）**:
+  - コンテナタグとプロジェクトの `@playwright/test` バージョンの乖離を防ぐため、`apps/web/package.json` でバージョンを完全固定（例: `"1.64.1"`）し、一括最新更新から除外・保護すること。先行の軽量ジョブ（`sparse-checkout: apps/web/package.json`）で `jq` を用いてバージョン番号を抽出し、後続ジョブの `container.image` に動的注入することで、YAML パース障害を排除し最速かつ確実な追従を担保する。
+- **コンテナ共有メモリ枯渇防止（--ipc=host）**:
+  - コンテナ内で Chromium を動作させる際、デフォルトの共有メモリ（`/dev/shm` 64MB）ではクラッシュ（SIGSEGV）の原因となるため、コンテナオプションに `options: --ipc=host` を必ず指定すること。

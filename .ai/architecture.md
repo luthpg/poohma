@@ -20,7 +20,8 @@ poohma/
 ├── packages/
 │   ├── backend/           # @poohma/backend (Convex BaaS バックエンド)
 │   │   ├── convex/        # schema, functions, RLS, customBuilders, admin/
-│   │   ├── scripts/       # setup-preview, export-demo-records
+│   │   ├── docker-compose.local.yml # ローカル Self-hosted Convex Docker 構成
+│   │   ├── scripts/       # setup-preview, setup-local-convex, stop-local-convex, export-demo-records
 │   │   └── tests/         # バックエンド結合テスト (convex-test)
 │   ├── shared/            # @poohma/shared (共通モジュール・部品)
 │   │   └── src/           # schemas, url-safety, index-group, emails
@@ -37,15 +38,15 @@ poohma/
 
 ### Workspaceの責務
 
-| Workspace                  | 責務                                                                                      | 主要技術                                                                              |
-| -------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `apps/web`                 | メインWebアプリケーション（フロントエンド、SSR、Server Functions）                        | React 19, TanStack Start, TanStack Router, Tailwind CSS v4, shadcn/ui, Web Crypto API |
-| `apps/extension`           | Chrome 拡張機能（閲覧中サイトのアカウント参照・パスコード解除・ヒント復号・自動入力支援） | WXT, Manifest V3, React 19, Tailwind CSS v4, Web Crypto API                           |
-| `apps/admin`               | 管理者コンソール（お問い合わせ対応、統計KPI、ユーザー/ファミリー照会、システム監査）      | React 19, TanStack Start, Cloudflare Workers/Vite Plugin, cmdk, Geist Fonts           |
-| `packages/backend`         | Convex BaaS バックエンド（スキーマ、関数、RLS、admin API、プレビュー構築）                | Convex, convex-helpers, convex-test, TypeScript                                       |
-| `packages/shared`          | 共通バリデーションスキーマ、URL検証（SSRF対策）、メール定義                               | Zod, React Email, ipaddr.js, TypeScript                                               |
-| `packages/knowledge-tools` | AI開発支援、Doc-Sync、参照整合性検証ツール                                                | TypeScript, simple-git                                                                |
-| `workers/backup`           | Convex Cloud からの定期データエクスポートおよび Cloudflare R2 へのアーカイブ保存          | Cloudflare Workers, Cloudflare R2, Wrangler, Fetch                                    |
+| Workspace                  | 責務                                                                                               | 主要技術                                                                              |
+| -------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `apps/web`                 | メインWebアプリケーション（フロントエンド、SSR、Server Functions）                                 | React 19, TanStack Start, TanStack Router, Tailwind CSS v4, shadcn/ui, Web Crypto API |
+| `apps/extension`           | Chrome 拡張機能（閲覧中サイトのアカウント参照・パスコード解除・ヒント復号・自動入力支援）          | WXT, Manifest V3, React 19, Tailwind CSS v4, Web Crypto API                           |
+| `apps/admin`               | 管理者コンソール（お問い合わせ対応、統計KPI、ユーザー/ファミリー照会、システム監査）               | React 19, TanStack Start, Cloudflare Workers/Vite Plugin, cmdk, Geist Fonts           |
+| `packages/backend`         | Convex BaaS バックエンド（スキーマ、関数、RLS、admin API、Preview 構築、Local Convex Docker 実行） | Convex, convex-helpers, convex-test, Docker, TypeScript                               |
+| `packages/shared`          | 共通バリデーションスキーマ、URL検証（SSRF対策）、メール定義                                        | Zod, React Email, ipaddr.js, TypeScript                                               |
+| `packages/knowledge-tools` | AI開発支援、Doc-Sync、参照整合性検証ツール                                                         | TypeScript, simple-git                                                                |
+| `workers/backup`           | Convex Cloud からの定期データエクスポートおよび Cloudflare R2 へのアーカイブ保存                   | Cloudflare Workers, Cloudflare R2, Wrangler, Fetch                                    |
 
 ---
 
@@ -83,10 +84,10 @@ poohma/
 - `convex.config.ts`: Convex Components 設定（`@convex-dev/rate-limiter` の登録）
 - `auditLogs.ts`: 監査ログ書き込みヘルパー（`logAuditEvent` 関数）および監査ログCSVエクスポート用クエリ（`exportFamilyAuditLogs`、年指定・全期間、JST期間計算、IDOR防止）。
 - `records.ts`: サービスレコード CRUD、検索（半角・全角スペース区切りの複数単語による横断 AND 検索、NFKC正規化による表記揺れ吸収、読み仮名・URL・タグ名・メモ・ID横断検索）、タグ、一括操作（共有/解除/個別管理者一括設定 `bulkSetRecordAdmin`/一括アーカイブ `bulkArchiveRecords`/一括利用再開 `bulkUnarchiveRecords`）、アーカイブと利用再開（`archiveRecord`, `unarchiveRecord`, `archiveStatus` フィルター）、同時編集セッション管理（`recordEditingSessions`、1分cron上限500件バッチ自動削除）、`updateRecord` revision方式楽観的ロック競合防止（FR-REC-15）、**監査ログ記録**（RECORD_CREATE/UPDATE/DELETE/HINT_VIEW/SHARE_SETTING_CHANGED/ADMIN_CHANGED/RECORD_ARCHIVE/RECORD_UNARCHIVE → `auditLogs` テーブル）、`getFamilyAuditLogs`/`getRecordAuditLogs`/`getStaleRecords`、ページネーション対応クエリ（`getRecordsPaginated`）、監査ログ自動クリーンアップ（3年/1095日保持、閲覧ログは180日保持cron）
-- `families.ts`: 家族グループ、家族招待（`familyInvites`）、参加申請（`joinRequests`、保留中申請取得 `getPendingRequests`）、家族移行（`familyMigrations`）、パスコードローテーション、メンバーロール変更（`updateMemberRole`）、メンバーキック・データ持ち出し（`pendingExportVaults`）
+- `families.ts`: 家族グループ、家族招待（`familyInvites`）、参加申請（`joinRequests`、保留中申請取得 `getPendingRequests`）、家族移行（`familyMigrations`、action 必須化、参加コミット時の有効申請必須再検証・消費）、パスコードローテーション、メンバーロール変更（`updateMemberRole`）、メンバーキック・データ持ち出し（`pendingExportVaults`、キック時の対象アカウント参加申請物理削除・同一UID別アカウント申請保護・未完了移行の即時失効）
 - `users.ts`: ユーザー同期、アカウント作成・切り替え・削除、メール通知設定更新（`updateEmailNotificationSettings`）、ログイン履歴記録、SSR用ユーザー/アカウント（family暗号化メタデータ含む）取得
 - `contacts.ts`: お問い合わせ受付（`createContact` mutation）、Honeypot スパム防御、多層レート制限（①Convex公式 `@convex-dev/rate-limiter` トークンバケット ＋ ②同一メール短時間連投制限 `by_email_createdAt`）、管理者メール通知（`sendNotificationEmail` internalAction、`ADMIN_EMAIL` 宛て Resend 送信、replyTo: 問い合わせ者メール）
-- `extensionAuth.ts`: Chrome 拡張機能連携用の短命同期コード発行（`issueSyncToken`）・検証引き換え（`redeemSyncToken`、全サブアカウント一覧 `accounts`、家族暗号メタデータ、および `customToken` のバックチャネル返却、Zero Token Exposure、Single-Use即時物理削除）、期限切れコード定期パージ（`cleanupExpiredSyncCodes`）
+- `extensionAuth.ts`: Chrome 拡張機能連携用の短命同期コード発行（`issueSyncToken`）・検証引き換え（`redeemSyncToken`、全サブアカウント一覧 `accounts`、家族暗号メタデータ、および `customToken` のバックチャネル返却、Zero Token Exposure、Single-Use即時物理削除）、拡張機能セッション暗号メタデータ同期（`getSessionState`、パスコード変更後のRe-wrap自動追従）、期限切れコード定期パージ（`cleanupExpiredSyncCodes`）
 - `recovery.ts`: リカバリーキット検証、2段階復元（メールOTP発行・検証、マスターキー再ラップ）
 - `actions.ts`: Node.js ランタイムでの外部連携（OGP取得、ふりがなAPI、Resend メール送信。環境変数 `DISABLE_EMAIL_DELIVERY=true` での外部配送スキップ対応）
 - `http.ts`: 内部 HTTP エンドポイント（`getUserByFirebaseUid`、内部共有シークレット認証）
@@ -100,10 +101,10 @@ poohma/
 
 | 認証要素                            | 役割                                     | 保持期間                          | 責務と位置付け                                                                                                                                                                         |
 | ----------------------------------- | ---------------------------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Firebase Auth**                   | 長期ログイン状態の本体                   | 数ヶ月単位（無期限）              | **Single Source of Truth**。IndexedDB + LocalStorage 永続化によりブラウザ側で長期間維持。                                                                                              |
+| **Firebase Auth**                   | 長期ログイン状態の本体                   | 数ヶ月単位（無期限）              | **Single Source of Truth**。IndexedDB + LocalStorage 永続化によりブラウザ側で長期間維持。拡張機能でも Refresh Token のみを保持して長期セッションを維持。                               |
 | **Firebase ID Token**               | Convex バックエンドへの通信認証          | 1時間（SDK自動更新）              | Convex への WebSocket/HTTP 通信時に付与され、Convex 側 OIDC 検証で直接認証。                                                                                                           |
 | **session Cookie**                  | SSR初期表示・Server Function用キャッシュ | 14日間（自動ローリング延長）      | サーバー側補助セッション。Cookie の期限切れのみでログアウト扱いにしてはならない。                                                                                                      |
-| **Custom Token**                    | Client Auth 消失時のリカバリ             | 一時発行（1回限り）               | ブラウザストレージの揮発時に session Cookie から Client Auth を復旧するための非常用経路。                                                                                              |
+| **Custom Token**                    | Client Auth 消失時・連携時のリカバリ     | 一時発行（1回限り）               | Web側ストレージ揮発時の再認証や、拡張機能初回連携時（Sync Code引き換え）の初期セッション確立にのみ一時利用。永続保存は禁止し即座に破棄。                                               |
 | **poohma_active_account_id Cookie** | SSR時のアクティブアカウント同期          | 365日間（アカウント切替時に更新） | SSR初期表示でクライアントと同一のアカウント/家族コンテキストを確定・整合させる補助Cookie。ふとした利用時でもアカウント再選択を不要にし、端末上で直前の利用アカウントを長期間保持する。 |
 
 ### 認証フロー
@@ -185,6 +186,7 @@ flowchart TD
 | E2EE 暗号化・鍵導出アルゴリズム | `packages/crypto/src/index.ts`                  |
 | 脅威モデル・セキュリティ境界    | `.docs/security/threat-model.md`                |
 | 人間向け正規仕様・詳細設計      | `.docs/requirements.md`, `.docs/code-design.md` |
+| E2E テスト・自動テスト戦略      | `.docs/code-design.md`, `.ai/testing.md`        |
 
 ---
 

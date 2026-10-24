@@ -14,9 +14,9 @@ Convex におけるデータ移行・スキーマ更新を安全かつ確実に�
    - PR に一時マイグレーション関数やオプショナルスキーマ（`v.optional(...)`）を残してマージすると、二段階リリースや不要な管理コスト、マイグレ実行漏れが生じる。
    - トピックブランチ上で先行して本番環境へのバックアップ、デプロイ、マイグレ実行、突合検証を完遂し、直後にマイグレ関数を削除してスキーマを必須型（`v.boolean()` 等）に昇格させる。
    - PR には一時マイグレコードを一切含めず、「必須スキーマ ＋ 新機能ロジック ＋ テスト」のみのクリーンな差分として提出・マージする。
-3. **本番環境アクセスの厳格な合意分離と手動デプロイ委任**:
+3. **本番環境アクセスの厳格な合意分離と認証設定切り替えの徹底**:
    - 本番環境（Production DB）の調査・マイグレーション・バックアップを行う際は、**必ず事前にユーザーへ許可を取り、明示的な合意を得てから接続・実行する**。
-   - 本番環境への Convex デプロイは、非対話シェルでのプロンプト停止（`Do you want to push your code to your prod deployment...?`）を回避し安全性を担保するため、**ユーザーの対話ターミナルで `pnpm convex:deploy` を実行してもらい完了報告を受ける**運用とする。
+   - 本番環境への Convex デプロイは、非対話シェルでのプロンプト停止（`Do you want to push your code to your prod deployment...?`）を回避し、かつ本番認証プロバイダー（`poohma`）への切り替えを担保するため、**対話ターミナルで `pnpm server run auth:switch production && pnpm convex:deploy` を実行（デプロイの成功・失敗・中断を問わず、終了後は直ちに `pnpm server run auth:switch staging` で staging 設定へ復元）してもらい完了報告を受ける**か、または本番 CI ワークフロー経由でデプロイする運用とする。
 4. **実施前後のスナップショット突合義務**:
    - 「マイグレーション関数がエラーなく終了した」だけで安心せず、必ず実行前後の対象テーブル全件（`convex export` の ZIP 内 `documents.jsonl` 等）を機械的に 1:1 突合（Diff 検証）し、想定外のフィールド書き換えや欠落がないことを確認する。
 
@@ -99,7 +99,7 @@ flowchart TD
 - **本番環境でも開発環境と全く同じステップ**を順に実行する：
   1. 移行前後の突合検証で不要な差分混入を防ぐため、対象テーブルへの通常書き込みを行わない（事後バックアップ完了まで維持する）
   2. 本番環境の全体バックアップ作成（`pnpm -F @poohma/backend exec convex export --prod --path ../../.local/migrations/prod-backup-before.zip`）
-  3. ユーザーに対話ターミナルで `pnpm convex:deploy` の実行を依頼（非対話環境でのプロンプト停止を回避）
+  3. ユーザーに対話ターミナルで `pnpm server run auth:switch production && pnpm convex:deploy` の実行を依頼（非対話環境でのプロンプト停止回避および本番認証プロバイダー適用。デプロイの成功・失敗・中断を問わず、終了後は直ちに `pnpm server run auth:switch staging` で staging 設定へ復元）
   4. 本番環境でワンショットマイグレ実行（`pnpm -F @poohma/backend exec convex run --prod migrations:xxx`）
   5. 本番環境の事後バックアップ作成（`pnpm -F @poohma/backend exec convex export --prod --path ../../.local/migrations/prod-backup-after.zip`）
   6. 実施前後のデータ機械突合チェック（全件検証・暗号化含む他フィールドの無改変・欠損 0 件の確認）

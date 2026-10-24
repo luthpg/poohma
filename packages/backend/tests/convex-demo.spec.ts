@@ -475,6 +475,7 @@ describe("デモファミリー定期リセット機能 (convex/demo.ts)", () =>
       await ctx.db.insert("familyMigrations", {
         userId: "guest_uid_1",
         accountId: guest1Id,
+        action: "join",
         sourceFamilyId: demoFamilyId,
         targetFamilyId: demoFamilyId, // ダミー（実際は別ファミリーだが、テスト簡略化のため同一）
         serviceRecordIds: [],

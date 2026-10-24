@@ -108,6 +108,10 @@ export const VaultDecryptHintMessageSchema = z.object({
   passwordHintDekIv: z.string(),
 });
 
+export const SyncSessionStateMessageSchema = z.object({
+  type: z.literal("SYNC_SESSION_STATE"),
+});
+
 /**
  * 全メッセージ型のUnion
  */
@@ -125,6 +129,7 @@ export const ExtensionMessageSchema = z.discriminatedUnion("type", [
   VaultLockMessageSchema,
   VaultGetStatusMessageSchema,
   VaultDecryptHintMessageSchema,
+  SyncSessionStateMessageSchema,
 ]);
 
 export type ExtensionMessage = z.infer<typeof ExtensionMessageSchema>;

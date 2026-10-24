@@ -201,6 +201,9 @@ export function App() {
           type: "ENSURE_OFFSCREEN",
         }).catch(() => ({ success: false }));
 
+        // 最新の家族暗号メタデータ・所属・アカウントをバックグラウンドで同期
+        sendExtensionMessage({ type: "SYNC_SESSION_STATE" }).catch(() => {});
+
         // ロック状態確認（メモリ上の MasterKey で即時判定）
         setIsUnlocked(masterKeyRef.current !== null);
 
@@ -234,9 +237,25 @@ export function App() {
             if (accountGenerationRef.current === currentGeneration) {
               setRecords(recordsRes.records);
             }
+          } else {
+            // 同期失敗またはレコード取得失敗時は、暗号メタデータの変更やセッション失効の安全策として鍵と復号表示を破棄
+            masterKeyRef.current = null;
+            setIsUnlocked(false);
+            setDecryptedHints({});
+            setVisibleHints({});
+            setPendingRevealCred(null);
+            setPendingRevealRecordId(null);
+            setRecords([]);
           }
         } catch (_err) {
-          // レコード取得失敗時は既存の一覧を維持（アカウント変更時は storageListener / handleSelectAccount で即時破棄済み）
+          // レコード取得失敗時は安全策として鍵と復号表示を破棄
+          masterKeyRef.current = null;
+          setIsUnlocked(false);
+          setDecryptedHints({});
+          setVisibleHints({});
+          setPendingRevealCred(null);
+          setPendingRevealRecordId(null);
+          setRecords([]);
         }
       } else {
         setIsUnlocked(false);
@@ -311,7 +330,7 @@ export function App() {
           changes.accounts ||
           changes.activeAccountId)
       ) {
-        if (changes.activeAccountId || changes.user) {
+        if (changes.activeAccountId || changes.user || changes.family) {
           accountGenerationRef.current += 1;
           cryptoGenerationRef.current += 1;
           masterKeyRef.current = null;
@@ -556,14 +575,27 @@ export function App() {
 
     startTransition(async () => {
       try {
+        // パスコード解除前に最新の家族暗号メタデータ同期を必須化（Web側でパスコード変更された場合の即時追従）
+        const syncRes = await sendExtensionMessage<{ success: boolean }>({
+          type: "SYNC_SESSION_STATE",
+        }).catch(() => ({ success: false }));
+
+        if (!syncRes?.success) {
+          setUnlockError(
+            "家族情報の同期に失敗しました。接続を確認してください",
+          );
+          return;
+        }
+
         const storage = await getAuthStorage();
-        const currentFamily = family || storage.family;
+        const currentFamily = storage.family;
         if (
           !currentFamily?.masterKeyEncrypted ||
           !currentFamily?.masterKeyIv ||
           !currentFamily?.masterKeySalt
         ) {
-          throw new Error("家族暗号情報が見つかりません");
+          setUnlockError("家族暗号情報が見つかりません");
+          return;
         }
 
         const derivedKey = await unlockMasterKeyWithPasscode(
@@ -573,6 +605,9 @@ export function App() {
 
         // 処理中にアカウント切り替えやロックが行われていた場合は古い鍵を破棄
         if (accountGenerationRef.current !== startGen) {
+          setUnlockError(
+            "家族情報が更新されました。もう一度パスコードを入力してください",
+          );
           return;
         }
 

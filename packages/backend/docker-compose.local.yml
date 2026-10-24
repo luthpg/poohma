@@ -1,0 +1,18 @@
+services:
+  backend:
+    image: ghcr.io/convex/convex-backend:latest
+    container_name: poohma-convex-local
+    ports:
+      - "127.0.0.1:3210:3210"
+      - "127.0.0.1:3211:3211"
+    environment:
+      - INSTANCE_NAME=poohma-local-e2e
+      - INSTANCE_SECRET=${INSTANCE_SECRET}
+      - CONVEX_CLOUD_ORIGIN=http://127.0.0.1:3210
+      - CONVEX_SITE_ORIGIN=http://127.0.0.1:3211
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3210/version"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+      start_period: 3s
