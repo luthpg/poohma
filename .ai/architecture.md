@@ -38,15 +38,15 @@ poohma/
 
 ### Workspaceの責務
 
-| Workspace                  | 責務                                                                                      | 主要技術                                                                              |
-| -------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `apps/web`                 | メインWebアプリケーション（フロントエンド、SSR、Server Functions）                        | React 19, TanStack Start, TanStack Router, Tailwind CSS v4, shadcn/ui, Web Crypto API |
-| `apps/extension`           | Chrome 拡張機能（閲覧中サイトのアカウント参照・パスコード解除・ヒント復号・自動入力支援） | WXT, Manifest V3, React 19, Tailwind CSS v4, Web Crypto API                           |
-| `apps/admin`               | 管理者コンソール（お問い合わせ対応、統計KPI、ユーザー/ファミリー照会、システム監査）      | React 19, TanStack Start, Cloudflare Workers/Vite Plugin, cmdk, Geist Fonts           |
-| `packages/backend`         | Convex BaaS バックエンド（スキーマ、関数、RLS、admin API、プレビュー構築）                | Convex, convex-helpers, convex-test, TypeScript                                       |
-| `packages/shared`          | 共通バリデーションスキーマ、URL検証（SSRF対策）、メール定義                               | Zod, React Email, ipaddr.js, TypeScript                                               |
-| `packages/knowledge-tools` | AI開発支援、Doc-Sync、参照整合性検証ツール                                                | TypeScript, simple-git                                                                |
-| `workers/backup`           | Convex Cloud からの定期データエクスポートおよび Cloudflare R2 へのアーカイブ保存          | Cloudflare Workers, Cloudflare R2, Wrangler, Fetch                                    |
+| Workspace                  | 責務                                                                                               | 主要技術                                                                              |
+| -------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `apps/web`                 | メインWebアプリケーション（フロントエンド、SSR、Server Functions）                                 | React 19, TanStack Start, TanStack Router, Tailwind CSS v4, shadcn/ui, Web Crypto API |
+| `apps/extension`           | Chrome 拡張機能（閲覧中サイトのアカウント参照・パスコード解除・ヒント復号・自動入力支援）          | WXT, Manifest V3, React 19, Tailwind CSS v4, Web Crypto API                           |
+| `apps/admin`               | 管理者コンソール（お問い合わせ対応、統計KPI、ユーザー/ファミリー照会、システム監査）               | React 19, TanStack Start, Cloudflare Workers/Vite Plugin, cmdk, Geist Fonts           |
+| `packages/backend`         | Convex BaaS バックエンド（スキーマ、関数、RLS、admin API、Preview 構築、Local Convex Docker 実行） | Convex, convex-helpers, convex-test, Docker, TypeScript                               |
+| `packages/shared`          | 共通バリデーションスキーマ、URL検証（SSRF対策）、メール定義                                        | Zod, React Email, ipaddr.js, TypeScript                                               |
+| `packages/knowledge-tools` | AI開発支援、Doc-Sync、参照整合性検証ツール                                                         | TypeScript, simple-git                                                                |
+| `workers/backup`           | Convex Cloud からの定期データエクスポートおよび Cloudflare R2 へのアーカイブ保存                   | Cloudflare Workers, Cloudflare R2, Wrangler, Fetch                                    |
 
 ---
 
@@ -186,6 +186,7 @@ flowchart TD
 | E2EE 暗号化・鍵導出アルゴリズム | `packages/crypto/src/index.ts`                  |
 | 脅威モデル・セキュリティ境界    | `.docs/security/threat-model.md`                |
 | 人間向け正規仕様・詳細設計      | `.docs/requirements.md`, `.docs/code-design.md` |
+| E2E テスト・自動テスト戦略      | `.docs/code-design.md`, `.ai/testing.md`        |
 
 ---
 

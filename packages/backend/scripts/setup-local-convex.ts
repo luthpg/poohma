@@ -1,7 +1,8 @@
 import { execFileSync, execSync, type StdioOptions } from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const dirname =
   import.meta.dirname ?? path.dirname(fileURLToPath(import.meta.url));
@@ -11,10 +12,14 @@ const webDir = path.resolve(rootDir, "apps/web");
 const localEnvFile = path.resolve(webDir, "e2e/.env.e2e-local");
 const composeFile = path.resolve(backendDir, "docker-compose.local.yml");
 
-function runCommand(cmd: string, options: { cwd?: string } = {}) {
+function runCommand(
+  cmd: string,
+  options: { cwd?: string; env?: NodeJS.ProcessEnv } = {},
+) {
   try {
     return execSync(cmd, {
       cwd: options.cwd ?? backendDir,
+      env: { ...process.env, ...options.env },
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "pipe"],
     }).trim();
@@ -57,29 +62,35 @@ function runPnpm(
   return execFileSync(pnpmExecPath, args, options);
 }
 
-async function main() {
+export async function setupLocalConvex(): Promise<void> {
   console.log("🐳 [local-convex] Starting local Convex backend container...");
+
+  // 動的インスタンスシークレットの生成（固定シークレットの公開防止）
+  const instanceSecret =
+    process.env.INSTANCE_SECRET || crypto.randomBytes(32).toString("hex");
+  process.env.INSTANCE_SECRET = instanceSecret;
 
   try {
     // 1. Docker Compose 起動
-    runCommand(`docker compose -f "${composeFile}" up -d`);
+    runCommand(`docker compose -f "${composeFile}" up -d`, {
+      env: { INSTANCE_SECRET: instanceSecret },
+    });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error(
       "❌ [local-convex] Failed to start Docker container. Ensure Docker Desktop is running.\n" +
         msg,
     );
-    process.exit(1);
+    throw error;
   }
 
   // 2. ヘルスチェック待機
   console.log("⏳ [local-convex] Waiting for backend to become ready...");
   const isHealthy = await waitForHealth("http://127.0.0.1:3210/version");
   if (!isHealthy) {
-    console.error(
-      "❌ [local-convex] Timeout waiting for local Convex backend to start.",
-    );
-    process.exit(1);
+    const err = new Error("Timeout waiting for local Convex backend to start.");
+    console.error("❌ [local-convex]", err.message);
+    throw err;
   }
 
   // 3. Admin Key の取得
@@ -92,7 +103,7 @@ async function main() {
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error("❌ [local-convex] Failed to generate admin key:", msg);
-    process.exit(1);
+    throw error;
   }
 
   // 4. E2E テスト・デプロイ用環境変数ファイルに先に書き出し
@@ -146,11 +157,16 @@ async function main() {
       "❌ [local-convex] Deployment to local backend failed:",
       error,
     );
-    process.exit(1);
+    throw error;
   }
 }
 
-main().catch((err) => {
-  console.error("Fatal error:", err);
-  process.exit(1);
-});
+// 直接スクリプト実行された場合のエントリポイント
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  setupLocalConvex().catch(() => {
+    process.exit(1);
+  });
+}

@@ -24,8 +24,8 @@ PoohMaは、フロントエンドとサーバーサイド処理を単一のTanSt
 - `workers/backup`: Cloudflare Workers バックアップワーカー
 
 システム全体の E2E テストは、モノレポルートのオーケストレーションにより「バックエンドのプロビジョニング（`@poohma/backend`）」→「ブラウザブリッジのビルド（`@poohma/web`）」→「Playwright 実行（`@poohma/web`）」の順で責務境界を保って実行される：
-- **Preview Deployment 実行 (`pnpm test:e2e`)**: CI パイプライン（`deploy-staging.yml`）およびステージング環境向けの動的 Preview Deployment（`preview/e2e-test`）を用いた結合検証。
-- **ローカル Self-hosted 実行 (`pnpm test:e2e:local`)**: 開発時の反復テストにおいて Convex 無料プランの月間枠（Usage Limit）枯渇を防止するため、Docker による Local Convex Backend（`ghcr.io/convex/convex-backend`、`http://127.0.0.1:3210`）を自動起動 → コード・スキーマデプロイ → テスト実行 → 自動停止クリーンアップを一括実行するテスト戦略。
+- **Preview Deployment 実行 (`pnpm test:e2e`)**: CI パイプライン（`deploy-staging.yml`）およびステージング環境向けの動的 Preview Deployment（`preview/e2e-test`）を用いた結合検証。CI パイプラインでは Playwright 公式 Docker コンテナ（`mcr.microsoft.com/playwright`）上で実行し、`apps/web/package.json` から `@playwright/test` のバージョンを動的に抽出・同期することで、OS 依存インストール待ち（3〜6分）を排除している。
+- **ローカル Self-hosted 実行 (`pnpm test:e2e:local`)**: 開発時の反復テストにおいて Convex 無料プランの月間枠（Usage Limit）枯渇を防止するため、Docker による Local Convex Backend（`ghcr.io/convex/convex-backend`、`http://127.0.0.1:3210`）を自動起動 → コード・スキーマデプロイ → テスト実行 → 自動停止クリーンアップを一括実行するテスト戦略（`run-local-e2e.ts` による失敗時クリーンアップ保証付き）。
 
 認証はFirebase Authenticationを用い、コンテンツ管理はmicroCMS、メール送信はResendを利用する。
 

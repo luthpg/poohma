@@ -559,19 +559,27 @@ export function App() {
 
     startTransition(async () => {
       try {
-        // パスコード解除前に最新の家族暗号メタデータ同期を試みる（Web側でパスコード変更された場合の即時追従）
-        await sendExtensionMessage({ type: "SYNC_SESSION_STATE" }).catch(
-          () => {},
-        );
+        // パスコード解除前に最新の家族暗号メタデータ同期を必須化（Web側でパスコード変更された場合の即時追従）
+        const syncRes = await sendExtensionMessage<{ success: boolean }>({
+          type: "SYNC_SESSION_STATE",
+        }).catch(() => ({ success: false }));
+
+        if (!syncRes?.success) {
+          setUnlockError(
+            "家族情報の同期に失敗しました。接続を確認してください",
+          );
+          return;
+        }
 
         const storage = await getAuthStorage();
-        const currentFamily = storage.family || family;
+        const currentFamily = storage.family;
         if (
           !currentFamily?.masterKeyEncrypted ||
           !currentFamily?.masterKeyIv ||
           !currentFamily?.masterKeySalt
         ) {
-          throw new Error("家族暗号情報が見つかりません");
+          setUnlockError("家族暗号情報が見つかりません");
+          return;
         }
 
         const derivedKey = await unlockMasterKeyWithPasscode(

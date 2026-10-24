@@ -323,3 +323,21 @@ Environment variable CONVEX_AUTH_PROJECT_ID is used in auth config file but its 
    本番デプロイパイプライン（`.github/workflows/deploy-production.yml`）でのみ、デプロイ直前に `pnpm --filter @poohma/backend run auth:switch production`（`packages/backend/scripts/switch-auth-config.ts`）を実行し、`auth.config.ts` を本番用（`poohma`）に書き換えてから `convex deploy` を実行する。
 3. **単一プロバイダー境界の死守**:
    ステージング用・本番用の配列を併記（マルチプロバイダー化）する安易な逃げ道は厳禁（本番 Convex がステージングの ID トークンを受け入れてしまう脆弱性 CWE-287 / P1 指摘の再発）。静的リテラルの単一プロバイダーを CI でアトミックに切り替える方式により、安全性と Preview デプロイの安定性を両立する。
+
+---
+
+## 17. Playwright E2E テストでの OS 依存インストールによる CI 遅延と Docker コンテナ自動同期
+
+### 事象
+
+GitHub Actions の Ubuntu ランナー上で Playwright E2E テストを実行する際、`playwright install-deps chromium` を実行すると、毎回使い捨ての VM 上で `apt-get update` および多数の deb パッケージのダウンロード・展開が走り、3〜6分以上の待ち時間が発生する。
+ブラウザバイナリ（`~/.cache/ms-playwright`）をキャッシュしても、OS 側の共有ライブラリ（`libnss3` 等）はキャッシュされないため、毎回のオーバーヘッドが解消されない。
+
+### 対策
+
+1. **Playwright 公式 Docker コンテナ（`mcr.microsoft.com/playwright`）の採用**:
+   ブラウザバイナリと必要な Linux 依存関係が最初から組み込まれた公式コンテナ上でジョブを実行することで、`install` および `install-deps` を完全に不要化（0秒化）する。
+2. **`package.json` からのバージョン自動抽出（Single Source of Truth）**:
+   YAML へのコンテナタグ直書きはパッケージ更新時の追従漏れ（バージョン不一致エラー）を招くため、先行の軽量ジョブ（`sparse-checkout` で `apps/web/package.json` のみ取得）で `@playwright/test` のバージョンを抽出し、後続の E2E ジョブの `container.image` に動的注入する。
+3. **共有メモリ枯渇防止（`--ipc=host`）**:
+   Docker コンテナ内で Chromium を動作させる際、デフォルトの共有メモリ（`/dev/shm` 64MB）ではクラッシュ（SIGSEGV）の原因となるため、コンテナオプションに `options: --ipc=host` を指定する。

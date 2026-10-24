@@ -17,8 +17,28 @@ permissions:
   contents: read
 
 jobs:
-  e2e:
+  resolve-playwright-version:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: apps/web/package.json
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - id: version
+        run: |
+          VERSION=$(jq -r '.devDependencies["@playwright/test"] | ltrimstr("^") | ltrimstr("~")' apps/web/package.json)
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+
+  e2e:
+    needs: resolve-playwright-version
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v${{ needs.resolve-playwright-version.outputs.version }}-noble
+      options: --ipc=host
     env:
       E2E_BASE_URL: ${{ inputs.base_url != '' && inputs.base_url || vars.E2E_STAGING_URL }}
       VITE_CONVEX_URL: ${{ inputs.convex_url != '' && inputs.convex_url || vars.VITE_CONVEX_URL }}
@@ -46,21 +66,6 @@ jobs:
           cache: "pnpm"
 
       - run: pnpm install --frozen-lockfile
-
-      - name: Cache Playwright Browsers
-        uses: actions/cache@v5
-        id: playwright-cache
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('**/pnpm-lock.yaml') }}
-
-      - name: Install Playwright Chromium with dependencies
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm --filter @poohma/web exec playwright install chromium --with-deps
-
-      - name: Install Playwright OS dependencies only
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm --filter @poohma/web exec playwright install-deps chromium
 
       - name: Wait for DNS and Edge propagation
         run: sleep 10

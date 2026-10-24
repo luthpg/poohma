@@ -12,10 +12,10 @@ const convexUrlObj = (() => {
 })();
 
 const convexHost = convexUrlObj?.host ?? "";
-const isLocalConvex =
+const isLoopback =
   convexUrlObj?.hostname === "127.0.0.1" ||
-  convexUrlObj?.hostname === "localhost" ||
-  convexUrlObj?.protocol === "http:";
+  convexUrlObj?.hostname === "localhost";
+const isLocalConvex = isLoopback && convexUrlObj?.protocol === "http:";
 
 const cspMiddleware = createMiddleware().server(({ next, request }) => {
   if (request.method !== "GET") {

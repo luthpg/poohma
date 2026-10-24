@@ -96,46 +96,72 @@ export async function getRecordsCached(force = false): Promise<CachedRecord[]> {
   return requestPromise;
 }
 
+let inflightSyncPromise: Promise<boolean> | null = null;
+let syncGeneration = 0;
+
 /**
  * Convex から最新のユーザー情報・サブアカウント一覧・家族暗号メタデータを取得してストレージを同期する
  */
 export async function syncSessionState(): Promise<boolean> {
-  try {
-    const token = await getValidIdToken(env.VITE_FIREBASE_API_KEY);
-    if (!token) return false;
-
-    const storage = await getAuthStorage();
-    if (!storage.user) return false;
-
-    const authedConvex = new ConvexHttpClient(env.VITE_CONVEX_URL);
-    authedConvex.setAuth(token);
-    const targetAccountId = storage.activeAccountId || storage.user._id;
-    const latest = await authedConvex.query(api.extensionAuth.getSessionState, {
-      accountId: targetAccountId as Id<"users">,
-    });
-
-    if (!latest) return false;
-
-    // 非同期取得完了後に現在のセッション状態を再検証（ログアウトやアカウント切り替えとの競合・ゾンビ復活を防止）
-    const currentStorage = await getAuthStorage();
-    if (
-      !currentStorage.user ||
-      (currentStorage.activeAccountId || currentStorage.user._id) !==
-        targetAccountId
-    ) {
-      return false;
-    }
-
-    await chrome.storage.local.set({
-      user: latest.user,
-      accounts: latest.accounts,
-      family: latest.family,
-    });
-
-    return true;
-  } catch {
-    return false;
+  if (inflightSyncPromise) {
+    return inflightSyncPromise;
   }
+
+  const thisGen = ++syncGeneration;
+  const doSync = async (): Promise<boolean> => {
+    try {
+      const token = await getValidIdToken(env.VITE_FIREBASE_API_KEY);
+      if (!token) return false;
+
+      const storage = await getAuthStorage();
+      if (!storage.user) return false;
+
+      const authedConvex = new ConvexHttpClient(env.VITE_CONVEX_URL);
+      authedConvex.setAuth(token);
+      const targetAccountId = storage.activeAccountId || storage.user._id;
+      const latest = await authedConvex.query(
+        api.extensionAuth.getSessionState,
+        {
+          accountId: targetAccountId as Id<"users">,
+        },
+      );
+
+      if (!latest) return false;
+
+      // 取得待機中に世代が進んでいる場合（ログアウト、アカウント切替、後続の同期等）は古い応答を破棄
+      if (thisGen !== syncGeneration) {
+        return false;
+      }
+
+      // 非同期取得完了後に現在のセッション状態を再検証（ログアウトやアカウント切り替えとの競合・ゾンビ復活を防止）
+      const currentStorage = await getAuthStorage();
+      if (
+        !currentStorage.user ||
+        (currentStorage.activeAccountId || currentStorage.user._id) !==
+          targetAccountId
+      ) {
+        return false;
+      }
+
+      await chrome.storage.local.set({
+        user: latest.user,
+        accounts: latest.accounts,
+        family: latest.family,
+      });
+
+      return true;
+    } catch {
+      return false;
+    } finally {
+      if (inflightSyncPromise === syncPromise) {
+        inflightSyncPromise = null;
+      }
+    }
+  };
+
+  const syncPromise = doSync();
+  inflightSyncPromise = syncPromise;
+  return syncPromise;
 }
 
 /**
@@ -262,6 +288,8 @@ export default defineBackground(() => {
     if (areaName === "local" && (changes.activeAccountId || changes.user)) {
       recordsCache = null;
       inflightRecordsPromises.clear();
+      syncGeneration += 1;
+      inflightSyncPromise = null;
     }
   });
 
@@ -491,6 +519,8 @@ export default defineBackground(() => {
           convex.clearAuth();
           recordsCache = null;
           inflightRecordsPromises.clear();
+          syncGeneration += 1;
+          inflightSyncPromise = null;
           await clearAuthSession();
         } catch (_e) {}
 

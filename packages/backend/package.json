@@ -13,6 +13,7 @@
     "preview:setup:clean": "tsx scripts/setup-preview.ts --clean",
     "convex:local:setup": "tsx scripts/setup-local-convex.ts",
     "convex:local:stop": "tsx scripts/stop-local-convex.ts",
+    "convex:local:test-e2e": "tsx scripts/run-local-e2e.ts",
     "demo:export": "tsx scripts/export-demo-records.ts",
     "auth:switch": "tsx scripts/switch-auth-config.ts"
   },

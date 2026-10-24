@@ -251,3 +251,12 @@
 - **Biome フォーマッターとワークフロー構文の互換性**:
   - Biome 2.6 以降、`.github/workflows/*.yml` を含む YAML ファイルも自動フォーマット（クォートの統一、インデント等）の対象となる。
   - フォーマット実施後も GitHub Actions 式（`${{ ... }}`）やシングルクォート・ダブルクォートの解釈に破壊が生じていないか、ワークフロー変更・整形時は必ずコミット前にローカルで `pnpm lint:workflows`（actionlint + shellcheck）を実行し、構文妥当性を検証すること。
+
+### Playwright E2E テストのコンテナ実行とバージョン動的同期
+
+- **公式コンテナ利用による OS 依存インストールの 0 秒化**:
+  - GitHub Actions で Playwright E2E テストを実行する際、VM 上で毎回 `playwright install-deps`（apt-get）を走らせると数分〜5分以上の遅延が生じるため、ブラウザおよび OS 共有ライブラリが最初から組み込まれている Playwright 公式 Docker コンテナ（`mcr.microsoft.com/playwright`）上でジョブを実行すること。
+- **package.json からのバージョン動的抽出（Single Source of Truth）**:
+  - コンテナタグとプロジェクトの `@playwright/test` バージョンの乖離を防ぐため、先行の軽量ジョブ（`sparse-checkout`）で `apps/web/package.json` からバージョン番号を抽出し、後続ジョブの `container.image` に動的注入すること。YAML へのハードコードを排除し、パッケージ更新時の完全自動追従を担保する。
+- **コンテナ共有メモリ枯渇防止（--ipc=host）**:
+  - コンテナ内で Chromium を動作させる際、デフォルトの共有メモリ（`/dev/shm` 64MB）ではクラッシュ（SIGSEGV）の原因となるため、コンテナオプションに `options: --ipc=host` を必ず指定すること。

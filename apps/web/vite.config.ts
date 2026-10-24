@@ -9,18 +9,20 @@ import dotenv from "dotenv";
 import { nitro } from "nitro/vite";
 import { defineConfig, loadEnv } from "vite";
 
-export default defineConfig(async ({ mode }) => {
+export default defineConfig(async ({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), "");
   Object.assign(process.env, env);
 
-  // E2E テスト用オーバーライド環境変数（Preview / Local）の反映
-  const e2eEnvs = [
-    path.resolve(process.cwd(), "e2e/.env.e2e-preview"),
-    path.resolve(process.cwd(), "e2e/.env.e2e-local"),
-  ];
-  for (const envFile of e2eEnvs) {
-    if (fs.existsSync(envFile)) {
-      dotenv.config({ path: envFile, override: true });
+  // E2E テスト用オーバーライド環境変数（Preview / Local）の反映（開発サーバー serve 時のみロード）
+  if (command === "serve") {
+    const e2eEnvs = [
+      path.resolve(process.cwd(), "e2e/.env.e2e-preview"),
+      path.resolve(process.cwd(), "e2e/.env.e2e-local"),
+    ];
+    for (const envFile of e2eEnvs) {
+      if (fs.existsSync(envFile)) {
+        dotenv.config({ path: envFile, override: true });
+      }
     }
   }
 
