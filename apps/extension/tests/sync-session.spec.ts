@@ -146,4 +146,67 @@ describe("Extension Background syncSessionState Deduping and Race Prevention", (
     expect(res).toBe(false);
     expect(mockStore.user).toBeNull();
   });
+
+  it("fails GET_ALL_RECORDS and returns empty records if syncSessionState fails", async () => {
+    let capturedHandler:
+      | ((
+          message: { type: string },
+          sender: unknown,
+          sendResponse: (res: { success: boolean; records: unknown[] }) => void,
+        ) => boolean | undefined)
+      | null = null;
+
+    vi.stubGlobal("chrome", {
+      storage: {
+        local: {
+          get: vi.fn(async () => mockStore),
+          set: vi.fn(async (items: Record<string, unknown>) => {
+            Object.assign(mockStore, items);
+          }),
+          remove: vi.fn(async () => {}),
+          setAccessLevel: vi.fn(async () => {}),
+        },
+        onChanged: { addListener: vi.fn() },
+      },
+      runtime: {
+        id: "ext_id",
+        getURL: vi.fn((path: string) => `chrome-extension://ext_id/${path}`),
+        sendMessage: vi.fn(async () => {}),
+        onMessage: {
+          addListener: vi.fn((handler) => {
+            capturedHandler = handler;
+          }),
+        },
+      },
+      tabs: {
+        onUpdated: { addListener: vi.fn() },
+        onActivated: { addListener: vi.fn() },
+        onRemoved: { addListener: vi.fn() },
+      },
+      action: {
+        setBadgeText: vi.fn(async () => {}),
+        setBadgeBackgroundColor: vi.fn(async () => {}),
+      },
+    });
+
+    queryMock.mockRejectedValue(new Error("Convex query failed"));
+
+    const bg = await import("../entrypoints/background");
+    if (typeof bg.default === "function") {
+      (bg.default as () => void)();
+    }
+
+    expect(capturedHandler).toBeDefined();
+
+    const responsePromise = new Promise<{
+      success: boolean;
+      records: unknown[];
+    }>((resolve) => {
+      capturedHandler!({ type: "GET_ALL_RECORDS" }, {}, resolve);
+    });
+
+    const res = await responsePromise;
+    expect(res.success).toBe(false);
+    expect(res.records).toEqual([]);
+  });
 });

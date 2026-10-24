@@ -14,12 +14,14 @@ const composeFile = path.resolve(backendDir, "docker-compose.local.yml");
 export async function stopLocalConvex(): Promise<void> {
   console.log("🛑 [local-convex] Stopping local Convex backend container...");
 
+  let stopError: unknown = null;
   try {
     execSync(`docker compose -f "${composeFile}" down`, {
       cwd: backendDir,
       stdio: "inherit",
     });
   } catch (error: unknown) {
+    stopError = error;
     const msg = error instanceof Error ? error.message : String(error);
     console.warn("⚠️  [local-convex] Failed to stop container cleanly:", msg);
   }
@@ -27,6 +29,10 @@ export async function stopLocalConvex(): Promise<void> {
   if (fs.existsSync(localEnvFile)) {
     fs.rmSync(localEnvFile, { force: true });
     console.log(`🧹 [local-convex] Removed ${localEnvFile}`);
+  }
+
+  if (stopError) {
+    throw stopError;
   }
 
   console.log("✅ [local-convex] Local Convex backend stopped.");

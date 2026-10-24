@@ -256,7 +256,7 @@
 
 - **公式コンテナ利用による OS 依存インストールの 0 秒化**:
   - GitHub Actions で Playwright E2E テストを実行する際、VM 上で毎回 `playwright install-deps`（apt-get）を走らせると数分〜5分以上の遅延が生じるため、ブラウザおよび OS 共有ライブラリが最初から組み込まれている Playwright 公式 Docker コンテナ（`mcr.microsoft.com/playwright`）上でジョブを実行すること。
-- **package.json からのバージョン動的抽出（Single Source of Truth）**:
-  - コンテナタグとプロジェクトの `@playwright/test` バージョンの乖離を防ぐため、先行の軽量ジョブ（`sparse-checkout`）で `apps/web/package.json` からバージョン番号を抽出し、後続ジョブの `container.image` に動的注入すること。YAML へのハードコードを排除し、パッケージ更新時の完全自動追従を担保する。
+- **pnpm-lock.yaml からの解決済みバージョン動的抽出（Single Source of Truth）**:
+  - コンテナタグとプロジェクトの `@playwright/test` バージョンの乖離を防ぐため、先行の軽量ジョブ（`sparse-checkout: pnpm-lock.yaml`）で `pnpm-lock.yaml` の `importers["apps/web"]` から解決済みバージョン番号を `yq` で抽出し、後続ジョブの `container.image` に動的注入すること。YAML へのハードコードや SemVer 範囲記号（`^` / `~`）による乖離リスクを排除し、完全な再現性を担保する。
 - **コンテナ共有メモリ枯渇防止（--ipc=host）**:
   - コンテナ内で Chromium を動作させる際、デフォルトの共有メモリ（`/dev/shm` 64MB）ではクラッシュ（SIGSEGV）の原因となるため、コンテナオプションに `options: --ipc=host` を必ず指定すること。

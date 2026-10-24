@@ -661,8 +661,12 @@ export default defineBackground(() => {
     if (message?.type === "GET_ALL_RECORDS") {
       (async () => {
         try {
-          // バックグラウンドで家族暗号メタデータや所属の最新状態も合わせて同期
-          syncSessionState().catch(() => {});
+          // バックグラウンドで家族暗号メタデータや所属の最新状態も合わせて同期（失敗時は古い鍵での平文漏洩を防ぐため取得を中止）
+          const syncSuccess = await syncSessionState().catch(() => false);
+          if (!syncSuccess) {
+            sendResponse({ success: false, records: [] });
+            return;
+          }
           const records = await getRecordsCached(true);
           sendResponse({ success: true, records: records ?? [] });
         } catch (_err) {

@@ -24,13 +24,14 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          sparse-checkout: apps/web/package.json
+          sparse-checkout: |
+            pnpm-lock.yaml
           sparse-checkout-cone-mode: false
           persist-credentials: false
 
       - id: version
         run: |
-          VERSION=$(jq -r '.devDependencies["@playwright/test"] | ltrimstr("^") | ltrimstr("~")' apps/web/package.json)
+          VERSION=$(yq -r '.importers["apps/web"].devDependencies["@playwright/test"].version' pnpm-lock.yaml)
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
 
   e2e:

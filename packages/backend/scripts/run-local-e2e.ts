@@ -25,8 +25,30 @@ function runPnpm(
   return execFileSync(pnpmExecPath, args, options);
 }
 
+let isCleaningUp = false;
+
+async function cleanup(): Promise<void> {
+  if (isCleaningUp) return;
+  isCleaningUp = true;
+
+  try {
+    await stopLocalConvex();
+  } catch (cleanupError) {
+    console.error("⚠️ [local-convex] Cleanup encountered error:", cleanupError);
+  }
+}
+
 async function main() {
   let exitCode = 0;
+
+  const handleSignal = async (signal: string) => {
+    console.log(`\n🛑 [local-convex] Received ${signal}, cleaning up...`);
+    await cleanup();
+    process.exit(130);
+  };
+
+  process.on("SIGINT", () => void handleSignal("SIGINT"));
+  process.on("SIGTERM", () => void handleSignal("SIGTERM"));
 
   try {
     await setupLocalConvex();
@@ -50,15 +72,8 @@ async function main() {
     console.error("❌ [local-convex] Setup failed:", setupError);
     exitCode = 1;
   } finally {
-    // 成功・失敗・中断問わず確実にクリーンアップを実行
-    try {
-      await stopLocalConvex();
-    } catch (cleanupError) {
-      console.error(
-        "⚠️ [local-convex] Cleanup encountered error:",
-        cleanupError,
-      );
-    }
+    // 成功・失敗・例外問わず確実にクリーンアップを実行
+    await cleanup();
   }
 
   process.exit(exitCode);

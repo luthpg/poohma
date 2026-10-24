@@ -337,7 +337,7 @@ GitHub Actions の Ubuntu ランナー上で Playwright E2E テストを実行�
 
 1. **Playwright 公式 Docker コンテナ（`mcr.microsoft.com/playwright`）の採用**:
    ブラウザバイナリと必要な Linux 依存関係が最初から組み込まれた公式コンテナ上でジョブを実行することで、`install` および `install-deps` を完全に不要化（0秒化）する。
-2. **`package.json` からのバージョン自動抽出（Single Source of Truth）**:
-   YAML へのコンテナタグ直書きはパッケージ更新時の追従漏れ（バージョン不一致エラー）を招くため、先行の軽量ジョブ（`sparse-checkout` で `apps/web/package.json` のみ取得）で `@playwright/test` のバージョンを抽出し、後続の E2E ジョブの `container.image` に動的注入する。
+2. **`pnpm-lock.yaml` からの解決済みバージョン自動抽出（Single Source of Truth）**:
+   YAML へのコンテナタグ直書きはパッケージ更新時の追従漏れ（バージョン不一致エラー）を招き、また `package.json` のキャレット指定（`^` / `~`）では実インストールとの乖離リスクがある。そのため、先行の軽量ジョブ（`sparse-checkout` で `pnpm-lock.yaml` のみ取得）で `yq` を用いて解決済み `@playwright/test` のバージョン（`importers["apps/web"]` 配下）を抽出し、後続の E2E ジョブの `container.image` に動的注入する。
 3. **共有メモリ枯渇防止（`--ipc=host`）**:
    Docker コンテナ内で Chromium を動作させる際、デフォルトの共有メモリ（`/dev/shm` 64MB）ではクラッシュ（SIGSEGV）の原因となるため、コンテナオプションに `options: --ipc=host` を指定する。

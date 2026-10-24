@@ -237,9 +237,25 @@ export function App() {
             if (accountGenerationRef.current === currentGeneration) {
               setRecords(recordsRes.records);
             }
+          } else {
+            // 同期失敗またはレコード取得失敗時は、暗号メタデータの変更やセッション失効の安全策として鍵と復号表示を破棄
+            masterKeyRef.current = null;
+            setIsUnlocked(false);
+            setDecryptedHints({});
+            setVisibleHints({});
+            setPendingRevealCred(null);
+            setPendingRevealRecordId(null);
+            setRecords([]);
           }
         } catch (_err) {
-          // レコード取得失敗時は既存の一覧を維持（アカウント変更時は storageListener / handleSelectAccount で即時破棄済み）
+          // レコード取得失敗時は安全策として鍵と復号表示を破棄
+          masterKeyRef.current = null;
+          setIsUnlocked(false);
+          setDecryptedHints({});
+          setVisibleHints({});
+          setPendingRevealCred(null);
+          setPendingRevealRecordId(null);
+          setRecords([]);
         }
       } else {
         setIsUnlocked(false);
@@ -589,6 +605,9 @@ export function App() {
 
         // 処理中にアカウント切り替えやロックが行われていた場合は古い鍵を破棄
         if (accountGenerationRef.current !== startGen) {
+          setUnlockError(
+            "家族情報が更新されました。もう一度パスコードを入力してください",
+          );
           return;
         }
 
