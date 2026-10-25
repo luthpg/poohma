@@ -99,7 +99,8 @@ describe("Extension Auth Storage & Multi-Account Management", () => {
     expect(storage.user).toEqual(dummyUser1);
     expect(storage.family).toEqual(dummyFamily);
     expect(storage.pendingSyncNonce).toBeNull();
-    expect(storage.customToken).toBe("custom_token");
+    // Web設計準拠: ワンタイムの Custom Token はストレージに残さない（null）
+    expect(storage.customToken).toBeNull();
     expect(storage.idToken).toBe("id_token");
     expect(storage.refreshToken).toBe("refresh_token");
     expect(storage.accounts).toHaveLength(2);

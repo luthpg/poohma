@@ -42,6 +42,9 @@ jobs:
           VITE_FIREBASE_PROJECT_ID: "dummy"
           VITE_CONVEX_URL: "https://dummy.convex.cloud"
 
+      - name: Switch auth.config.ts to Production (poohma)
+        run: pnpm --filter @poohma/backend run auth:switch production
+
       - name: Deploy Convex Backend to Production
         run: pnpm --filter @poohma/backend run deploy
         env:

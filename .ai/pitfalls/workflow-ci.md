@@ -300,3 +300,44 @@ Monorepo 配下に新しいパッケージ（例: Chrome 拡張機能 `apps/exte
 6. **インラインスクリプト内への GitHub 式直接埋め込み禁止（Template Injection 対策）**:
    - `run:` スクリプトブロック内に `${{ github.event_name }}` や `${{ github.sha }}`、`${{ github.event.pull_request.number }}` などの GitHub 式を直接展開すると、シェルエスケープの破壊や zizmor / CodeQL による script injection 脆弱性（CWE-78）指摘の原因となる。
    - PR Job Summary 生成ステップ（`$GITHUB_STEP_SUMMARY`）等も含め、すべてのコンテキスト値はステップレベルの `env:` でシェル変数（例: `PR_NUMBER: ${{ github.event.pull_request.number }}`）として安全に注入し、スクリプト内では `"$PR_NUMBER"` として参照すること。
+
+---
+
+## 16. Convex `auth.config.ts` での環境変数参照による Preview Deployment クラッシュと CI 切り替えパターン
+
+### 事象
+
+Convex CLI は `convex deploy` や `convex dev` 実行時、`convex/auth.config.ts` 内に記述された `process.env.XXX` を静的解析し、「デプロイ対象の Convex 環境（サーバー側）にその環境変数が設定されているか」を強制検証する。
+
+このため、`auth.config.ts` 内で `process.env.CONVEX_AUTH_PROJECT_ID` などの環境変数を参照させていると、PR ごとにオンデマンドで生成される **Convex Preview Deployment**（`--preview-name=e2e-test`）やローカル開発環境（`convex dev --once`）において、デプロイ初回時にサーバー側環境変数が未設定であるため、以下のエラーで即座にビルド・デプロイがクラッシュする：
+
+```text
+Environment variable CONVEX_AUTH_PROJECT_ID is used in auth config file but its value was not set.
+```
+
+### 対策
+
+1. **リポジトリ上はステージング用の静的設定に固定**:
+   `packages/backend/convex/auth.config.ts` のデフォルトは環境変数を使わず、ステージング環境（`poohma-staging`）の静的リテラルとしてコミットする。これにより、Preview Deployment やローカル開発環境でサーバー側環境変数の事前注入を一切要求せず、即座にデプロイを成立させる。
+2. **本番デプロイ時（CI）に専用スクリプトで本番設定に切り替え**:
+   本番デプロイパイプライン（`.github/workflows/deploy-production.yml`）でのみ、デプロイ直前に `pnpm --filter @poohma/backend run auth:switch production`（`packages/backend/scripts/switch-auth-config.ts`）を実行し、`auth.config.ts` を本番用（`poohma`）に書き換えてから `convex deploy` を実行する。
+3. **単一プロバイダー境界の死守**:
+   ステージング用・本番用の配列を併記（マルチプロバイダー化）する安易な逃げ道は厳禁（本番 Convex がステージングの ID トークンを受け入れてしまう脆弱性 CWE-287 / P1 指摘の再発）。静的リテラルの単一プロバイダーを CI でアトミックに切り替える方式により、安全性と Preview デプロイの安定性を両立する。
+
+---
+
+## 17. Playwright E2E テストでの OS 依存インストールによる CI 遅延と Docker コンテナ自動同期
+
+### 事象
+
+GitHub Actions の Ubuntu ランナー上で Playwright E2E テストを実行する際、`playwright install-deps chromium` を実行すると、毎回使い捨ての VM 上で `apt-get update` および多数の deb パッケージのダウンロード・展開が走り、3〜6分以上の待ち時間が発生する。
+ブラウザバイナリ（`~/.cache/ms-playwright`）をキャッシュしても、OS 側の共有ライブラリ（`libnss3` 等）はキャッシュされないため、毎回のオーバーヘッドが解消されない。
+
+### 対策
+
+1. **Playwright 公式 Docker コンテナ（`mcr.microsoft.com/playwright`）の採用**:
+   ブラウザバイナリと必要な Linux 依存関係が最初から組み込まれた公式コンテナ上でジョブを実行することで、`install` および `install-deps` を完全に不要化（0秒化）する。
+2. **`package.json` での完全固定管理と `jq` 自動抽出（Single Source of Truth）**:
+   YAML へのコンテナタグ直書きは追従漏れを招き、また `yq` による lockfile パースは YAML ヘッダー（`---`）混入等の環境依存障害を招く。そのため、`apps/web/package.json` でバージョンを完全固定（例: `"1.64.1"`）して一括更新から保護・除外し、先行の軽量ジョブ（`sparse-checkout` で `apps/web/package.json` のみ取得）で `jq` を用いてバージョンを抽出し、後続の E2E ジョブの `container.image` に動的注入する。
+3. **共有メモリ枯渇防止（`--ipc=host`）**:
+   Docker コンテナ内で Chromium を動作させる際、デフォルトの共有メモリ（`/dev/shm` 64MB）ではクラッシュ（SIGSEGV）の原因となるため、コンテナオプションに `options: --ipc=host` を指定する。

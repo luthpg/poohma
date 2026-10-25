@@ -96,6 +96,74 @@ export async function getRecordsCached(force = false): Promise<CachedRecord[]> {
   return requestPromise;
 }
 
+let inflightSyncPromise: Promise<boolean> | null = null;
+let syncGeneration = 0;
+
+/**
+ * Convex から最新のユーザー情報・サブアカウント一覧・家族暗号メタデータを取得してストレージを同期する
+ */
+export async function syncSessionState(): Promise<boolean> {
+  if (inflightSyncPromise) {
+    return inflightSyncPromise;
+  }
+
+  const thisGen = ++syncGeneration;
+  const doSync = async (): Promise<boolean> => {
+    try {
+      const token = await getValidIdToken(env.VITE_FIREBASE_API_KEY);
+      if (!token) return false;
+
+      const storage = await getAuthStorage();
+      if (!storage.user) return false;
+
+      const authedConvex = new ConvexHttpClient(env.VITE_CONVEX_URL);
+      authedConvex.setAuth(token);
+      const targetAccountId = storage.activeAccountId || storage.user._id;
+      const latest = await authedConvex.query(
+        api.extensionAuth.getSessionState,
+        {
+          accountId: targetAccountId as Id<"users">,
+        },
+      );
+
+      if (!latest) return false;
+
+      // 取得待機中に世代が進んでいる場合（ログアウト、アカウント切替、後続の同期等）は古い応答を破棄
+      if (thisGen !== syncGeneration) {
+        return false;
+      }
+
+      // 非同期取得完了後に現在のセッション状態を再検証（ログアウトやアカウント切り替えとの競合・ゾンビ復活を防止）
+      const currentStorage = await getAuthStorage();
+      if (
+        !currentStorage.user ||
+        (currentStorage.activeAccountId || currentStorage.user._id) !==
+          targetAccountId
+      ) {
+        return false;
+      }
+
+      await chrome.storage.local.set({
+        user: latest.user,
+        accounts: latest.accounts,
+        family: latest.family,
+      });
+
+      return true;
+    } catch {
+      return false;
+    } finally {
+      if (inflightSyncPromise === syncPromise) {
+        inflightSyncPromise = null;
+      }
+    }
+  };
+
+  const syncPromise = doSync();
+  inflightSyncPromise = syncPromise;
+  return syncPromise;
+}
+
 /**
  * 指定タブの URL に一致する登録情報数を算出し、拡張機能アイコンのバッジに反映
  */
@@ -220,6 +288,8 @@ export default defineBackground(() => {
     if (areaName === "local" && (changes.activeAccountId || changes.user)) {
       recordsCache = null;
       inflightRecordsPromises.clear();
+      syncGeneration += 1;
+      inflightSyncPromise = null;
     }
   });
 
@@ -397,10 +467,11 @@ export default defineBackground(() => {
           }
 
           // ストレージにセッション保存（Side Panel が storage.onChanged で即座に検知）
+          // Web設計準拠: Refresh Token で長期セッションを維持し、Custom Token は保存しない
           await setAuthSession(
             extensionUser,
             extensionFamily,
-            retrievedCustomToken,
+            null,
             activeIdToken,
             activeRefreshToken,
             extensionAccounts,
@@ -448,6 +519,8 @@ export default defineBackground(() => {
           convex.clearAuth();
           recordsCache = null;
           inflightRecordsPromises.clear();
+          syncGeneration += 1;
+          inflightSyncPromise = null;
           await clearAuthSession();
         } catch (_e) {}
 
@@ -576,10 +649,24 @@ export default defineBackground(() => {
       return true;
     }
 
+    // 5.1. 家族暗号メタデータ・セッション状態の最新化同期
+    if (message?.type === "SYNC_SESSION_STATE") {
+      syncSessionState()
+        .then((success) => sendResponse({ success }))
+        .catch(() => sendResponse({ success: false }));
+      return true;
+    }
+
     // 6. レコード一覧の取得（Background で直接 Convex から取得し、自律サジェスト・Sidepanel へ即時応答。期限切れ時は自動リフレッシュ）
     if (message?.type === "GET_ALL_RECORDS") {
       (async () => {
         try {
+          // バックグラウンドで家族暗号メタデータや所属の最新状態も合わせて同期（失敗時は古い鍵での平文漏洩を防ぐため取得を中止）
+          const syncSuccess = await syncSessionState().catch(() => false);
+          if (!syncSuccess) {
+            sendResponse({ success: false, records: [] });
+            return;
+          }
           const records = await getRecordsCached(true);
           sendResponse({ success: true, records: records ?? [] });
         } catch (_err) {

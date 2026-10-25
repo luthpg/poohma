@@ -129,3 +129,14 @@ Playwright E2E テストおよびフロントエンド遷移における落と�
 - **回避法**:
   - Convex パージ処理の戻り値を `Promise<number | null>` とし、正常終了（削除件数 0 件を含む）と異常終了（`null`）を厳格に区別する。
   - Convex パージが成功した UID（`deleted !== null`）のみ Firebase ユーザーを削除し、パージ失敗時は Firebase ユーザーを意図的に保持する。これにより、次回以降の実行（`auth.setup.ts` や `auth.teardown.ts`）で `listStaleE2ETestUids` から自動的に再検出され、Convex データの確実な後続クリーンアップが行われる。
+
+---
+
+### E2E テスト反復実行による Convex クラウド枠（Usage Limit）枯渇の罠
+
+- **問題**:
+  - E2E テストは短時間に大量の DB クエリ・ミューテーション（セットアップ、認証、シードインポート、一括削除、監査ログ、Teardown 等）を発行する。
+  - ローカル開発中に E2E テストを頻繁に反復実行すると、Convex 無料プランの月間呼び出し枠（Usage Limit）が急速に消費され、制限到達によりステージング環境や開発環境全体の API が停止するリスクがある。
+- **回避法**:
+  - ローカルでの反復検証には、Docker による Self-hosted Local Backend（`pnpm test:e2e:local`）を活用する。
+  - `packages/backend/docker-compose.local.yml` およびセットアップスクリプトにより、ローカル Docker（`http://127.0.0.1:3210`）へコードを即時デプロイし、`e2e/.env.e2e-local` 経由で Playwright に読み込ませることで、クラウド枠の消費をゼロに抑えて E2E テストを安全に反復実行できる。

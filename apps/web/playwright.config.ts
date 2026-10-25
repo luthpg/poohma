@@ -8,13 +8,14 @@ const dirname =
   import.meta.dirname ?? path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(dirname, "../..");
 
-// .env.local と .env をロード（.env.local を優先、さらに e2e/.env.e2e-preview で上書き）
+// .env.local と .env をロード（.env.local を優先、さらに e2e/.env.e2e-preview、e2e/.env.e2e-local で上書き）
 const envFiles = [
   path.join(rootDir, ".env"),
   path.join(rootDir, ".env.local"),
   path.join(dirname, ".env"),
   path.join(dirname, ".env.local"),
   path.join(dirname, "e2e/.env.e2e-preview"),
+  path.join(dirname, "e2e/.env.e2e-local"),
 ];
 for (const envFile of envFiles) {
   if (fs.existsSync(envFile)) {

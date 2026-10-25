@@ -85,7 +85,7 @@ export default defineSchema({
   familyMigrations: defineTable({
     userId: v.string(), // Firebase UID
     accountId: v.id("users"), // 作成元 PoohMa アカウント ID
-    action: v.optional(v.union(v.literal("create"), v.literal("join"))),
+    action: v.union(v.literal("create"), v.literal("join")),
     sourceFamilyId: v.optional(v.id("families")),
     targetFamilyId: v.id("families"),
     serviceRecordIds: v.array(v.id("serviceRecords")),

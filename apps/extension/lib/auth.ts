@@ -60,25 +60,30 @@ export async function getAuthStorage(): Promise<AuthStorageData> {
         : [];
   const activeAccountId = result.activeAccountId || user?._id || null;
 
+  // 既存ストレージに残存する customToken があればクリーンアップ
+  if (result.customToken) {
+    chrome.storage.local.remove(["customToken"]).catch(() => {});
+  }
+
   return {
     user,
     accounts,
     activeAccountId,
     family: result.family ?? null,
     pendingSyncNonce: result.pendingSyncNonce ?? null,
-    customToken: result.customToken ?? null,
+    customToken: null,
     idToken: result.idToken ?? null,
     refreshToken: result.refreshToken ?? null,
   };
 }
 
 /**
- * 認証セッションを保存する
+ * 認証セッションを保存する（Web設計準拠: Refresh Token で長期セッションを維持し、Custom Token は保存しない）
  */
 export async function setAuthSession(
   user: ExtensionUser,
   family: ExtensionFamily | null,
-  customToken?: string | null,
+  _customToken?: string | null,
   idToken?: string | null,
   refreshToken?: string | null,
   accounts?: ExtensionUser[],
@@ -90,10 +95,11 @@ export async function setAuthSession(
     activeAccountId: user._id,
     family,
     pendingSyncNonce: null,
-    customToken: customToken ?? null,
     idToken: idToken ?? null,
     refreshToken: refreshToken ?? null,
   });
+  // customToken は初回引き換え用のワンタイムトークンであるためストレージから完全削除
+  await chrome.storage.local.remove(["customToken"]);
 }
 
 /**
@@ -245,7 +251,7 @@ export async function getValidIdToken(apiKey: string): Promise<string | null> {
   inflightIdTokenPromise = (async () => {
     try {
       const storage = await getAuthStorage();
-      if (!storage.idToken && !storage.refreshToken && !storage.customToken) {
+      if (!storage.idToken && !storage.refreshToken) {
         return null;
       }
 
@@ -273,27 +279,6 @@ export async function getValidIdToken(apiKey: string): Promise<string | null> {
             refreshToken: refreshed.refreshToken,
           });
           return refreshed.idToken;
-        }
-      }
-
-      // 2. refreshToken がない / 失敗した場合、customToken での再取得を試みる（フォールバック）
-      if (storage.customToken) {
-        const exchanged = await exchangeCustomToken(
-          storage.customToken,
-          apiKey,
-        );
-        if (exchanged) {
-          // レースコンディション対策: 書き戻し前にストレージ状態を検証
-          const latest = await getAuthStorage();
-          if (!latest.user || latest.customToken !== storage.customToken) {
-            return latest.idToken ?? null;
-          }
-
-          await chrome.storage.local.set({
-            idToken: exchanged.idToken,
-            refreshToken: exchanged.refreshToken,
-          });
-          return exchanged.idToken;
         }
       }
 
