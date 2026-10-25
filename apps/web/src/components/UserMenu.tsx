@@ -21,6 +21,7 @@ import {
   Plus,
   ScrollText,
   Sun,
+  Tag,
   UserCog,
   Users,
 } from "lucide-react";
@@ -253,14 +254,22 @@ export function UserMenu({
                 <div className="h-[1px] bg-border/50" />
 
                 {/* データ管理 */}
-                <div>
+                <div className="grid grid-cols-2 gap-1">
                   <Link
                     to="/settings/bulk"
                     onClick={() => setIsSheetOpen(false)}
-                    className="flex items-center gap-3 px-3 py-1 rounded-lg hover:bg-accent text-sm font-medium transition cursor-pointer"
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-accent text-xs font-medium transition cursor-pointer min-w-0"
                   >
-                    <Database className="h-5 w-5 text-orange-500" />
-                    <span>データ管理（CSV）</span>
+                    <Database className="h-4 w-4 text-orange-500 shrink-0" />
+                    <span className="truncate">データ管理（CSV）</span>
+                  </Link>
+                  <Link
+                    to="/settings/tags"
+                    onClick={() => setIsSheetOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-accent text-xs font-medium transition cursor-pointer min-w-0"
+                  >
+                    <Tag className="h-4 w-4 text-orange-500 shrink-0" />
+                    <span className="truncate">タグ管理</span>
                   </Link>
                 </div>
 
@@ -633,11 +642,20 @@ export function UserMenu({
             <DropdownMenuSeparator />
 
             {/* データ管理 */}
+            <DropdownMenuLabel className="text-[11px] text-muted-foreground font-normal py-1">
+              データ管理
+            </DropdownMenuLabel>
             <DropdownMenuGroup>
               <DropdownMenuItem asChild>
                 <Link to="/settings/bulk" className="cursor-pointer">
                   <Database className="mr-2 h-4 w-4 text-orange-500" />
                   <span>データ管理（CSV）</span>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/settings/tags" className="cursor-pointer">
+                  <Tag className="mr-2 h-4 w-4 text-orange-500" />
+                  <span>タグ管理</span>
                 </Link>
               </DropdownMenuItem>
             </DropdownMenuGroup>
