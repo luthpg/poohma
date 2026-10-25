@@ -239,6 +239,9 @@ export function App() {
             }
           } else {
             // 同期失敗またはレコード取得失敗時は、暗号メタデータの変更やセッション失効の安全策として鍵と復号表示を破棄
+            // 進行中のパスコード鍵導出やヒント復号も無効化するため暗号・アカウント世代を更新
+            cryptoGenerationRef.current += 1;
+            accountGenerationRef.current += 1;
             masterKeyRef.current = null;
             setIsUnlocked(false);
             setDecryptedHints({});
@@ -248,7 +251,9 @@ export function App() {
             setRecords([]);
           }
         } catch (_err) {
-          // レコード取得失敗時は安全策として鍵と復号表示を破棄
+          // レコード取得失敗時は安全策として鍵と復号表示を破棄し、進行中の鍵導出も無効化
+          cryptoGenerationRef.current += 1;
+          accountGenerationRef.current += 1;
           masterKeyRef.current = null;
           setIsUnlocked(false);
           setDecryptedHints({});
@@ -571,7 +576,8 @@ export function App() {
     if (!passcode || lockoutRemainingSec > 0) return;
 
     setUnlockError(null);
-    const startGen = accountGenerationRef.current;
+    const startAccountGen = accountGenerationRef.current;
+    const startCryptoGen = cryptoGenerationRef.current;
 
     startTransition(async () => {
       try {
@@ -603,8 +609,11 @@ export function App() {
           currentFamily,
         );
 
-        // 処理中にアカウント切り替えやロックが行われていた場合は古い鍵を破棄
-        if (accountGenerationRef.current !== startGen) {
+        // 処理中にアカウント切り替え、ロック、または取得失敗による破棄が行われていた場合は古い鍵を破棄
+        if (
+          accountGenerationRef.current !== startAccountGen ||
+          cryptoGenerationRef.current !== startCryptoGen
+        ) {
           setUnlockError(
             "家族情報が更新されました。もう一度パスコードを入力してください",
           );

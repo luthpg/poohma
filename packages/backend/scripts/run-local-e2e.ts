@@ -27,14 +27,16 @@ function runPnpm(
 
 let isCleaningUp = false;
 
-async function cleanup(): Promise<void> {
-  if (isCleaningUp) return;
+async function cleanup(): Promise<boolean> {
+  if (isCleaningUp) return true;
   isCleaningUp = true;
 
   try {
     await stopLocalConvex();
+    return true;
   } catch (cleanupError) {
     console.error("⚠️ [local-convex] Cleanup encountered error:", cleanupError);
+    return false;
   }
 }
 
@@ -73,7 +75,10 @@ async function main() {
     exitCode = 1;
   } finally {
     // 成功・失敗・例外問わず確実にクリーンアップを実行
-    await cleanup();
+    const cleanupSuccess = await cleanup();
+    if (!cleanupSuccess && exitCode === 0) {
+      exitCode = 1;
+    }
   }
 
   process.exit(exitCode);

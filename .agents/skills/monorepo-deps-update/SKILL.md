@@ -64,7 +64,7 @@ description: Update dependencies across PoohMa monorepo packages iteratively (on
 #### 例: `apps/web` の場合（playwright と firebase-admin を保護）
 
 ```bash
-pnpm --filter @poohma/web update --latest "!@playwright/test" "!firebase-admin"
+pnpm --filter @poohma/web update --latest "!@playwright/test" "!firebase-admin" "!vitest" "!@vitest/*"
 ```
 
 #### 例: 保護パッケージが存在しない通常パッケージの場合
@@ -137,8 +137,8 @@ git commit -m "chore(deps): update dependencies in <package-name>"
 `vitest` およびその関連プラグイン（`@vitest/coverage-v8`, `@vitest/ui` 等）をバージョンアップする際は、個別パッケージごとではなく、モノレポ内のすべての参照箇所を一括で同一バージョンに引き上げる。
 
 ```bash
-# 例: vitest 関連を最新安定版（例: 3.1.0）へ一斉に揃える
-pnpm -r update "vitest@^3.1.0" "@vitest/coverage-v8@^3.1.0"
+# 例: vitest 関連を最新安定版（例: 5.x 系）へ一斉に揃える
+pnpm -r update "vitest@^5.0.5" "@vitest/coverage-v8@^5.0.5" "@vitest/browser-playwright@^5.0.5"
 ```
 更新後は直ちに `pnpm verify` で全テストが動作することを確認する。
 

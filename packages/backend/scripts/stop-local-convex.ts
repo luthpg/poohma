@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -16,7 +16,7 @@ export async function stopLocalConvex(): Promise<void> {
 
   let stopError: unknown = null;
   try {
-    execSync(`docker compose -f "${composeFile}" down`, {
+    execFileSync("docker", ["compose", "-f", composeFile, "down"], {
       cwd: backendDir,
       stdio: "inherit",
     });
