@@ -15,6 +15,7 @@ export const env = createEnv({
     VITE_FIREBASE_AUTH_DOMAIN: z.string().min(1).optional(),
     VITE_FIREBASE_PROJECT_ID: z.string().min(1).optional(),
     VITE_FIREBASE_STORAGE_BUCKET: z.string().min(1).optional(),
+    VITE_CONVEX_TEAM_ACCESS_TOKEN: z.string().min(1).optional(),
   },
 
   runtimeEnv:
@@ -52,6 +53,11 @@ export const env = createEnv({
             import.meta.env?.VITE_FIREBASE_STORAGE_BUCKET ??
             (typeof process !== "undefined"
               ? process.env.VITE_FIREBASE_STORAGE_BUCKET
+              : undefined),
+          VITE_CONVEX_TEAM_ACCESS_TOKEN:
+            import.meta.env?.VITE_CONVEX_TEAM_ACCESS_TOKEN ??
+            (typeof process !== "undefined"
+              ? process.env.VITE_CONVEX_TEAM_ACCESS_TOKEN
               : undefined),
         },
 

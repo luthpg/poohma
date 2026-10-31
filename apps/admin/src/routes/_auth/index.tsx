@@ -95,7 +95,12 @@ function DashboardPage() {
   const runHealthCheck = useCallback(async () => {
     setIsCheckingHealth(true);
     try {
-      const res = await checkHealth();
+      const clientToken =
+        (import.meta.env.VITE_CONVEX_TEAM_ACCESS_TOKEN as string | undefined) ||
+        (import.meta.env.CONVEX_TEAM_ACCESS_TOKEN as string | undefined);
+      const res = await checkHealth(
+        clientToken ? { teamAccessToken: clientToken } : {},
+      );
       setHealthData(res);
     } catch {
       // 内部エラーは握る（KISS原則・情報漏洩防止）
@@ -118,6 +123,14 @@ function DashboardPage() {
             {healthData == null ? (
               <span className="text-xs font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
                 CHECKING...
+              </span>
+            ) : healthData.convexTeamMetrics?.isDatabaseIoCritical ? (
+              <span className="text-xs font-mono px-2 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/30 animate-pulse flex items-center gap-1">
+                <span>⚠️</span>
+                <span>
+                  DB I/O 逼迫中 (
+                  {healthData.convexTeamMetrics.databaseIoPercent}%)
+                </span>
               </span>
             ) : healthData.allHealthy ? (
               <span className="text-xs font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -411,25 +424,63 @@ function DashboardPage() {
                 ヘルスチェック実行中...
               </div>
             ) : (
-              healthData.services.map((srv) => (
-                <div
-                  key={srv.id}
-                  className="flex items-center justify-between p-2 rounded-lg bg-zinc-950/40 border border-zinc-800/50 hover:border-zinc-700/80 transition-colors text-xs"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    {getServiceIcon(srv.category)}
-                    <span className="text-zinc-300 font-medium truncate">
-                      {srv.name}
-                    </span>
+              healthData.services.map((srv) => {
+                const isDb = srv.category === "database";
+                const metrics = healthData.convexTeamMetrics;
+
+                return (
+                  <div
+                    key={srv.id}
+                    className="flex items-center justify-between p-2 rounded-lg bg-zinc-950/40 border border-zinc-800/50 hover:border-zinc-700/80 transition-colors text-xs"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      {getServiceIcon(srv.category)}
+                      <span className="text-zinc-300 font-medium truncate">
+                        {srv.name}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {/* Quota / I/O インジケータ */}
+                      {isDb && metrics ? (
+                        <span
+                          className={`font-mono text-[10px] px-1.5 py-0.5 rounded border ${
+                            metrics.isDatabaseIoCritical
+                              ? "bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse font-semibold"
+                              : "bg-zinc-800/80 text-zinc-300 border-zinc-700/60"
+                          }`}
+                          title={`全環境合算 DB I/O: ${metrics.totalDatabaseIoMb.toFixed(1)}MB / ${metrics.databaseIoLimitMb}MB`}
+                        >
+                          {metrics.isDatabaseIoCritical ? "⚠️ " : ""}I/O{" "}
+                          {metrics.databaseIoPercent}%
+                        </span>
+                      ) : srv.quota?.remaining != null &&
+                        srv.quota?.limit != null ? (
+                        <span
+                          className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-zinc-800/60 text-zinc-400 border border-zinc-700/40"
+                          title={`残り: ${srv.quota.remaining} / ${srv.quota.limit} ${srv.quota.unit ?? ""}`}
+                        >
+                          残 {srv.quota.remaining}
+                          {srv.quota.unit === "req"
+                            ? ""
+                            : (srv.quota.unit ?? "")}
+                        </span>
+                      ) : srv.quota?.type === "spec" ? (
+                        <span
+                          className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-500 border border-zinc-800"
+                          title={srv.quota.note}
+                        >
+                          {srv.quota.unit ?? srv.quota.specLimit}
+                        </span>
+                      ) : null}
+
+                      <span className="font-mono text-[11px] text-zinc-500">
+                        {srv.latencyMs}ms
+                      </span>
+                      {getCompactStatusBadge(srv.status)}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2.5 shrink-0">
-                    <span className="font-mono text-[11px] text-zinc-500">
-                      {srv.latencyMs}ms
-                    </span>
-                    {getCompactStatusBadge(srv.status)}
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 
