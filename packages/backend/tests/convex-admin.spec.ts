@@ -250,11 +250,47 @@ describe("Convex Admin API & System Admin Authorization", () => {
       expect(logs[0]?.action).toBe("ACCOUNT_DELETE");
     });
 
-    it("内部pingクエリが正常に応答すること", async () => {
+    it("内部pingクエリが正常に応答し、ストレージ容量とドキュメント件数を集計できること", async () => {
       const t = setupTest();
       const ping = await t.query(internal.admin.system.pingDbInternal, {});
       expect(ping.ok).toBe(true);
       expect(ping.timestamp).toBeGreaterThan(0);
+      expect(typeof ping.fileStorageBytes).toBe("number");
+      expect(typeof ping.fileCount).toBe("number");
+      expect(typeof ping.totalDocuments).toBe("number");
+    });
+
+    it("checkSystemHealth が全6サービスのQuota情報を正しく返却すること", async () => {
+      const t = setupTest();
+      const adminT = t.withIdentity({
+        subject: "admin_1",
+        email: "admin@poohma.app",
+        emailVerified: true,
+      });
+
+      const res = await adminT.action(api.admin.system.checkSystemHealth, {});
+      expect(res.services.length).toBe(6);
+
+      const dbService = res.services.find((s) => s.id === "convex_db");
+      expect(dbService).toBeDefined();
+      expect(dbService?.quota).toBeDefined();
+      expect(dbService?.quota?.specLimit).toContain("Starter");
+
+      const resendService = res.services.find((s) => s.id === "resend");
+      expect(resendService?.quota).toBeDefined();
+
+      const geoService = res.services.find((s) => s.id === "abstract_geo");
+      expect(geoService?.quota).toBeDefined();
+
+      const cmsService = res.services.find((s) => s.id === "microcms");
+      expect(cmsService?.quota).toBeDefined();
+
+      const nlpService = res.services.find((s) => s.id === "yahoo_nlp");
+      expect(nlpService?.quota).toBeDefined();
+      expect(nlpService?.quota?.specLimit).toBe("300 req/min (1 Client ID)");
+
+      const authService = res.services.find((s) => s.id === "firebase_auth");
+      expect(authService?.quota).toBeDefined();
     });
 
     it("microCMS未設定時は configured: false を返すこと", async () => {

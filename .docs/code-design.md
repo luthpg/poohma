@@ -1076,6 +1076,24 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 | getSessionState                 | Query            | authenticated    | 最新の認証ユーザー、全サブアカウント、および所属家族の暗号メタデータ（masterKeyEncrypted/Iv/Salt/kdfIterations等）を一括取得。家族パスコード変更時の自動同期（Re-wrap追従）に利用 |
 | cleanupExpiredSyncCodesInternal | InternalMutation | 内部限定（Cron） | 期限切れ同期コードの定期クリーンアップ                                                                                                                                            |
 
+### 7.9 convex/admin/system.ts（システム健全性・外部連携監視API）
+
+| 関数               | 種別              | 認可           | 概要                                                                                                                                                                                                                                                                                                                                    |
+| ------------------ | ----------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| checkSystemHealth  | systemAdminAction | システム管理者 | 全6外部連携基盤（Convex DB, Firebase, microCMS, Resend, Yahoo, Abstract）の完全並列ヘルスチェック。ヘッダー（`ratelimit-*`, `x-resend-*-quota`等）と仕様値カタログから Quota/RateLimit を抽出。CONVEX_TEAM_ACCESS_TOKEN 提供時は全環境の `get_current_usage` を合算し、Database I/O・Calls・Egress・環境別内訳・逼迫度（80%警告）を返却 |
+| pingDbInternal     | InternalQuery     | 内部限定（DB） | インデックス疎通確認、`_storage` システムテーブルの実ファイル総容量・ファイル件数、および主要テーブル総ドキュメント件数の集計                                                                                                                                                                                                           |
+| getSystemAuditLogs | systemAdminQuery  | システム管理者 | システム全体の操作監査ログ時系列照会（直近最大100件取得、アクション別フィルタ対応）                                                                                                                                                                                                                                                     |
+| triggerDemoReset   | systemAdminAction | システム管理者 | 公開デモファミリーのゲストデータ（レコード、参加申請、監査ログ）の一括消去と初期データ復元                                                                                                                                                                                                                                              |
+
+### 7.9 convex/admin/system.ts（システム健全性・外部連携監視API）
+
+| 関数               | 種別              | 認可           | 概要                                                                                                                                                                                                                                                                                                                                    |
+| ------------------ | ----------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| checkSystemHealth  | systemAdminAction | システム管理者 | 全6外部連携基盤（Convex DB, Firebase, microCMS, Resend, Yahoo, Abstract）の完全並列ヘルスチェック。ヘッダー（`ratelimit-*`, `x-resend-*-quota`等）と仕様値カタログから Quota/RateLimit を抽出。CONVEX_TEAM_ACCESS_TOKEN 提供時は全環境の `get_current_usage` を合算し、Database I/O・Calls・Egress・環境別内訳・逼迫度（80%警告）を返却 |
+| pingDbInternal     | InternalQuery     | 内部限定（DB） | インデックス疎通確認、`_storage` システムテーブルの実ファイル総容量・ファイル件数、および主要テーブル総ドキュメント件数の集計                                                                                                                                                                                                           |
+| getSystemAuditLogs | systemAdminQuery  | システム管理者 | システム全体の操作監査ログ時系列照会（直近最大100件取得、アクション別フィルタ対応）                                                                                                                                                                                                                                                     |
+| triggerDemoReset   | systemAdminAction | システム管理者 | 公開デモファミリーのゲストデータ（レコード、参加申請、監査ログ）の一括消去と初期データ復元                                                                                                                                                                                                                                              |
+
 ## 8. 画面設計・ルーティング設計
 
 ### 8.1 ルートグループ構成（TanStack Router）
