@@ -215,3 +215,20 @@ Convex バックエンド開発における落とし穴と回避法です。
   - `apps/web/src/routes/(app)/dashboard.tsx`
   - `packages/backend/convex/records.ts`
   - `packages/backend/convex/schema.ts`
+
+---
+
+### 内部ヘルスチェック・疎通確認におけるテーブル全件走査（`.collect()`）の禁止と I/O 消費の罠
+
+- **問題 (Problem)**:
+  ヘルスチェックや Ping などの内部クエリ内で、主要テーブルやシステムテーブル（`_storage` 等）を無邪気に `.collect()` して件数や実容量を集計すると、本番運用中にドキュメント数やファイル数が増加した際、ヘルスチェック自身が Database I/O クォータを消費し尽くしてしまう。また、内部 DB Ping と外部 REST API（Convex Management API 等）を同一アクション内で順次実行する際、外部 API 通信完了後に全体の所要時間から DB レイテンシを計算したり、ステータス判定を外部 API に依存させると、外部ネットワーク遅延が DB 自身の障害として誤認される。
+- **原因 (Root Cause)**:
+  `.collect()` はテーブル内の全ドキュメントをメモリに読み込むため、レコード数に比例して Database I/O とメモリを消費する。また、外部 API 通信を含む全体のレイテンシをそのまま DB の `latencyMs` に代入していたため。
+- **誤ったアプローチ (Anti-Pattern)**:
+  CodeRabbit 等の外部 AI の提案に従い、ヘルスチェックのためだけに `@convex-dev/aggregate` 等の重い集計ライブラリを導入したり、全テーブル更新時に集計テーブルを書き換えるトリガーを新設する過剰防衛（Over-engineering / KISS原則違反）。
+- **正しいアプローチ (Correct Pattern)**:
+  ヘルスチェック（DB Ping）の主責務は「データベースへの接続およびクエリ実行が可能であること（生存・疎通確認）」である。したがって内部 Ping クエリは `ctx.db.query("...").take(1)` 等の最小限のインデックスクエリに純化させ、重い全件走査を全廃する。容量や件数の詳細監視が必要な場合は、Convex Management API（`get_current_usage`）等の外部メトリクスを Primary ソースとして利用する。また、DB Ping のレイテンシ計測とステータス判定は `runQuery` 直後に即座に確定させ、外部 REST API と完全に分離する。
+- **再発防止 (Prevention)**:
+  内部 Ping や監視クエリを実装する際、`.collect()` の使用を禁止し、`take(1)` によるインデックス疎通確認に留めること。
+- **関連実装 (Related Code References)**:
+  - `packages/backend/convex/admin/system.ts`
