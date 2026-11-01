@@ -38,15 +38,15 @@ poohma/
 
 ### Workspaceの責務
 
-| Workspace                  | 責務                                                                                               | 主要技術                                                                              |
-| -------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `apps/web`                 | メインWebアプリケーション（フロントエンド、SSR、Server Functions）                                 | React 19, TanStack Start, TanStack Router, Tailwind CSS v4, shadcn/ui, Web Crypto API |
-| `apps/extension`           | Chrome 拡張機能（閲覧中サイトのアカウント参照・パスコード解除・ヒント復号・自動入力支援）          | WXT, Manifest V3, React 19, Tailwind CSS v4, Web Crypto API                           |
-| `apps/admin`               | 管理者コンソール（お問い合わせ対応、統計KPI、ユーザー/ファミリー照会、システム監査）               | React 19, TanStack Start, Cloudflare Workers/Vite Plugin, cmdk, Geist Fonts           |
-| `packages/backend`         | Convex BaaS バックエンド（スキーマ、関数、RLS、admin API、Preview 構築、Local Convex Docker 実行） | Convex, convex-helpers, convex-test, Docker, TypeScript                               |
-| `packages/shared`          | 共通バリデーションスキーマ、URL検証（SSRF対策）、メール定義                                        | Zod, React Email, ipaddr.js, TypeScript                                               |
-| `packages/knowledge-tools` | AI開発支援、Doc-Sync、参照整合性検証ツール                                                         | TypeScript, simple-git                                                                |
-| `workers/backup`           | Convex Cloud からの定期データエクスポートおよび Cloudflare R2 へのアーカイブ保存                   | Cloudflare Workers, Cloudflare R2, Wrangler, Fetch                                    |
+| Workspace                  | 責務                                                                                                                                                          | 主要技術                                                                              |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `apps/web`                 | メインWebアプリケーション（フロントエンド、SSR、Server Functions）                                                                                            | React 19, TanStack Start, TanStack Router, Tailwind CSS v4, shadcn/ui, Web Crypto API |
+| `apps/extension`           | Chrome 拡張機能（閲覧中サイトのアカウント参照・パスコード解除・ヒント復号・自動入力支援）                                                                     | WXT, Manifest V3, React 19, Tailwind CSS v4, Web Crypto API                           |
+| `apps/admin`               | 管理者コンソール（お問い合わせ対応、統計KPI、ユーザー/ファミリー照会、全6外接APIヘルス・Quota監視、Convex全環境合算リソース逼迫度モニタリング、システム監査） | React 19, TanStack Start, Cloudflare Workers/Vite Plugin, cmdk, Geist Fonts           |
+| `packages/backend`         | Convex BaaS バックエンド（スキーマ、関数、RLS、admin API、Preview 構築、Local Convex Docker 実行）                                                            | Convex, convex-helpers, convex-test, Docker, TypeScript                               |
+| `packages/shared`          | 共通バリデーションスキーマ、URL検証（SSRF対策）、メール定義                                                                                                   | Zod, React Email, ipaddr.js, TypeScript                                               |
+| `packages/knowledge-tools` | AI開発支援、Doc-Sync、参照整合性検証ツール                                                                                                                    | TypeScript, simple-git                                                                |
+| `workers/backup`           | Convex Cloud からの定期データエクスポートおよび Cloudflare R2 へのアーカイブ保存                                                                              | Cloudflare Workers, Cloudflare R2, Wrangler, Fetch                                    |
 
 ---
 
@@ -139,7 +139,7 @@ flowchart TD
 3. `familyBoundQuery / Mutation`: 上記 + 対象アカウントが家族グループ（`familyId`）に所属していることを強制
 4. `familyAdminQuery / Mutation`: 上記 + 対象アカウントがファミリー管理者（`familyRole === "admin"`）であることを強制（家族設定・招待管理・パスコード変更・リカバリーキット・キック・監査ログ等の管理者専権保護）
 5. `recordAdminMutation`: `familyBound` + 対象レコードが存在し管理者アクセス権（`requireAdminAccess`）を満たすことを検証
-6. `systemAdminQuery / Mutation / Action`: システム管理者専権保護。Firebase 認証済み + メール確認済み（`emailVerified === true`） + `ADMIN_EMAILS` ホワイトリスト合致を厳格検証（お問い合わせ管理、全体KPI、ユーザー/ファミリー照会、microCMS管理、デモ環境手動リセット等。※E2EE不変条件によりパスワードヒント等の秘密情報はシステム管理者でも復号・閲覧不可）
+6. `systemAdminQuery / Mutation / Action`: システム管理者専権保護。Firebase 認証済み + メール確認済み（`emailVerified === true`） + `ADMIN_EMAILS` ホワイトリスト合致を厳格検証（お問い合わせ管理、全体KPI、ユーザー/ファミリー照会、microCMS管理、全6外接APIヘルス/Quota監視、Convex全環境合算Database I/O・月間関数実行数監視、デモ環境手動リセット等。※E2EE不変条件によりパスワードヒント等の秘密情報はシステム管理者でも復号・閲覧不可）
 
 ---
 
