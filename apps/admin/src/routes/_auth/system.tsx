@@ -116,12 +116,7 @@ function SystemPage() {
   const runHealthCheck = useCallback(async () => {
     setIsCheckingHealth(true);
     try {
-      const clientToken =
-        (import.meta.env.VITE_CONVEX_TEAM_ACCESS_TOKEN as string | undefined) ||
-        (import.meta.env.CONVEX_TEAM_ACCESS_TOKEN as string | undefined);
-      const res = await checkHealth(
-        clientToken ? { teamAccessToken: clientToken } : {},
-      );
+      const res = await checkHealth({});
       setHealthData(res);
     } catch {
       toast.error("ヘルスチェックの実行に失敗しました");
@@ -567,7 +562,8 @@ function SystemPage() {
                       </div>
 
                       {typeof svc.quota.remaining === "number" &&
-                      typeof svc.quota.limit === "number" ? (
+                      typeof svc.quota.limit === "number" &&
+                      svc.quota.limit > 0 ? (
                         <div className="space-y-1">
                           <div className="flex justify-between text-[11px] font-mono">
                             <span className="text-zinc-400">残り枠</span>

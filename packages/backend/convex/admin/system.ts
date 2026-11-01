@@ -4,7 +4,7 @@ import { internalQuery } from "../_generated/server";
 import { systemAdminAction, systemAdminQuery } from "../customBuilders";
 
 /**
- * DB Ping計測用の内部クエリ（実ファイル容量と主要テーブル件数の集計を含む）
+ * DB Ping計測用の内部クエリ（最小限のインデックスクエリで疎通確認）
  */
 export const pingDbInternal = internalQuery({
   args: {},
@@ -12,56 +12,10 @@ export const pingDbInternal = internalQuery({
     // 最小限のインデックスクエリで疎通確認
     const firstLog = await ctx.db.query("auditLogs").take(1);
 
-    // _storage システムテーブル集計（ファイル実容量と件数）
-    let fileStorageBytes = 0;
-    let fileCount = 0;
-    try {
-      const files = await ctx.db.system.query("_storage").collect();
-      fileCount = files.length;
-      fileStorageBytes = files.reduce((acc, f) => acc + (f.size ?? 0), 0);
-    } catch {
-      // システムテーブルアクセス失敗時は0
-    }
-
-    // 主要テーブル総ドキュメント件数集計
-    let totalDocuments = 0;
-    try {
-      const [users, families, records, contacts, auditLogs] = await Promise.all(
-        [
-          ctx.db
-            .query("users")
-            .collect()
-            .then((r) => r.length),
-          ctx.db
-            .query("families")
-            .collect()
-            .then((r) => r.length),
-          ctx.db
-            .query("serviceRecords")
-            .collect()
-            .then((r) => r.length),
-          ctx.db
-            .query("contacts")
-            .collect()
-            .then((r) => r.length),
-          ctx.db
-            .query("auditLogs")
-            .collect()
-            .then((r) => r.length),
-        ],
-      );
-      totalDocuments = users + families + records + contacts + auditLogs;
-    } catch {
-      // エラー時はフォールバック
-    }
-
     return {
       ok: true,
       timestamp: Date.now(),
       count: firstLog.length,
-      fileStorageBytes,
-      fileCount,
-      totalDocuments,
     };
   },
 });
@@ -203,31 +157,33 @@ function getHeader(headers: Headers, name: string): string | null {
  * 外部接続（外接）全6基盤のリアルタイムヘルスチェック
  */
 export const checkSystemHealth = systemAdminAction({
-  args: {
-    teamAccessToken: v.optional(v.string()),
-  },
-  handler: async (ctx, args): Promise<SystemHealthResult> => {
+  args: {},
+  handler: async (ctx): Promise<SystemHealthResult> => {
     // 1. Convex DB
     const checkDb = async (): Promise<ServiceHealth> => {
-      const t0 = Date.now();
-      let dbPingRes: {
-        fileStorageBytes?: number;
-        fileCount?: number;
-        totalDocuments?: number;
-      } = {};
+      const tDb = Date.now();
+      let isPingOk = false;
       try {
-        dbPingRes = await ctx.runQuery(
+        const pingRes = await ctx.runQuery(
           internal.admin.system.pingDbInternal,
           {},
         );
+        isPingOk = pingRes?.ok === true;
       } catch {
-        // ping失敗時は後続判定
+        // ping失敗
       }
+      const dbLatencyMs = Date.now() - tDb;
+      const dbStatus = isPingOk
+        ? dbLatencyMs < 500
+          ? "healthy"
+          : "degraded"
+        : "error";
 
-      const token =
-        args.teamAccessToken || process.env.CONVEX_TEAM_ACCESS_TOKEN;
+      const token = process.env.CONVEX_TEAM_ACCESS_TOKEN;
 
       let convexTeamMetrics: ConvexTeamUsageMetrics | undefined;
+      let totalFileStorageBytes = 0;
+      let totalDatabaseStorageBytes = 0;
 
       if (token) {
         try {
@@ -287,6 +243,12 @@ export const checkSystemHealth = systemAdminAction({
                             dataEgressGb?: {
                               usage?: { current_month?: number };
                             };
+                            databaseStorageGb?: {
+                              usage?: { current_month?: number };
+                            };
+                            fileStorageGb?: {
+                              usage?: { current_month?: number };
+                            };
                           };
                         };
                         const calls =
@@ -298,12 +260,25 @@ export const checkSystemHealth = systemAdminAction({
                         const egressGb =
                           uData.metrics?.dataEgressGb?.usage?.current_month ??
                           0;
+                        const dbStorageGb =
+                          uData.metrics?.databaseStorageGb?.usage
+                            ?.current_month ?? 0;
+                        const fileStorageGb =
+                          uData.metrics?.fileStorageGb?.usage?.current_month ??
+                          0;
+
                         return {
                           name: d.name,
                           deploymentType: d.deploymentType,
                           functionCalls: calls,
                           databaseIoMb: Math.round(ioGb * 1024 * 100) / 100,
                           dataEgressMb: Math.round(egressGb * 1024 * 100) / 100,
+                          databaseStorageBytes: Math.round(
+                            dbStorageGb * 1024 * 1024 * 1024,
+                          ),
+                          fileStorageBytes: Math.round(
+                            fileStorageGb * 1024 * 1024 * 1024,
+                          ),
                         };
                       }
                     } catch {
@@ -315,6 +290,8 @@ export const checkSystemHealth = systemAdminAction({
                       functionCalls: 0,
                       databaseIoMb: 0,
                       dataEgressMb: 0,
+                      databaseStorageBytes: 0,
+                      fileStorageBytes: 0,
                     };
                   }),
                 );
@@ -333,6 +310,14 @@ export const checkSystemHealth = systemAdminAction({
                   Math.round(
                     usages.reduce((acc, u) => acc + u.dataEgressMb, 0) * 100,
                   ) / 100;
+                totalFileStorageBytes = usages.reduce(
+                  (acc, u) => acc + u.fileStorageBytes,
+                  0,
+                );
+                totalDatabaseStorageBytes = usages.reduce(
+                  (acc, u) => acc + u.databaseStorageBytes,
+                  0,
+                );
 
                 const callsLimit = 1_000_000;
                 const ioLimitMb = 1_024;
@@ -354,8 +339,8 @@ export const checkSystemHealth = systemAdminAction({
                     Math.round((totalEgressMb / egressLimitMb) * 1000) / 10,
                   deploymentsCount: items.length,
                   deployments: usages,
-                  fileStorageBytes: dbPingRes.fileStorageBytes ?? 0,
-                  totalDocuments: dbPingRes.totalDocuments ?? 0,
+                  fileStorageBytes: totalFileStorageBytes,
+                  totalDocuments: 0,
                 };
               }
             }
@@ -365,9 +350,6 @@ export const checkSystemHealth = systemAdminAction({
           // トークン取得・パース失敗時はフォールバック
         }
       }
-
-      const latencyMs = Date.now() - t0;
-      const isOk = dbPingRes.totalDocuments != null || latencyMs < 2000;
 
       const quota: ServiceQuota = convexTeamMetrics
         ? {
@@ -391,17 +373,28 @@ export const checkSystemHealth = systemAdminAction({
             note: "CONVEX_TEAM_ACCESS_TOKEN 未設定 (Starter仕様枠表示)",
           };
 
+      const details: Record<string, string | number | boolean> = {};
+      if (totalFileStorageBytes > 0) {
+        details.totalStorageSizeBytes = totalFileStorageBytes;
+      }
+      if (totalDatabaseStorageBytes > 0) {
+        details.databaseStorageBytes = totalDatabaseStorageBytes;
+      }
+
       return {
         id: "convex_db",
         name: "Convex Database",
         category: "database",
         description: "リアクティブドキュメントDB & リアルタイム同期",
-        status: isOk ? (latencyMs < 500 ? "healthy" : "degraded") : "error",
-        latencyMs,
+        status: dbStatus,
+        latencyMs: dbLatencyMs,
         message: convexTeamMetrics
           ? `チーム全体 I/O: ${convexTeamMetrics.totalDatabaseIoMb} MB / 1 GB (${convexTeamMetrics.databaseIoPercent}%)`
-          : "正常にクエリを実行できました",
+          : isPingOk
+            ? "正常にクエリを実行できました"
+            : "データベースへの接続・クエリ実行に失敗しました",
         quota,
+        details: Object.keys(details).length > 0 ? details : undefined,
       };
     };
 

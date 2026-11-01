@@ -95,12 +95,7 @@ function DashboardPage() {
   const runHealthCheck = useCallback(async () => {
     setIsCheckingHealth(true);
     try {
-      const clientToken =
-        (import.meta.env.VITE_CONVEX_TEAM_ACCESS_TOKEN as string | undefined) ||
-        (import.meta.env.CONVEX_TEAM_ACCESS_TOKEN as string | undefined);
-      const res = await checkHealth(
-        clientToken ? { teamAccessToken: clientToken } : {},
-      );
+      const res = await checkHealth({});
       setHealthData(res);
     } catch {
       // 内部エラーは握る（KISS原則・情報漏洩防止）

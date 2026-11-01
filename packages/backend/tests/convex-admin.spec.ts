@@ -250,14 +250,11 @@ describe("Convex Admin API & System Admin Authorization", () => {
       expect(logs[0]?.action).toBe("ACCOUNT_DELETE");
     });
 
-    it("内部pingクエリが正常に応答し、ストレージ容量とドキュメント件数を集計できること", async () => {
+    it("内部pingクエリが正常に応答し、疎通確認できること", async () => {
       const t = setupTest();
       const ping = await t.query(internal.admin.system.pingDbInternal, {});
       expect(ping.ok).toBe(true);
       expect(ping.timestamp).toBeGreaterThan(0);
-      expect(typeof ping.fileStorageBytes).toBe("number");
-      expect(typeof ping.fileCount).toBe("number");
-      expect(typeof ping.totalDocuments).toBe("number");
     });
 
     it("checkSystemHealth が全6サービスのQuota情報を正しく返却すること", async () => {
