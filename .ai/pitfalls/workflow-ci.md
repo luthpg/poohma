@@ -392,7 +392,7 @@ gh actions-lock
 
 ---
 
-## 19. `pnpm/setup@v3` と `package.json` の `packageManager.runtime` による Node.js バージョン一元管理
+## 19. `pnpm/setup@v3` と `package.json` の `devEngines.runtime` による Node.js バージョン一元管理
 
 ### 事象
 
@@ -400,19 +400,22 @@ CI ワークフロー内で `actions/setup-node` と `pnpm/setup` を併用し�
 
 ### 対策
 
-1. **ルート `package.json` の `packageManager` と `runtime` に一元化（Single Source of Truth）**:
-   ルート `package.json` に pnpm バージョンと Node.js ランタイムバージョン（`packageManager.runtime`）を定義する：
+1. **ルート `package.json` の `packageManager` と `devEngines.runtime` に一元化（Single Source of Truth）**:
+   ルート `package.json` に pnpm バージョン（トップレベル文字列）と `devEngines` による Node.js ランタイムバージョンを定義する：
 
    ```json
-   "packageManager": {
-     "name": "pnpm",
-     "version": "12.14.0",
-     "onFail": "download"
-   },
-   "runtime": {
-     "name": "node",
-     "version": "^26.7.0",
-     "onFail": "download"
+   "packageManager": "pnpm@12.14.0",
+   "devEngines": {
+     "packageManager": {
+       "name": "pnpm",
+       "version": "12.14.0",
+       "onFail": "download"
+     },
+     "runtime": {
+       "name": "node",
+       "version": "^26.7.0",
+       "onFail": "download"
+     }
    }
    ```
 2. **ワークフロー側から個別 `actions/setup-node` を廃止し、`install: false` を明示**:

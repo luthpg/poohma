@@ -148,6 +148,25 @@ describe("url-matcher", () => {
         rankRecordUrl("https://user-a.github.io", "https://user-b.github.io"),
       ).toBeNull();
     });
+
+    it("eTLD+1 を持たないホスト (localhost / IP / 単一ラベル) でも同一ホストなら tier 1 を返すこと", () => {
+      expect(
+        rankRecordUrl("http://localhost:3000/login", "http://localhost:8080"),
+      ).toEqual({ tier: 1, matchedLabels: 1 });
+      expect(
+        rankRecordUrl("http://192.168.0.1/admin", "http://192.168.0.1:80"),
+      ).toEqual({ tier: 1, matchedLabels: 4 });
+      expect(
+        rankRecordUrl("http://intranet/portal", "http://intranet:8080/app"),
+      ).toEqual({ tier: 1, matchedLabels: 1 });
+      // 異なるIPやホストは null
+      expect(
+        rankRecordUrl("http://192.168.0.1/admin", "http://192.168.0.2/admin"),
+      ).toBeNull();
+      expect(
+        rankRecordUrl("http://localhost:3000", "http://otherhost:3000"),
+      ).toBeNull();
+    });
   });
 
   describe("sortByDomainRank (Issue 383 表示例テーブルの総合検証)", () => {

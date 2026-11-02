@@ -344,17 +344,19 @@ export async function uploadZipStreamToR2(
         currentPartChunks.push(value);
         currentPartLength += value.length;
 
-        if (currentPartLength >= partSize) {
-          const partBuffer = concatChunks(currentPartChunks, currentPartLength);
+        while (currentPartLength >= partSize) {
+          const buffer = concatChunks(currentPartChunks, currentPartLength);
+          const partBuffer = buffer.subarray(0, partSize);
+          const rest = buffer.subarray(partSize);
           const uploadedPart = await multipart.uploadPart(
             partNumber,
             partBuffer,
           );
           uploadedParts.push(uploadedPart);
-          totalBytesUploaded += currentPartLength;
+          totalBytesUploaded += partSize;
           partNumber++;
-          currentPartChunks = [];
-          currentPartLength = 0;
+          currentPartChunks = rest.length > 0 ? [rest] : [];
+          currentPartLength = rest.length;
         }
       }
     }
@@ -386,6 +388,7 @@ export async function uploadZipStreamToR2(
     );
   }
   if (headObj.size !== totalBytesUploaded) {
+    await bucket.delete(key).catch(() => {});
     throw new Error(
       `[Backup] Uploaded size mismatch in R2: expected ${totalBytesUploaded} bytes, actual ${headObj.size} bytes`,
     );

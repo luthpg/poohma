@@ -385,7 +385,7 @@ export const deleteAllAccounts = identityVerifiedMutation({
           .withIndex("by_accountId", (q) => q.eq("accountId", account._id))
           .collect();
         for (const record of records) {
-          if (record.ownerType === "user") {
+          if (getEffectiveOwnerType(record) === "user") {
             await cascadeDeleteRecord(ctx, record._id);
           }
         }
@@ -508,7 +508,7 @@ export const deleteAccount = authenticatedMutation({
         .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
         .collect();
       for (const record of records) {
-        if (record.ownerType === "user") {
+        if (getEffectiveOwnerType(record) === "user") {
           await cascadeDeleteRecord(ctx, record._id);
         }
       }

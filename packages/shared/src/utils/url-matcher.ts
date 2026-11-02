@@ -100,6 +100,14 @@ export function rankRecordUrl(
     return null;
   }
 
+  // 1. 完全一致 (tier 1): eTLD+1 を持たないホスト (localhost / IPアドレス / 単一ラベル等) も同一ホストなら tier 1
+  if (pageHost === recordHost) {
+    return {
+      tier: 1,
+      matchedLabels: pageHost.split(".").length,
+    };
+  }
+
   try {
     const pageParsed = parse(pageHost, { allowPrivateDomains: true });
     const recordParsed = parse(recordHost, { allowPrivateDomains: true });
@@ -113,14 +121,6 @@ export function rankRecordUrl(
     }
 
     const rootDomain = recordParsed.domain.toLowerCase();
-
-    // 1. 完全一致 (tier 1)
-    if (pageHost === recordHost) {
-      return {
-        tier: 1,
-        matchedLabels: pageHost.split(".").length,
-      };
-    }
 
     // 2. メインドメイン一致 (tier 2: 保存URLの正規化ホストがルートドメイン)
     if (recordHost === rootDomain) {

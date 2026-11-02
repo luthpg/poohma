@@ -35,15 +35,9 @@ jobs:
           fetch-depth: 0
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4.3.0
+        uses: pnpm/setup@v3.1.2
         with:
-          version: 12.14.0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v5.0.0
-        with:
-          node-version: "24"
-          cache: "pnpm"
+          install: false
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

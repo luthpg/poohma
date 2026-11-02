@@ -4381,6 +4381,31 @@ describe("2.1.18 家族グループ名の変更 (Issue 177)", () => {
       expect(bRecord).not.toBeNull();
       expect(bRecord?.title).toBe("Bの個人レコード");
       expect(bRecord?.accountId).toBe(userBId);
+
+      const userB = t.withIdentity({
+        subject: "user_b",
+        email: "b@example.com",
+      });
+
+      // 5. 家族解散後でも、除名されたBは自身の Export Vault を使って新規家族を作成し、個人レコードを持ち出して移行完了できること
+      const { migrationId: bMigId } = await userB.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "create",
+          name: "Bの独立家族",
+          masterKeyEncrypted: "enc_b_new",
+          masterKeyIv: "iv_b_new",
+          masterKeySalt: "salt_b_new",
+        },
+      );
+      await userB.mutation(api.families.commitFamilyMigration, {
+        migrationId: bMigId,
+        credentials: [],
+      });
+      const migratedB = await t.run(async (ctx) => ctx.db.get(userBId));
+      expect(migratedB?.familyId).not.toBeNull();
+      const bMigratedRecord = await t.run(async (ctx) => ctx.db.get(bRecordId));
+      expect(bMigratedRecord?.familyId).toBe(migratedB?.familyId);
     });
 
     it("項目3: 自発的離脱（別家族移行確定）時に旧家族への承認申請が失効し、再承認なしで復帰できないこと", async () => {
@@ -4444,6 +4469,31 @@ describe("2.1.18 家族グループ名の変更 (Issue 177)", () => {
       expect(memberB?.familyId).toBe(familyAId);
 
       // 2. ユーザーBが別の家族を作成して移行完了する
+      // 移行確定前に、旧家族Aに対する保留申請および旧家族に関連する未完了(PREPARED)移行を作成しておく
+      const strayJoinReqId = await t.run(async (ctx) => {
+        return await ctx.db.insert("joinRequests", {
+          familyId: familyAId,
+          userId: "user_b",
+          accountId: userBId,
+          status: "approved",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+      });
+      const strayMigId = await t.run(async (ctx) => {
+        return await ctx.db.insert("familyMigrations", {
+          userId: "user_b",
+          accountId: userBId,
+          action: "create",
+          sourceFamilyId: familyAId,
+          targetFamilyId: familyAId,
+          serviceRecordIds: [],
+          status: "PREPARED",
+          createdAt: Date.now(),
+          expiresAt: Date.now() + 100000,
+        });
+      });
+
       const { migrationId } = await userB.mutation(
         api.families.prepareFamilyMigration,
         {
@@ -4459,6 +4509,16 @@ describe("2.1.18 家族グループ名の変更 (Issue 177)", () => {
         migrationId,
         credentials: [],
       });
+
+      // 旧家族宛ての申請が物理削除されていること
+      const strayReqAfter = await t.run(async (ctx) =>
+        ctx.db.get(strayJoinReqId),
+      );
+      expect(strayReqAfter).toBeNull();
+
+      // 旧家族に関連するPREPARED移行がEXPIREDに失効していること
+      const strayMigAfter = await t.run(async (ctx) => ctx.db.get(strayMigId));
+      expect(strayMigAfter?.status).toBe("EXPIRED");
 
       // Bは新家族に所属
       const migratedB = await t.run(async (ctx) => ctx.db.get(userBId));
@@ -4650,6 +4710,66 @@ describe("2.1.18 家族グループ名の変更 (Issue 177)", () => {
       // 旧家族の個人レコードもカスケード削除されていること
       const bRecord = await t.run(async (ctx) => ctx.db.get(bRecordId));
       expect(bRecord).toBeNull();
+    });
+
+    it("家族未所属時のアカウント削除で、ownerType 欠落の旧レコードも確実にカスケード削除されること", async () => {
+      const testSchema = { ...schema, schemaValidation: false };
+      const t = convexTest(testSchema as unknown as typeof schema, modules);
+      let userId!: Id<"users">;
+      let recordId!: Id<"serviceRecords">;
+
+      await t.run(async (ctx) => {
+        const dummyFamilyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
+          name: "ダミー家族",
+          updatedAt: Date.now(),
+        });
+
+        userId = await ctx.db.insert("users", {
+          userId: "orphan_user",
+          email: "orphan@example.com",
+          familyRole: "viewer",
+          // familyId なし (未所属)
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+
+        // ownerType を持たない旧形式のレコード (旧 familyId 付き)
+        const untypedInsert = ctx.db.insert as unknown as (
+          table: string,
+          value: Record<string, unknown>,
+        ) => Promise<Id<"serviceRecords">>;
+        recordId = await untypedInsert("serviceRecords", {
+          title: "旧形式レコード",
+          sortKey: "legacy_record",
+          accountId: userId,
+          userId: "orphan_user",
+          familyId: dummyFamilyId,
+          admins: [],
+          updatedByAccountId: userId,
+          stableId: crypto.randomUUID(),
+          revision: 0,
+          isArchived: false,
+          tags: [],
+          updatedAt: Date.now(),
+        });
+      });
+
+      const orphanUser = t.withIdentity({
+        subject: "orphan_user",
+        email: "orphan@example.com",
+      });
+
+      // アカウント削除実行
+      await orphanUser.mutation(api.users.deleteAccount, {});
+
+      // ユーザーが削除されていること
+      const userDoc = await t.run(async (ctx) => ctx.db.get(userId));
+      expect(userDoc).toBeNull();
+
+      // ownerType 未設定のレコードも getEffectiveOwnerType により個人レコードと判定され削除されていること
+      const recordDoc = await t.run(async (ctx) => ctx.db.get(recordId));
+      expect(recordDoc).toBeNull();
     });
   });
 });

@@ -97,6 +97,32 @@ describe("uploadZipStreamToR2", () => {
     expect(headObj?.size).toBe(totalSize);
   });
 
+  it("チャンク境界が partSize と揃わない場合でも厳密に partSize で切り出されて保存されること", async () => {
+    const key = "test_unaligned_chunks.zip";
+    const testPartSize = 5 * 1024 * 1024; // 5 MiB
+    // 3 MiB チャンク × 2 = 6 MiB (5 MiB + 1 MiB に分割される)
+    const totalSize = 6 * 1024 * 1024;
+    const data = new Uint8Array(totalSize);
+    data[0] = 0x50;
+    data[1] = 0x4b;
+    data[2] = 0x03;
+    data[3] = 0x04;
+
+    const chunk1 = data.subarray(0, 3 * 1024 * 1024);
+    const chunk2 = data.subarray(3 * 1024 * 1024);
+    const stream = createStreamFromChunks([chunk1, chunk2]);
+
+    const res = await uploadZipStreamToR2(bucket, key, stream, {
+      partSize: testPartSize,
+    });
+
+    expect(res.key).toBe(key);
+    expect(res.size).toBe(totalSize);
+
+    const obj = await bucket.get(key);
+    expect(obj?.size).toBe(totalSize);
+  });
+
   it("先頭4バイトがZIPマジックナンバーでない場合はエラーとなりR2に保存されないこと", async () => {
     const key = "test_invalid_magic.zip";
     const data = new Uint8Array([0x00, 0x01, 0x02, 0x03, 0x04]);
