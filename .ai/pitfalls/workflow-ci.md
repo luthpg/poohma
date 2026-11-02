@@ -415,6 +415,14 @@ CI ワークフロー内で `actions/setup-node` と `pnpm/setup` を併用し�
      "onFail": "download"
    }
    ```
-2. **ワークフロー側から個別 `actions/setup-node` を廃止**:
-   CI ワークフロー側では `pnpm/setup@v3` のみを呼び出し、引数を指定せず `package.json` から Node.js と pnpm の双方を自動解決・ダウンロードさせる。
-   これにより、全ワークフローでの環境指定の重複・乖離を排除し、`gh actions-lock` で管理するアクション数も最小化する。
+2. **ワークフロー側から個別 `actions/setup-node` を廃止し、`install: false` を明示**:
+   CI ワークフロー側では `pnpm/setup@v3` のみを呼び出し、`with: install: false` を指定する：
+
+   ```yaml
+   - name: Install pnpm
+     uses: pnpm/setup@v3.1.2
+     with:
+       install: false
+   ```
+
+   `install: false` を指定しない場合、`pnpm/setup` はデフォルトで直ちに `pnpm install` を実行してしまう。これにより、ステップ単位で渡すべき環境変数（`VITE_CONVEX_URL` 等）が渡っていない状態で `postinstall`（`wxt prepare` 等）が走って即死したり、後続の `Install dependencies` ステップ（`--frozen-lockfile`）と無駄に二重実行される事故を防ぐ。

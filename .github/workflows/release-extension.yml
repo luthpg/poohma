@@ -35,6 +35,8 @@ jobs:
 
       - name: Install pnpm
         uses: pnpm/setup@v3.1.2
+        with:
+          install: false
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
