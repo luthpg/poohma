@@ -1,4 +1,7 @@
-import { matchRecordUrl } from "@poohma/shared/utils/url-matcher";
+import {
+  matchRecordUrl,
+  sortByDomainRank,
+} from "@poohma/shared/utils/url-matcher";
 import {
   Check,
   ChevronDown,
@@ -789,10 +792,7 @@ export function App() {
   const matchedRecords = useMemo(() => {
     const tabUrl = tabInfo?.url;
     if (!tabUrl) return [];
-    return records.filter((r) => {
-      if (!r.url) return false;
-      return matchRecordUrl(tabUrl, r.url) !== "none";
-    });
+    return sortByDomainRank(records, tabUrl);
   }, [records, tabInfo?.url]);
 
   const searchedRecords = useMemo(() => {

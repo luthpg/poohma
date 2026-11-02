@@ -2970,9 +2970,9 @@ describe("2.1.13 メンバーキック機能とExport Vault（E2EEデータ持�
     const memberB = await t.run(async (ctx) => ctx.db.get(userBId));
     expect(memberB?.familyId).toBe(familyId);
 
-    // 承認済み申請が一旦存在すること
+    // 新規即時所属により、申請は即時消費（削除）されていること
     const approvedReq = await t.run(async (ctx) => ctx.db.get(joinRequestId));
-    expect(approvedReq?.status).toBe("approved");
+    expect(approvedReq).toBeNull();
 
     // テスト用に、もし旧システムのように残存した approved joinRequest を挿入しておく
     const ghostRequestId = await t.run(async (ctx) => {
@@ -3967,8 +3967,9 @@ describe("家族ロール管理（updateMemberRole & 認可・不変条件ガー
     });
 
     await t.run(async (ctx) => {
+      // 即時所属完了により承認済み申請は消費（削除）されていること
       const r1 = await ctx.db.get(req1Id);
-      expect(r1?.status).toBe("approved");
+      expect(r1).toBeNull();
       const r2 = await ctx.db.get(req2Id);
       expect(r2?.status).toBe("rejected");
     });
@@ -4248,5 +4249,407 @@ describe("2.1.18 家族グループ名の変更 (Issue 177)", () => {
     await expect(
       noFamilyUser.mutation(api.families.updateFamilyName, { name: "名前" }),
     ).rejects.toThrow("User does not belong to a family");
+  });
+
+  describe("Issue 383: 家族ライフサイクル・除名ユーザー保護・承認消費・Vault破棄の整合性検証", () => {
+    it("項目2: 最後のメンバーのアカウント削除時、除名済みユーザーの持ち出し個人レコードが保護されること", async () => {
+      const t = convexTest(schema, modules);
+      let familyId!: Id<"families">;
+      let userAId!: Id<"users">;
+      let userBId!: Id<"users">;
+      let bRecordId!: Id<"serviceRecords">;
+      let aRecordId!: Id<"serviceRecords">;
+      let sharedRecordId!: Id<"serviceRecords">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
+          name: "テスト家族",
+          updatedAt: Date.now(),
+        });
+
+        userAId = await ctx.db.insert("users", {
+          userId: "user_a",
+          email: "a@example.com",
+          familyId,
+          familyRole: "admin",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+
+        userBId = await ctx.db.insert("users", {
+          userId: "user_b",
+          email: "b@example.com",
+          familyId,
+          familyRole: "viewer",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+
+        // Aの個人レコード
+        aRecordId = await ctx.db.insert("serviceRecords", {
+          title: "Aの個人レコード",
+          sortKey: "a_record",
+          accountId: userAId,
+          userId: "user_a",
+          familyId,
+          ownerType: "user",
+          admins: [],
+          updatedByAccountId: userAId,
+          stableId: crypto.randomUUID(),
+          revision: 0,
+          isArchived: false,
+          tags: [],
+          updatedAt: Date.now(),
+        });
+
+        // Bの個人レコード
+        bRecordId = await ctx.db.insert("serviceRecords", {
+          title: "Bの個人レコード",
+          sortKey: "b_record",
+          accountId: userBId,
+          userId: "user_b",
+          familyId,
+          ownerType: "user",
+          admins: [],
+          updatedByAccountId: userBId,
+          stableId: crypto.randomUUID(),
+          revision: 0,
+          isArchived: false,
+          tags: [],
+          updatedAt: Date.now(),
+        });
+
+        // 家族共有レコード
+        sharedRecordId = await ctx.db.insert("serviceRecords", {
+          title: "共有レコード",
+          sortKey: "shared_record",
+          accountId: userAId,
+          userId: "user_a",
+          familyId,
+          ownerType: "family",
+          ownerFamilyId: familyId,
+          admins: [userAId],
+          updatedByAccountId: userAId,
+          stableId: crypto.randomUUID(),
+          revision: 0,
+          isArchived: false,
+          tags: [],
+          updatedAt: Date.now(),
+        });
+      });
+
+      const userA = t.withIdentity({
+        subject: "user_a",
+        email: "a@example.com",
+      });
+
+      // 1. AがBを除名 (Bに pendingExportVault が作成される)
+      await userA.mutation(api.families.kickMember, {
+        targetAccountId: userBId,
+      });
+
+      // BのVaultが存在することを確認
+      const vault = await t.run(async (ctx) => {
+        return await ctx.db
+          .query("pendingExportVaults")
+          .withIndex("by_accountId", (q) => q.eq("accountId", userBId))
+          .first();
+      });
+      expect(vault).not.toBeNull();
+      expect(vault?.oldFamilyId).toBe(familyId);
+
+      // 2. 残った唯一のメンバーAが自身のアカウントを削除 (deleteAccount)
+      await userA.mutation(api.users.deleteAccount, {
+        accountId: userAId,
+      });
+
+      // 3. 家族レコードと共有レコード、Aの個人レコードは削除されていること
+      const familyDoc = await t.run(async (ctx) => ctx.db.get(familyId));
+      expect(familyDoc).toBeNull();
+
+      const aRecord = await t.run(async (ctx) => ctx.db.get(aRecordId));
+      expect(aRecord).toBeNull();
+
+      const sharedRecord = await t.run(async (ctx) =>
+        ctx.db.get(sharedRecordId),
+      );
+      expect(sharedRecord).toBeNull();
+
+      // 4. 重要: 除名されたBの個人レコードは保護されて残存していること！
+      const bRecord = await t.run(async (ctx) => ctx.db.get(bRecordId));
+      expect(bRecord).not.toBeNull();
+      expect(bRecord?.title).toBe("Bの個人レコード");
+      expect(bRecord?.accountId).toBe(userBId);
+    });
+
+    it("項目3: 自発的離脱（別家族移行確定）時に旧家族への承認申請が失効し、再承認なしで復帰できないこと", async () => {
+      const t = convexTest(schema, modules);
+      let familyAId!: Id<"families">;
+      let userBId!: Id<"users">;
+      let joinReqId!: Id<"joinRequests">;
+
+      await t.run(async (ctx) => {
+        familyAId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
+          name: "家族A",
+          updatedAt: Date.now(),
+        });
+
+        await ctx.db.insert("users", {
+          userId: "admin_a",
+          email: "admin_a@example.com",
+          familyId: familyAId,
+          familyRole: "admin",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+
+        userBId = await ctx.db.insert("users", {
+          userId: "user_b",
+          email: "b@example.com",
+          familyRole: "viewer",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+
+        joinReqId = await ctx.db.insert("joinRequests", {
+          familyId: familyAId,
+          userId: "user_b",
+          accountId: userBId,
+          status: "pending",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+      });
+
+      const adminA = t.withIdentity({
+        subject: "admin_a",
+        email: "admin_a@example.com",
+      });
+      const userB = t.withIdentity({
+        subject: "user_b",
+        email: "b@example.com",
+      });
+
+      // 1. 管理者AがユーザーBの参加申請を承認 -> 即時所属完了のため申請は即座に削除される
+      await adminA.mutation(api.families.approveJoinRequest, {
+        requestId: joinReqId,
+      });
+
+      const reqAfterApprove = await t.run(async (ctx) => ctx.db.get(joinReqId));
+      expect(reqAfterApprove).toBeNull();
+
+      const memberB = await t.run(async (ctx) => ctx.db.get(userBId));
+      expect(memberB?.familyId).toBe(familyAId);
+
+      // 2. ユーザーBが別の家族を作成して移行完了する
+      const { migrationId } = await userB.mutation(
+        api.families.prepareFamilyMigration,
+        {
+          action: "create",
+          name: "Bの新家族",
+          masterKeyEncrypted: "enc_b",
+          masterKeyIv: "iv_b",
+          masterKeySalt: "salt_b",
+        },
+      );
+
+      await userB.mutation(api.families.commitFamilyMigration, {
+        migrationId,
+        credentials: [],
+      });
+
+      // Bは新家族に所属
+      const migratedB = await t.run(async (ctx) => ctx.db.get(userBId));
+      expect(migratedB?.familyId).not.toBe(familyAId);
+
+      // 3. 元の家族Aへの承認申請が残っていないため、再承認なしで参加準備しようとすると拒否されること
+      await expect(
+        userB.mutation(api.families.prepareFamilyMigration, {
+          action: "join",
+          familyId: familyAId,
+        }),
+      ).rejects.toThrow(
+        "Access denied: You must be approved to join this family",
+      );
+    });
+
+    it("項目4: abandonPendingExportVault で旧家族個人レコードが完全カスケード削除され、共有データは残ること", async () => {
+      const t = convexTest(schema, modules);
+      let familyId!: Id<"families">;
+      let userAId!: Id<"users">;
+      let userBId!: Id<"users">;
+      let bRecordId!: Id<"serviceRecords">;
+      let sharedRecordId!: Id<"serviceRecords">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
+          name: "テスト家族",
+          updatedAt: Date.now(),
+        });
+
+        userAId = await ctx.db.insert("users", {
+          userId: "user_a",
+          email: "a@example.com",
+          familyId,
+          familyRole: "admin",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+
+        userBId = await ctx.db.insert("users", {
+          userId: "user_b",
+          email: "b@example.com",
+          familyId,
+          familyRole: "viewer",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+
+        bRecordId = await ctx.db.insert("serviceRecords", {
+          title: "Bの個人レコード",
+          sortKey: "b_record",
+          accountId: userBId,
+          userId: "user_b",
+          familyId,
+          ownerType: "user",
+          admins: [],
+          updatedByAccountId: userBId,
+          stableId: crypto.randomUUID(),
+          revision: 0,
+          isArchived: false,
+          tags: [],
+          updatedAt: Date.now(),
+        });
+
+        sharedRecordId = await ctx.db.insert("serviceRecords", {
+          title: "家族共有レコード",
+          sortKey: "shared_record",
+          accountId: userAId,
+          userId: "user_a",
+          familyId,
+          ownerType: "family",
+          ownerFamilyId: familyId,
+          admins: [userAId],
+          updatedByAccountId: userAId,
+          stableId: crypto.randomUUID(),
+          revision: 0,
+          isArchived: false,
+          tags: [],
+          updatedAt: Date.now(),
+        });
+      });
+
+      const userA = t.withIdentity({
+        subject: "user_a",
+        email: "a@example.com",
+      });
+      const userB = t.withIdentity({
+        subject: "user_b",
+        email: "b@example.com",
+      });
+
+      // AがBを除名
+      await userA.mutation(api.families.kickMember, {
+        targetAccountId: userBId,
+      });
+
+      // Bが自身のVaultを明示的に破棄 (abandonPendingExportVault)
+      await userB.mutation(api.families.abandonPendingExportVault, {});
+
+      // Vaultが削除されていること
+      const vault = await t.run(async (ctx) => {
+        return await ctx.db
+          .query("pendingExportVaults")
+          .withIndex("by_accountId", (q) => q.eq("accountId", userBId))
+          .first();
+      });
+      expect(vault).toBeNull();
+
+      // Bの旧家族個人レコードが完全削除されていること
+      const bRecord = await t.run(async (ctx) => ctx.db.get(bRecordId));
+      expect(bRecord).toBeNull();
+
+      // 家族共有レコードは維持されていること
+      const sharedRecord = await t.run(async (ctx) =>
+        ctx.db.get(sharedRecordId),
+      );
+      expect(sharedRecord).not.toBeNull();
+    });
+
+    it("項目4: cleanupExpiredExportVaultsInternal で期限切れVaultに紐づく旧家族個人レコードが完全削除されること", async () => {
+      const t = convexTest(schema, modules);
+      let familyId!: Id<"families">;
+      let userBId!: Id<"users">;
+      let bRecordId!: Id<"serviceRecords">;
+
+      await t.run(async (ctx) => {
+        familyId = await ctx.db.insert("families", {
+          ...mockCryptoMaterials,
+          name: "テスト家族",
+          updatedAt: Date.now(),
+        });
+
+        userBId = await ctx.db.insert("users", {
+          userId: "user_b",
+          email: "b@example.com",
+          familyRole: "viewer",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+
+        bRecordId = await ctx.db.insert("serviceRecords", {
+          title: "Bの旧個人レコード",
+          sortKey: "b_old_record",
+          accountId: userBId,
+          userId: "user_b",
+          familyId,
+          ownerType: "user",
+          admins: [],
+          updatedByAccountId: userBId,
+          stableId: crypto.randomUUID(),
+          revision: 0,
+          isArchived: false,
+          tags: [],
+          updatedAt: Date.now(),
+        });
+
+        // 期限切れのVaultを直接挿入
+        await ctx.db.insert("pendingExportVaults", {
+          accountId: userBId,
+          userId: "user_b",
+          oldFamilyId: familyId,
+          oldFamilyName: "テスト家族",
+          masterKeyEncrypted: "enc",
+          masterKeyIv: "iv",
+          masterKeySalt: "salt",
+          kdfIterations: 300_000,
+          cryptoVersion: 1,
+          createdAt: Date.now() - 31 * 24 * 60 * 60 * 1000,
+          expiresAt: Date.now() - 1000, // 過去日付 (期限切れ)
+        });
+      });
+
+      // クロン処理 (cleanupExpiredExportVaultsInternal) を実行
+      await t.mutation(
+        internal.families.cleanupExpiredExportVaultsInternal,
+        {},
+      );
+
+      // Vaultが削除されていること
+      const vault = await t.run(async (ctx) => {
+        return await ctx.db
+          .query("pendingExportVaults")
+          .withIndex("by_accountId", (q) => q.eq("accountId", userBId))
+          .first();
+      });
+      expect(vault).toBeNull();
+
+      // 旧家族の個人レコードもカスケード削除されていること
+      const bRecord = await t.run(async (ctx) => ctx.db.get(bRecordId));
+      expect(bRecord).toBeNull();
+    });
   });
 });

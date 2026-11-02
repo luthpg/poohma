@@ -3923,5 +3923,177 @@ describe("レコードのアーカイブ・復元機能テスト (Issue #154)", 
         expect(logs.length).toBe(0);
       });
     });
+
+    describe("Issue 383: タグ操作時の revision 更新と楽観ロック競合検知", () => {
+      it("mergeOrRenameTags: タグ変更時に revision がインクリメントされ、古い revision での保存が拒否されること", async () => {
+        const t = convexTest(schema, modules);
+        let familyId!: Id<"families">;
+        let userId!: Id<"users">;
+        let recordId!: Id<"serviceRecords">;
+
+        await t.run(async (ctx) => {
+          familyId = await ctx.db.insert("families", {
+            ...mockCryptoMaterials,
+            name: "Tag Revision Family",
+            updatedAt: Date.now(),
+          });
+          userId = await ctx.db.insert("users", {
+            userId: "tag_user",
+            email: "tag_user@example.com",
+            familyId,
+            familyRole: "admin",
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          });
+          recordId = await ctx.db.insert("serviceRecords", {
+            title: "Tag Record",
+            sortKey: "tag_record",
+            accountId: userId,
+            userId: "tag_user",
+            familyId,
+            ownerType: "user",
+            admins: [],
+            updatedByAccountId: userId,
+            stableId: crypto.randomUUID(),
+            isArchived: false,
+            tags: ["旧タグ", "固定タグ"],
+            revision: 0,
+            updatedAt: Date.now(),
+          });
+        });
+
+        const client = t.withIdentity({
+          subject: "tag_user",
+          email: "tag_user@example.com",
+        });
+
+        // 1. タグ名を変更・統合 (旧タグ -> 新タグ)
+        const result = await client.mutation(api.records.mergeOrRenameTags, {
+          sourceTags: ["旧タグ"],
+          targetTag: "新タグ",
+        });
+        expect(result.updatedCount).toBe(1);
+
+        // レコードの revision が 1 に増加していること
+        const updatedRec = await t.run(async (ctx) => ctx.db.get(recordId));
+        expect(updatedRec?.tags).toEqual(["固定タグ", "新タグ"]);
+        expect(updatedRec?.revision).toBe(1);
+
+        // 2. 編集画面が古い revision 0 のまま通常保存 (updateRecord) を試みた場合、競合として拒否されること！
+        await expect(
+          client.mutation(api.records.updateRecord, {
+            id: recordId,
+            revision: 0, // 古い revision
+            data: {
+              title: "古い編集画面からの保存",
+              tags: ["旧タグ", "固定タグ"],
+              credentials: [],
+            },
+          }),
+        ).rejects.toThrow(/CONFLICT/);
+
+        // 最新の revision 1 での保存は成功すること
+        await client.mutation(api.records.updateRecord, {
+          id: recordId,
+          revision: 1, // 正しい最新 revision
+          data: {
+            title: "最新画面からの保存",
+            tags: ["新タグ", "固定タグ"],
+            credentials: [],
+          },
+        });
+
+        // 3. 存在しないタグへの変更操作では revision が増えないこと
+        const noOpResult = await client.mutation(
+          api.records.mergeOrRenameTags,
+          {
+            sourceTags: ["存在しないタグ"],
+            targetTag: "別タグ",
+          },
+        );
+        expect(noOpResult.updatedCount).toBe(0);
+
+        const afterNoOpRec = await t.run(async (ctx) => ctx.db.get(recordId));
+        expect(afterNoOpRec?.revision).toBe(2); // updateRecord で 1->2 になった後のまま
+      });
+
+      it("bulkRemoveTags: タグ一括削除時に revision がインクリメントされ、古い revision での保存が拒否されること", async () => {
+        const t = convexTest(schema, modules);
+        let familyId!: Id<"families">;
+        let userId!: Id<"users">;
+        let recordId!: Id<"serviceRecords">;
+
+        await t.run(async (ctx) => {
+          familyId = await ctx.db.insert("families", {
+            ...mockCryptoMaterials,
+            name: "Bulk Tag Family",
+            updatedAt: Date.now(),
+          });
+          userId = await ctx.db.insert("users", {
+            userId: "bulk_user",
+            email: "bulk_user@example.com",
+            familyId,
+            familyRole: "admin",
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          });
+          recordId = await ctx.db.insert("serviceRecords", {
+            title: "Bulk Tag Record",
+            sortKey: "bulk_tag_record",
+            accountId: userId,
+            userId: "bulk_user",
+            familyId,
+            ownerType: "user",
+            admins: [],
+            updatedByAccountId: userId,
+            stableId: crypto.randomUUID(),
+            isArchived: false,
+            tags: ["削除対象タグ", "残るタグ"],
+            revision: 0,
+            updatedAt: Date.now(),
+          });
+        });
+
+        const client = t.withIdentity({
+          subject: "bulk_user",
+          email: "bulk_user@example.com",
+        });
+
+        // 1. タグを一括削除
+        const result = await client.mutation(api.records.bulkRemoveTags, {
+          recordIds: [recordId],
+          tagsToRemove: ["削除対象タグ"],
+        });
+        expect(result.updatedCount).toBe(1);
+
+        // revision が 1 に増加していること
+        const updatedRec = await t.run(async (ctx) => ctx.db.get(recordId));
+        expect(updatedRec?.tags).toEqual(["残るタグ"]);
+        expect(updatedRec?.revision).toBe(1);
+
+        // 2. 古い revision 0 での保存が競合として拒否されること
+        await expect(
+          client.mutation(api.records.updateRecord, {
+            id: recordId,
+            revision: 0,
+            data: {
+              title: "古い保存",
+              tags: ["残るタグ"],
+              credentials: [],
+            },
+          }),
+        ).rejects.toThrow(/CONFLICT/);
+
+        // 3. 対象タグを持たないレコードに対する bulkRemoveTags では revision が増加しないこと
+        const noOpResult = await client.mutation(api.records.bulkRemoveTags, {
+          recordIds: [recordId],
+          tagsToRemove: ["すでにないタグ"],
+        });
+        expect(noOpResult.updatedCount).toBe(0);
+
+        const afterNoOpRec = await t.run(async (ctx) => ctx.db.get(recordId));
+        expect(afterNoOpRec?.revision).toBe(1);
+      });
+    });
   });
 });

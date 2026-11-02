@@ -32,17 +32,17 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v5.1.0
         with:
           persist-credentials: false
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/setup@v3.1.2
         with:
           version: 12.14.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v5.0.0
         with:
           node-version: "24"
           cache: "pnpm"
@@ -88,7 +88,7 @@ jobs:
           echo "current_time=$(TZ=Asia/Tokyo date +'%Y-%m-%d %H:%M:%S JST')" >> "$GITHUB_OUTPUT"
 
       - name: Comment or Update PR
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: marocchino/sticky-pull-request-comment@v2.9.4
         # デプロイ成否に関わらず実行しつつ、手動実行(workflow_dispatch)時はPRが存在しないためスキップ
         if: always() && github.event_name == 'pull_request'
         with:
@@ -131,17 +131,17 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v5.1.0
         with:
           persist-credentials: false
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/setup@v3.1.2
         with:
           version: 12.14.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v5.0.0
         with:
           node-version: "24"
           cache: "pnpm"

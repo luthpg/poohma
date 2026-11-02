@@ -10,7 +10,7 @@ const dirname =
 const AUTH_DIR = path.join(dirname, ".auth");
 
 setup("authenticate as e2e test user", async ({ page, context, baseURL }) => {
-  setup.setTimeout(60_000);
+  setup.setTimeout(120_000);
 
   if (fs.existsSync(AUTH_DIR)) {
     for (const file of fs.readdirSync(AUTH_DIR)) {

@@ -1,6 +1,9 @@
 import { api } from "@poohma/backend/api";
 import type { Id } from "@poohma/backend/dataModel";
-import { matchRecordUrl } from "@poohma/shared/utils/url-matcher";
+import {
+  rankRecordUrl,
+  sortByDomainRank,
+} from "@poohma/shared/utils/url-matcher";
 import { ConvexHttpClient } from "convex/browser";
 import { env } from "@/env";
 import {
@@ -189,7 +192,7 @@ export async function updateBadgeForTab(
   try {
     const records = await getRecordsCached();
     const matchedCount = records.filter(
-      (r) => r.url && matchRecordUrl(url, r.url) !== "none",
+      (r) => r.url && rankRecordUrl(url, r.url) !== null,
     ).length;
 
     if (matchedCount > 0) {
@@ -688,19 +691,18 @@ export default defineBackground(() => {
           }
 
           const records = await getRecordsCached();
-          const matched: MatchedRecord[] = records
-            .filter((r) => r.url && matchRecordUrl(pageUrl, r.url) !== "none")
-            .map((r) => ({
-              _id: r._id,
-              title: r.title,
-              url: r.url,
-              credentials: (r.credentials || []).map((c) => ({
-                _id: c._id,
-                label: c.label,
-                loginId: c.loginId ?? "",
-                hasPasswordHint: !!c.passwordHint,
-              })),
-            }));
+          const sortedRecords = sortByDomainRank(records, pageUrl);
+          const matched: MatchedRecord[] = sortedRecords.map((r) => ({
+            _id: r._id,
+            title: r.title,
+            url: r.url,
+            credentials: (r.credentials || []).map((c) => ({
+              _id: c._id,
+              label: c.label,
+              loginId: c.loginId ?? "",
+              hasPasswordHint: !!c.passwordHint,
+            })),
+          }));
 
           sendResponse({ success: true, matchedRecords: matched });
         } catch (_err) {

@@ -222,11 +222,69 @@ async function runBackup(env: Env): Promise<{ fileName: string }> {
 
   console.log(`[Backup] 4. Validating and streaming zip to Cloudflare R2...`);
 
-  if (!downloadRes.body) {
-    throw new Error("[Backup] Response body is empty");
-  }
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const fileName = `convex_backup_${timestamp}.zip`;
 
-  const reader = downloadRes.body.getReader();
+  const { size } = await uploadZipStreamToR2(
+    env.BACKUP_BUCKET,
+    fileName,
+    downloadRes.body,
+    {
+      httpMetadata: {
+        contentType: "application/zip",
+      },
+      customMetadata: {
+        exportedAt: new Date().toISOString(),
+        trigger: "scheduled",
+        deployment: deploymentIdentifier,
+        snapshotTs: snapshotExportTs,
+      },
+    },
+  );
+
+  console.log(
+    `[Backup Success] Successfully exported and saved ${fileName} (${size} bytes) to R2.`,
+  );
+
+  return { fileName };
+}
+
+export const MULTIPART_PART_SIZE = 8 * 1024 * 1024; // 8 MiB (R2 最小 5MiB 制約を満たす)
+
+export interface UploadZipOptions {
+  httpMetadata?: R2HTTPMetadata;
+  customMetadata?: Record<string, string>;
+  partSize?: number;
+}
+
+function concatChunks(chunks: Uint8Array[], totalLength: number): Uint8Array {
+  if (chunks.length === 1 && chunks[0].length === totalLength) {
+    return chunks[0];
+  }
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return result;
+}
+
+/**
+ * ReadableStream を ZIP 検証しながら Cloudflare R2 へマルチパートアップロードする
+ * - ストリーム長が事前不明でも確実に保存可能 (FixedLengthStream 不要)
+ * - メモリ常駐は最大 1 パート分 (8 MiB) に制限し、サイズ無制限の全件読み込みを回避
+ * - 先頭 4 バイトのマジックナンバー (PK\x03\x04) をアップロード前に検証
+ * - 中断・エラー発生時は abort() で R2 の未完了マルチパートを確実に後始末
+ * - 保存完了後に head() でサイズ突合を検証
+ */
+export async function uploadZipStreamToR2(
+  bucket: R2Bucket,
+  key: string,
+  stream: ReadableStream<Uint8Array>,
+  options?: UploadZipOptions,
+): Promise<{ key: string; size: number }> {
+  const reader = stream.getReader();
   const initialChunks: Uint8Array[] = [];
   let accumulatedLength = 0;
 
@@ -245,7 +303,7 @@ async function runBackup(env: Env): Promise<{ fileName: string }> {
     );
   }
 
-  // 先頭4バイトを抽出して検証
+  // 先頭4バイトを抽出して ZIP マジックナンバー (0x50, 0x4b, 0x03, 0x04) を検証
   const header = new Uint8Array(4);
   let offset = 0;
   for (const chunk of initialChunks) {
@@ -266,45 +324,72 @@ async function runBackup(env: Env): Promise<{ fileName: string }> {
     );
   }
 
-  // 読み取った全初期チャンクと残りのストリームを結合して R2 へストリーミング転送
-  const combinedStream = new ReadableStream({
-    start(controller) {
-      for (const chunk of initialChunks) {
-        controller.enqueue(chunk);
-      }
-    },
-    async pull(controller) {
+  const partSize = options?.partSize ?? MULTIPART_PART_SIZE;
+  const multipart = await bucket.createMultipartUpload(key, {
+    httpMetadata: options?.httpMetadata,
+    customMetadata: options?.customMetadata,
+  });
+
+  const uploadedParts: R2UploadedPart[] = [];
+  let partNumber = 1;
+  let currentPartChunks: Uint8Array[] = [...initialChunks];
+  let currentPartLength = accumulatedLength;
+  let totalBytesUploaded = 0;
+
+  try {
+    while (true) {
       const { done, value } = await reader.read();
-      if (done) {
-        controller.close();
-      } else {
-        controller.enqueue(value);
+      if (done) break;
+      if (value && value.length > 0) {
+        currentPartChunks.push(value);
+        currentPartLength += value.length;
+
+        if (currentPartLength >= partSize) {
+          const partBuffer = concatChunks(currentPartChunks, currentPartLength);
+          const uploadedPart = await multipart.uploadPart(
+            partNumber,
+            partBuffer,
+          );
+          uploadedParts.push(uploadedPart);
+          totalBytesUploaded += currentPartLength;
+          partNumber++;
+          currentPartChunks = [];
+          currentPartLength = 0;
+        }
       }
-    },
-    cancel(reason) {
-      return reader.cancel(reason);
-    },
-  });
+    }
 
-  // 4. Cloudflare R2 への保存
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const fileName = `convex_backup_${timestamp}.zip`;
+    // 残りのバッファがあれば最終パートとしてアップロード (1パートのみで完了する場合も含む)
+    if (currentPartLength > 0 || uploadedParts.length === 0) {
+      const partBuffer = concatChunks(currentPartChunks, currentPartLength);
+      const uploadedPart = await multipart.uploadPart(partNumber, partBuffer);
+      uploadedParts.push(uploadedPart);
+      totalBytesUploaded += currentPartLength;
+    }
 
-  await env.BACKUP_BUCKET.put(fileName, combinedStream, {
-    httpMetadata: {
-      contentType: "application/zip",
-    },
-    customMetadata: {
-      exportedAt: new Date().toISOString(),
-      trigger: "scheduled",
-      deployment: deploymentIdentifier,
-      snapshotTs: snapshotExportTs,
-    },
-  });
+    await multipart.complete(uploadedParts);
+  } catch (error) {
+    // 途中中断・例外発生時は R2 未完了パートを確実に abort
+    try {
+      await multipart.abort();
+    } catch (_abortErr) {
+      // abort自体の失敗は元の例外を優先
+    }
+    throw error;
+  }
 
-  console.log(
-    `[Backup Success] Successfully exported and saved ${fileName} to R2.`,
-  );
+  // アップロード後の実データ検証 (サイズ突合)
+  const headObj = await bucket.head(key);
+  if (!headObj) {
+    throw new Error(
+      `[Backup] Uploaded object not found in R2 after completion: ${key}`,
+    );
+  }
+  if (headObj.size !== totalBytesUploaded) {
+    throw new Error(
+      `[Backup] Uploaded size mismatch in R2: expected ${totalBytesUploaded} bytes, actual ${headObj.size} bytes`,
+    );
+  }
 
-  return { fileName };
+  return { key, size: totalBytesUploaded };
 }

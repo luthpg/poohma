@@ -22,7 +22,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5.1.0
         with:
           sparse-checkout: apps/web/package.json
           sparse-checkout-cone-mode: false
@@ -52,15 +52,15 @@ jobs:
       E2E_FAMILY_PASSCODE: ${{ secrets.E2E_FAMILY_PASSCODE }}
       CONVEX_PREVIEW_DEPLOY_KEY: ${{ secrets.CONVEX_PREVIEW_DEPLOY_KEY }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5.1.0
         with:
           persist-credentials: false
 
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/setup@v3.1.2
         with:
           version: 12.14.0
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v5.0.0
         with:
           node-version: "24"
           cache: "pnpm"
@@ -75,7 +75,7 @@ jobs:
 
       - name: Upload Playwright Artifacts
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: playwright-results
           path: |
