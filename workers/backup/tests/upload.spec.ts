@@ -125,7 +125,7 @@ describe("uploadZipStreamToR2", () => {
     const obj = await bucket.get(key);
     expect(obj?.size).toBe(totalSize);
     const saved = new Uint8Array((await obj?.arrayBuffer())!);
-    expect(saved).toEqual(data);
+    expect(Buffer.from(saved.buffer).equals(Buffer.from(data.buffer))).toBe(true);
   }, 15000);
 
   it("先頭4バイトがZIPマジックナンバーでない場合はエラーとなりR2に保存されないこと", async () => {
