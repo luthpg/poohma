@@ -32,20 +32,14 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v5.1.0
         with:
           persist-credentials: false
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/setup@v3.1.2
         with:
-          version: 12.14.0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: "24"
-          cache: "pnpm"
+          install: false
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -58,7 +52,7 @@ jobs:
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_STAGING_DEPLOY_KEY }}
 
       - name: Install Vercel CLI
-        run: npm install --global vercel@latest
+        run: pnpm add --global vercel@latest
 
       - name: Pull Vercel Environment Information
         run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
@@ -88,7 +82,7 @@ jobs:
           echo "current_time=$(TZ=Asia/Tokyo date +'%Y-%m-%d %H:%M:%S JST')" >> "$GITHUB_OUTPUT"
 
       - name: Comment or Update PR
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: marocchino/sticky-pull-request-comment@v2.9.4
         # デプロイ成否に関わらず実行しつつ、手動実行(workflow_dispatch)時はPRが存在しないためスキップ
         if: always() && github.event_name == 'pull_request'
         with:
@@ -131,20 +125,14 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v5.1.0
         with:
           persist-credentials: false
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/setup@v3.1.2
         with:
-          version: 12.14.0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: "24"
-          cache: "pnpm"
+          install: false
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -152,7 +140,7 @@ jobs:
           VITE_CONVEX_URL: ${{ secrets.CONVEX_PREVIEW_URL }}
 
       - name: Install Vercel CLI
-        run: npm install --global vercel@latest
+        run: pnpm add --global vercel@latest
 
       - name: Disable email delivery in Convex E2E Preview
         run: printf 'DISABLE_EMAIL_DELIVERY=true\n' > apps/web/.env.e2e.local

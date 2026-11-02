@@ -1,7 +1,11 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { internalMutation, internalQuery } from "./_generated/server";
+import {
+  internalMutation,
+  internalQuery,
+  type MutationCtx,
+} from "./_generated/server";
 import { logAuditEvent } from "./auditLogs";
 import {
   authenticatedMutation,
@@ -10,6 +14,46 @@ import {
 } from "./customBuilders";
 import { deleteFamilyInvites, reconcileAdminsOnLeave } from "./families";
 import { cascadeDeleteRecord } from "./records";
+import { getEffectiveOwnerType } from "./rls";
+
+/**
+ * 最後のメンバーの脱退・退会に伴い、家族グループを解散・削除するヘルパー
+ * - 家族共有レコードを cascadeDeleteRecord で削除
+ * - 退会アカウント自身の個人レコードを cascadeDeleteRecord で削除
+ * - 除名済みユーザーの持ち出し待ち個人レコード（ownerType === "user" && accountId !== leavingAccountId）は削除せず保護
+ * - joinRequests、家族招待を削除し、家族レコード本体を削除
+ */
+async function dissolveFamilyOnLastMemberLeave(
+  ctx: { db: MutationCtx["db"] },
+  familyId: Id<"families">,
+  leavingAccountId: Id<"users">,
+) {
+  const familyRecords = await ctx.db
+    .query("serviceRecords")
+    .withIndex("by_family_sortKey", (q) => q.eq("familyId", familyId))
+    .collect();
+
+  for (const record of familyRecords) {
+    const ownerType = getEffectiveOwnerType(record);
+    if (
+      ownerType === "family" ||
+      (ownerType === "user" && record.accountId === leavingAccountId)
+    ) {
+      await cascadeDeleteRecord(ctx, record._id);
+    }
+  }
+
+  const joinReqs = await ctx.db
+    .query("joinRequests")
+    .withIndex("by_familyId_userId", (q) => q.eq("familyId", familyId))
+    .collect();
+  for (const req of joinReqs) {
+    await ctx.db.delete(req._id);
+  }
+
+  await deleteFamilyInvites(ctx, familyId);
+  await ctx.db.delete(familyId);
+}
 
 /**
  * ユーザー同期（ログイン時に呼ばれる）
@@ -316,26 +360,9 @@ export const deleteAllAccounts = identityVerifiedMutation({
       // 3. 家族に関する処理
       if (account.familyId) {
         const familyId = account.familyId;
-        // 他のメンバーがいない場合は家族およびそのレコードも削除
+        // 他のメンバーがいない場合は家族およびそのレコードも削除（除名済みユーザーの持ち出し個人レコードは保護）
         if (otherMembersCount === 0) {
-          const familyRecords = await ctx.db
-            .query("serviceRecords")
-            .withIndex("by_family_sortKey", (q) => q.eq("familyId", familyId))
-            .collect();
-          for (const record of familyRecords) {
-            await cascadeDeleteRecord(ctx, record._id);
-          }
-
-          const joinReqs = await ctx.db
-            .query("joinRequests")
-            .withIndex("by_familyId_userId", (q) => q.eq("familyId", familyId))
-            .collect();
-          for (const req of joinReqs) {
-            await ctx.db.delete(req._id);
-          }
-
-          await deleteFamilyInvites(ctx, familyId);
-          await ctx.db.delete(familyId);
+          await dissolveFamilyOnLastMemberLeave(ctx, familyId, account._id);
         } else {
           // 他のメンバーがいる場合は、このアカウントの個人レコードのみ削除し、共有レコードの管理者を調停
           const allUserRecords = await ctx.db
@@ -343,7 +370,7 @@ export const deleteAllAccounts = identityVerifiedMutation({
             .withIndex("by_accountId", (q) => q.eq("accountId", account._id))
             .collect();
           const personalRecords = allUserRecords.filter(
-            (r) => r.ownerType === "user",
+            (r) => getEffectiveOwnerType(r) === "user",
           );
           for (const record of personalRecords) {
             await cascadeDeleteRecord(ctx, record._id);
@@ -358,7 +385,7 @@ export const deleteAllAccounts = identityVerifiedMutation({
           .withIndex("by_accountId", (q) => q.eq("accountId", account._id))
           .collect();
         for (const record of records) {
-          if (record.ownerType === "user") {
+          if (getEffectiveOwnerType(record) === "user") {
             await cascadeDeleteRecord(ctx, record._id);
           }
         }
@@ -445,26 +472,9 @@ export const deleteAccount = authenticatedMutation({
     if (user.familyId) {
       const familyId = user.familyId;
 
-      // 他のメンバーがいない場合は家族およびそのレコードも削除
+      // 他のメンバーがいない場合は家族およびそのレコードも削除（除名済みユーザーの持ち出し個人レコードは保護）
       if (otherMembersCount === 0) {
-        const familyRecords = await ctx.db
-          .query("serviceRecords")
-          .withIndex("by_family_sortKey", (q) => q.eq("familyId", familyId))
-          .collect();
-        for (const record of familyRecords) {
-          await cascadeDeleteRecord(ctx, record._id);
-        }
-
-        const joinReqs = await ctx.db
-          .query("joinRequests")
-          .withIndex("by_familyId_userId", (q) => q.eq("familyId", familyId))
-          .collect();
-        for (const req of joinReqs) {
-          await ctx.db.delete(req._id);
-        }
-
-        await deleteFamilyInvites(ctx, familyId);
-        await ctx.db.delete(familyId);
+        await dissolveFamilyOnLastMemberLeave(ctx, familyId, user._id);
       } else {
         // 他のメンバーがいる場合は、このアカウントの個人レコードのみ削除し、共有レコードの管理者を調停
         const allUserRecords = await ctx.db
@@ -472,7 +482,7 @@ export const deleteAccount = authenticatedMutation({
           .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
           .collect();
         const personalRecords = allUserRecords.filter(
-          (r) => r.ownerType === "user",
+          (r) => getEffectiveOwnerType(r) === "user",
         );
         for (const record of personalRecords) {
           await cascadeDeleteRecord(ctx, record._id);
@@ -498,7 +508,7 @@ export const deleteAccount = authenticatedMutation({
         .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
         .collect();
       for (const record of records) {
-        if (record.ownerType === "user") {
+        if (getEffectiveOwnerType(record) === "user") {
           await cascadeDeleteRecord(ctx, record._id);
         }
       }

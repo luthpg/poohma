@@ -341,3 +341,94 @@ GitHub Actions の Ubuntu ランナー上で Playwright E2E テストを実行�
    YAML へのコンテナタグ直書きは追従漏れを招き、また `yq` による lockfile パースは YAML ヘッダー（`---`）混入等の環境依存障害を招く。そのため、`apps/web/package.json` でバージョンを完全固定（例: `"1.64.1"`）して一括更新から保護・除外し、先行の軽量ジョブ（`sparse-checkout` で `apps/web/package.json` のみ取得）で `jq` を用いてバージョンを抽出し、後続の E2E ジョブの `container.image` に動的注入する。
 3. **共有メモリ枯渇防止（`--ipc=host`）**:
    Docker コンテナ内で Chromium を動作させる際、デフォルトの共有メモリ（`/dev/shm` 64MB）ではクラッシュ（SIGSEGV）の原因となるため、コンテナオプションに `options: --ipc=host` を指定する。
+
+---
+
+## 18. GitHub Actions Lockfile（`actions.lock`）と `gh actions-lock` によるアクションバージョン管理・更新手順
+
+### 背景と目的
+
+GitHub Actions では、サードパーティ製アクションのタグ書き換えやアカウント乗っ取りによるサプライチェーン攻撃を防ぐため、コミット SHA による完全ピン留めが推奨される。しかし、ワークフロー YAML 内に生の SHA（例: `uses: actions/checkout@fbc6f399...`）を直書きすると、可読性の低下やセマンティックバージョンの追従困難を招く。
+
+PoohMa では、GitHub 公式の Actions Lockfile 機構（`.github/workflows/actions.lock`）を採用している。
+ワークフロー側には可読性の高いセマンティックバージョン（例: `uses: actions/checkout@v5.1.0`）を記述し、リポジトリルートの `.github/workflows/actions.lock` に各アクションの commit SHA、owner ID、repo ID を記録することで、安全なピン留めと可読性を両立する。
+
+### バージョンロック更新手順
+
+GitHub Actions のアクションを新規追加・バージョン更新する際は、以下の手順に従う：
+
+#### 1. 前提ツールの確認
+
+GitHub CLI（`gh`）および `actions/gh-actions-lock` 拡張機能が導入されていることを確認する（未導入の場合は一度だけインストール）：
+```bash
+gh extension install actions/gh-actions-lock
+```
+
+#### 2. ワークフロー YAML の変更
+
+対象のワークフローファイル（`.github/workflows/*.yml`）内で、アクションのセマンティックバージョン（例: `@v5.1.0`）を更新または新規記述する。
+
+#### 3. ロックファイルの自動更新
+
+リポジトリルートで `gh actions-lock` を実行する：
+```bash
+gh actions-lock
+```
+これにより、`.github/workflows/actions.lock` が自動的に再生成され、新しいアクションの正確なコミットハッシュ（`sha1-...`）やリポジトリ ID が記録される。
+
+#### 4. 検証とコミット
+
+- ロックファイルの整合性確認:
+
+  ```bash
+  gh actions-lock --verify
+  ```
+- ワークフロー静的検証（必須）:
+
+  ```bash
+  pnpm lint:workflows
+  ```
+- ワークフロー YAML と `.github/workflows/actions.lock` の差分をセットでコミットする。片方のみをコミットしてはならない。
+
+---
+
+## 19. `pnpm/setup@v3` と `package.json` の `devEngines.runtime` による Node.js バージョン一元管理
+
+### 事象
+
+CI ワークフロー内で `actions/setup-node` と `pnpm/setup` を併用したり、ワークフロー側に個別の `version: 12.14.0` や `node-version: "24"` を分散記述していると、ワークフロー間で指定の乖離が発生したり、`pnpm/setup` が「No runtime requested or Node.js version file detected. Skipping runtime install.」と判定してランナーの古い Node.js で `pnpm install` や `postinstall`（`wxt prepare` 等）が実行されビルド失敗を招くことがある。
+
+### 対策
+
+1. **ルート `package.json` の `packageManager` と `devEngines.runtime` に一元化（Single Source of Truth）**:
+   ルート `package.json` に pnpm バージョン（トップレベル文字列）と `devEngines` による Node.js ランタイムバージョンを定義する：
+
+   ```json
+   "packageManager": "pnpm@12.14.0",
+   "devEngines": {
+     "packageManager": {
+       "name": "pnpm",
+       "version": "12.14.0",
+       "onFail": "download"
+     },
+     "runtime": {
+       "name": "node",
+       "version": "^26.7.0",
+       "onFail": "download"
+     }
+   }
+   ```
+2. **ワークフロー側から個別 `actions/setup-node` を廃止し、`install: false` を明示**:
+   CI ワークフロー側では `pnpm/setup@v3` のみを呼び出し、`with: install: false` を指定する：
+
+   ```yaml
+   - name: Install pnpm
+     uses: pnpm/setup@v3.1.2
+     with:
+       install: false
+   ```
+
+   `install: false` を指定しない場合、`pnpm/setup` はデフォルトで直ちに `pnpm install` を実行してしまう。これにより、ステップ単位で渡すべき環境変数（`VITE_CONVEX_URL` 等）が渡っていない状態で `postinstall`（`wxt prepare` 等）が走って即死したり、後続の `Install dependencies` ステップ（`--frozen-lockfile`）と無駄に二重実行される事故を防ぐ。
+3. **CLI ツール導入時の `pnpm add --global` 統一（`$PATH` 整合性）**:
+   `actions/setup-node` を廃止した場合、`npm install --global <pkg>` でインストールされる npm グローバル bin ディレクトリが `$PATH` に含まれず、`command not found`（exit code 127）の原因となる。
+   CLI ツール（`vercel` 等）をグローバル導入する際は、必ず `pnpm add --global vercel@latest` を使用する。`pnpm/setup` により `PNPM_HOME` は確実に `$PATH` に通っているため、バイナリを即時安全に実行可能となる。

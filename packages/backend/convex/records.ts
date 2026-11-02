@@ -3112,6 +3112,7 @@ export const mergeOrRenameTags = familyBoundMutation({
 
       await ctx.db.patch(record._id, {
         tags: newTags,
+        revision: (record.revision ?? 0) + 1,
         updatedAt: now,
         updatedByAccountId: user._id,
       });
@@ -3183,6 +3184,7 @@ export const bulkRemoveTags = familyBoundMutation({
 
       await ctx.db.patch(record._id, {
         tags: newTags,
+        revision: (record.revision ?? 0) + 1,
         updatedAt: now,
         updatedByAccountId: user._id,
       });

@@ -152,6 +152,12 @@
 - 必ず事前に定義された親切で安全な固定日本語メッセージ（例: `「パスコードの更新に失敗しました」`、`「招待コードが無効です。内容をご確認ください。」` 等）を表示する。
 - 例外として、`BiometricPrfNotSupportedError` 等の明示的にエンドユーザー通知用に設計されたカスタムエラーのみ、メッセージ内容を安全に判定（例: `error.message?.includes("PRF")`）して表示することを許可する。
 
+### 編集フォームの平文ステート保持と自動ロック（暗号鍵破棄）の境界
+
+- レコード新規作成・編集フォームを開いている最中に、無操作タイムアウト経過後の復帰時やタブ復帰時等でアプリが「自動ロック」された場合、**メモリ上の `masterKey`（暗号化鍵）は直ちに破棄されるが、編集中フォームの入力内容（React ステート）は保存・離脱・リロードまで保持される**。
+- これは「放置によって暗号鍵を即時保護しつつ、編集中ユーザーの入力データ消失を防ぐ」ための明示的な設計判断である。
+- ロック状態で暗号化が必要なフィールド（パスワードヒント等）を含むフォームの「保存」を試みた際は、マスターキーが存在しない（`!masterKey`）ため即座にパスコード入力モーダルが開き、再アンロック成功後に初めて保存処理が完了する。平文フィールドのみの更新であればマスターキー不要で保存可能とし、いずれの場合も勝手にフォーム入力を破棄してはならない。
+
 ---
 
 ## 6. 設計・アーキテクチャの不変原則（Single Source of Truth と「念のため二重にする」精神の完全排除）
@@ -260,3 +266,18 @@
   - コンテナタグとプロジェクトの `@playwright/test` バージョンの乖離を防ぐため、`apps/web/package.json` でバージョンを完全固定（例: `"1.64.1"`）し、一括最新更新から除外・保護すること。先行の軽量ジョブ（`sparse-checkout: apps/web/package.json`）で `jq` を用いてバージョン番号を抽出し、後続ジョブの `container.image` に動的注入することで、YAML パース障害を排除し最速かつ確実な追従を担保する。
 - **コンテナ共有メモリ枯渇防止（--ipc=host）**:
   - コンテナ内で Chromium を動作させる際、デフォルトの共有メモリ（`/dev/shm` 64MB）ではクラッシュ（SIGSEGV）の原因となるため、コンテナオプションに `options: --ipc=host` を必ず指定すること。
+
+### GitHub Actions Lockfile（actions.lock）によるアクションのコミットSHA固定と同期義務
+
+- **`gh actions-lock` によるロックファイル管理**:
+  - サードパーティ製アクションのタグ改ざんによるサプライチェーン攻撃を防ぐため、`.github/workflows/actions.lock` を管理し、各アクションのコミットSHA・オーナーID・リポジトリIDを確実に固定する。
+  - ワークフローファイル（`.github/workflows/*.yml`）で `uses: actions/...@vX.Y.Z` の追加・更新を行った際は、必ずローカルで `gh actions-lock` を実行して `actions.lock` を同期し、セットでコミットすること。
+  - コミット前には必ず `pnpm lint:workflows` で構文チェックを実施すること。
+
+### `pnpm/setup` と `package.json` による Node.js / pnpm バージョンの一元管理
+
+- **ランタイム定義の Single Source of Truth と自動インストールの抑止**:
+  - `pnpm/setup@v3` を使用する際、各ワークフロー YAML で `actions/setup-node` や `version: 12.14.0` を重複定義してはならない。
+  - ルート `package.json` の `"packageManager": "pnpm@..."` および `"devEngines": { "packageManager": { ... }, "runtime": { "name": "node", "version": "..." } }` にバージョン指定を集約し、ワークフロー側は `uses: pnpm/setup@v3.1.2` に `with: install: false` を指定してランタイムのみを一元的に解決させること。
+  - `install: false` を指定しないと `pnpm/setup` がデフォルトで環境変数のない状態で `pnpm install` を自動実行してしまい、`postinstall`（`apps/extension` 等のスキーマ検証）でクラッシュしたり後続の `Install dependencies` と二重実行になるため、必ず `install: false` を明示すること。
+  - ワークフロー内で Vercel CLI 等の外部ツールをグローバル導入する際は、`npm install --global` ではなく `pnpm add --global` を使用すること（`PNPM_HOME` が `$PATH` に通っているため確実に実行可能となる）。

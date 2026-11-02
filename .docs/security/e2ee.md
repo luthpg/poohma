@@ -80,6 +80,12 @@ flowchart TB
 - E2EE の Zero-Knowledge 原則を堅持するため、平文や未ラップの鍵材料はストレージに一切保存せず、自動保存ごとに短命な `draftDEK`（AES-GCM 256）を生成してフォーム全入力値（メモや平文項目を含む）を暗号化し、その `draftDEK` をメモリ上の `masterKey` で wrap して保存する（`draftDEKEncrypted` + `encryptedValues`）。
 - 保存先キーは `poohma_draft_record_${recordId}` / `poohma_draft_new_${draftId}`。24時間TTL、保存完了・明示的キャンセル・競合解決完了（最新リロード／上書き保存）時の即時物理破棄、別タブ複製時の `BroadcastChannel`（`poohma_draft_bus`）衝突自律検知、およびアカウント分離（`accountId` 照合）を行う。
 
+### 自動ロック時の暗号鍵破棄と編集中平文フォームステートの分離
+
+- 無操作タイムアウト経過後の復帰時やタブ復帰時等によって自動ロックが発生した際、揮発性メモリ上の `masterKey`（CryptoKey オブジェクト）は直ちに破棄（`null` 化）される。
+- 一方で、編集中フォームの入力内容（React ステート）は入力ロスト防止のため画面上にそのまま残る。
+- ユーザーがロック後に「保存」を押下した際、暗号化が必要なフィールド（パスワードヒント等）を含む場合はメモリ上に `masterKey` が存在しないため直ちにパスコード解除モーダル（または WebAuthn 生体認証）がトリガーされ、再アンロック成功後に DEK 生成・暗号化が行われてサーバーへ送信される。平文フィールドのみの更新であればマスターキー不要で保存可能とし、いずれの場合も勝手に入力ステートがクリアされることはない。
+
 ## Encryption / Decryption Flow
 
 ```mermaid

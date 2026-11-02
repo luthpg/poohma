@@ -140,3 +140,13 @@ Playwright E2E テストおよびフロントエンド遷移における落と�
 - **回避法**:
   - ローカルでの反復検証には、Docker による Self-hosted Local Backend（`pnpm test:e2e:local`）を活用する。
   - `packages/backend/docker-compose.local.yml` およびセットアップスクリプトにより、ローカル Docker（`http://127.0.0.1:3210`）へコードを即時デプロイし、`e2e/.env.e2e-local` 経由で Playwright に読み込ませることで、クラウド枠の消費をゼロに抑えて E2E テストを安全に反復実行できる。
+
+---
+
+### Playwright Worker フィクスチャのタイムアウト不足による E2E 認証セットアップ失敗
+
+- **問題**:
+  ローカル環境で多数の並列ワーカー（例: 8ワーカー）が同時に起動した際、各ワーカーが初回実行時に独立した Firebase ユーザー作成、サインイン、オンボーディング完了を直列で一から行うため、全体で 30 秒以上の時間がかかる場合がある。
+  Playwright のフィクスチャ（`workerStorageState` 等）の既定タイムアウト（30秒）を超過すると、テスト本体が始まる前に `Timeout 30000ms exceeded while setting up "workerStorageState"` でワーカー全体が即座にクラッシュする。
+- **回避法**:
+  `e2e/support/test-fixtures.ts` 内の `workerStorageState` フィクスチャ定義において、第2引数のオプションに `{ scope: "worker", timeout: 120_000 }` を明示的に指定し、初期認証セットアップに十分なタイムアウト（120秒）を付与する。同様に `e2e/auth.setup.ts` の `test.setTimeout(120_000)` も揃えて設定する。

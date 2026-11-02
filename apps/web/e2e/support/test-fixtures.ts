@@ -355,7 +355,7 @@ export const test = baseTest.extend<
       );
       await use(statePath);
     },
-    { scope: "worker" },
+    { scope: "worker", timeout: 120_000 },
   ],
   page: async ({ page, context, baseURL }, use) => {
     await setupProtectionBypass(context, baseURL);

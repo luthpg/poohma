@@ -4,7 +4,7 @@ import {
 } from "@poohma/shared/schemas";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import {
   internalMutation,
   internalQuery,
@@ -752,6 +752,35 @@ export const commitFamilyMigration = authenticatedMutation({
       const sourceFamilyId = migration.sourceFamilyId;
       await reconcileAdminsOnLeave(ctx, sourceFamilyId, user._id);
 
+      // 旧家族に対する当該アカウントの参加申請を削除（自発的離脱後の無承認復帰を遮断）
+      const oldJoinRequests = await ctx.db
+        .query("joinRequests")
+        .withIndex("by_familyId_accountId", (q) =>
+          q.eq("familyId", sourceFamilyId).eq("accountId", user._id),
+        )
+        .collect();
+      for (const req of oldJoinRequests) {
+        await ctx.db.delete(req._id);
+      }
+
+      // 旧家族に関連する当該アカウントの未完了マイグレーション（PREPARED）を失効
+      const oldMigrations = await ctx.db
+        .query("familyMigrations")
+        .withIndex("by_accountId", (q) => q.eq("accountId", user._id))
+        .filter((q) =>
+          q.and(
+            q.eq(q.field("status"), "PREPARED"),
+            q.or(
+              q.eq(q.field("sourceFamilyId"), sourceFamilyId),
+              q.eq(q.field("targetFamilyId"), sourceFamilyId),
+            ),
+          ),
+        )
+        .collect();
+      for (const mig of oldMigrations) {
+        await ctx.db.patch(mig._id, { status: "EXPIRED" });
+      }
+
       const remainingUsers = await ctx.db
         .query("users")
         .withIndex("by_familyId", (q) => q.eq("familyId", sourceFamilyId))
@@ -1443,12 +1472,14 @@ export const approveJoinRequest = familyAdminMutation({
     if (!isMigration) {
       // 家族未所属かつ引き継ぎ用Vaultもない新規ユーザーのみ即時所属
       await ctx.db.patch(applicant._id, { familyId, familyRole: "viewer" });
+      // 即時所属完了のため、申請は再利用できないよう即座に消費（削除）
+      await ctx.db.delete(request._id);
+    } else {
+      await ctx.db.patch(request._id, {
+        status: "approved",
+        updatedAt: Date.now(),
+      });
     }
-
-    await ctx.db.patch(request._id, {
-      status: "approved",
-      updatedAt: Date.now(),
-    });
 
     const family = await ctx.db.get(familyId);
     await ctx.scheduler.runAfter(
@@ -1732,7 +1763,34 @@ export const getMyPendingExportVault = authenticatedQuery({
 });
 
 /**
+ * Export Vault の破棄・失効に伴い、当該アカウントの旧家族個人レコードを完全削除するヘルパー
+ * - 当該アカウント所有かつ旧家族IDを持つ個人レコードのみを cascadeDeleteRecord で削除
+ * - 家族共有レコードや他人のレコード、新家族のレコードは削除しない
+ */
+async function purgeVaultPersonalRecords(
+  ctx: { db: MutationCtx["db"] },
+  vault: Doc<"pendingExportVaults">,
+) {
+  const userRecords = await ctx.db
+    .query("serviceRecords")
+    .withIndex("by_accountId", (q) => q.eq("accountId", vault.accountId))
+    .collect();
+
+  for (const record of userRecords) {
+    if (
+      record.familyId === vault.oldFamilyId &&
+      getEffectiveOwnerType(record) === "user"
+    ) {
+      await cascadeDeleteRecord(ctx, record._id);
+    }
+  }
+
+  await ctx.db.delete(vault._id);
+}
+
+/**
  * 自身のExport Vaultを破棄（持ち出しを放棄）するMutation
+ * - 紐づく旧家族個人レコードも cascadeDeleteRecord で完全削除
  */
 export const abandonPendingExportVault = authenticatedMutation({
   args: {},
@@ -1744,7 +1802,7 @@ export const abandonPendingExportVault = authenticatedMutation({
       .first();
 
     if (vault) {
-      await ctx.db.delete(vault._id);
+      await purgeVaultPersonalRecords(ctx, vault);
     }
 
     return { success: true };
@@ -1752,7 +1810,24 @@ export const abandonPendingExportVault = authenticatedMutation({
 });
 
 /**
+ * 期限切れExport Vaultを個別にカスケード削除する内部Mutation
+ * - 1 Vault 単位で独立トランザクションとして実行し、バッチ全体の失敗を防止
+ */
+export const purgeExpiredExportVaultInternal = internalMutation({
+  args: {
+    vaultId: v.id("pendingExportVaults"),
+  },
+  handler: async (ctx, args) => {
+    const vault = await ctx.db.get(args.vaultId);
+    if (vault && vault.expiresAt < Date.now()) {
+      await purgeVaultPersonalRecords(ctx, vault);
+    }
+  },
+});
+
+/**
  * 期限切れExport Vaultを定期削除する内部Mutation
+ * - 各Vaultの削除を独立したMutationとしてスケジュール（トランザクション分離）
  */
 export const cleanupExpiredExportVaultsInternal = internalMutation({
   args: {},
@@ -1761,7 +1836,11 @@ export const cleanupExpiredExportVaultsInternal = internalMutation({
     const allVaults = await ctx.db.query("pendingExportVaults").collect();
     for (const vault of allVaults) {
       if (vault.expiresAt < now) {
-        await ctx.db.delete(vault._id);
+        await ctx.scheduler.runAfter(
+          0,
+          internal.families.purgeExpiredExportVaultInternal,
+          { vaultId: vault._id },
+        );
       }
     }
   },
