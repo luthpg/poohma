@@ -280,3 +280,4 @@
   - `pnpm/setup@v3` を使用する際、各ワークフロー YAML で `actions/setup-node` や `version: 12.14.0` を重複定義してはならない。
   - ルート `package.json` の `packageManager`（pnpm）および `packageManager.runtime`（Node.js）にバージョン指定を集約し、ワークフロー側は `uses: pnpm/setup@v3.1.2` に `with: install: false` を指定してランタイムのみを一元的に解決させること。
   - `install: false` を指定しないと `pnpm/setup` がデフォルトで環境変数のない状態で `pnpm install` を自動実行してしまい、`postinstall`（`apps/extension` 等のスキーマ検証）でクラッシュしたり後続の `Install dependencies` と二重実行になるため、必ず `install: false` を明示すること。
+  - ワークフロー内で Vercel CLI 等の外部ツールをグローバル導入する際は、`npm install --global` ではなく `pnpm add --global` を使用すること（`PNPM_HOME` が `$PATH` に通っているため確実に実行可能となる）。

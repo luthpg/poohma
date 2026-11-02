@@ -426,3 +426,6 @@ CI ワークフロー内で `actions/setup-node` と `pnpm/setup` を併用し�
    ```
 
    `install: false` を指定しない場合、`pnpm/setup` はデフォルトで直ちに `pnpm install` を実行してしまう。これにより、ステップ単位で渡すべき環境変数（`VITE_CONVEX_URL` 等）が渡っていない状態で `postinstall`（`wxt prepare` 等）が走って即死したり、後続の `Install dependencies` ステップ（`--frozen-lockfile`）と無駄に二重実行される事故を防ぐ。
+3. **CLI ツール導入時の `pnpm add --global` 統一（`$PATH` 整合性）**:
+   `actions/setup-node` を廃止した場合、`npm install --global <pkg>` でインストールされる npm グローバル bin ディレクトリが `$PATH` に含まれず、`command not found`（exit code 127）の原因となる。
+   CLI ツール（`vercel` 等）をグローバル導入する際は、必ず `pnpm add --global vercel@latest` を使用する。`pnpm/setup` により `PNPM_HOME` は確実に `$PATH` に通っているため、バイナリを即時安全に実行可能となる。
