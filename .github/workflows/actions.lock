@@ -12,21 +12,17 @@ workflows:
         - 'reviewdog/action-actionlint@v1.77.0'
     '.github/workflows/deploy-production.yml':
         - 'actions/checkout@v5.1.0'
-        - 'actions/setup-node@v5.0.0'
         - 'pnpm/setup@v3.1.2'
     '.github/workflows/deploy-staging.yml':
         - 'actions/checkout@v5.1.0'
-        - 'actions/setup-node@v5.0.0'
         - 'marocchino/sticky-pull-request-comment@v2.9.4'
         - 'pnpm/setup@v3.1.2'
     '.github/workflows/e2e-staging.yml':
         - 'actions/checkout@v5.1.0'
-        - 'actions/setup-node@v5.0.0'
         - 'actions/upload-artifact@v7.0.2'
         - 'pnpm/setup@v3.1.2'
     '.github/workflows/release-extension.yml':
         - 'actions/checkout@v5.1.0'
-        - 'actions/setup-node@v5.0.0'
         - 'actions/upload-artifact@v7.0.2'
         - 'pnpm/setup@v3.1.2'
     '.github/workflows/reset-demo-family.yml': []

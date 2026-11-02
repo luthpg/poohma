@@ -389,3 +389,32 @@ gh actions-lock
   pnpm lint:workflows
   ```
 - ワークフロー YAML と `.github/workflows/actions.lock` の差分をセットでコミットする。片方のみをコミットしてはならない。
+
+---
+
+## 19. `pnpm/setup@v3` と `package.json` の `packageManager.runtime` による Node.js バージョン一元管理
+
+### 事象
+
+CI ワークフロー内で `actions/setup-node` と `pnpm/setup` を併用したり、ワークフロー側に個別の `version: 12.14.0` や `node-version: "24"` を分散記述していると、ワークフロー間で指定の乖離が発生したり、`pnpm/setup` が「No runtime requested or Node.js version file detected. Skipping runtime install.」と判定してランナーの古い Node.js で `pnpm install` や `postinstall`（`wxt prepare` 等）が実行されビルド失敗を招くことがある。
+
+### 対策
+
+1. **ルート `package.json` の `packageManager` と `runtime` に一元化（Single Source of Truth）**:
+   ルート `package.json` に pnpm バージョンと Node.js ランタイムバージョン（`packageManager.runtime`）を定義する：
+
+   ```json
+   "packageManager": {
+     "name": "pnpm",
+     "version": "12.14.0",
+     "onFail": "download"
+   },
+   "runtime": {
+     "name": "node",
+     "version": "^26.7.0",
+     "onFail": "download"
+   }
+   ```
+2. **ワークフロー側から個別 `actions/setup-node` を廃止**:
+   CI ワークフロー側では `pnpm/setup@v3` のみを呼び出し、引数を指定せず `package.json` から Node.js と pnpm の双方を自動解決・ダウンロードさせる。
+   これにより、全ワークフローでの環境指定の重複・乖離を排除し、`gh actions-lock` で管理するアクション数も最小化する。

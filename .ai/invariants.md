@@ -273,3 +273,9 @@
   - サードパーティ製アクションのタグ改ざんによるサプライチェーン攻撃を防ぐため、`.github/workflows/actions.lock` を管理し、各アクションのコミットSHA・オーナーID・リポジトリIDを確実に固定する。
   - ワークフローファイル（`.github/workflows/*.yml`）で `uses: actions/...@vX.Y.Z` の追加・更新を行った際は、必ずローカルで `gh actions-lock` を実行して `actions.lock` を同期し、セットでコミットすること。
   - コミット前には必ず `pnpm lint:workflows` で構文チェックを実施すること。
+
+### `pnpm/setup` と `package.json` による Node.js / pnpm バージョンの一元管理
+
+- **ランタイム定義の Single Source of Truth**:
+  - `pnpm/setup@v3` を使用する際、各ワークフロー YAML で `actions/setup-node` や `version: 12.14.0` を重複定義してはならない。
+  - ルート `package.json` の `packageManager`（pnpm）および `packageManager.runtime`（Node.js）にバージョン指定を集約し、ワークフロー側は `uses: pnpm/setup@v3.1.2` のみで一元的に解決させること。ワークフロー間のバージョン乖離や `postinstall` 時のランタイム不一致エラーを構造的に防止する。
