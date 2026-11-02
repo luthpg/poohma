@@ -3534,6 +3534,7 @@ describe("2.1.13 メンバーキック機能とExport Vault（E2EEデータ持�
 
     // クリーンアップ実行
     await t.mutation(internal.families.cleanupExpiredExportVaultsInternal, {});
+    await t.finishAllScheduledFunctions(() => {});
 
     // DBからも物理削除されていること
     const count = await t.run(async (ctx) => {
@@ -4697,6 +4698,7 @@ describe("2.1.18 家族グループ名の変更 (Issue 177)", () => {
         internal.families.cleanupExpiredExportVaultsInternal,
         {},
       );
+      await t.finishAllScheduledFunctions(() => {});
 
       // Vaultが削除されていること
       const vault = await t.run(async (ctx) => {

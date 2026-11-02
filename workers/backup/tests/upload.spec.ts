@@ -107,6 +107,9 @@ describe("uploadZipStreamToR2", () => {
     data[1] = 0x4b;
     data[2] = 0x03;
     data[3] = 0x04;
+    for (let i = 4; i < totalSize; i++) {
+      data[i] = (i * 31) % 251;
+    }
 
     const chunk1 = data.subarray(0, 3 * 1024 * 1024);
     const chunk2 = data.subarray(3 * 1024 * 1024);
@@ -121,7 +124,9 @@ describe("uploadZipStreamToR2", () => {
 
     const obj = await bucket.get(key);
     expect(obj?.size).toBe(totalSize);
-  });
+    const saved = new Uint8Array((await obj?.arrayBuffer())!);
+    expect(saved).toEqual(data);
+  }, 15000);
 
   it("先頭4バイトがZIPマジックナンバーでない場合はエラーとなりR2に保存されないこと", async () => {
     const key = "test_invalid_magic.zip";

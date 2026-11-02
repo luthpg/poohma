@@ -1810,8 +1810,24 @@ export const abandonPendingExportVault = authenticatedMutation({
 });
 
 /**
+ * 期限切れExport Vaultを個別にカスケード削除する内部Mutation
+ * - 1 Vault 単位で独立トランザクションとして実行し、バッチ全体の失敗を防止
+ */
+export const purgeExpiredExportVaultInternal = internalMutation({
+  args: {
+    vaultId: v.id("pendingExportVaults"),
+  },
+  handler: async (ctx, args) => {
+    const vault = await ctx.db.get(args.vaultId);
+    if (vault && vault.expiresAt < Date.now()) {
+      await purgeVaultPersonalRecords(ctx, vault);
+    }
+  },
+});
+
+/**
  * 期限切れExport Vaultを定期削除する内部Mutation
- * - 紐づく旧家族個人レコードも cascadeDeleteRecord で完全削除
+ * - 各Vaultの削除を独立したMutationとしてスケジュール（トランザクション分離）
  */
 export const cleanupExpiredExportVaultsInternal = internalMutation({
   args: {},
@@ -1820,7 +1836,11 @@ export const cleanupExpiredExportVaultsInternal = internalMutation({
     const allVaults = await ctx.db.query("pendingExportVaults").collect();
     for (const vault of allVaults) {
       if (vault.expiresAt < now) {
-        await purgeVaultPersonalRecords(ctx, vault);
+        await ctx.scheduler.runAfter(
+          0,
+          internal.families.purgeExpiredExportVaultInternal,
+          { vaultId: vault._id },
+        );
       }
     }
   },

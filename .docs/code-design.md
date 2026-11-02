@@ -986,7 +986,8 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 | abandonPendingExportVault              | Mutation         | authenticated    | 被キックユーザーによるExport Vaultの明示的破棄（データ持ち出し放棄。旧家族個人レコードおよびクレデンシャル等の完全カスケード削除 purgeVaultPersonalRecords を実行）                                                                                                        |
 | cleanupExpiredMigrationsInternal       | InternalMutation | 内部限定（Cron） | 期限切れ移行データの自動クリーンアップ                                                                                                                                                                                                                                     |
 | cleanupExpiredFamilyInvitesInternal    | InternalMutation | 内部限定（Cron） | 30日以上前の期限切れ・失効済み招待コードの自動削除                                                                                                                                                                                                                         |
-| cleanupExpiredExportVaultsInternal     | InternalMutation | 内部限定（Cron） | 期限切れExport Vaultの自動クリーンアップ（期限切れVaultに紐づく旧家族個人レコードおよびクレデンシャル等の完全カスケード削除 purgeVaultPersonalRecords を実行）                                                                                                             |
+| cleanupExpiredExportVaultsInternal     | InternalMutation | 内部限定（Cron） | 期限切れExport Vaultの自動クリーンアップ（期限切れVaultごとに purgeExpiredExportVaultInternal を非同期スケジュールしてトランザクションを分離）                                                                                                                             |
+| purgeExpiredExportVaultInternal        | InternalMutation | 内部限定（Task） | 単一の期限切れExport Vaultおよび紐づく旧家族個人レコード・クレデンシャル等の完全カスケード削除（purgeVaultPersonalRecords を実行）                                                                                                                                         |
 
 ### 7.3 convex/records.ts
 
