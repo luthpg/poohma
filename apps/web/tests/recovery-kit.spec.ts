@@ -1,11 +1,84 @@
 import { generateRecoveryCode } from "@poohma/crypto";
 import { describe, expect, it } from "vitest";
 import {
+  embedRecoveryCodeInPng,
   extractRecoveryCodeFromFile,
+  extractRecoveryCodeFromPngBytes,
   generateRecoveryKitPdf,
 } from "@/lib/recovery-kit";
 
-describe("1.5 リカバリーキット PDF生成・読み取りテスト (src/lib/recovery-kit.ts)", () => {
+// 最小限の有効な 1x1 PNG バイナリ（IHDR + IDAT + IEND）
+const MINIMAL_PNG_BYTES = new Uint8Array([
+  0x89,
+  0x50,
+  0x4e,
+  0x47,
+  0x0d,
+  0x0a,
+  0x1a,
+  0x0a, // PNG Signature
+  0x00,
+  0x00,
+  0x00,
+  0x0d,
+  0x49,
+  0x48,
+  0x44,
+  0x52, // IHDR header
+  0x00,
+  0x00,
+  0x00,
+  0x01,
+  0x00,
+  0x00,
+  0x00,
+  0x01, // 1x1
+  0x08,
+  0x06,
+  0x00,
+  0x00,
+  0x00,
+  0x1f,
+  0x15,
+  0xc4, // RGBA, CRC
+  0x89, // CRC end
+  0x00,
+  0x00,
+  0x00,
+  0x0a,
+  0x49,
+  0x44,
+  0x41,
+  0x54, // IDAT header
+  0x78,
+  0x9c,
+  0x63,
+  0x00,
+  0x01,
+  0x00,
+  0x00,
+  0x05,
+  0x00,
+  0x01,
+  0x0d,
+  0x0a,
+  0x2d,
+  0xb4, // IDAT data + CRC
+  0x00,
+  0x00,
+  0x00,
+  0x00,
+  0x49,
+  0x45,
+  0x4e,
+  0x44, // IEND header
+  0xae,
+  0x42,
+  0x60,
+  0x82, // IEND CRC
+]);
+
+describe("1.5 リカバリーキット PDF・PNG生成・読み取りテスト (src/lib/recovery-kit.ts)", () => {
   it("A4サイズのPDFバイナリ（Uint8Array）が正しく生成されること", async () => {
     const recoveryCode = generateRecoveryCode();
     const pdfBytes = await generateRecoveryKitPdf({
@@ -74,5 +147,31 @@ describe("1.5 リカバリーキット PDF生成・読み取りテスト (src/li
 
     expect(pdfBytes).toBeInstanceOf(Uint8Array);
     expect(pdfBytes.length).toBeGreaterThan(1000);
+  });
+
+  it("PNGバイナリへtEXtチャンクを埋め込み、正しく復元コードが抽出できること", () => {
+    const recoveryCode = generateRecoveryCode();
+    const embedded = embedRecoveryCodeInPng(MINIMAL_PNG_BYTES, recoveryCode);
+
+    expect(embedded.length).toBeGreaterThan(MINIMAL_PNG_BYTES.length);
+
+    const extracted = extractRecoveryCodeFromPngBytes(embedded);
+    expect(extracted).toBe(recoveryCode.replace(/-/g, ""));
+  });
+
+  it("tEXtチャンクが埋め込まれたPNGファイルから extractRecoveryCodeFromFile で高速に復元コードが読み取れること", async () => {
+    const recoveryCode = generateRecoveryCode();
+    const embedded = embedRecoveryCodeInPng(MINIMAL_PNG_BYTES, recoveryCode);
+
+    const pngFile = new File(
+      [embedded as unknown as BlobPart],
+      "PoohMa-RecoveryKit.png",
+      {
+        type: "image/png",
+      },
+    );
+
+    const extracted = await extractRecoveryCodeFromFile(pngFile);
+    expect(extracted).toBe(recoveryCode.replace(/-/g, ""));
   });
 });

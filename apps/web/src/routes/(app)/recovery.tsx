@@ -442,11 +442,11 @@ function RecoveryPageComponent() {
                 <span className="flex items-center justify-center h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-bold">
                   1
                 </span>
-                リカバリーコードの入力またはPDFの読込
+                復元コードの入力またはリカバリーキットの読込
               </h2>
               <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
                 事前に発行・保管した「PoohMa
-                リカバリーキット」のPDFファイルをアップロードするか、記載されている32文字の復旧コードを入力してください。
+                リカバリーキット」のファイル（PDFまたは画像）を選択するか、記載されている復元コードを入力してください。
               </p>
             </div>
 
@@ -477,10 +477,10 @@ function RecoveryPageComponent() {
                     <FileUp className="h-8 w-8 text-muted-foreground" />
                     <div className="space-y-1">
                       <span className="text-sm font-semibold text-primary hover:underline">
-                        PDFまたは画像ファイルを選択
+                        PDFまたは画像ファイル（カード・QR）を選択
                       </span>
                       <p className="text-xs text-muted-foreground">
-                        QRコードから自動的にリカバリーコードを読み取ります
+                        ファイルから自動的に復元コードを読み取ります
                       </p>
                     </div>
                   </>

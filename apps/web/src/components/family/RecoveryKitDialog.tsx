@@ -16,6 +16,7 @@ import {
   FolderPlus,
   FolderSearch,
   HardDrive,
+  Image as ImageIcon,
   KeyRound,
   Printer,
   Share2,
@@ -52,7 +53,10 @@ import {
   showGoogleDrivePicker,
   uploadFileToGoogleDrive,
 } from "../../lib/google-drive";
-import { generateRecoveryKitPdf } from "../../lib/recovery-kit";
+import {
+  generateRecoveryKitPdf,
+  generateRecoveryKitPng,
+} from "../../lib/recovery-kit";
 import { usePasscode } from "../PasscodeProvider";
 
 interface RecoveryKitDialogProps {
@@ -82,7 +86,10 @@ export function RecoveryKitDialog({
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [hasSavedLocally, setHasSavedLocally] = useState(false);
+  const [pngBlob, setPngBlob] = useState<Blob | null>(null);
+  const [pngUrl, setPngUrl] = useState<string | null>(null);
+  const [hasSavedPdf, setHasSavedPdf] = useState(false);
+  const [hasSavedPng, setHasSavedPng] = useState(false);
   const [hasPrinted, setHasPrinted] = useState(false);
   const [hasSavedDrive, setHasSavedDrive] = useState(false);
   const [hasShared, setHasShared] = useState(false);
@@ -106,8 +113,8 @@ export function RecoveryKitDialog({
         typeof navigator.canShare === "function"
       ) {
         try {
-          const testFile = new File(["test"], "test.pdf", {
-            type: "application/pdf",
+          const testFile = new File(["test"], "test.png", {
+            type: "image/png",
           });
           setCanShareFile(navigator.canShare({ files: [testFile] }));
         } catch {
@@ -121,16 +128,22 @@ export function RecoveryKitDialog({
     if (pdfUrl) {
       URL.revokeObjectURL(pdfUrl);
     }
+    if (pngUrl) {
+      URL.revokeObjectURL(pngUrl);
+    }
     setStep("initial");
     setGeneratedCode(null);
     setPdfBlob(null);
     setPdfUrl(null);
-    setHasSavedLocally(false);
+    setPngBlob(null);
+    setPngUrl(null);
+    setHasSavedPdf(false);
+    setHasSavedPng(false);
     setHasPrinted(false);
     setHasSavedDrive(false);
     setHasShared(false);
     setIsDriveUploading(false);
-  }, [pdfUrl]);
+  }, [pdfUrl, pngUrl]);
 
   const handleClose = () => {
     handleReset();
@@ -173,20 +186,26 @@ export function RecoveryKitDialog({
         recoveryKey,
       );
 
-      // 4. PDFドキュメントの生成（PDF生成が成功した後にDB登録を行う）
-      const pdfBytes = await generateRecoveryKitPdf({
+      // 4. PDFドキュメントおよび PNG カード画像の同時生成
+      const kitParams = {
         familyName,
         issuedAt,
         issuerName,
         recoveryCode,
-      });
+      };
+
+      const [pdfBytes, generatedPngBlob] = await Promise.all([
+        generateRecoveryKitPdf(kitParams),
+        generateRecoveryKitPng(kitParams),
+      ]);
 
       const blob = new Blob([pdfBytes as Uint8Array<ArrayBuffer>], {
         type: "application/pdf",
       });
       const url = URL.createObjectURL(blob);
+      const generatedPngUrl = URL.createObjectURL(generatedPngBlob);
 
-      // 5. バックエンドへの登録（PDF生成完了後に旧リカバリー情報の上書き/無効化を実行）
+      // 5. バックエンドへの登録（生成完了後に旧リカバリー情報の上書き/無効化を実行）
       const recoveryCodeHash = await hashRecoveryCode(recoveryCode);
       await registerRecoveryKitMut({
         accountId: activeAccountId || undefined,
@@ -201,6 +220,8 @@ export function RecoveryKitDialog({
       setGeneratedCode(recoveryCode);
       setPdfBlob(blob);
       setPdfUrl(url);
+      setPngBlob(generatedPngBlob);
+      setPngUrl(generatedPngUrl);
       setStep("saved");
       toast.success(
         isReissue
@@ -214,8 +235,8 @@ export function RecoveryKitDialog({
     }
   };
 
-  // ローカルに保存（ダウンロード）
-  const handleDownload = () => {
+  // PDF をローカルに保存（ダウンロード）
+  const handleDownloadPdf = () => {
     if (!pdfUrl) return;
     const a = document.createElement("a");
     a.href = pdfUrl;
@@ -223,31 +244,56 @@ export function RecoveryKitDialog({
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    setHasSavedLocally(true);
+    setHasSavedPdf(true);
     toast.success("リカバリーキットPDFをダウンロードしました");
+  };
+
+  // PNG 画像をローカルに保存（ダウンロード）
+  const handleDownloadPng = () => {
+    if (!pngUrl) return;
+    const a = document.createElement("a");
+    a.href = pngUrl;
+    a.download = `PoohMa-RecoveryKit-${familyName.replace(/[^a-zA-Z0-9_\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff-]/g, "")}-${new Date().toISOString().slice(0, 10)}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setHasSavedPng(true);
+    toast.success("リカバリーキット画像をダウンロードしました");
   };
 
   // Web Share API による共有（モバイル / 対応環境）
   const handleShare = async () => {
-    if (!pdfBlob) return;
+    if (!pngBlob && !pdfBlob) return;
     try {
       const safeFamilyName = familyName.replace(
         /[^a-zA-Z0-9_\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff-]/g,
         "",
       );
-      const fileName = `PoohMa-RecoveryKit-${safeFamilyName}-${new Date().toISOString().slice(0, 10)}.pdf`;
-      const file = new File([pdfBlob], fileName, { type: "application/pdf" });
+      const dateStr = new Date().toISOString().slice(0, 10);
 
-      if (navigator.canShare?.({ files: [file] })) {
+      // モバイル環境では写真アプリ保存に対応できるよう PNG 画像を優先共有
+      const fileToShare = pngBlob
+        ? new File(
+            [pngBlob],
+            `PoohMa-RecoveryKit-${safeFamilyName}-${dateStr}.png`,
+            { type: "image/png" },
+          )
+        : new File(
+            [pdfBlob as Blob],
+            `PoohMa-RecoveryKit-${safeFamilyName}-${dateStr}.pdf`,
+            { type: "application/pdf" },
+          );
+
+      if (navigator.canShare?.({ files: [fileToShare] })) {
         await navigator.share({
-          files: [file],
+          files: [fileToShare],
           title: `PoohMa リカバリーキット (${familyName})`,
-          text: "PoohMa の非常時用リカバリーキットPDFです。Googleドライブやファイルアプリ等に安全に保管してください。",
+          text: "PoohMa の非常時用リカバリーキットです。写真アプリやGoogleドライブ、ファイル等に安全に保管してください。",
         });
         setHasShared(true);
         toast.success("共有メニューを開きました");
       } else {
-        handleDownload();
+        handleDownloadPng();
       }
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
@@ -390,7 +436,7 @@ export function RecoveryKitDialog({
   };
 
   const hasSavedAtLeastOne =
-    hasSavedLocally || hasPrinted || hasSavedDrive || hasShared;
+    hasSavedPdf || hasSavedPng || hasPrinted || hasSavedDrive || hasShared;
 
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -435,7 +481,7 @@ export function RecoveryKitDialog({
                   </h4>
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     <JpText>
-                      家族パスコードを忘れた場合に、家族データを復元・救出するための緊急バックアップPDFです。
+                      家族パスコードを忘れた場合に、家族データを復元・救出するための緊急バックアップ（PDF・画像）です。
                     </JpText>
                   </p>
                 </div>
@@ -449,7 +495,7 @@ export function RecoveryKitDialog({
                   </h4>
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     <JpText>
-                      リカバリーコードそのものはサーバーに保存されず、再表示できません。生成されるPDFを必ず安全な場所（印刷保管、Google
+                      復元コードそのものはサーバーに保存されず、再表示できません。生成されるPDFまたは画像を必ず安全な場所（写真アプリの非表示・お気に入り、印刷保管、Google
                       Drive、パスワード管理ソフト等）に保存してください。
                     </JpText>
                   </p>
@@ -486,7 +532,7 @@ export function RecoveryKitDialog({
                   リカバリーキットが生成されました
                 </h4>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  以下のいずれかの方法でPDFを保管してください。少なくとも1つの保存方法を実行すると完了ボタンが有効になります。
+                  以下のいずれかの方法でPDFまたは画像を保管してください。少なくとも1つの保存方法を実行すると完了ボタンが有効になります。
                 </p>
               </div>
             </div>
@@ -502,26 +548,44 @@ export function RecoveryKitDialog({
             </div>
 
             {/* 保存先オプションボタン一覧 */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              {/* PDF 保存 */}
               <button
                 type="button"
-                onClick={handleDownload}
-                className={`flex flex-col items-center justify-center gap-2 p-3.5 rounded-lg border text-center transition-all ${
-                  hasSavedLocally
+                onClick={handleDownloadPdf}
+                className={`flex flex-col items-center justify-center gap-2 p-3 rounded-lg border text-center transition-all cursor-pointer ${
+                  hasSavedPdf
                     ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
                     : "border-border bg-card hover:bg-muted text-foreground"
                 }`}
               >
                 <Download className="h-5 w-5" />
                 <span className="text-xs font-semibold">
-                  {hasSavedLocally ? "ダウンロード済" : "この端末に保存"}
+                  {hasSavedPdf ? "PDF保存済" : "PDFを保存"}
                 </span>
               </button>
 
+              {/* PNG 画像 保存 */}
+              <button
+                type="button"
+                onClick={handleDownloadPng}
+                className={`flex flex-col items-center justify-center gap-2 p-3 rounded-lg border text-center transition-all cursor-pointer ${
+                  hasSavedPng
+                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                    : "border-border bg-card hover:bg-muted text-foreground"
+                }`}
+              >
+                <ImageIcon className="h-5 w-5 text-orange-500" />
+                <span className="text-xs font-semibold">
+                  {hasSavedPng ? "画像保存済" : "画像を保存"}
+                </span>
+              </button>
+
+              {/* 印刷 */}
               <button
                 type="button"
                 onClick={handlePrint}
-                className={`flex flex-col items-center justify-center gap-2 p-3.5 rounded-lg border text-center transition-all ${
+                className={`flex flex-col items-center justify-center gap-2 p-3 rounded-lg border text-center transition-all cursor-pointer ${
                   hasPrinted
                     ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
                     : "border-border bg-card hover:bg-muted text-foreground"
@@ -532,11 +596,13 @@ export function RecoveryKitDialog({
                   {hasPrinted ? "印刷済" : "印刷する"}
                 </span>
               </button>
+
+              {/* モバイル共有 または Google Drive */}
               {isMobile && canShareFile ? (
                 <button
                   type="button"
                   onClick={handleShare}
-                  className={`flex flex-col items-center justify-center gap-2 p-3.5 rounded-lg border text-center transition-all ${
+                  className={`flex flex-col items-center justify-center gap-2 p-3 rounded-lg border text-center transition-all cursor-pointer ${
                     hasShared
                       ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
                       : "border-border bg-card hover:bg-muted text-foreground"
@@ -544,7 +610,7 @@ export function RecoveryKitDialog({
                 >
                   <Share2 className="h-5 w-5 text-primary" />
                   <span className="text-xs font-semibold">
-                    {hasShared ? "共有済" : "アプリへ共有"}
+                    {hasShared ? "共有済" : "写真に保存/共有"}
                   </span>
                 </button>
               ) : (
@@ -553,7 +619,7 @@ export function RecoveryKitDialog({
                     <button
                       type="button"
                       disabled={isDriveUploading}
-                      className={`flex flex-col items-center justify-center gap-2 p-3.5 rounded-lg border text-center transition-all disabled:opacity-50 ${
+                      className={`flex flex-col items-center justify-center gap-2 p-3 rounded-lg border text-center transition-all disabled:opacity-50 cursor-pointer ${
                         hasSavedDrive
                           ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
                           : "border-border bg-card hover:bg-muted text-foreground"
@@ -621,11 +687,11 @@ export function RecoveryKitDialog({
               <Button
                 onClick={handleClose}
                 disabled={!hasSavedAtLeastOne}
-                className="w-full font-semibold"
+                className="w-full font-semibold cursor-pointer"
               >
                 {hasSavedAtLeastOne
                   ? "完了して閉じる"
-                  : "PDFを保存してください"}
+                  : "PDFまたは画像を保存してください"}
               </Button>
             </DialogFooter>
           </div>
