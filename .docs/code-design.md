@@ -16,7 +16,7 @@ PoohMaは、フロントエンドとサーバーサイド処理を単一のTanSt
 リポジトリは Turborepo によるモノレポ構成をとっており、責務に応じて以下のパッケージに分離されている：
 - `apps/web`: フロントエンド & SSR（TanStack Start, Vite）およびブラウザ E2E テスト（Playwright）
 - `apps/admin`: 管理者コンソール（TanStack Start, Cloudflare Workers / Vite Plugin, cmdk, Geist Fonts）
-- `apps/extension`: Chrome 拡張機能（Manifest V3, WXT, React 19, Tailwind v4, Side Panel, Offscreen Document, Content Script）
+- `apps/extension`: Chrome 拡張機能（Manifest V3, WXT, React 19, Tailwind v4, Side Panel, Content Script）
 - `packages/backend`: Convex バックエンド（Schema, Functions, RLS, customBuilders, admin API, 結合テスト、Preview 環境プロビジョニング、シードエクスポート）
 - `packages/crypto`: 暗号化コアモジュール（`@poohma/crypto`: Web Crypto API, マスターキー/DEKエンベロープ暗号化, 鍵導出, extractable制御）
 - `packages/shared`: 共通モジュール（`@poohma/shared`: Zod スキーマ, React Email テンプレート, URLドメイン照合, 拡張機能メッセージプロトコル, ユーティリティ）
@@ -79,30 +79,30 @@ PWA 構成要素と責務:
 
 ## 2. 技術スタック一覧
 
-| 分類                         | 技術・ライブラリ                                                                                                                                                                                                           |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| フロントエンドフレームワーク | React 19, TanStack Start（SSR）                                                                                                                                                                                            |
-| ルーティング                 | TanStack Router（ファイルベースルーティング、(app)/(public)のルートグループ分割）                                                                                                                                          |
-| スタイリング                 | Tailwind CSS v4, shadcn/ui（radix-ui ベース）、Geist Sans／Geist Mono（ `@fontsource/geist-sans`, `@fontsource/geist-mono` 。8.5参照）                                                                                     |
-| 状態管理・データ取得         | TanStack Query, Convex React SDK（リアルタイムQuery/Mutation）。責務分離は8.4参照                                                                                                                                          |
-| 日本語処理                   | budoux（禁則処理・分かち書き、和文の適切な折り返し）                                                                                                                                                                       |
-| UI補助                       | next-themes（ライト/ダーク/システムテーマ切替）、cmdk（コマンドパレット系UI）、@icons-pack/react-simple-icons（サービスロゴアイコン）、html-react-parser（CMSリッチテキストの描画）、@dnd-kit（クレデンシャルDnD並び替え） |
-| バックエンド／DB             | Convex（サーバーレス関数＋リアクティブDB）                                                                                                                                                                                 |
-| 認証                         | Firebase Authentication（Google OAuth）＋ firebase-admin（サーバー側検証）＋ httpOnlyセッションCookie                                                                                                                      |
-| CMS                          | microCMS（microcms-js-sdk）                                                                                                                                                                                                |
-| メール送信・テンプレート     | Resend, React Email（`@react-email/components`）                                                                                                                                                                           |
-| 外部API                      | Yahoo!テキスト解析API（ふりがな）、任意サイトのOGPスクレイピング（cheerio）、Abstract IP Geolocation API（位置情報取得）、ipaddr.js（IPアドレス検証・SSRF/プライベートIP除外）                                             |
-| CSV処理                      | papaparse                                                                                                                                                                                                                  |
-| QRコード                     | qrcode.react                                                                                                                                                                                                               |
-| PWA                          | Web App Manifest（`public/manifest.json`）、iOS standalone判定ロジック（自前実装）                                                                                                                                         |
-| PDF生成                      | @cantoo/pdf-lib, @cantoo/fontkit（Noto Sans JP サブセット埋め込みによる日本語ベクターPDF生成）＋qrcode（リカバリーキット印刷用、FR-CRYPT-06）                                                                              |
-| 暗号                         | Web Crypto API（AES-GCM, PBKDF2）、WebAuthn（PRF拡張）                                                                                                                                                                     |
-| バリデーション               | zod, convex-helpers（customQuery/customMutation）                                                                                                                                                                          |
-| 監視                         | Vercel Analytics, Vercel Speed Insights                                                                                                                                                                                    |
-| テスト                       | Vitest, @testing-library/react, convex-test, Playwright（ブラウザモード）                                                                                                                                                  |
-| コンポーネントカタログ       | Storybook（Storybook Test Runner + axe-core による a11y 自動テスト連携）                                                                                                                                                   |
-| Lint／フォーマット           | Biome                                                                                                                                                                                                                      |
-| デプロイ                     | Vercel（フロントエンド）、Convex Cloud（バックエンド）                                                                                                                                                                     |
+| 分類                         | 技術・ライブラリ                                                                                                                                                                                                                             |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| フロントエンドフレームワーク | React 19, TanStack Start（SSR）                                                                                                                                                                                                              |
+| ルーティング                 | TanStack Router（ファイルベースルーティング、(app)/(public)のルートグループ分割）                                                                                                                                                            |
+| スタイリング                 | Tailwind CSS v4, shadcn/ui（radix-ui ベース）、Geist Sans／Geist Mono（ `@fontsource/geist-sans`, `@fontsource/geist-mono` 。8.5参照）                                                                                                       |
+| 状態管理・データ取得         | TanStack Query, Convex React SDK（リアルタイムQuery/Mutation）。責務分離は8.4参照                                                                                                                                                            |
+| 日本語処理                   | budoux（禁則処理・分かち書き、和文の適切な折り返し）                                                                                                                                                                                         |
+| UI補助                       | next-themes（ライト/ダーク/システムテーマ切替）、cmdk（コマンドパレット系UI）、@icons-pack/react-simple-icons（サービスロゴアイコン）、html-react-parser（CMSリッチテキストの描画）、@dnd-kit（クレデンシャルDnD並び替え）                   |
+| バックエンド／DB             | Convex（サーバーレス関数＋リアクティブDB）                                                                                                                                                                                                   |
+| 認証                         | Firebase Authentication（Google OAuth）＋ firebase-admin（サーバー側検証）＋ httpOnlyセッションCookie                                                                                                                                        |
+| CMS                          | microCMS（microcms-js-sdk）                                                                                                                                                                                                                  |
+| メール送信・テンプレート     | Resend, React Email（`@react-email/components`）                                                                                                                                                                                             |
+| 外部API                      | Yahoo!テキスト解析API（ふりがな）、任意サイトのOGPスクレイピング（cheerio）、Abstract IP Geolocation API（位置情報取得）、ipaddr.js（IPアドレス検証・SSRF/プライベートIP除外）                                                               |
+| CSV処理                      | papaparse                                                                                                                                                                                                                                    |
+| QRコード                     | qrcode.react                                                                                                                                                                                                                                 |
+| PWA                          | Web App Manifest（`public/manifest.json`）、iOS standalone判定ロジック（自前実装）                                                                                                                                                           |
+| PDF / PNG生成                | @cantoo/pdf-lib, @cantoo/fontkit（Noto Sans JP サブセット埋め込みによる日本語ベクターPDF生成）＋qrcode、Canvas API + PNG tEXtチャンク埋め込み・抽出（リカバリーキット印刷用・PNGカード画像保存・Web Share API共有、FR-CRYPT-06, Issue #387） |
+| 暗号                         | Web Crypto API（AES-GCM, PBKDF2）、WebAuthn（PRF拡張）                                                                                                                                                                                       |
+| バリデーション               | zod, convex-helpers（customQuery/customMutation）                                                                                                                                                                                            |
+| 監視                         | Vercel Analytics, Vercel Speed Insights                                                                                                                                                                                                      |
+| テスト                       | Vitest, @testing-library/react, convex-test, Playwright（ブラウザモード）                                                                                                                                                                    |
+| コンポーネントカタログ       | Storybook（Storybook Test Runner + axe-core による a11y 自動テスト連携）                                                                                                                                                                     |
+| Lint／フォーマット           | Biome                                                                                                                                                                                                                                        |
+| デプロイ                     | Vercel（フロントエンド）、Convex Cloud（バックエンド）                                                                                                                                                                                       |
 
 ## 3. ディレクトリ構成（抜粋）
 
@@ -235,7 +235,7 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 | createdAt                 | number                 | 作成日時                                                                                              |
 | updatedAt                 | number                 | 更新日時                                                                                              |
 
-インデックス: by\_userId, by\_email, by\_familyId
+インデックス: by\_userId, by\_email, by\_familyId, by\_createdAt
 
 #### familyMigrations
 
@@ -332,7 +332,7 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 | isSample                  | boolean(optional)      | サンプルデータフラグ（オンボーディング用のサンプルレコードはtrue）                                                                                                                                                     |
 | updatedAt                 | number                 | 更新日時                                                                                                                                                                                                               |
 
-インデックス: by_family_sortKey, by_family_isSample, by_family_isArchived, by_ownerType_accountId, by_ownerType_ownerFamilyId, by_userId, by_accountId, by_family_updatedAt, by_ownerType_accountId_updatedAt, by_family_stableId, by_stableId
+インデックス: by_family_sortKey, by_family_isSample, by_family_isArchived, by_ownerType_accountId, by_ownerType_ownerFamilyId, by_userId, by_accountId, by_accountId_isArchived, by_family_updatedAt, by_ownerType_accountId_updatedAt, by_family_stableId, by_stableId
 
 #### credentials
 
@@ -443,7 +443,7 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 | createdAt  | number                           | 送信日時（epoch ms）                |
 | status     | "UNREAD" \| "READ" \| "RESOLVED" | 対応ステータス                      |
 
-インデックス: by_createdAt, by_email_createdAt。同一メールアドレスによる短時間連投の抑止（レート制限）および一覧照会に使用。
+インデックス: by_createdAt, by_email_createdAt, by_status。同一メールアドレスによる短時間連投の抑止（レート制限）および一覧・ステータス別集計照会に使用。
 
 #### extensionSyncCodes
 
@@ -998,7 +998,7 @@ DEKは credentials.passwordHintDekEncrypted / passwordHintDekIv として保存�
 | getRecordDetail                                                   | Query            | authenticated    | 詳細取得（rls.tsによるrequireContentAccess制御）。adminUsersをファミリー管理者＋admins配列から動的マージして返却。取得時にrecordAccessLogへVIEWEDを記録し、lastViewedAt/Byを更新                                                                                                                                                                                                                                                                       |
 | getAvailableTags                                                  | Query            | authenticated    | 閲覧可能レコードから使用中タグ一覧を抽出（by\_family\_sortKey経由）                                                                                                                                                                                                                                                                                                                                                                                    |
 | getOwnedRecords                                                   | Query            | authenticated    | 自分が管理可能な全レコード取得（個人レコード＋自分が管理者の共有レコード、CSVエクスポート用）                                                                                                                                                                                                                                                                                                                                                          |
-| fetchRecordsForExport                                             | Mutation         | authenticated    | CSVエクスポート用レコード一括取得（stableId、isArchived含む。サーバー側でCSVエクスポート通知メールもスケジュール送信）                                                                                                                                                                                                                                                                                                                                 |
+| fetchRecordsForExport                                             | Mutation         | authenticated    | CSVエクスポート用レコード一括取得（引数: scope, archiveStatus, includeHints, tag, q 対応。includeHints: false 指定時はパスコード未解除でもエクスポート可能。stableId、isArchived含む。サーバー側でCSVエクスポート通知メールもスケジュール送信、Issue #135）                                                                                                                                                                                            |
 | shareRecord                                                       | Mutation         | familyBound      | ワンタップで個人レコードを家族共有レコード（ownerType: "family"）に昇格。共有者が閲覧者の場合はadminsに追加、ファミリー管理者の場合は空配列（共有変更通知メール送信）                                                                                                                                                                                                                                                                                  |
 | unshareRecord                                                     | Mutation         | familyBound      | ワンタップで共有レコードを個人レコード（ownerType: "user", admins: []）に戻す（管理者限定・共有変更通知メール送信）                                                                                                                                                                                                                                                                                                                                    |
 | addRecordAdmin / removeRecordAdmin                                | Mutation         | recordAdmin      | 共有レコードの個別管理者（一般メンバー）の追加・解除（管理者限定・管理者変更通知メール送信。ファミリー管理者の冗長追加は防止）                                                                                                                                                                                                                                                                                                                         |

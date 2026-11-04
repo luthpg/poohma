@@ -150,3 +150,23 @@ Playwright E2E テストおよびフロントエンド遷移における落と�
   Playwright のフィクスチャ（`workerStorageState` 等）の既定タイムアウト（30秒）を超過すると、テスト本体が始まる前に `Timeout 30000ms exceeded while setting up "workerStorageState"` でワーカー全体が即座にクラッシュする。
 - **回避法**:
   `e2e/support/test-fixtures.ts` 内の `workerStorageState` フィクスチャ定義において、第2引数のオプションに `{ scope: "worker", timeout: 120_000 }` を明示的に指定し、初期認証セットアップに十分なタイムアウト（120秒）を付与する。同様に `e2e/auth.setup.ts` の `test.setTimeout(120_000)` も揃えて設定する。
+
+---
+
+### ローカル Convex（Docker）におけるサーバー環境変数（`CONVEX_INTERNAL_SECRET` 等）の注入漏れ
+
+- **問題**:
+  `pnpm test:e2e:local` では Docker コンテナ上のローカル Convex バックエンドを起動してテストを実行するが、`convex deploy` を実行しただけでは、バックエンド内の環境変数（`process.env.CONVEX_INTERNAL_SECRET`）が登録されない。
+  その結果、Server Function（`getAuthUser`）が呼び出す Convex HTTP Action（`/getUserByFirebaseUid`）のシークレット検証で 401 Unauthorized となり、SSR セッション初期化・認証リダイレクト判定が失敗して E2E テストがタイムアウトする。
+- **回避法**:
+  `packages/backend/scripts/setup-local-convex.ts` において、`localEnvFile` への書き出しだけでなく、`convex deploy` 完了後に `convex env set CONVEX_INTERNAL_SECRET=... DISABLE_EMAIL_DELIVERY=true` を実行して、ローカル Convex インスタンスへ確実にデプロイメント環境変数を注入する。
+
+---
+
+### 家族作成直後のオンボーディングツアー完了モーダルによる後続操作遮断
+
+- **問題**:
+  E2E テストフィクスチャ（`ensureFamilyAssigned` 等）で家族グループを新規作成した直後、UI 上にオンボーディングツアーの「家族グループができました！ 🎉」ダイアログが前面にポップアップ表示される。
+  これを閉じずに後続の画面操作（家族グループ名変更ボタンのクリック等）を進めようとすると、ダイアログに遮られてクリックがインターセプトされ、30秒タイムアウトとなる。
+- **回避法**:
+  `ensureFamilyAssigned` で家族グループ作成ボタンをクリックしてセクションの表示を待機した直後に、「家族設定を見る」ボタン（`page.getByRole("button", { name: "家族設定を見る" })`）の表示を短時間待機し、表示された場合は自動でクリックして閉じるハンドリングをテストフィクスチャに組み込む。
