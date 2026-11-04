@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import dotenv from "dotenv";
 
 const dirname =
   import.meta.dirname ?? path.dirname(fileURLToPath(import.meta.url));
@@ -11,6 +12,22 @@ const rootDir = path.resolve(backendDir, "../..");
 const webDir = path.resolve(rootDir, "apps/web");
 const localEnvFile = path.resolve(webDir, "e2e/.env.e2e-local");
 const composeFile = path.resolve(backendDir, "docker-compose.local.yml");
+
+// .env および .env.local をロード
+const envFiles = [
+  path.join(rootDir, ".env"),
+  path.join(rootDir, ".env.local"),
+  path.join(backendDir, ".env"),
+  path.join(backendDir, ".env.local"),
+  path.join(webDir, ".env"),
+  path.join(webDir, ".env.local"),
+];
+
+for (const envFile of envFiles) {
+  if (fs.existsSync(envFile)) {
+    dotenv.config({ path: envFile, override: true });
+  }
+}
 
 function runCommand(
   cmd: string,
@@ -108,6 +125,9 @@ export async function setupLocalConvex(): Promise<void> {
 
   // 4. E2E テスト・デプロイ用環境変数ファイルに先に書き出し
   console.log("📝 [local-convex] Writing environment configuration...");
+  const internalSecret =
+    process.env.CONVEX_INTERNAL_SECRET || "e2e-local-internal-secret";
+
   fs.mkdirSync(path.dirname(localEnvFile), { recursive: true });
   fs.writeFileSync(
     localEnvFile,
@@ -115,6 +135,7 @@ export async function setupLocalConvex(): Promise<void> {
       `VITE_CONVEX_SITE_URL=http://127.0.0.1:3211\n` +
       `CONVEX_SELF_HOSTED_URL=http://127.0.0.1:3210\n` +
       `CONVEX_SELF_HOSTED_ADMIN_KEY=${adminKey}\n` +
+      `CONVEX_INTERNAL_SECRET=${internalSecret}\n` +
       `CONVEX_DEPLOYMENT=\n`,
     "utf-8",
   );
@@ -147,6 +168,33 @@ export async function setupLocalConvex(): Promise<void> {
         stdio: "inherit",
       },
     );
+
+    // 6. ローカル Convex インスタンスに環境変数を設定（HTTP Action / getUserByFirebaseUid 用）
+    console.log(
+      "⚙️  [local-convex] Setting environment variables on local instance...",
+    );
+    try {
+      runPnpm(
+        [
+          "exec",
+          "convex",
+          "env",
+          "set",
+          `CONVEX_INTERNAL_SECRET=${internalSecret}`,
+          "DISABLE_EMAIL_DELIVERY=true",
+        ],
+        {
+          cwd: backendDir,
+          env: selfHostedEnv,
+          stdio: "inherit",
+        },
+      );
+    } catch (envSetError) {
+      console.warn(
+        "⚠️ [local-convex] Non-fatal: failed to set environment variables on local instance via CLI:",
+        envSetError,
+      );
+    }
 
     console.log(
       `✅ [local-convex] Local Convex backend is ready! (Wrote to ${localEnvFile})\n` +
