@@ -8,18 +8,39 @@ import { useAccount } from "@/hooks/useAccount";
 import { getClientRequestContext } from "@/services/security.functions";
 import { sanitizeCsvValue } from "@/utils/csv-sanitize";
 
+export interface CsvExportOptions {
+  scope?: "all" | "personal" | "shared";
+  archiveStatus?: "active" | "archived" | "all";
+  includeHints?: boolean;
+  tag?: string;
+  q?: string;
+}
+
 export function useExportCsv() {
   const [isExporting, setIsExporting] = useState(false);
   const { masterKey, requireUnlock, decryptHint } = usePasscode();
   const { activeAccountId } = useAccount();
   const fetchRecordsForExport = useMutation(api.records.fetchRecordsForExport);
 
-  const handleExport = async () => {
+  const handleExport = async (
+    optionsOrEvent?: CsvExportOptions | React.MouseEvent,
+  ) => {
     setIsExporting(true);
+    const options: CsvExportOptions =
+      optionsOrEvent && !("nativeEvent" in optionsOrEvent)
+        ? optionsOrEvent
+        : {};
+    const includeHints = options.includeHints !== false;
+
     try {
       const context = await getClientRequestContext().catch(() => ({}));
       const records = await fetchRecordsForExport({
         accountId: activeAccountId || undefined,
+        scope: options.scope,
+        archiveStatus: options.archiveStatus,
+        includeHints,
+        tag: options.tag,
+        q: options.q,
         ...context,
       });
 
@@ -40,70 +61,76 @@ export function useExportCsv() {
           row[`CredentialId${idx}`] = cred.stableId || "";
           row[`Label${idx}`] = cred.label || "";
           row[`LoginID${idx}`] = cred.loginId || "";
-          row[`PasswordHint${idx}`] = cred.passwordHint || "";
-          row[`PasswordHintIv${idx}`] = cred.passwordHintIv || "";
-          row[`PasswordHintDekEncrypted${idx}`] =
-            cred.passwordHintDekEncrypted || "";
-          row[`PasswordHintDekIv${idx}`] = cred.passwordHintDekIv || "";
+          if (includeHints) {
+            row[`PasswordHint${idx}`] = cred.passwordHint || "";
+            row[`PasswordHintIv${idx}`] = cred.passwordHintIv || "";
+            row[`PasswordHintDekEncrypted${idx}`] =
+              cred.passwordHintDekEncrypted || "";
+            row[`PasswordHintDekIv${idx}`] = cred.passwordHintDekIv || "";
+          }
         });
         return row;
       });
 
-      // Check if there are any encrypted hints
+      // Check if there are any encrypted hints to decrypt
       let hasEncryptedHints = false;
-      for (const row of data) {
-        for (let i = 1; i <= MAX_CREDENTIALS_PER_RECORD; i++) {
-          if (row[`PasswordHint${i}`] && row[`PasswordHintIv${i}`]) {
-            hasEncryptedHints = true;
-            break;
+      if (includeHints) {
+        for (const row of data) {
+          for (let i = 1; i <= MAX_CREDENTIALS_PER_RECORD; i++) {
+            if (row[`PasswordHint${i}`] && row[`PasswordHintIv${i}`]) {
+              hasEncryptedHints = true;
+              break;
+            }
+          }
+          if (hasEncryptedHints) break;
+        }
+
+        if (hasEncryptedHints && !masterKey) {
+          const unlocked = await requireUnlock();
+          if (!unlocked) {
+            setIsExporting(false);
+            return;
           }
         }
-        if (hasEncryptedHints) break;
       }
 
-      if (hasEncryptedHints && !masterKey) {
-        const unlocked = await requireUnlock();
-        if (!unlocked) {
-          setIsExporting(false);
-          return;
-        }
-      }
-
-      // Decrypt hints for export
+      // Decrypt hints for export (only when includeHints is true)
       let totalDecryptionErrors = 0;
-      const decryptedData = await Promise.all(
+      const processedData = await Promise.all(
         data.map(async (row) => {
           const newRow = { ...row };
 
-          for (let i = 1; i <= MAX_CREDENTIALS_PER_RECORD; i++) {
-            const hint = row[`PasswordHint${i}`];
-            const iv = row[`PasswordHintIv${i}`];
-            const dekEncrypted = row[`PasswordHintDekEncrypted${i}`];
-            const dekIv = row[`PasswordHintDekIv${i}`];
-            if (hint && iv) {
-              try {
-                const plainHint = await decryptHint(
-                  hint,
-                  iv,
-                  dekEncrypted || undefined,
-                  dekIv || undefined,
-                );
-                // 復号後の平文ヒントにCSVサニタイズを適用
-                newRow[`PasswordHint${i}`] = sanitizeCsvValue(plainHint);
-              } catch (_e) {
+          if (includeHints) {
+            for (let i = 1; i <= MAX_CREDENTIALS_PER_RECORD; i++) {
+              const hint = row[`PasswordHint${i}`];
+              const iv = row[`PasswordHintIv${i}`];
+              const dekEncrypted = row[`PasswordHintDekEncrypted${i}`];
+              const dekIv = row[`PasswordHintDekIv${i}`];
+              if (hint && iv) {
+                try {
+                  const plainHint = await decryptHint(
+                    hint,
+                    iv,
+                    dekEncrypted || undefined,
+                    dekIv || undefined,
+                  );
+                  // 復号後の平文ヒントにCSVサニタイズを適用
+                  newRow[`PasswordHint${i}`] = sanitizeCsvValue(plainHint);
+                } catch (_e) {
+                  newRow[`PasswordHint${i}`] = "";
+                  totalDecryptionErrors += 1;
+                }
+              } else {
                 newRow[`PasswordHint${i}`] = "";
-                totalDecryptionErrors += 1;
+                if (hint && !iv) {
+                  totalDecryptionErrors += 1;
+                }
               }
-            } else {
-              newRow[`PasswordHint${i}`] = "";
-              if (hint && !iv) {
-                totalDecryptionErrors += 1;
-              }
+              // Remove IV and DEK fields from export
+              delete newRow[`PasswordHintIv${i}`];
+              delete newRow[`PasswordHintDekEncrypted${i}`];
+              delete newRow[`PasswordHintDekIv${i}`];
             }
-            // Remove IV and DEK fields from export
-            delete newRow[`PasswordHintIv${i}`];
-            delete newRow[`PasswordHintDekEncrypted${i}`];
-            delete newRow[`PasswordHintDekIv${i}`];
           }
 
           // 非暗号化フィールドにサニタイズを適用
@@ -128,25 +155,24 @@ export function useExportCsv() {
         "IsArchived",
       ];
       for (let i = 1; i <= MAX_CREDENTIALS_PER_RECORD; i++) {
-        columns.push(
-          `CredentialId${i}`,
-          `Label${i}`,
-          `LoginID${i}`,
-          `PasswordHint${i}`,
-        );
+        columns.push(`CredentialId${i}`, `Label${i}`, `LoginID${i}`);
+        if (includeHints) {
+          columns.push(`PasswordHint${i}`);
+        }
       }
 
       const Papa = (await import("papaparse")).default;
-      const csv = Papa.unparse(decryptedData, { columns });
+      const csv = Papa.unparse(processedData, { columns });
       // Excelの文字化け対策としてBOM (UTF-8) を付与
       const bom = new Uint8Array([0xef, 0xbb, 0xbf]);
       const blob = new Blob([bom, csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.setAttribute("href", url);
+      const prefix = includeHints ? "poohma_export" : "poohma_export_nohints";
       link.setAttribute(
         "download",
-        `poohma_export_${new Date().toISOString().split("T")[0]}.csv`,
+        `${prefix}_${new Date().toISOString().split("T")[0]}.csv`,
       );
       document.body.appendChild(link);
       link.click();
@@ -156,7 +182,11 @@ export function useExportCsv() {
           "一部のアカウント情報の復号に失敗したため、該当のヒントは空欄で出力されました",
         );
       } else {
-        toast.success("データをエクスポートしました");
+        toast.success(
+          includeHints
+            ? "データをエクスポートしました"
+            : "ヒントを除外してデータをエクスポートしました",
+        );
       }
     } catch (_error) {
       toast.error("エクスポートに失敗しました");

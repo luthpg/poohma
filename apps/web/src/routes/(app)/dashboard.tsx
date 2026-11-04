@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   Archive,
   ArchiveRestore,
+  FileSpreadsheet,
   Globe,
   LayoutGrid,
   List,
@@ -1374,11 +1375,35 @@ function RecordListSection({
               </span>
             </label>
           ) : (
-            <div
-              className="text-[14px] text-muted-foreground font-medium tracking-geist-ui"
-              data-testid="record-count"
-            >
-              {filteredRecords.length} 件のレコード
+            <div className="flex items-center gap-2.5">
+              <div
+                className="text-[14px] text-muted-foreground font-medium tracking-geist-ui"
+                data-testid="record-count"
+              >
+                {filteredRecords.length} 件のレコード
+              </div>
+              {Boolean(
+                searchParams.q?.trim() ||
+                  searchParams.tag ||
+                  (searchParams.filter && searchParams.filter !== "all") ||
+                  (searchParams.archiveStatus &&
+                    searchParams.archiveStatus !== "active"),
+              ) && (
+                <Link
+                  to="/settings/bulk"
+                  search={{
+                    q: searchParams.q?.trim() || undefined,
+                    tag: searchParams.tag || undefined,
+                    scope: currentFilter,
+                    archiveStatus: searchParams.archiveStatus || "active",
+                  }}
+                  className="hidden sm:inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-orange-600 transition-colors cursor-pointer"
+                  title="現在の絞り込み条件を引き継いでCSV出力します"
+                >
+                  <FileSpreadsheet className="h-3 w-3 text-orange-500" />
+                  <span>この条件でCSV出力</span>
+                </Link>
+              )}
             </div>
           )}
         </div>
