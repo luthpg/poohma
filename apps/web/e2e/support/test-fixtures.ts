@@ -186,11 +186,12 @@ export async function ensureFamilyAssigned(
 
     // 家族作成直後にオンボーディングの「家族設定を見る」ダイアログが表示される場合は閉じる
     const tourModalBtn = page.getByRole("button", { name: "家族設定を見る" });
-    try {
-      await tourModalBtn.waitFor({ state: "visible", timeout: 2000 });
+    const isTourModalVisible = await tourModalBtn
+      .waitFor({ state: "visible", timeout: 2000 })
+      .then(() => true)
+      .catch(() => false);
+    if (isTourModalVisible) {
       await tourModalBtn.click();
-    } catch {
-      // 表示されなければそのまま進行
     }
   }
 }

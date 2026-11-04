@@ -153,13 +153,14 @@ Playwright E2E テストおよびフロントエンド遷移における落と�
 
 ---
 
-### ローカル Convex（Docker）におけるサーバー環境変数（`CONVEX_INTERNAL_SECRET` 等）の注入漏れ
+### ローカル Convex（Docker）におけるサーバー環境変数（`CONVEX_INTERNAL_SECRET` 等）の注入漏れと `CONVEX_DEPLOYMENT` 衝突の罠
 
 - **問題**:
   `pnpm test:e2e:local` では Docker コンテナ上のローカル Convex バックエンドを起動してテストを実行するが、`convex deploy` を実行しただけでは、バックエンド内の環境変数（`process.env.CONVEX_INTERNAL_SECRET`）が登録されない。
   その結果、Server Function（`getAuthUser`）が呼び出す Convex HTTP Action（`/getUserByFirebaseUid`）のシークレット検証で 401 Unauthorized となり、SSR セッション初期化・認証リダイレクト判定が失敗して E2E テストがタイムアウトする。
+  また、`convex env set` を CLI で実行する際、`--env-file` を明示しないと `packages/backend/.env.local` 内の `CONVEX_DEPLOYMENT` が自動ロードされ、self-hosted 設定（`CONVEX_SELF_HOSTED_URL` / `ADMIN_KEY`）と衝突してエラー（`CONVEX_DEPLOYMENT must not be set when CONVEX_SELF_HOSTED_URL and CONVEX_SELF_HOSTED_ADMIN_KEY are set`）となり環境変数が注入されない。
 - **回避法**:
-  `packages/backend/scripts/setup-local-convex.ts` において、`localEnvFile` への書き出しだけでなく、`convex deploy` 完了後に `convex env set CONVEX_INTERNAL_SECRET=... DISABLE_EMAIL_DELIVERY=true` を実行して、ローカル Convex インスタンスへ確実にデプロイメント環境変数を注入する。
+  `packages/backend/scripts/setup-local-convex.ts` において、`localEnvFile` への書き出しだけでなく、`convex deploy` 完了後に `--env-file=${localEnvFile}` を明示指定して `convex env set CONVEX_INTERNAL_SECRET=...` および `DISABLE_EMAIL_DELIVERY=true` を実行し、ローカル Convex インスタンスへ確実にデプロイメント環境変数を注入する。失敗時は Non-fatal で握りつぶさず例外を投げてセットアップを中断する。
 
 ---
 
@@ -169,4 +170,4 @@ Playwright E2E テストおよびフロントエンド遷移における落と�
   E2E テストフィクスチャ（`ensureFamilyAssigned` 等）で家族グループを新規作成した直後、UI 上にオンボーディングツアーの「家族グループができました！ 🎉」ダイアログが前面にポップアップ表示される。
   これを閉じずに後続の画面操作（家族グループ名変更ボタンのクリック等）を進めようとすると、ダイアログに遮られてクリックがインターセプトされ、30秒タイムアウトとなる。
 - **回避法**:
-  `ensureFamilyAssigned` で家族グループ作成ボタンをクリックしてセクションの表示を待機した直後に、「家族設定を見る」ボタン（`page.getByRole("button", { name: "家族設定を見る" })`）の表示を短時間待機し、表示された場合は自動でクリックして閉じるハンドリングをテストフィクスチャに組み込む。
+  `ensureFamilyAssigned` で家族グループ作成ボタンをクリックしてセクションの表示を待機した直後に、「家族設定を見る」ボタン（`page.getByRole("button", { name: "家族設定を見る" })`）の表示を短時間待機（`waitFor` のタイムアウトはスキップ）し、表示された場合のみ `click()` を実行するハンドリングをテストフィクスチャに組み込む（待機タイムアウトとクリック失敗を同一 `try/catch` で握りつぶさない）。

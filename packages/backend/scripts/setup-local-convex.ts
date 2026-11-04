@@ -177,7 +177,7 @@ export async function setupLocalConvex(): Promise<void> {
     );
     try {
       // backendDir の .env.local から CONVEX_DEPLOYMENT を自動ロードして selfHostedEnv と衝突するのを防ぐため、
-      // rootDir を作業ディレクトリとして @poohma/backend フィルター経由で実行する
+      // localEnvFile を明示的に指定して実行する
       runPnpm(
         [
           "-F",
@@ -188,6 +188,7 @@ export async function setupLocalConvex(): Promise<void> {
           "set",
           "CONVEX_INTERNAL_SECRET",
           internalSecret,
+          `--env-file=${localEnvFile}`,
         ],
         {
           cwd: rootDir,
@@ -205,6 +206,7 @@ export async function setupLocalConvex(): Promise<void> {
           "set",
           "DISABLE_EMAIL_DELIVERY",
           "true",
+          `--env-file=${localEnvFile}`,
         ],
         {
           cwd: rootDir,
@@ -213,8 +215,11 @@ export async function setupLocalConvex(): Promise<void> {
         },
       );
     } catch {
-      console.warn(
-        "⚠️ [local-convex] Non-fatal: failed to set environment variables on local instance via CLI. See the CLI output above.",
+      console.error(
+        "❌ [local-convex] Failed to set environment variables on local instance via CLI.",
+      );
+      throw new Error(
+        "Failed to set required environment variables on local Convex backend.",
       );
     }
 
