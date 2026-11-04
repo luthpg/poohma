@@ -197,17 +197,27 @@ async function collectVisibleRecords(
   }
 
   // 家族未所属の場合
-  const personalRecords = await ctx.db
-    .query("serviceRecords")
-    .withIndex("by_accountId", (i) => i.eq("accountId", user._id))
-    .collect();
+  const personalRecords =
+    archiveStatus === "active"
+      ? await ctx.db
+          .query("serviceRecords")
+          .withIndex("by_accountId_isArchived", (i) =>
+            i.eq("accountId", user._id).eq("isArchived", false),
+          )
+          .collect()
+      : archiveStatus === "archived"
+        ? await ctx.db
+            .query("serviceRecords")
+            .withIndex("by_accountId_isArchived", (i) =>
+              i.eq("accountId", user._id).eq("isArchived", true),
+            )
+            .collect()
+        : await ctx.db
+            .query("serviceRecords")
+            .withIndex("by_accountId", (i) => i.eq("accountId", user._id))
+            .collect();
 
-  return personalRecords.filter((r) => {
-    if (getEffectiveOwnerType(r) !== "user") return false;
-    if (archiveStatus === "active") return !r.isArchived;
-    if (archiveStatus === "archived") return r.isArchived;
-    return true;
-  });
+  return personalRecords.filter((r) => getEffectiveOwnerType(r) === "user");
 }
 
 /**
@@ -273,11 +283,6 @@ export const getRecords = authenticatedQuery({
 
     const archiveStatus = args.archiveStatus ?? "active";
     let records = await collectVisibleRecords(ctx, user, false, archiveStatus);
-    if (archiveStatus === "active") {
-      records = records.filter((r) => !r.isArchived);
-    } else if (archiveStatus === "archived") {
-      records = records.filter((r) => r.isArchived);
-    }
 
     if (args.tag) {
       records = records.filter((r) => r.tags.includes(args.tag as string));
@@ -372,13 +377,38 @@ export const getRecordsPaginated = authenticatedQuery({
     const { user } = ctx;
 
     const familyId = user.familyId;
+    const archiveStatus = args.archiveStatus ?? "active";
     const baseQuery = familyId
-      ? ctx.db
-          .query("serviceRecords")
-          .withIndex("by_family_sortKey", (i) => i.eq("familyId", familyId))
-      : ctx.db
-          .query("serviceRecords")
-          .withIndex("by_accountId", (i) => i.eq("accountId", user._id));
+      ? archiveStatus === "active"
+        ? ctx.db
+            .query("serviceRecords")
+            .withIndex("by_family_isArchived", (i) =>
+              i.eq("familyId", familyId).eq("isArchived", false),
+            )
+        : archiveStatus === "archived"
+          ? ctx.db
+              .query("serviceRecords")
+              .withIndex("by_family_isArchived", (i) =>
+                i.eq("familyId", familyId).eq("isArchived", true),
+              )
+          : ctx.db
+              .query("serviceRecords")
+              .withIndex("by_family_sortKey", (i) => i.eq("familyId", familyId))
+      : archiveStatus === "active"
+        ? ctx.db
+            .query("serviceRecords")
+            .withIndex("by_accountId_isArchived", (i) =>
+              i.eq("accountId", user._id).eq("isArchived", false),
+            )
+        : archiveStatus === "archived"
+          ? ctx.db
+              .query("serviceRecords")
+              .withIndex("by_accountId_isArchived", (i) =>
+                i.eq("accountId", user._id).eq("isArchived", true),
+              )
+          : ctx.db
+              .query("serviceRecords")
+              .withIndex("by_accountId", (i) => i.eq("accountId", user._id));
 
     const paginated = await baseQuery.paginate(args.paginationOpts);
 
@@ -396,13 +426,6 @@ export const getRecordsPaginated = authenticatedQuery({
     });
 
     let records = visiblePage;
-
-    const archiveStatus = args.archiveStatus ?? "active";
-    if (archiveStatus === "active") {
-      records = records.filter((r) => !r.isArchived);
-    } else if (archiveStatus === "archived") {
-      records = records.filter((r) => r.isArchived);
-    }
 
     if (args.tag) {
       records = records.filter((r) => r.tags.includes(args.tag as string));
@@ -1850,10 +1873,30 @@ export const fetchRecordsForExport = authenticatedMutation({
     os: v.optional(v.string()),
     ipAddress: v.optional(v.string()),
     location: v.optional(v.string()),
+    scope: v.optional(
+      v.union(v.literal("all"), v.literal("personal"), v.literal("shared")),
+    ),
+    archiveStatus: v.optional(
+      v.union(v.literal("active"), v.literal("archived"), v.literal("all")),
+    ),
+    includeHints: v.optional(v.boolean()),
+    tag: v.optional(v.string()),
+    q: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { user } = ctx;
-    const records = await collectVisibleRecords(ctx, user, false);
+    const archiveStatus = args.archiveStatus ?? "all";
+    let records = await collectVisibleRecords(ctx, user, false, archiveStatus);
+
+    if (args.scope === "personal") {
+      records = records.filter((r) => (r.ownerType ?? "family") === "user");
+    } else if (args.scope === "shared") {
+      records = records.filter((r) => (r.ownerType ?? "family") === "family");
+    }
+
+    if (args.tag) {
+      records = records.filter((r) => r.tags.includes(args.tag as string));
+    }
 
     const members = user.familyId
       ? await ctx.db
@@ -1863,32 +1906,10 @@ export const fetchRecordsForExport = authenticatedMutation({
       : [user];
     const emailById = new Map(members.map((m) => [m._id, m.email]));
 
-    // エクスポート実行通知メールをスケジュール（オプトアウト判定）
-    if (user.emailNotificationSettings?.notifyDataExport !== false) {
-      await ctx.scheduler.runAfter(
-        0,
-        internal.actions.sendTemplatedEmailInternal,
-        {
-          email: user.email,
-          payload: {
-            template: "csvExported",
-            props: {
-              displayName: user.displayName || "メンバー",
-              exportedAt: Date.now(),
-              recordCount: records.length,
-              deviceName: args.deviceName,
-              browser: args.browser,
-              os: args.os,
-              ipAddress: args.ipAddress,
-              location: args.location,
-              ctaUrl: "/settings",
-            },
-          },
-        },
-      );
-    }
+    const includeHints = args.includeHints !== false;
 
-    return Promise.all(
+    // 各レコードに紐づく credentials を取得
+    const recordsWithCreds = await Promise.all(
       records.map(async (r) => {
         const admins = getEffectiveAdmins(r);
         const creds = await getCredentialsForRecord(ctx, r._id);
@@ -1902,10 +1923,14 @@ export const fetchRecordsForExport = authenticatedMutation({
             stableId: c.stableId,
             label: c.label,
             loginId: c.loginId,
-            passwordHint: c.passwordHint,
-            passwordHintIv: c.passwordHintIv,
-            passwordHintDekEncrypted: c.passwordHintDekEncrypted,
-            passwordHintDekIv: c.passwordHintDekIv,
+            ...(includeHints
+              ? {
+                  passwordHint: c.passwordHint,
+                  passwordHintIv: c.passwordHintIv,
+                  passwordHintDekEncrypted: c.passwordHintDekEncrypted,
+                  passwordHintDekIv: c.passwordHintDekIv,
+                }
+              : {}),
           })),
           adminEmails: (admins ?? [])
             .map((id) => emailById.get(id))
@@ -1913,6 +1938,55 @@ export const fetchRecordsForExport = authenticatedMutation({
         };
       }),
     );
+
+    let filtered = recordsWithCreds;
+    if (args.q) {
+      const searchWords = extractSearchWords(args.q);
+      if (searchWords.length > 0) {
+        filtered = filtered.filter((r) => {
+          const searchableTexts: string[] = [
+            r.title,
+            r.titleReading,
+            r.url,
+            r.memo,
+            ...(r.tags ?? []),
+            ...r.credentials.flatMap((c) => [c.label, c.loginId]),
+          ].filter(
+            (text): text is string =>
+              typeof text === "string" && text.length > 0,
+          );
+
+          return matchesSearchWords(searchableTexts, searchWords);
+        });
+      }
+    }
+
+    // エクスポート実行通知メールをスケジュール（オプトアウト判定）
+    if (user.emailNotificationSettings?.notifyDataExport !== false) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.actions.sendTemplatedEmailInternal,
+        {
+          email: user.email,
+          payload: {
+            template: "csvExported",
+            props: {
+              displayName: user.displayName || "メンバー",
+              exportedAt: Date.now(),
+              recordCount: filtered.length,
+              deviceName: args.deviceName,
+              browser: args.browser,
+              os: args.os,
+              ipAddress: args.ipAddress,
+              location: args.location,
+              ctaUrl: "/settings",
+            },
+          },
+        },
+      );
+    }
+
+    return filtered;
   },
 });
 

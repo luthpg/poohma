@@ -79,6 +79,7 @@ export default defineSchema({
     .index("by_userId", ["userId"])
     .index("by_email", ["email"])
     .index("by_familyId", ["familyId"])
+    .index("by_createdAt", ["createdAt"])
     .searchIndex("search_email", { searchField: "email" })
     .searchIndex("search_displayName", { searchField: "displayName" }),
 
@@ -182,6 +183,7 @@ export default defineSchema({
   })
     .index("by_userId", ["userId"])
     .index("by_accountId", ["accountId"])
+    .index("by_accountId_isArchived", ["accountId", "isArchived"])
     .index("by_family_sortKey", ["familyId", "sortKey"])
     .index("by_family_isSample", ["familyId", "isSample"])
     .index("by_family_isArchived", ["familyId", "isArchived"])
@@ -235,6 +237,7 @@ export default defineSchema({
       v.literal("RESOLVED"),
     ),
   })
+    .index("by_status", ["status"])
     .index("by_createdAt", ["createdAt"])
     .index("by_email_createdAt", ["email", "createdAt"]),
 

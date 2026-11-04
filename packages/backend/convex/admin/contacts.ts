@@ -55,23 +55,27 @@ export const updateContactStatus = systemAdminMutation({
 export const getContactStats = systemAdminQuery({
   args: {},
   handler: async (ctx) => {
-    const allContacts = await ctx.db
-      .query("contacts")
-      .withIndex("by_createdAt")
-      .collect();
+    const [unreadList, readList, resolvedList] = await Promise.all([
+      ctx.db
+        .query("contacts")
+        .withIndex("by_status", (q) => q.eq("status", "UNREAD"))
+        .collect(),
+      ctx.db
+        .query("contacts")
+        .withIndex("by_status", (q) => q.eq("status", "READ"))
+        .collect(),
+      ctx.db
+        .query("contacts")
+        .withIndex("by_status", (q) => q.eq("status", "RESOLVED"))
+        .collect(),
+    ]);
 
-    let unreadCount = 0;
-    let readCount = 0;
-    let resolvedCount = 0;
-
-    for (const c of allContacts) {
-      if (c.status === "UNREAD") unreadCount++;
-      else if (c.status === "READ") readCount++;
-      else if (c.status === "RESOLVED") resolvedCount++;
-    }
+    const unreadCount = unreadList.length;
+    const readCount = readList.length;
+    const resolvedCount = resolvedList.length;
 
     return {
-      total: allContacts.length,
+      total: unreadCount + readCount + resolvedCount,
       unread: unreadCount,
       read: readCount,
       resolved: resolvedCount,
