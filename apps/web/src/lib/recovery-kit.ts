@@ -8,6 +8,7 @@ import {
 import { isValidRecoveryCode, normalizeRecoveryCode } from "@poohma/crypto";
 import jsQR from "jsqr";
 import QRCode from "qrcode";
+import { renderCanvasLogo } from "@/components/common/LogoText";
 
 export interface RecoveryKitPdfParams {
   familyName: string;
@@ -643,36 +644,40 @@ export async function generateRecoveryKitPng({
   ctx.roundRect(cardX, cardY, cardW, cardH, radius);
   ctx.fillStyle = "#FFFFFF";
   ctx.fill();
+
+  // カード内部にクリップして上部アクセントバーを描画（角丸境界からの横はみ出しを完全防止）
+  ctx.save();
+  ctx.clip();
+  ctx.fillStyle = "#EA580C";
+  ctx.fillRect(cardX, cardY, cardW, 8);
+  ctx.restore();
+
+  // カード外枠境界線
   ctx.strokeStyle = "#E2E8F0";
   ctx.lineWidth = 2;
   ctx.stroke();
   ctx.restore();
 
-  // 上部アクセントバー（PoohMa オレンジ #ea580c）
-  ctx.save();
-  ctx.beginPath();
-  ctx.roundRect(cardX, cardY, cardW, 8, [radius, radius, 0, 0]);
-  ctx.fillStyle = "#EA580C";
-  ctx.fill();
-  ctx.restore();
-
   // ヘッダー情報
-  // 左上: ブランド & タイトル
-  ctx.fillStyle = "#EA580C";
-  ctx.font =
-    "bold 20px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-  ctx.fillText("PoohMa", cardX + 36, cardY + 48);
+  // 左上: ブランドロゴ（LogoText よりインポート） & タイトル
+  const logoMetrics = renderCanvasLogo(ctx, cardX + 36, cardY + 50, {
+    fontSize: 26,
+  });
 
   ctx.fillStyle = "#0F172A";
   ctx.font =
-    "bold 26px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-  ctx.fillText("リカバリーキット", cardX + 130, cardY + 48);
+    "bold 24px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  ctx.fillText(
+    "リカバリーキット",
+    cardX + 36 + logoMetrics.width + 14,
+    cardY + 50,
+  );
 
-  ctx.fillStyle = "#64748B";
+  ctx.fillStyle = "#334155";
   ctx.font =
-    "500 15px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-  const familyText = fitCanvasText(ctx, `家族グループ: ${familyName}`, 540);
-  ctx.fillText(familyText, cardX + 36, cardY + 80);
+    "600 18px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  const familyText = fitCanvasText(ctx, `家族グループ: ${familyName}`, 560);
+  ctx.fillText(familyText, cardX + 36, cardY + 82);
 
   // 右上: メタ情報（発行日時・発行者）
   const formattedDate = `${new Date(issuedAt).toLocaleString("ja-JP", {
@@ -692,7 +697,7 @@ export async function generateRecoveryKitPng({
     "14px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
   ctx.fillText(`発行日時: ${formattedDate}`, cardX + cardW - 36, cardY + 48);
   const issuerText = fitCanvasText(ctx, `発行者: ${issuerName}`, 450);
-  ctx.fillText(issuerText, cardX + cardW - 36, cardY + 74);
+  ctx.fillText(issuerText, cardX + cardW - 36, cardY + 76);
   ctx.textAlign = "left";
 
   // 区切り線
