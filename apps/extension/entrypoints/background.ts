@@ -18,9 +18,6 @@ import {
 import type { MatchedRecord, ServiceRecordItem } from "@/lib/messaging";
 import { isTrustedPoohmaOrigin } from "@/lib/url";
 
-const OFFSCREEN_PATH = "offscreen.html";
-
-let creatingOffscreen: Promise<void> | null = null;
 const convex = new ConvexHttpClient(env.VITE_CONVEX_URL);
 
 type CachedRecord = ServiceRecordItem;
@@ -218,66 +215,6 @@ export async function updateBadgeForTab(
   }
 }
 
-// Offscreen Document のシングルトン起動管理（排他制御・コンテキスト存在保証付き）
-async function ensureOffscreenDocument(): Promise<void> {
-  const offscreenUrl = chrome.runtime.getURL(OFFSCREEN_PATH);
-  try {
-    const existingContexts = await chrome.runtime.getContexts({
-      contextTypes: ["OFFSCREEN_DOCUMENT" as chrome.runtime.ContextType],
-      documentUrls: [offscreenUrl],
-    });
-
-    if (existingContexts.length > 0) {
-      console.log("[PoohMa Background] Offscreen document already active");
-      return;
-    }
-  } catch (_err) {
-    // getContexts 非対応環境のフォールバック
-  }
-
-  if (creatingOffscreen) {
-    console.log(
-      "[PoohMa Background] Waiting for existing createDocument promise...",
-    );
-    await creatingOffscreen;
-    return;
-  }
-
-  console.log(
-    "[PoohMa Background] Creating offscreen document with URL:",
-    offscreenUrl,
-  );
-  creatingOffscreen = chrome.offscreen
-    .createDocument({
-      url: offscreenUrl,
-      reasons: [
-        "DOM_SCRAPING" as chrome.offscreen.Reason,
-        "BLOBS" as chrome.offscreen.Reason,
-      ],
-      justification:
-        "Web Crypto PBKDF2 and AES-GCM cryptographic operations and in-memory key isolation",
-    })
-    .then(async () => {
-      console.log(
-        "[PoohMa Background] Offscreen document created successfully!",
-      );
-      // スクリプト初期化の完了をわずかに待機（安全マージン）
-      await new Promise((resolve) => setTimeout(resolve, 150));
-    })
-    .catch((err) => {
-      if (err?.message?.includes("Only a single offscreen")) {
-        return;
-      }
-      throw err;
-    });
-
-  try {
-    await creatingOffscreen;
-  } finally {
-    creatingOffscreen = null;
-  }
-}
-
 export default defineBackground(() => {
   // ストレージアクセスを TRUSTED_CONTEXTS に限定（Content Script からの直接アクセス防止）
   if (chrome.storage?.local?.setAccessLevel) {
@@ -304,11 +241,6 @@ export default defineBackground(() => {
         // 初期化時の非対応またはエラーを握る
       });
   }
-
-  // 起動時に Offscreen Document を準備
-  ensureOffscreenDocument().catch((_err) => {
-    // 起動待機
-  });
 
   // フォーム検知による openPopup 試行のタブ別制御（同一タブ重複抑制）
   const tabFormPrompted = new Set<number>();
@@ -527,13 +459,6 @@ export default defineBackground(() => {
           await clearAuthSession();
         } catch (_e) {}
 
-        // Offscreen Document が存在すれば Firebase サインアウト・暗号鍵破棄を実行
-        chrome.runtime
-          .sendMessage({
-            type: "OFFSCREEN_SIGN_OUT",
-          })
-          .catch(() => {});
-
         // 全体へログアウト完了通知
         chrome.runtime
           .sendMessage({
@@ -642,14 +567,6 @@ export default defineBackground(() => {
       }
       sendResponse({ success: false });
       return false;
-    }
-
-    // 5. Offscreen Document の起動完了待機（Side Panel 等からの事前保証用）
-    if (message?.type === "ENSURE_OFFSCREEN") {
-      ensureOffscreenDocument()
-        .then(() => sendResponse({ success: true }))
-        .catch(() => sendResponse({ success: false }));
-      return true;
     }
 
     // 5.1. 家族暗号メタデータ・セッション状態の最新化同期
@@ -781,29 +698,6 @@ export default defineBackground(() => {
       pendingSave = null;
       sendResponse({ success: true });
       return false;
-    }
-
-    // 7. Offscreen Document からのログ通知受信
-    if (message?.type === "OFFSCREEN_LOG") {
-      console.log("[PoohMa Background] [From Offscreen]:", message.text);
-      sendResponse({ received: true });
-      return false;
-    }
-
-    // 8. Offscreen Document を必要とする暗号・認証メッセージの起動保証
-    const offscreenMessageTypes = [
-      "AUTH_SIGN_OUT",
-      "AUTH_GET_STATE",
-      "VAULT_UNLOCK",
-      "VAULT_LOCK",
-      "VAULT_GET_STATUS",
-      "VAULT_DECRYPT_HINT",
-      "GET_FAMILY_CRYPTO_INFO",
-    ];
-
-    if (message?.type && offscreenMessageTypes.includes(message.type)) {
-      ensureOffscreenDocument().catch(() => {});
-      return;
     }
 
     // 9. Content Script からのフォーム検知通知（バッジ即時反映 ＋ openPopup 受動的案内）
