@@ -8,6 +8,7 @@ import {
 import { isValidRecoveryCode, normalizeRecoveryCode } from "@poohma/crypto";
 import jsQR from "jsqr";
 import QRCode from "qrcode";
+import { renderCanvasLogo } from "@/components/common/LogoText";
 
 export interface RecoveryKitPdfParams {
   familyName: string;
@@ -437,6 +438,436 @@ export async function generateRecoveryKitPdf({
   return await pdfDoc.save();
 }
 
+// --- PNG tEXt Chunk Metadata Handling ---
+
+const PNG_KEYWORD = "PoohMa-RecoveryCode";
+
+// 標準的な CRC-32 (IEEE 802.3, 多項式 0xEDB88320)
+function crc32(buf: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (let i = 0; i < buf.length; i++) {
+    const byte = buf[i] ?? 0;
+    crc ^= byte;
+    for (let j = 0; j < 8; j++) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+/**
+ * PNG バイナリの末尾 IEND チャンク直前に復元コードを格納した tEXt チャンクを埋め込む
+ */
+export function embedRecoveryCodeInPng(
+  pngBytes: Uint8Array,
+  recoveryCode: string,
+): Uint8Array {
+  if (
+    pngBytes.length < 8 ||
+    pngBytes[0] !== 0x89 ||
+    pngBytes[1] !== 0x50 ||
+    pngBytes[2] !== 0x4e ||
+    pngBytes[3] !== 0x47
+  ) {
+    return pngBytes;
+  }
+
+  // 末尾の IEND チャンクを探す
+  let iendOffset = -1;
+  for (let i = pngBytes.length - 12; i >= 8; i--) {
+    if (
+      pngBytes[i + 4] === 0x49 && // 'I'
+      pngBytes[i + 5] === 0x45 && // 'E'
+      pngBytes[i + 6] === 0x4e && // 'N'
+      pngBytes[i + 7] === 0x44 // 'D'
+    ) {
+      iendOffset = i;
+      break;
+    }
+  }
+
+  if (iendOffset === -1) {
+    return pngBytes;
+  }
+
+  // tEXt チャンクデータ構築: Keyword + 0x00 + Text
+  const keywordBytes = new TextEncoder().encode(PNG_KEYWORD);
+  const textBytes = new TextEncoder().encode(recoveryCode);
+  const dataLen = keywordBytes.length + 1 + textBytes.length;
+  const chunkData = new Uint8Array(dataLen);
+  chunkData.set(keywordBytes, 0);
+  chunkData[keywordBytes.length] = 0x00;
+  chunkData.set(textBytes, keywordBytes.length + 1);
+
+  // Type + Data に対する CRC 計算
+  const typeAndData = new Uint8Array(4 + dataLen);
+  typeAndData.set([116, 69, 88, 116], 0); // "tEXt"
+  typeAndData.set(chunkData, 4);
+  const crc = crc32(typeAndData);
+
+  // チャンク全体 (4 length + 4 type + dataLen + 4 crc)
+  const chunkTotalLen = 4 + 4 + dataLen + 4;
+  const textChunk = new Uint8Array(chunkTotalLen);
+  const view = new DataView(textChunk.buffer);
+  view.setUint32(0, dataLen, false); // Length (big-endian)
+  textChunk.set(typeAndData, 4); // Type + Data
+  view.setUint32(4 + 4 + dataLen, crc, false); // CRC (big-endian)
+
+  // 新しい PNG バイト列の生成
+  const result = new Uint8Array(pngBytes.length + chunkTotalLen);
+  result.set(pngBytes.subarray(0, iendOffset), 0);
+  result.set(textChunk, iendOffset);
+  result.set(pngBytes.subarray(iendOffset), iendOffset + chunkTotalLen);
+
+  return result;
+}
+
+/**
+ * PNG バイナリから tEXt チャンクを走査し、復元コードを抽出
+ */
+export function extractRecoveryCodeFromPngBytes(
+  pngBytes: Uint8Array,
+): string | null {
+  if (
+    pngBytes.length < 8 ||
+    pngBytes[0] !== 0x89 ||
+    pngBytes[1] !== 0x50 ||
+    pngBytes[2] !== 0x4e ||
+    pngBytes[3] !== 0x47
+  ) {
+    return null;
+  }
+
+  let offset = 8;
+  const view = new DataView(
+    pngBytes.buffer,
+    pngBytes.byteOffset,
+    pngBytes.byteLength,
+  );
+
+  while (offset + 8 <= pngBytes.length) {
+    const chunkLen = view.getUint32(offset, false);
+    const chunkType = String.fromCharCode(
+      pngBytes[offset + 4] ?? 0,
+      pngBytes[offset + 5] ?? 0,
+      pngBytes[offset + 6] ?? 0,
+      pngBytes[offset + 7] ?? 0,
+    );
+
+    if (chunkType === "tEXt") {
+      const dataStart = offset + 8;
+      const dataEnd = dataStart + chunkLen;
+      if (dataEnd <= pngBytes.length) {
+        const chunkData = pngBytes.subarray(dataStart, dataEnd);
+        const nullIdx = chunkData.indexOf(0x00);
+        if (nullIdx !== -1) {
+          const keyword = new TextDecoder("latin1").decode(
+            chunkData.subarray(0, nullIdx),
+          );
+          if (keyword === PNG_KEYWORD) {
+            const code = new TextDecoder("latin1").decode(
+              chunkData.subarray(nullIdx + 1),
+            );
+            if (isValidRecoveryCode(code)) {
+              return normalizeRecoveryCode(code);
+            }
+          }
+        }
+      }
+    }
+
+    if (chunkType === "IEND") {
+      break;
+    }
+
+    offset += 8 + chunkLen + 4;
+  }
+
+  return null;
+}
+
+/**
+ * Canvas のテキスト描画において、指定した最大幅に収まるよう末尾を "…" で省略する
+ */
+function fitCanvasText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+): string {
+  if (ctx.measureText(text).width <= maxWidth) {
+    return text;
+  }
+  let truncated = text;
+  while (
+    truncated.length > 0 &&
+    ctx.measureText(`${truncated}…`).width > maxWidth
+  ) {
+    truncated = truncated.slice(0, -1);
+  }
+  return `${truncated}…`;
+}
+
+/**
+ * リカバリーキットの PNG カード画像（高解像度 1200x760）を生成
+ */
+export async function generateRecoveryKitPng({
+  familyName,
+  issuedAt,
+  issuerName,
+  recoveryCode,
+}: RecoveryKitPdfParams): Promise<Blob> {
+  if (typeof document === "undefined") {
+    throw new Error("generateRecoveryKitPng requires browser environment");
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 1200;
+  canvas.height = 760;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Canvas 2D context not available");
+  }
+
+  // 背景描画（上質なオフホワイト）
+  ctx.fillStyle = "#F8F9FA";
+  ctx.fillRect(0, 0, 1200, 760);
+
+  // 外枠カード（丸角 24px、洗練された境界線と微細なシャドウ）
+  const cardX = 36;
+  const cardY = 36;
+  const cardW = 1128;
+  const cardH = 688;
+  const radius = 24;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(cardX, cardY, cardW, cardH, radius);
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fill();
+
+  // カード内部にクリップして上部アクセントバーを描画（角丸境界からの横はみ出しを完全防止）
+  ctx.save();
+  ctx.clip();
+  ctx.fillStyle = "#EA580C";
+  ctx.fillRect(cardX, cardY, cardW, 8);
+  ctx.restore();
+
+  // カード外枠境界線
+  ctx.strokeStyle = "#E2E8F0";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  // ヘッダー情報
+  // 左上: ブランドロゴ（LogoText よりインポート） & タイトル
+  const logoMetrics = renderCanvasLogo(ctx, cardX + 36, cardY + 50, {
+    fontSize: 26,
+  });
+
+  ctx.fillStyle = "#0F172A";
+  ctx.font =
+    "bold 24px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  ctx.fillText(
+    "リカバリーキット",
+    cardX + 36 + logoMetrics.width + 14,
+    cardY + 50,
+  );
+
+  ctx.fillStyle = "#334155";
+  ctx.font =
+    "600 18px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  const familyText = fitCanvasText(ctx, `家族グループ: ${familyName}`, 560);
+  ctx.fillText(familyText, cardX + 36, cardY + 82);
+
+  // 右上: メタ情報（発行日時・発行者）
+  const formattedDate = `${new Date(issuedAt).toLocaleString("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  })} JST`;
+
+  ctx.textAlign = "right";
+  ctx.fillStyle = "#64748B";
+  ctx.font =
+    "14px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  ctx.fillText(`発行日時: ${formattedDate}`, cardX + cardW - 36, cardY + 48);
+  const issuerText = fitCanvasText(ctx, `発行者: ${issuerName}`, 450);
+  ctx.fillText(issuerText, cardX + cardW - 36, cardY + 76);
+  ctx.textAlign = "left";
+
+  // 区切り線
+  ctx.strokeStyle = "#E2E8F0";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cardX + 36, cardY + 104);
+  ctx.lineTo(cardX + cardW - 36, cardY + 104);
+  ctx.stroke();
+
+  // 中央エリア
+  // 左カラム: 復元コード枠（幅 680px）
+  const leftX = cardX + 36;
+  const leftY = cardY + 128;
+  const leftW = 680;
+
+  ctx.fillStyle = "#334155";
+  ctx.font =
+    "bold 15px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  ctx.fillText("復元コード（Recovery Code）", leftX, leftY + 16);
+
+  // コードコンテナ（グレー背景・ボーダー）
+  const codeBoxY = leftY + 30;
+  const codeBoxH = 170;
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(leftX, codeBoxY, leftW, codeBoxH, 16);
+  ctx.fillStyle = "#F8FAFC";
+  ctx.fill();
+  ctx.strokeStyle = "#CBD5E1";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.restore();
+
+  // 復元コードを2行（前半ブロック / 後半ブロック）に分割して等幅フォントで描画
+  const blocks = recoveryCode.split("-");
+  const half = Math.ceil(blocks.length / 2);
+  const line1 = blocks.slice(0, half).join("-");
+  const line2 = blocks.slice(half).join("-");
+
+  ctx.fillStyle = "#0F172A";
+  ctx.font = "bold 28px 'SF Mono', 'Courier New', Menlo, Consolas, monospace";
+  ctx.textAlign = "center";
+  const codeCenterX = leftX + leftW / 2;
+  if (line2) {
+    ctx.fillText(line1, codeCenterX, codeBoxY + 70);
+    ctx.fillText(line2, codeCenterX, codeBoxY + 125);
+  } else {
+    ctx.fillText(recoveryCode, codeCenterX, codeBoxY + 95);
+  }
+  ctx.textAlign = "left";
+
+  // コード下部の案内
+  ctx.fillStyle = "#64748B";
+  ctx.font =
+    "14px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  ctx.fillText(
+    "※ 家族パスコードをお忘れの際、この復元コードを入力してマスターキーを救出します。",
+    leftX,
+    codeBoxY + codeBoxH + 32,
+  );
+
+  // 右カラム: QRコード枠（幅 340px）
+  const rightX = cardX + cardW - 36 - 340;
+  const rightY = leftY;
+  const rightW = 340;
+  const rightH = 260;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(rightX, rightY, rightW, rightH, 16);
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fill();
+  ctx.strokeStyle = "#CBD5E1";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.restore();
+
+  // QR コード生成（200x200）
+  try {
+    const qrDataUrl = await QRCode.toDataURL(recoveryCode, {
+      margin: 1,
+      width: 200,
+      color: {
+        dark: "#0F172A",
+        light: "#FFFFFF",
+      },
+    });
+
+    await new Promise<void>((resolve, _reject) => {
+      const qrImg = new Image();
+      qrImg.onload = () => {
+        ctx.drawImage(
+          qrImg,
+          rightX + (rightW - 200) / 2,
+          rightY + 20,
+          200,
+          200,
+        );
+        resolve();
+      };
+      qrImg.onerror = () => resolve(); // エラー時はスキップして継続
+      qrImg.src = qrDataUrl;
+    });
+  } catch {
+    // QR 生成失敗時は枠のみ
+  }
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#64748B";
+  ctx.font =
+    "13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  ctx.fillText(
+    "カメラまたはアプリでスキャン",
+    rightX + rightW / 2,
+    rightY + 242,
+  );
+  ctx.textAlign = "left";
+
+  // 下部注意喚起バナー（温かみのあるアンバー背景 #FFFBEB）
+  const noticeY = cardY + cardH - 120;
+  const noticeW = cardW - 72;
+  const noticeH = 84;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(cardX + 36, noticeY, noticeW, noticeH, 12);
+  ctx.fillStyle = "#FFFBEB";
+  ctx.fill();
+  ctx.strokeStyle = "#FDE68A";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.fillStyle = "#B45309";
+  ctx.font =
+    "bold 14px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  ctx.fillText("【重要】安全な保管のお願い", cardX + 54, noticeY + 30);
+
+  ctx.fillStyle = "#78350F";
+  ctx.font =
+    "13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  ctx.fillText(
+    "この画像は写真アプリの「非表示」や「お気に入り」アルバム、安全な金庫等で大切に保管してください。",
+    cardX + 54,
+    noticeY + 54,
+  );
+  ctx.fillText(
+    "復元コードそのものはサーバーに保存されません。第三者に見られたり紛失しないようご注意ください。",
+    cardX + 54,
+    noticeY + 72,
+  );
+
+  // Blob 変換
+  const baseBlob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((b) => {
+      if (b) resolve(b);
+      else reject(new Error("Canvas toBlob failed"));
+    }, "image/png");
+  });
+
+  // tEXt チャンク埋め込み
+  const rawBytes = new Uint8Array(await baseBlob.arrayBuffer());
+  const embeddedBytes = embedRecoveryCodeInPng(rawBytes, recoveryCode);
+
+  return new Blob([embeddedBytes as unknown as BlobPart], {
+    type: "image/png",
+  });
+}
+
 /**
  * 画像（ImageData）から QR コードを読み取り、Recovery Code を抽出
  */
@@ -483,7 +914,24 @@ export async function extractRecoveryCodeFromFile(
     }
   }
 
-  // 2. 画像ファイル（またはメタデータが取得できないPDF）: 画像として QR コードを解析
+  // 2. PNG ファイルの場合: tEXt チャンクメタデータからの高速・確実な抽出を優先試行
+  const isPng =
+    file.type === "image/png" || file.name.toLowerCase().endsWith(".png");
+  if (isPng) {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const extracted = extractRecoveryCodeFromPngBytes(
+        new Uint8Array(arrayBuffer),
+      );
+      if (extracted && isValidRecoveryCode(extracted)) {
+        return normalizeRecoveryCode(extracted);
+      }
+    } catch (_err) {
+      // tEXt 抽出失敗時は画像QRフォールバックへ進む
+    }
+  }
+
+  // 3. 画像ファイル（またはメタデータが取得できないPDF/PNG）: 画像として QR コードを解析
   if (typeof window === "undefined" || typeof Image === "undefined") {
     return null;
   }

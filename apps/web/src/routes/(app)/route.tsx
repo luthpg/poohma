@@ -87,8 +87,9 @@ function RouteComponent() {
   }, [activeAccount, isAccountLoading, pathname, navigate]);
 
   // (app) 直下のツアー対象外ルート（家族管理・設定等）に不要な onboarding クエリが残っていたら自動削除
-  const searchParams = new URLSearchParams(location.search);
-  const hasOnboardingParam = searchParams.has("onboarding");
+  const hasOnboardingParam = Boolean(
+    (location.search as Record<string, unknown>)?.onboarding,
+  );
   useEffect(() => {
     if (
       hasOnboardingParam &&

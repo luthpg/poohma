@@ -183,6 +183,16 @@ export async function ensureFamilyAssigned(
       .filter({ hasText: "作成する" })
       .click();
     await expect(familyManagerSection).toBeVisible({ timeout: 25000 });
+
+    // 家族作成直後にオンボーディングの「家族設定を見る」ダイアログが表示される場合は閉じる
+    const tourModalBtn = page.getByRole("button", { name: "家族設定を見る" });
+    const isTourModalVisible = await tourModalBtn
+      .waitFor({ state: "visible", timeout: 2000 })
+      .then(() => true)
+      .catch(() => false);
+    if (isTourModalVisible) {
+      await tourModalBtn.click();
+    }
   }
 }
 

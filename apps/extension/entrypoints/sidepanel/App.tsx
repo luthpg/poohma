@@ -138,7 +138,6 @@ export function App() {
   const handleLock = useCallback(() => {
     cryptoGenerationRef.current += 1;
     masterKeyRef.current = null;
-    sendExtensionMessage({ type: "VAULT_LOCK" }).catch(() => {});
     setIsUnlocked(false);
     setIsPasscodePromptOpen(false);
     setPendingRevealCred(null);
@@ -199,18 +198,13 @@ export function App() {
         }
         setIsWaitingSync(false);
 
-        // Offscreen Document の起動完了を待機
-        await sendExtensionMessage<{ success: boolean }>({
-          type: "ENSURE_OFFSCREEN",
-        }).catch(() => ({ success: false }));
-
         // 最新の家族暗号メタデータ・所属・アカウントをバックグラウンドで同期
         sendExtensionMessage({ type: "SYNC_SESSION_STATE" }).catch(() => {});
 
         // ロック状態確認（メモリ上の MasterKey で即時判定）
         setIsUnlocked(masterKeyRef.current !== null);
 
-        // レコード取得（Offscreen Document 初期化遅延対策としてリトライ付き）
+        // レコード取得（ネットワーク状況対策としてリトライ付き）
         try {
           let recordsRes: {
             success: boolean;
@@ -293,8 +287,6 @@ export function App() {
       family?: ExtensionFamily | null;
       isUnlocked?: boolean;
     }) => {
-      if (message?.type === "OFFSCREEN_PING") return;
-
       if (message.type === "AUTH_STATE_CHANGED") {
         setIsAuthenticated(!!message.isAuthenticated);
         setCurrentUser(message.user ?? null);
@@ -313,15 +305,6 @@ export function App() {
         } else {
           setIsWaitingSync(false);
           refreshState();
-        }
-      }
-      if (message.type === "VAULT_LOCK_STATE_CHANGED") {
-        setIsUnlocked(!!message.isUnlocked);
-        if (!message.isUnlocked) {
-          cryptoGenerationRef.current += 1;
-          masterKeyRef.current = null;
-          setDecryptedHints({});
-          setVisibleHints({});
         }
       }
     };

@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { CheckCircle2, Database, HelpCircle, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
+import { z } from "zod";
 import { CsvExportSection } from "@/components/bulk/CsvExportSection";
 import { CsvImportDropZone } from "@/components/bulk/CsvImportDropZone";
 import { CsvImportPreviewTable } from "@/components/bulk/CsvImportPreviewTable";
@@ -11,12 +12,22 @@ import { Button } from "@/components/ui/button";
 import { useAccount } from "@/hooks/useAccount";
 import { useImportCsvDiff } from "@/hooks/useImportCsvDiff";
 
+const bulkSearchSchema = z.object({
+  scope: z.enum(["all", "personal", "shared"]).optional(),
+  archiveStatus: z.enum(["active", "archived", "all"]).optional(),
+  includeHints: z.boolean().optional(),
+  tag: z.string().optional(),
+  q: z.string().optional(),
+});
+
 export const Route = createFileRoute("/(app)/settings/bulk")({
+  validateSearch: bulkSearchSchema,
   component: BulkSettingsPage,
 });
 
 function BulkSettingsPage() {
   const router = useRouter();
+  const searchParams = Route.useSearch();
   const { activeAccountId } = useAccount();
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [completedStats, setCompletedStats] = useState<{
@@ -160,7 +171,7 @@ function BulkSettingsPage() {
             <h2 className="text-sm font-semibold text-muted-foreground tracking-wider">
               1. ファイルへの書き出し（ダウンロード）
             </h2>
-            <CsvExportSection />
+            <CsvExportSection initialFilters={searchParams} />
           </section>
 
           {/* 2. インポートセクション */}

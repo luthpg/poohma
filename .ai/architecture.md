@@ -12,7 +12,7 @@ poohma/
 │   │   ├── e2e/           # Playwright E2E シナリオ
 │   │   └── tests/         # フロントエンド単体・ブラウザ暗号テスト
 │   ├── extension/         # @poohma/extension (Chrome 拡張機能 Manifest V3: WXT + React 19)
-│   │   ├── entrypoints/   # background, content, sidepanel, offscreen, popup
+│   │   ├── entrypoints/   # background, content, sidepanel, popup
 │   │   ├── components/    # UIコンポーネント (Geist デザインシステム, Tailwind CSS v4)
 │   │   └── lib/           # auth, messaging, passcode (共通暗号処理)
 │   └── admin/             # @poohma/admin (管理者コンソール: TanStack Start + Cloudflare)

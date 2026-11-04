@@ -59,17 +59,8 @@ export const FillLoginIdMessageSchema = z.object({
 export type FillLoginIdMessage = z.infer<typeof FillLoginIdMessageSchema>;
 
 /**
- * UI / SW <-> Offscreen: 認証関連メッセージ
+ * UI / Background: 認証・同期メッセージ
  */
-export const AuthGetStateMessageSchema = z.object({
-  type: z.literal("AUTH_GET_STATE"),
-});
-
-export const AuthSignInMessageSchema = z.object({
-  type: z.literal("AUTH_SIGN_IN"),
-  idToken: z.string(),
-});
-
 export const AuthSignOutMessageSchema = z.object({
   type: z.literal("AUTH_SIGN_OUT"),
 });
@@ -77,35 +68,9 @@ export const AuthSignOutMessageSchema = z.object({
 export const AuthStateChangedMessageSchema = z.object({
   type: z.literal("AUTH_STATE_CHANGED"),
   isAuthenticated: z.boolean(),
-  userId: z.string().nullable(),
-  email: z.string().nullable(),
-  accountId: z.string().nullable(),
-});
-
-/**
- * UI <-> Offscreen: 暗号・照合関連メッセージ
- */
-export const VaultUnlockMessageSchema = z.object({
-  type: z.literal("VAULT_UNLOCK"),
-  passcode: z.string().min(1).max(256),
-});
-
-export const VaultLockMessageSchema = z.object({
-  type: z.literal("VAULT_LOCK"),
-});
-
-export const VaultGetStatusMessageSchema = z.object({
-  type: z.literal("VAULT_GET_STATUS"),
-});
-
-export const VaultDecryptHintMessageSchema = z.object({
-  type: z.literal("VAULT_DECRYPT_HINT"),
-  recordId: z.string(),
-  credentialId: z.string(),
-  passwordHint: z.string(),
-  passwordHintIv: z.string(),
-  passwordHintDekEncrypted: z.string(),
-  passwordHintDekIv: z.string(),
+  userId: z.string().nullable().optional(),
+  email: z.string().nullable().optional(),
+  accountId: z.string().nullable().optional(),
 });
 
 export const SyncSessionStateMessageSchema = z.object({
@@ -121,14 +86,8 @@ export const ExtensionMessageSchema = z.discriminatedUnion("type", [
   FormSubmittedMessageSchema,
   FormGoneMessageSchema,
   FillLoginIdMessageSchema,
-  AuthGetStateMessageSchema,
-  AuthSignInMessageSchema,
   AuthSignOutMessageSchema,
   AuthStateChangedMessageSchema,
-  VaultUnlockMessageSchema,
-  VaultLockMessageSchema,
-  VaultGetStatusMessageSchema,
-  VaultDecryptHintMessageSchema,
   SyncSessionStateMessageSchema,
 ]);
 

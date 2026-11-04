@@ -6,26 +6,44 @@ import { systemAdminQuery } from "../customBuilders";
 export const getSystemStats = systemAdminQuery({
   args: {},
   handler: async (ctx) => {
-    // 全件集計
-    const users = await ctx.db.query("users").collect();
-    const families = await ctx.db.query("families").collect();
-    const records = await ctx.db.query("serviceRecords").collect();
-    const contacts = await ctx.db.query("contacts").collect();
-
     const now = Date.now();
     const oneDayMs = 24 * 60 * 60 * 1000;
     const sevenDaysAgo = now - 7 * oneDayMs;
 
+    // 全件集計およびインデックスを活用した個別集計を並行実行
+    const [
+      users,
+      families,
+      records,
+      unreadContactsList,
+      readContactsList,
+      resolvedContactsList,
+    ] = await Promise.all([
+      ctx.db.query("users").collect(),
+      ctx.db.query("families").collect(),
+      ctx.db.query("serviceRecords").collect(),
+      ctx.db
+        .query("contacts")
+        .withIndex("by_status", (q) => q.eq("status", "UNREAD"))
+        .collect(),
+      ctx.db
+        .query("contacts")
+        .withIndex("by_status", (q) => q.eq("status", "READ"))
+        .collect(),
+      ctx.db
+        .query("contacts")
+        .withIndex("by_status", (q) => q.eq("status", "RESOLVED"))
+        .collect(),
+    ]);
+
     // 1. ユーザー: 直近7日間の日別新規登録数（最古〜今日までの7要素）
+    const recentUsers = users.filter((u) => u.createdAt >= sevenDaysAgo);
     const userRegistrationDaily: number[] = [0, 0, 0, 0, 0, 0, 0];
-    let newUsersLast7Days = 0;
-    for (const u of users) {
-      if (u.createdAt >= sevenDaysAgo) {
-        newUsersLast7Days++;
-        const dayDiff = Math.floor((u.createdAt - sevenDaysAgo) / oneDayMs);
-        const index = Math.min(Math.max(dayDiff, 0), 6);
-        userRegistrationDaily[index] = (userRegistrationDaily[index] ?? 0) + 1;
-      }
+    const newUsersLast7Days = recentUsers.length;
+    for (const u of recentUsers) {
+      const dayDiff = Math.floor((u.createdAt - sevenDaysAgo) / oneDayMs);
+      const index = Math.min(Math.max(dayDiff, 0), 6);
+      userRegistrationDaily[index] = (userRegistrationDaily[index] ?? 0) + 1;
     }
 
     // 2. ファミリー: ファミリー所属ユーザー数 vs 未所属（ソロ）ユーザー数
@@ -45,11 +63,10 @@ export const getSystemStats = systemAdminQuery({
         : 0;
 
     // 4. お問い合わせ: 未読、対応中、完了の内訳
-    const unreadContacts = contacts.filter((c) => c.status === "UNREAD").length;
-    const readContacts = contacts.filter((c) => c.status === "READ").length;
-    const resolvedContacts = contacts.filter(
-      (c) => c.status === "RESOLVED",
-    ).length;
+    const unreadContacts = unreadContactsList.length;
+    const readContacts = readContactsList.length;
+    const resolvedContacts = resolvedContactsList.length;
+    const totalContacts = unreadContacts + readContacts + resolvedContacts;
 
     return {
       totalUsers: users.length,
@@ -73,7 +90,7 @@ export const getSystemStats = systemAdminQuery({
         unread: unreadContacts,
         read: readContacts,
         resolved: resolvedContacts,
-        total: contacts.length,
+        total: totalContacts,
       },
       timestamp: now,
     };

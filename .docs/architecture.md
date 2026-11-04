@@ -14,7 +14,7 @@ PoohMa は、家族間でアカウント情報を共有・管理するための 
 - Server Functions（`syncUser` / `getAuthUser` / `logout` 等）が Firebase Admin SDK による ID トークン検証・セッション Cookie 発行を担当する。
 - `ConvexReactClient` を `ConvexProviderWithAuth` でラップし、`useConvexFirebaseAuth` が Firebase の ID トークンを Convex 認証に供給する。
 - 暗号化・復号（`src/lib/crypto.ts`）と生体認証（`src/lib/biometric.ts`, WebAuthn PRF拡張）はすべてクライアント側で完結する。
-- Service Worker + IndexedDB による読み取り専用のオフラインキャッシュ（PWA）を持つ。書き込み系操作（新規登録・編集等）はオフライン中は無効化される。
+- Web App Manifest によりモバイル端末のホーム画面からスタンドアロンアプリとして起動可能とする。なお、家族メンバー除名時におけるアクセス権の即時失効を厳格に保つため、ローカルストレージ（IndexedDB等）への暗号化レコードのオフライン永続キャッシュは行わず、データ参照はすべて Convex のリアルタイム購読（WebSocket / RLS）に一本化している。
 - サーバーミドルウェア（`start.ts`）が全GETリクエストに対して、nonceベースの厳格なCSPを含むセキュリティヘッダーを付与する（詳細は [Security Model](./security/security-model.md)）。
 
 ### Backend（Convex Cloud）
@@ -40,7 +40,7 @@ PoohMa は、家族間でアカウント情報を共有・管理するための 
 ### Authentication
 
 - Firebase Authentication（Google OAuth）でログインし、`auth.config.ts` の Issuer 設定（`securetoken.google.com/poohma`）により Convex 側が Firebase ID トークンをそのまま信頼・検証する。
-- サーバー側は Firebase Admin SDK でセッション Cookie（14日間・httpOnly・本番では secure・SameSite=Lax）を発行し、`__root.tsx` の `beforeLoad` が毎回 `checkRevoked: true` 付きで検証する。
+- サーバー側は Firebase Admin SDK でセッション Cookie（14日間・httpOnly・本番では secure・SameSite=Lax）を発行する。SSR 初期描画時（`getAuthUser`）には、毎リクエストの外部通信によるレイテンシを排除するため公開鍵署名と有効期限をローカル検証（`verifySessionCookie(session, false)`）して SSR コンテキストを構築する。一方、クライアント側 IndexedDB 消失時のトークン再発行（`getCustomTokenFromSession`）やセッション Cookie ローリング更新（`refreshSessionCookie`）では `verifySessionCookie(session, true)` による厳格な失効チェック（Revocation Check）を実施する。
 - ログアウト時は `revokeRefreshTokens` によるリフレッシュトークンの即時失効と Cookie 削除を行う。
 
 ### E2EE
@@ -65,7 +65,7 @@ flowchart TB
     subgraph Client["Browser"]
         WebApp["Web Application (React / TanStack Start)"]
         Crypto["E2EE (crypto.ts) / WebAuthn PRF (biometric.ts)"]
-        IDB["Service Worker + IndexedDB (read-only cache)"]
+        Manifest["Web App Manifest (PWA Standalone)"]
     end
 
     subgraph VercelHost["Vercel"]
@@ -93,7 +93,6 @@ flowchart TB
     R2[("Cloudflare R2")]
 
     WebApp --> Crypto
-    WebApp --> IDB
     WebApp --> SSR
     SSR --> Firebase
     WebApp -->|認証済みリアルタイム通信| Fn
