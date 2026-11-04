@@ -586,6 +586,27 @@ export function extractRecoveryCodeFromPngBytes(
 }
 
 /**
+ * Canvas のテキスト描画において、指定した最大幅に収まるよう末尾を "…" で省略する
+ */
+function fitCanvasText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+): string {
+  if (ctx.measureText(text).width <= maxWidth) {
+    return text;
+  }
+  let truncated = text;
+  while (
+    truncated.length > 0 &&
+    ctx.measureText(`${truncated}…`).width > maxWidth
+  ) {
+    truncated = truncated.slice(0, -1);
+  }
+  return `${truncated}…`;
+}
+
+/**
  * リカバリーキットの PNG カード画像（高解像度 1200x760）を生成
  */
 export async function generateRecoveryKitPng({
@@ -610,7 +631,7 @@ export async function generateRecoveryKitPng({
   ctx.fillStyle = "#F8F9FA";
   ctx.fillRect(0, 0, 1200, 760);
 
-  // 外枠カード（丸角 28px、洗練された境界線と微細なシャドウ）
+  // 外枠カード（丸角 24px、洗練された境界線と微細なシャドウ）
   const cardX = 36;
   const cardY = 36;
   const cardW = 1128;
@@ -650,7 +671,8 @@ export async function generateRecoveryKitPng({
   ctx.fillStyle = "#64748B";
   ctx.font =
     "500 15px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-  ctx.fillText(`家族グループ: ${familyName}`, cardX + 36, cardY + 80);
+  const familyText = fitCanvasText(ctx, `家族グループ: ${familyName}`, 540);
+  ctx.fillText(familyText, cardX + 36, cardY + 80);
 
   // 右上: メタ情報（発行日時・発行者）
   const formattedDate = `${new Date(issuedAt).toLocaleString("ja-JP", {
@@ -669,7 +691,8 @@ export async function generateRecoveryKitPng({
   ctx.font =
     "14px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
   ctx.fillText(`発行日時: ${formattedDate}`, cardX + cardW - 36, cardY + 48);
-  ctx.fillText(`発行者: ${issuerName}`, cardX + cardW - 36, cardY + 74);
+  const issuerText = fitCanvasText(ctx, `発行者: ${issuerName}`, 450);
+  ctx.fillText(issuerText, cardX + cardW - 36, cardY + 74);
   ctx.textAlign = "left";
 
   // 区切り線

@@ -464,6 +464,6 @@ Convex バックエンドにおける全件スキャン（`.collect()`）の肥�
 ### 15.2 インデックス優先原則
 
 1. **メモリ内 `.filter()` による全件読み出しの禁止**:
-   - `archiveStatus` や `status` など定数的なカテゴリや状態フラグによる絞り込みを行う際、テーブル全件を `.collect()` してから JavaScript の `.filter()` で絞り込んではならない。必ず複合インデックス（`withIndex`）を用いて DB 段階で必要件数のみを走査すること。
+   - `archiveStatus` や `status` など定数的なカテゴリや状態フラグによる絞り込みを行う際、テーブル全件を `.collect()` してから JavaScript の `.filter()` で絞り込んではならない。必ず対応する適切なインデックス（`withIndex`）を用いて DB 段階で必要件数のみを走査すること。
 2. **家族未所属ユーザーのクエリ最適化**:
    - `serviceRecords` において家族所属アカウントは `by_family_isArchived` 等で効率的に走査されるが、家族未所属アカウントの個人レコードも `by_accountId_isArchived` インデックスを活用することで全件スキャンを回避する。

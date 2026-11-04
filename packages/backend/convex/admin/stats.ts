@@ -18,7 +18,6 @@ export const getSystemStats = systemAdminQuery({
       unreadContactsList,
       readContactsList,
       resolvedContactsList,
-      recentUsers,
     ] = await Promise.all([
       ctx.db.query("users").collect(),
       ctx.db.query("families").collect(),
@@ -35,13 +34,10 @@ export const getSystemStats = systemAdminQuery({
         .query("contacts")
         .withIndex("by_status", (q) => q.eq("status", "RESOLVED"))
         .collect(),
-      ctx.db
-        .query("users")
-        .withIndex("by_createdAt", (q) => q.gte("createdAt", sevenDaysAgo))
-        .collect(),
     ]);
 
     // 1. ユーザー: 直近7日間の日別新規登録数（最古〜今日までの7要素）
+    const recentUsers = users.filter((u) => u.createdAt >= sevenDaysAgo);
     const userRegistrationDaily: number[] = [0, 0, 0, 0, 0, 0, 0];
     const newUsersLast7Days = recentUsers.length;
     for (const u of recentUsers) {

@@ -186,7 +186,7 @@ export function RecoveryKitDialog({
         recoveryKey,
       );
 
-      // 4. PDFドキュメントおよび PNG カード画像の同時生成
+      // 4. PDFドキュメントおよび PNG カード画像の同時生成（PNG生成失敗時もPDF発行を継続）
       const kitParams = {
         familyName,
         issuedAt,
@@ -196,14 +196,12 @@ export function RecoveryKitDialog({
 
       const [pdfBytes, generatedPngBlob] = await Promise.all([
         generateRecoveryKitPdf(kitParams),
-        generateRecoveryKitPng(kitParams),
+        generateRecoveryKitPng(kitParams).catch(() => null),
       ]);
 
       const blob = new Blob([pdfBytes as Uint8Array<ArrayBuffer>], {
         type: "application/pdf",
       });
-      const url = URL.createObjectURL(blob);
-      const generatedPngUrl = URL.createObjectURL(generatedPngBlob);
 
       // 5. バックエンドへの登録（生成完了後に旧リカバリー情報の上書き/無効化を実行）
       const recoveryCodeHash = await hashRecoveryCode(recoveryCode);
@@ -216,6 +214,12 @@ export function RecoveryKitDialog({
         recoveryKdfIterations: RECOVERY_KDF_ITERATIONS,
         recoveryCryptoVersion: RECOVERY_KDF_VERSION,
       });
+
+      // 6. 登録成功後に Object URL を作成（登録失敗時の URL リーク防止）
+      const url = URL.createObjectURL(blob);
+      const generatedPngUrl = generatedPngBlob
+        ? URL.createObjectURL(generatedPngBlob)
+        : null;
 
       setGeneratedCode(recoveryCode);
       setPdfBlob(blob);
@@ -293,7 +297,11 @@ export function RecoveryKitDialog({
         setHasShared(true);
         toast.success("共有メニューを開きました");
       } else {
-        handleDownloadPng();
+        if (pngUrl) {
+          handleDownloadPng();
+        } else {
+          handleDownloadPdf();
+        }
       }
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
@@ -566,20 +574,22 @@ export function RecoveryKitDialog({
               </button>
 
               {/* PNG 画像 保存 */}
-              <button
-                type="button"
-                onClick={handleDownloadPng}
-                className={`flex flex-col items-center justify-center gap-2 p-3 rounded-lg border text-center transition-all cursor-pointer ${
-                  hasSavedPng
-                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                    : "border-border bg-card hover:bg-muted text-foreground"
-                }`}
-              >
-                <ImageIcon className="h-5 w-5 text-orange-500" />
-                <span className="text-xs font-semibold">
-                  {hasSavedPng ? "画像保存済" : "画像を保存"}
-                </span>
-              </button>
+              {pngBlob && (
+                <button
+                  type="button"
+                  onClick={handleDownloadPng}
+                  className={`flex flex-col items-center justify-center gap-2 p-3 rounded-lg border text-center transition-all cursor-pointer ${
+                    hasSavedPng
+                      ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                      : "border-border bg-card hover:bg-muted text-foreground"
+                  }`}
+                >
+                  <ImageIcon className="h-5 w-5 text-orange-500" />
+                  <span className="text-xs font-semibold">
+                    {hasSavedPng ? "画像保存済" : "画像を保存"}
+                  </span>
+                </button>
+              )}
 
               {/* 印刷 */}
               <button

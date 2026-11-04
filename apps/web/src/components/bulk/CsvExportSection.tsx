@@ -126,8 +126,14 @@ export function CsvExportSection({ initialFilters }: CsvExportSectionProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             {/* 所有種別（スコープ） */}
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">対象範囲</Label>
+              <Label
+                htmlFor="csv-export-scope"
+                className="text-xs text-muted-foreground"
+              >
+                対象範囲
+              </Label>
               <select
+                id="csv-export-scope"
                 value={scope}
                 onChange={(e) =>
                   setScope(e.target.value as "all" | "personal" | "shared")
@@ -142,10 +148,14 @@ export function CsvExportSection({ initialFilters }: CsvExportSectionProps) {
 
             {/* アーカイブステータス */}
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">
+              <Label
+                htmlFor="csv-export-status"
+                className="text-xs text-muted-foreground"
+              >
                 ステータス
               </Label>
               <select
+                id="csv-export-status"
                 value={archiveStatus}
                 onChange={(e) =>
                   setArchiveStatus(
@@ -162,11 +172,15 @@ export function CsvExportSection({ initialFilters }: CsvExportSectionProps) {
 
             {/* タグ */}
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">
+              <Label
+                htmlFor="csv-export-tag"
+                className="text-xs text-muted-foreground"
+              >
                 タグで絞り込み
               </Label>
               <div className="relative">
                 <Input
+                  id="csv-export-tag"
                   value={tag}
                   onChange={(e) => setTag(e.target.value)}
                   placeholder="タグ名を入力..."
@@ -186,11 +200,15 @@ export function CsvExportSection({ initialFilters }: CsvExportSectionProps) {
 
             {/* キーワード */}
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">
+              <Label
+                htmlFor="csv-export-q"
+                className="text-xs text-muted-foreground"
+              >
                 キーワード検索
               </Label>
               <div className="relative">
                 <Input
+                  id="csv-export-q"
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   placeholder="サービス名、URL、ID等..."

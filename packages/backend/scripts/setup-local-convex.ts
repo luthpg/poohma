@@ -151,6 +151,8 @@ export async function setupLocalConvex(): Promise<void> {
   };
   delete selfHostedEnv.CONVEX_DEPLOYMENT;
   delete selfHostedEnv.CONVEX_DEPLOY_KEY;
+  delete process.env.CONVEX_DEPLOYMENT;
+  delete process.env.CONVEX_DEPLOY_KEY;
 
   try {
     runPnpm(
@@ -174,25 +176,45 @@ export async function setupLocalConvex(): Promise<void> {
       "⚙️  [local-convex] Setting environment variables on local instance...",
     );
     try {
+      // backendDir の .env.local から CONVEX_DEPLOYMENT を自動ロードして selfHostedEnv と衝突するのを防ぐため、
+      // rootDir を作業ディレクトリとして @poohma/backend フィルター経由で実行する
       runPnpm(
         [
+          "-F",
+          "@poohma/backend",
           "exec",
           "convex",
           "env",
           "set",
-          `CONVEX_INTERNAL_SECRET=${internalSecret}`,
-          "DISABLE_EMAIL_DELIVERY=true",
+          "CONVEX_INTERNAL_SECRET",
+          internalSecret,
         ],
         {
-          cwd: backendDir,
+          cwd: rootDir,
           env: selfHostedEnv,
           stdio: "inherit",
         },
       );
-    } catch (envSetError) {
+      runPnpm(
+        [
+          "-F",
+          "@poohma/backend",
+          "exec",
+          "convex",
+          "env",
+          "set",
+          "DISABLE_EMAIL_DELIVERY",
+          "true",
+        ],
+        {
+          cwd: rootDir,
+          env: selfHostedEnv,
+          stdio: "inherit",
+        },
+      );
+    } catch {
       console.warn(
-        "⚠️ [local-convex] Non-fatal: failed to set environment variables on local instance via CLI:",
-        envSetError,
+        "⚠️ [local-convex] Non-fatal: failed to set environment variables on local instance via CLI. See the CLI output above.",
       );
     }
 
