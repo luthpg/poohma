@@ -4,6 +4,9 @@
   "type": "module",
   "exports": {
     "./schemas": "./src/schemas/index.ts",
+    "./microcms": {
+      "types": "./src/types/microcms.d.ts"
+    },
     "./utils/index-group": "./src/utils/index-group.ts",
     "./utils/url-safety": "./src/utils/url-safety.ts",
     "./utils/url-matcher": "./src/utils/url-matcher.ts",
@@ -17,6 +20,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",
+    "typegen:cms": "microcms-typegen generate",
+    "check:cms": "microcms-typegen check",
     "email:dev": "email dev --dir src/emails/templates --port 7878",
     "email:export": "email export --dir src/emails/templates"
   },
@@ -36,6 +41,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitest/coverage-v8": "5.0.5",
+    "microcms-typegen": "^1.0.0",
     "react-email": "6.11.3",
     "typescript": "^7.0.2",
     "vitest": "5.0.5"

@@ -82,20 +82,20 @@ PoohMa の暗号設計思想、ゼロ知識E2EE（エンベロープ暗号化）
 
 ## 技術スタック
 
-| 分類               | 技術                                                                   |
-| ------------------ | ---------------------------------------------------------------------- |
-| フロントエンド     | React 19, TanStack Start（SSR）, TanStack Router, TanStack Query       |
-| スタイリング       | Tailwind CSS v4, shadcn/ui                                             |
-| バックエンド／DB   | Convex（サーバーレス関数＋リアクティブDB）                             |
-| 認証               | Firebase Authentication（Google OAuth）＋ セッションCookie             |
-| CMS                | microCMS（FAQ・利用規約・プライバシーポリシー）                        |
-| メール送信         | Resend                                                                 |
-| 暗号化             | Web Crypto API（AES-GCM, PBKDF2）, WebAuthn（PRF拡張）                 |
-| バリデーション     | zod                                                                    |
-| テスト             | Vitest, @testing-library/react, convex-test, Playwright                |
-| Lint／フォーマット | Biome                                                                  |
-| デプロイ           | Vercel（フロントエンド）, Convex Cloud（バックエンド）                 |
-| バックアップ       | Cloudflare Workers（定時自動実行）, Cloudflare R2（ZIP保存・90日保持） |
+| 分類               | 技術                                                                                          |
+| ------------------ | --------------------------------------------------------------------------------------------- |
+| フロントエンド     | React 19, TanStack Start（SSR）, TanStack Router, TanStack Query                              |
+| スタイリング       | Tailwind CSS v4, shadcn/ui                                                                    |
+| バックエンド／DB   | Convex（サーバーレス関数＋リアクティブDB）                                                    |
+| 認証               | Firebase Authentication（Google OAuth）＋ セッションCookie                                    |
+| CMS                | microCMS（FAQ・利用規約・プライバシーポリシー・お知らせ / microcms-js-sdk, microcms-typegen） |
+| メール送信         | Resend                                                                                        |
+| 暗号化             | Web Crypto API（AES-GCM, PBKDF2）, WebAuthn（PRF拡張）                                        |
+| バリデーション     | zod                                                                                           |
+| テスト             | Vitest, @testing-library/react, convex-test, Playwright                                       |
+| Lint／フォーマット | Biome                                                                                         |
+| デプロイ           | Vercel（フロントエンド）, Convex Cloud（バックエンド）                                        |
+| バックアップ       | Cloudflare Workers（定時自動実行）, Cloudflare R2（ZIP保存・90日保持）                        |
 
 技術的な詳細（DBスキーマ、API一覧、暗号鍵の階層構造など）は [設計書](#関連ドキュメント) を参照してください。
 
@@ -166,13 +166,13 @@ pnpm install
 
 サーバー（TanStack Startのサーバー関数用）：
 
-| 変数名                              | 必須 | 説明                                                                |
-| ----------------------------------- | ---- | ------------------------------------------------------------------- |
-| SERVER\_URL                         | 任意 | サーバーURL                                                         |
-| MICROCMS\_SERVICE\_DOMAIN           | 必須 | microCMSサービスドメイン                                            |
-| MICROCMS\_API\_KEY                  | 必須 | microCMS APIキー                                                    |
-| CONVEX\_INTERNAL\_SECRET            | 必須 | Convex内部API保護用シークレット（下記Convex環境変数と同じ値を設定） |
-| ABSTRACT\_IP\_GEOLOCATION\_API\_KEY | 任意 | Abstract API GeoIP（ログイン・監査メール位置情報取得用）            |
+| 変数名                              | 必須 | 説明                                                                            |
+| ----------------------------------- | ---- | ------------------------------------------------------------------------------- |
+| SERVER\_URL                         | 任意 | サーバーURL                                                                     |
+| MICROCMS\_SERVICE\_DOMAIN           | 必須 | microCMSサービスドメイン                                                        |
+| MICROCMS\_API\_KEY                  | 必須 | microCMS APIキー（スキーマ型生成・CI検証のため「API情報の取得」権限を含むこと） |
+| CONVEX\_INTERNAL\_SECRET            | 必須 | Convex内部API保護用シークレット（下記Convex環境変数と同じ値を設定）             |
+| ABSTRACT\_IP\_GEOLOCATION\_API\_KEY | 任意 | Abstract API GeoIP（ログイン・監査メール位置情報取得用）                        |
 
 Convex実行環境（ `npx convex env set` 等でConvex側に設定）：
 

@@ -23,6 +23,7 @@
     "check:knowledge": "pnpm knowledge check:refs",
     "check:doc-sync": "pnpm knowledge check:doc-sync",
     "lint:workflows": "docker run --rm --entrypoint actionlint -v .:/repo -w /repo ghcr.io/reviewdog/action-actionlint:v1.77.0",
+    "lock:workflows": "gh actions-lock",
     "verify": "pnpm typecheck && pnpm check && pnpm test && pnpm build",
     "admin": "pnpm -F @poohma/admin",
     "web": "pnpm -F @poohma/web",
@@ -37,6 +38,8 @@
     "convex:deploy": "pnpm server exec convex deploy",
     "convex:deploy:dry-run": "pnpm server exec convex deploy --dry-run",
     "demo:export": "pnpm server demo:export",
+    "typegen:cms": "pnpm shared typegen:cms",
+    "check:cms": "pnpm shared check:cms",
     "preview": "pnpm web preview:browser",
     "preview:auth": "pnpm web exec playwright test e2e/auth.setup.ts --project=setup --no-deps"
   },

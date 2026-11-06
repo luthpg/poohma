@@ -1,3 +1,4 @@
+import type { Info } from "@poohma/shared/microcms";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Bell, ChevronRight, Megaphone } from "lucide-react";
@@ -9,7 +10,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import type { NewsContent } from "@/lib/cms.server";
 import { cmsQueries } from "@/utils/cms.queries";
 
 const LAST_READ_STORAGE_KEY = "poohma_last_read_news_time";
@@ -100,7 +100,7 @@ export function NewsBell({
   onOpen,
   className = "",
 }: {
-  items: NewsContent[];
+  items: Info[];
   hasUnread: boolean;
   onOpen?: () => void;
   className?: string;
@@ -143,7 +143,7 @@ export function NewsCard({
   items,
   className = "",
 }: {
-  items: NewsContent[];
+  items: Info[];
   className?: string;
 }) {
   return (
@@ -168,7 +168,7 @@ export function NewsCard({
   );
 }
 
-function NewsItemsList({ items }: { items: NewsContent[] }) {
+function NewsItemsList({ items }: { items: Info[] }) {
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return "";
     try {

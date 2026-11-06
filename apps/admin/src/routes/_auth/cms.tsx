@@ -505,9 +505,7 @@ function CmsPage() {
                     >
                       <td className="py-3 px-4">
                         <span className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700/60 text-[10px] font-mono text-purple-300">
-                          {typeof item.category === "string"
-                            ? item.category
-                            : item.category.name}
+                          {item.category?.name ?? "未分類"}
                         </span>
                       </td>
                       <td className="py-3 px-4 font-medium text-white max-w-xs truncate">
@@ -524,11 +522,7 @@ function CmsPage() {
                               setEditingFaq(item);
                               setFaqQuestion(item.question);
                               setFaqAnswer(item.answer);
-                              setFaqCategory(
-                                typeof item.category === "string"
-                                  ? item.category
-                                  : item.category.name,
-                              );
+                              setFaqCategory(item.category?.id ?? "");
                               setFaqModalOpen(true);
                             }}
                             className="p-1.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer"
@@ -559,9 +553,7 @@ function CmsPage() {
               <div key={item.id} className="p-4 space-y-2 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="px-2 py-0.5 rounded bg-zinc-800 text-[10px] font-mono text-purple-300">
-                    {typeof item.category === "string"
-                      ? item.category
-                      : item.category.name}
+                    {item.category?.name ?? "未分類"}
                   </span>
                   <div className="flex items-center gap-2">
                     <button
@@ -570,11 +562,7 @@ function CmsPage() {
                         setEditingFaq(item);
                         setFaqQuestion(item.question);
                         setFaqAnswer(item.answer);
-                        setFaqCategory(
-                          typeof item.category === "string"
-                            ? item.category
-                            : item.category.name,
-                        );
+                        setFaqCategory(item.category?.id ?? "");
                         setFaqModalOpen(true);
                       }}
                       className="p-2 rounded bg-zinc-800 text-zinc-300 min-h-[44px] min-w-[44px] flex items-center justify-center"

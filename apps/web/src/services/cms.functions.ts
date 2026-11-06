@@ -1,10 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import {
-  type FAQContent,
-  type LegalContent,
-  microCmsClient,
-  type NewsContent,
-} from "@/lib/cms.server";
+import { microCmsClient } from "@/lib/cms.server";
 
 /**
  * FAQ一覧を取得するサーバー関数
@@ -12,7 +7,7 @@ import {
 export const fetchFaqsServer = createServerFn({ method: "GET" }).handler(
   async () => {
     try {
-      const response = await microCmsClient.getList<FAQContent>({
+      const response = await microCmsClient.getList({
         endpoint: "faq",
         queries: { limit: 100, orders: "createdAt" },
       });
@@ -30,7 +25,7 @@ export const fetchFaqsServer = createServerFn({ method: "GET" }).handler(
 export const fetchLegalServer = createServerFn({ method: "GET" }).handler(
   async () => {
     try {
-      const response = await microCmsClient.getObject<LegalContent>({
+      const response = await microCmsClient.getObject({
         endpoint: "legal",
       });
       return response;
@@ -73,7 +68,7 @@ export const fetchNewsListServer = createServerFn({ method: "GET" })
   .validator(normalizeNewsListParams)
   .handler(async ({ data }) => {
     try {
-      const response = await microCmsClient.getList<NewsContent>({
+      const response = await microCmsClient.getList({
         endpoint: "info",
         queries: {
           limit: data?.limit ?? 20,
@@ -115,7 +110,7 @@ export const fetchNewsDetailServer = createServerFn({ method: "GET" })
   })
   .handler(async ({ data: id }) => {
     try {
-      const response = await microCmsClient.getListDetail<NewsContent>({
+      const response = await microCmsClient.getListDetail({
         endpoint: "info",
         contentId: id,
       });
