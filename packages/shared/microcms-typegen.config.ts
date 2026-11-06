@@ -1,10 +1,13 @@
 import { resolve } from "node:path";
 import type { Config } from "microcms-typegen";
 
-try {
-  process.loadEnvFile(resolve(import.meta.dirname, ".env"));
-} catch {
-  // CI等では環境変数から直接注入されるため、ファイル不在時は無視
+// 注入済みの環境変数を優先し、ローカル設定から順に読み込む
+for (const envFile of [".env.local", ".env"]) {
+  try {
+    process.loadEnvFile(resolve(import.meta.dirname, "../..", envFile));
+  } catch {
+    // CI等では環境変数から直接注入されるため、ファイル不在時は無視
+  }
 }
 
 export default {

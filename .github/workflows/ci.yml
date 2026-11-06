@@ -70,6 +70,7 @@ jobs:
         run: pnpm run check:ci
 
       - name: Check microCMS schema
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
         run: pnpm run check:cms
         env:
           MICROCMS_SERVICE_DOMAIN: ${{ secrets.MICROCMS_SERVICE_DOMAIN }}
