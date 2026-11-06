@@ -16,7 +16,8 @@
       ".docs/**/*",
       ".agents/**/*",
       ".github/**/*",
-      ".vscode/**/*"
+      ".vscode/**/*",
+      "!**/microcms.d.ts"
     ]
   },
   "formatter": {

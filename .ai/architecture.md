@@ -44,7 +44,7 @@ poohma/
 | `apps/extension`           | Chrome 拡張機能（閲覧中サイトのアカウント参照・パスコード解除・ヒント復号・自動入力支援）                                                                     | WXT, Manifest V3, React 19, Tailwind CSS v4, Web Crypto API                           |
 | `apps/admin`               | 管理者コンソール（お問い合わせ対応、統計KPI、ユーザー/ファミリー照会、全6外接APIヘルス・Quota監視、Convex全環境合算リソース逼迫度モニタリング、システム監査） | React 19, TanStack Start, Cloudflare Workers/Vite Plugin, cmdk, Geist Fonts           |
 | `packages/backend`         | Convex BaaS バックエンド（スキーマ、関数、RLS、admin API、Preview 構築、Local Convex Docker 実行）                                                            | Convex, convex-helpers, convex-test, Docker, TypeScript                               |
-| `packages/shared`          | 共通バリデーションスキーマ、URL検証（SSRF対策）、メール定義                                                                                                   | Zod, React Email, ipaddr.js, TypeScript                                               |
+| `packages/shared`          | 共通バリデーションスキーマ、microCMS 自動生成スキーマ型（`@poohma/shared/microcms`）、URL検証（SSRF対策）、メール定義                                         | Zod, microcms-typegen, React Email, ipaddr.js, TypeScript                             |
 | `packages/knowledge-tools` | AI開発支援、Doc-Sync、参照整合性検証ツール                                                                                                                    | TypeScript, simple-git                                                                |
 | `workers/backup`           | Convex Cloud からの定期データエクスポートおよび Cloudflare R2 へのアーカイブ保存                                                                              | Cloudflare Workers, Cloudflare R2, Wrangler, Fetch                                    |
 
@@ -69,7 +69,8 @@ poohma/
   - `auth.functions.ts`: `syncUser`, `refreshSessionCookie`, `getAuthUser`, `logout`, `getCustomTokenFromSession`（Firebase Admin SDK とセッション Cookie 制御）
   - `firebase-admin.server.ts`: Firebase Admin 初期化・トークン検証
   - `cms.functions.ts` / `cms.server.ts`: microCMS 連携（FAQ/利用規約/お知らせ）
-    - `fetchNewsListServer`, `fetchNewsDetailServer`: `info` エンドポイント（`NewsContent` 型）でお知らせ一覧・詳細取得
+    - `packages/shared/microcms-typegen.config.ts` により管理APIからスキーマ型定義（`MainServiceSchema`, `Info`, `Faq`, `Legal`, `Categories`）を `packages/shared/src/types/microcms.d.ts`（`@poohma/shared/microcms`）に自動生成し、`createClient<MainServiceSchema>` で初期化
+    - `fetchNewsListServer`, `fetchNewsDetailServer`: `info` エンドポイント（`Info` 型）でお知らせ一覧・詳細取得
   - `cms.queries.ts`: TanStack Query の `queryOptions` ラッパー（`cmsQueries.newsList()`, `cmsQueries.newsDetail(id)` 等）
 - **Lib & Utils**:
   - `crypto.ts`: Web Crypto API による E2EE（AES-GCM, PBKDF2, DEK/MasterKey ラップ/アンラップ）
@@ -178,15 +179,16 @@ flowchart TD
 
 ## 5. 主要な Source of Truth
 
-| 領域                            | Source of Truth                                 |
-| ------------------------------- | ----------------------------------------------- |
-| DB スキーマ・インデックス       | `packages/backend/convex/schema.ts`             |
-| Convex 認証・認可基盤           | `packages/backend/convex/customBuilders.ts`     |
-| レコード単位アクセス制御 (RLS)  | `packages/backend/convex/rls.ts`                |
-| E2EE 暗号化・鍵導出アルゴリズム | `packages/crypto/src/index.ts`                  |
-| 脅威モデル・セキュリティ境界    | `.docs/security/threat-model.md`                |
-| 人間向け正規仕様・詳細設計      | `.docs/requirements.md`, `.docs/code-design.md` |
-| E2E テスト・自動テスト戦略      | `.docs/code-design.md`, `.ai/testing.md`        |
+| 領域                            | Source of Truth                                                         |
+| ------------------------------- | ----------------------------------------------------------------------- |
+| DB スキーマ・インデックス       | `packages/backend/convex/schema.ts`                                     |
+| Convex 認証・認可基盤           | `packages/backend/convex/customBuilders.ts`                             |
+| レコード単位アクセス制御 (RLS)  | `packages/backend/convex/rls.ts`                                        |
+| E2EE 暗号化・鍵導出アルゴリズム | `packages/crypto/src/index.ts`                                          |
+| 脅威モデル・セキュリティ境界    | `.docs/security/threat-model.md`                                        |
+| 人間向け正規仕様・詳細設計      | `.docs/requirements.md`, `.docs/code-design.md`                         |
+| E2E テスト・自動テスト戦略      | `.docs/code-design.md`, `.ai/testing.md`                                |
+| microCMS コンテンツスキーマ型   | `packages/shared/src/types/microcms.d.ts` (`microcms-typegen` 自動生成) |
 
 ---
 
@@ -204,3 +206,5 @@ flowchart TD
   - リカバリーキット（`recovery-kit.ts`, `recovery.ts`）への波及確認
 - **認証・セッション変更時**:
   - `apps/web/src/services/auth.functions.ts`, `firebase-admin.server.ts`, `useConvexFirebaseAuth.ts`, `AccountProvider.tsx`
+- **microCMS スキーマ変更時**:
+  - 管理画面で API スキーマを変更した際は、`pnpm run typegen:cms` を実行して `packages/shared/src/types/microcms.d.ts` を再生成し、`pnpm run check:cms` で整合性を検証する（自動生成ファイルは Biome フォーマット対象外とする）

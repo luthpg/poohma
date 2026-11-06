@@ -89,7 +89,7 @@ PWA 構成要素と責務:
 | UI補助                       | next-themes（ライト/ダーク/システムテーマ切替）、cmdk（コマンドパレット系UI）、@icons-pack/react-simple-icons（サービスロゴアイコン）、html-react-parser（CMSリッチテキストの描画）、@dnd-kit（クレデンシャルDnD並び替え）                   |
 | バックエンド／DB             | Convex（サーバーレス関数＋リアクティブDB）                                                                                                                                                                                                   |
 | 認証                         | Firebase Authentication（Google OAuth）＋ firebase-admin（サーバー側検証）＋ httpOnlyセッションCookie                                                                                                                                        |
-| CMS                          | microCMS（microcms-js-sdk）                                                                                                                                                                                                                  |
+| CMS                          | microCMS（microcms-js-sdk, microcms-typegen）                                                                                                                                                                                                |
 | メール送信・テンプレート     | Resend, React Email（`@react-email/components`）                                                                                                                                                                                             |
 | 外部API                      | Yahoo!テキスト解析API（ふりがな）、任意サイトのOGPスクレイピング（cheerio）、Abstract IP Geolocation API（位置情報取得）、ipaddr.js（IPアドレス検証・SSRF/プライベートIP除外）                                                               |
 | CSV処理                      | papaparse                                                                                                                                                                                                                                    |
@@ -116,7 +116,7 @@ poohma/                    … プロジェクトルート（Turborepo / pnpm wo
 │   │   │   ├── components/ … 共通UIコンポーネント (AppHeader, PasscodeProvider 等)
 │   │   │   ├── env/        … クライアント/サーバー環境変数スキーマ (t3-env)
 │   │   │   ├── hooks/      … usePersistentQuery, useConvexFirebaseAuth, use-export-csv 等
-│   │   │   ├── lib/        … biometric.ts (WebAuthn), cms.server.ts, recovery-kit.ts 等
+│   │   │   ├── lib/        … biometric.ts (WebAuthn), cms.server.ts, faq.ts, recovery-kit.ts 等
 │   │   │   ├── routes/
 │   │   │   │   ├── (app)/  … 認証必須ルート群 (dashboard, records, family, settings)
 │   │   │   │   ├── (public)/ … 公開ルート群 (LP, usage, faq, login, 規約等)
@@ -143,9 +143,10 @@ poohma/                    … プロジェクトルート（Turborepo / pnpm wo
 │   ├── crypto/            … @poohma/crypto（E2EE暗号処理コア: Web Crypto API, エンベロープ暗号化, 鍵導出, extractable制御）
 │   │   ├── src/           … 暗号化/復号、マスターキー/DEKラップ、ソルト生成、KDF
 │   │   └── tests/         … 暗号コア単体テスト (Vitest)
-│   ├── shared/            … @poohma/shared（共通バリデーションスキーマ、URLドメイン照合、拡張機能メッセージ定義、メール定義、ユーティリティ）
+│   ├── shared/            … @poohma/shared（共通バリデーションスキーマ、microCMSスキーマ型定義、URLドメイン照合、拡張機能メッセージ定義、メール定義、ユーティリティ）
 │   │   ├── emails/        … メールテンプレート定義・配信レジストリ (React Email / Resend)
 │   │   ├── src/schemas/   … 拡張機能メッセージ (extension-messages.ts) 等の型安全スキーマ
+│   │   ├── src/types/     … microcms.d.ts (microcms-typegen 自動生成の共通 microCMS スキーマ型定義)
 │   │   └── src/utils/     … url-matcher.ts (Public Suffix List準拠ドメイン判定・階層的ドメインランクソート・同一オリジン入力補助判定), search-normalization.ts 等
 │   └── knowledge-tools/   … @poohma/knowledge-tools（知見運用・Doc-Sync検証）
 ├── workers/
@@ -1447,13 +1448,13 @@ convex/crons.ts に登録されている定期ジョブ一覧:
 
 ### サーバー（src/env/server.ts）
 
-| 変数名                          | 必須 | 説明                                                     |
-| ------------------------------- | ---- | -------------------------------------------------------- |
-| SERVER_URL                      | 任意 | サーバーURL                                              |
-| MICROCMS_SERVICE_DOMAIN         | 必須 | microCMSサービスドメイン                                 |
-| MICROCMS_API_KEY                | 必須 | microCMS APIキー                                         |
-| CONVEX_INTERNAL_SECRET          | 必須 | Convex HTTP Action（内部API）保護用シークレット          |
-| ABSTRACT_IP_GEOLOCATION_API_KEY | 必須 | Abstract API GeoIP（ログイン・監査メール位置情報取得用） |
+| 変数名                          | 必須 | 説明                                                                                                     |
+| ------------------------------- | ---- | -------------------------------------------------------------------------------------------------------- |
+| SERVER_URL                      | 任意 | サーバーURL                                                                                              |
+| MICROCMS_SERVICE_DOMAIN         | 必須 | microCMSサービスドメイン                                                                                 |
+| MICROCMS_API_KEY                | 必須 | microCMS APIキー（`microcms-typegen` によるスキーマ型生成・CI検証のため「API情報の取得」権限を含むこと） |
+| CONVEX_INTERNAL_SECRET          | 必須 | Convex HTTP Action（内部API）保護用シークレット                                                          |
+| ABSTRACT_IP_GEOLOCATION_API_KEY | 必須 | Abstract API GeoIP（ログイン・監査メール位置情報取得用）                                                 |
 
 ### その他（Convex実行環境）
 
@@ -1492,7 +1493,7 @@ convex/crons.ts に登録されている定期ジョブ一覧:
 - **ブラウザテスト** ：@vitest/browser-playwright によるブラウザ実行モードのテスト。
 - **コンポーネントカタログ** ：Storybook（Storybook Test Runner + axe-core による `a11y: { test: "error" }` 自動検証、テーマ切替アドオン等を含む）。
 - **静的解析／フォーマット** ：Biome（ `check` / `check:ci` スクリプト）。
-- **型チェック** ： `tsc --noEmit` 。
+- **型チェック** ： `tsc --noEmit` 、および `microcms-typegen check`（ `check:cms` スクリプトによる microCMS 管理画面スキーマと `packages/shared/src/types/microcms.d.ts` の整合性検証）。
 
 ## 18. 今後の課題（技術的観点）
 

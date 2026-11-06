@@ -1,3 +1,9 @@
+import type {
+  Faq,
+  Info,
+  Legal,
+  MainServiceSchema,
+} from "@poohma/shared/microcms";
 import { v } from "convex/values";
 import { systemAdminAction } from "../customBuilders";
 
@@ -21,17 +27,6 @@ function getMicroCmsConfig() {
 // 1. info (お知らせ)
 // -------------------------------------------------------------
 
-export interface AdminNewsItem {
-  id: string;
-  title: string;
-  content?: string;
-  published_at?: string;
-  publishedAt?: string;
-  createdAt: string;
-  updatedAt: string;
-  status?: "published" | "draft";
-}
-
 export const getCmsInfoList = systemAdminAction({
   args: {
     limit: v.optional(v.number()),
@@ -41,7 +36,7 @@ export const getCmsInfoList = systemAdminAction({
     _ctx,
     args,
   ): Promise<{
-    contents: AdminNewsItem[];
+    contents: Info[];
     totalCount: number;
     configured: boolean;
   }> => {
@@ -64,7 +59,7 @@ export const getCmsInfoList = systemAdminAction({
         return { contents: [], totalCount: 0, configured: true };
       }
       const data = (await res.json()) as {
-        contents: AdminNewsItem[];
+        contents: Info[];
         totalCount: number;
       };
       return {
@@ -82,6 +77,7 @@ export const createCmsInfo = systemAdminAction({
   args: {
     title: v.string(),
     content: v.string(),
+    slug: v.optional(v.string()),
     published_at: v.optional(v.string()),
     isDraft: v.optional(v.boolean()),
   },
@@ -90,17 +86,20 @@ export const createCmsInfo = systemAdminAction({
     const query = args.isDraft ? "?status=draft" : "";
     const url = `${config.baseUrl}/info${query}`;
 
+    const body: MainServiceSchema["info"]["create"] = {
+      title: args.title,
+      slug: args.slug ?? `info-${Date.now()}`,
+      content: args.content,
+      published_at: args.published_at ?? new Date().toISOString(),
+    };
+
     const res = await fetch(url, {
       method: "POST",
       headers: {
         "X-MICROCMS-API-KEY": config.apiKey,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        title: args.title,
-        content: args.content,
-        published_at: args.published_at ?? new Date().toISOString(),
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) {
@@ -115,6 +114,7 @@ export const updateCmsInfo = systemAdminAction({
     id: v.string(),
     title: v.string(),
     content: v.string(),
+    slug: v.optional(v.string()),
     published_at: v.optional(v.string()),
     isDraft: v.optional(v.boolean()),
   },
@@ -123,17 +123,20 @@ export const updateCmsInfo = systemAdminAction({
     const query = args.isDraft ? "?status=draft" : "";
     const url = `${config.baseUrl}/info/${encodeURIComponent(args.id)}${query}`;
 
+    const body: MainServiceSchema["info"]["update"] = {
+      title: args.title,
+      content: args.content,
+      ...(args.slug ? { slug: args.slug } : {}),
+      ...(args.published_at ? { published_at: args.published_at } : {}),
+    };
+
     const res = await fetch(url, {
       method: "PATCH",
       headers: {
         "X-MICROCMS-API-KEY": config.apiKey,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        title: args.title,
-        content: args.content,
-        published_at: args.published_at,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) {
@@ -169,16 +172,6 @@ export const deleteCmsInfo = systemAdminAction({
 // 2. faq (よくある質問)
 // -------------------------------------------------------------
 
-export interface AdminFaqItem {
-  id: string;
-  slug?: string;
-  question: string;
-  answer: string;
-  category: string | { id?: string; name: string };
-  createdAt: string;
-  updatedAt: string;
-}
-
 export const getCmsFaqList = systemAdminAction({
   args: {
     limit: v.optional(v.number()),
@@ -188,7 +181,7 @@ export const getCmsFaqList = systemAdminAction({
     _ctx,
     args,
   ): Promise<{
-    contents: AdminFaqItem[];
+    contents: Faq[];
     totalCount: number;
     configured: boolean;
   }> => {
@@ -211,7 +204,7 @@ export const getCmsFaqList = systemAdminAction({
         return { contents: [], totalCount: 0, configured: true };
       }
       const data = (await res.json()) as {
-        contents: AdminFaqItem[];
+        contents: Faq[];
         totalCount: number;
       };
       return {
@@ -229,12 +222,19 @@ export const createCmsFaq = systemAdminAction({
   args: {
     question: v.string(),
     answer: v.string(),
-    category: v.string(),
+    category: v.optional(v.string()),
     slug: v.optional(v.string()),
   },
   handler: async (_ctx, args) => {
     const config = getMicroCmsConfig();
     const url = `${config.baseUrl}/faq`;
+
+    const body: MainServiceSchema["faq"]["create"] = {
+      question: args.question,
+      answer: args.answer,
+      slug: args.slug ?? `faq-${Date.now()}`,
+      ...(args.category ? { category: args.category } : {}),
+    };
 
     const res = await fetch(url, {
       method: "POST",
@@ -242,12 +242,7 @@ export const createCmsFaq = systemAdminAction({
         "X-MICROCMS-API-KEY": config.apiKey,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        question: args.question,
-        answer: args.answer,
-        category: args.category,
-        slug: args.slug ?? `faq-${Date.now()}`,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) {
@@ -262,12 +257,19 @@ export const updateCmsFaq = systemAdminAction({
     id: v.string(),
     question: v.string(),
     answer: v.string(),
-    category: v.string(),
+    category: v.optional(v.string()),
     slug: v.optional(v.string()),
   },
   handler: async (_ctx, args) => {
     const config = getMicroCmsConfig();
     const url = `${config.baseUrl}/faq/${encodeURIComponent(args.id)}`;
+
+    const body: MainServiceSchema["faq"]["update"] = {
+      question: args.question,
+      answer: args.answer,
+      ...(args.category ? { category: args.category } : {}),
+      ...(args.slug ? { slug: args.slug } : {}),
+    };
 
     const res = await fetch(url, {
       method: "PATCH",
@@ -275,12 +277,7 @@ export const updateCmsFaq = systemAdminAction({
         "X-MICROCMS-API-KEY": config.apiKey,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        question: args.question,
-        answer: args.answer,
-        category: args.category,
-        ...(args.slug ? { slug: args.slug } : {}),
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) {
@@ -316,19 +313,12 @@ export const deleteCmsFaq = systemAdminAction({
 // 3. legal (利用規約 & プライバシーポリシー)
 // -------------------------------------------------------------
 
-export interface AdminLegalContent {
-  terms: string;
-  privacy: string;
-  published_at?: string;
-  updatedAt?: string;
-}
-
 export const getCmsLegal = systemAdminAction({
   args: {},
   handler: async (
     _ctx,
   ): Promise<{
-    data: AdminLegalContent | null;
+    data: Legal | null;
     configured: boolean;
   }> => {
     let config: ReturnType<typeof getMicroCmsConfig>;
@@ -347,7 +337,7 @@ export const getCmsLegal = systemAdminAction({
       if (!res.ok) {
         return { data: null, configured: true };
       }
-      const data = (await res.json()) as AdminLegalContent;
+      const data = (await res.json()) as Legal;
       return { data, configured: true };
     } catch {
       return { data: null, configured: true };
@@ -365,17 +355,19 @@ export const updateCmsLegal = systemAdminAction({
     const config = getMicroCmsConfig();
     const url = `${config.baseUrl}/legal`;
 
+    const body: MainServiceSchema["legal"]["update"] = {
+      terms: args.terms,
+      privacy: args.privacy,
+      published_at: args.published_at ?? new Date().toISOString(),
+    };
+
     const res = await fetch(url, {
       method: "PATCH",
       headers: {
         "X-MICROCMS-API-KEY": config.apiKey,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        terms: args.terms,
-        privacy: args.privacy,
-        published_at: args.published_at ?? new Date().toISOString(),
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) {

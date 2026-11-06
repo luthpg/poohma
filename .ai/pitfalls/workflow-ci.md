@@ -432,3 +432,33 @@ CI ワークフロー内で `actions/setup-node` と `pnpm/setup` を併用し�
 3. **CLI ツール導入時の `pnpm add --global` 統一（`$PATH` 整合性）**:
    `actions/setup-node` を廃止した場合、`npm install --global <pkg>` でインストールされる npm グローバル bin ディレクトリが `$PATH` に含まれず、`command not found`（exit code 127）の原因となる。
    CLI ツール（`vercel` 等）をグローバル導入する際は、必ず `pnpm add --global vercel@latest` を使用する。`pnpm/setup` により `PNPM_HOME` は確実に `$PATH` に通っているため、バイナリを即時安全に実行可能となる。
+
+---
+
+## 20. `microcms-typegen check`（`check:cms`）における Biome 自動整形との競合・APIキー権限要件
+
+### 問題 (Problem)
+
+1. `microcms-typegen generate`（`pnpm run typegen:cms`）で `packages/shared/src/types/microcms.d.ts` を生成した直後は最新状態であるにもかかわらず、`pnpm check`（`biome check --write`）を実行した後に `microcms-typegen check`（`pnpm run check:cms`）を実行すると `Out of date .../packages/shared/src/types/microcms.d.ts`（`Generated types are out of date`）で失敗し、または Biome 側で `noBannedTypes`（`{}` 型の使用）の Lint エラーが発生する。また、拡張子を `.ts` にすると `noUnusedParameters: true` により `TS6196: 'Options' is declared but never used` が発生する。
+2. CI（`.github/workflows/ci.yml`）の `Check microCMS schema` ステップで `Management API apis returned HTTP 403. Check the Management API key and its API information permission.` が発生する。
+
+### 原因 (Root Cause)
+
+1. `microcms-typegen check` は管理 API から再生成した文字列と既存ファイルの文字列を厳密比較（`normalizeLineEndings(existing) === content`）する仕様である。`biome.json` の除外パターンに漏れやファイル名不一致があると、Biome が `packages/shared/src/types/microcms.d.ts` を複数行フォーマット・クォート除去してしまい、生成元の出力と一致しなくなる。また、生成コードは参照フィールドを持たないエンドポイントでも `<Options extends __MicroCMSTypegenReadOptions = {}>` を出力するため、`skipLibCheck: true` が適用される `.d.ts` 拡張子にする必要がある。
+2. `microcms-typegen` はコンテンツ API（`*.microcms.io`）ではなくマネジメント API（`*.microcms-management.io/api/v1/apis`）を呼び出すため、使用する `MICROCMS_API_KEY` にマネジメント API の「API情報の取得」権限が付与されていないと HTTP 403 となる。
+
+### 誤ったアプローチ (Anti-Pattern)
+
+- 生成後の `packages/shared/src/types/microcms.d.ts` を手動編集したり、Biome でフォーマットした状態でコミットする。
+- `@poohma/web` と `@poohma/backend` で別々に microCMS の型を手書き・二重定義する。
+
+### 正しいアプローチ (Correct Pattern)
+
+- `packages/shared/src/types/microcms.d.ts`（`@poohma/shared/microcms`）に生成型を一元集約し、ルート `biome.json` の `files.includes` にて `!**/packages/shared/src/types/microcms.d.ts` を指定して Biome の Lint・Format 対象から完全に除外する。
+- 万が一 Biome で整形されてしまった場合は、除外設定を確認した上で `pnpm run typegen:cms` を再実行し、`microcms-typegen` の無加工出力に戻す。
+- ローカルおよび GitHub Actions Secrets の `MICROCMS_API_KEY` には、microCMS 管理画面の「APIキー設定 ＞ マネジメントAPI」にて「API情報の取得」権限を有効化したキーを設定する。
+
+### 再発防止 (Prevention)
+
+- microCMS スキーマ変更時は `pnpm run typegen:cms` → `pnpm check` → `pnpm run check:cms` の順で実行し、`pnpm check` 実行後も `check:cms` が `Up to date` となることを確認してからコミットする。
+- 関連実装: `packages/shared/microcms-typegen.config.ts`, `packages/shared/src/types/microcms.d.ts`, `biome.json`, `.github/workflows/ci.yml`

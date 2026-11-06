@@ -281,3 +281,11 @@
   - ルート `package.json` の `"packageManager": "pnpm@..."` および `"devEngines": { "packageManager": { ... }, "runtime": { "name": "node", "version": "..." } }` にバージョン指定を集約し、ワークフロー側は `uses: pnpm/setup@v3.1.2` に `with: install: false` を指定してランタイムのみを一元的に解決させること。
   - `install: false` を指定しないと `pnpm/setup` がデフォルトで環境変数のない状態で `pnpm install` を自動実行してしまい、`postinstall`（`apps/extension` 等のスキーマ検証）でクラッシュしたり後続の `Install dependencies` と二重実行になるため、必ず `install: false` を明示すること。
   - ワークフロー内で Vercel CLI 等の外部ツールをグローバル導入する際は、`npm install --global` ではなく `pnpm add --global` を使用すること（`PNPM_HOME` が `$PATH` に通っているため確実に実行可能となる）。
+
+### microCMS スキーマ型定義の自動生成と CI 整合性検証（`microcms-typegen`）
+
+- **自動生成型（`packages/shared/src/types/microcms.d.ts`）の Single Source of Truth と手書き編集禁止**:
+  - microCMS のコンテンツ型定義（`Info`, `Faq`, `Legal`, `Categories`, `MainServiceSchema`）は `packages/shared/microcms-typegen.config.ts` に基づき `microcms-typegen generate`（`pnpm run typegen:cms`）で自動生成された `packages/shared/src/types/microcms.d.ts`（`@poohma/shared/microcms`）をモノレポ全体（`web`, `backend`, `admin`）における唯一の信頼できる情報源とし、各パッケージでの手動型定義や直接編集を行わない。
+- **CI におけるスキーマ乖離検知（`check:cms`）と Biome 除外の徹底**:
+  - CI（`.github/workflows/ci.yml`）の `Check microCMS schema` ステップにて `pnpm run check:cms`（`microcms-typegen check`）を実行し、microCMS 管理画面側の実スキーマとリポジトリ内の `packages/shared/src/types/microcms.d.ts` が完全一致していることを検証する（実行には `MICROCMS_API_KEY` にマネジメント API の「API情報の取得」権限が必要）。
+  - `microcms-typegen check` は生成コードとの厳密な文字列比較を行うため、`biome.json` で `!**/packages/shared/src/types/microcms.d.ts` を除外設定し、Biome（`pnpm check`）による自動整形でファイル内容が書き換わって `Out of date` エラーになることを防止する。

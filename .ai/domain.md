@@ -263,19 +263,19 @@ flowchart TD
 
 ---
 
-## 7. お知らせ (`NewsContent`) - microCMS `info` エンドポイント
+## 7. お知らせ (`Info`) - microCMS `info` エンドポイント
 
-お知らせはConvexではなくmicroCMSで管理。`NewsContent` 型（`cms.server.ts`）と同義の `InfoContent` エイリアスも提供。
+お知らせ・FAQ・利用規約はConvexではなくmicroCMSで管理。型定義は `packages/shared/microcms-typegen.config.ts` に基づき `microcms-typegen` が `packages/shared/src/types/microcms.d.ts`（`MainServiceSchema`, `Info`, `Faq`, `Legal`, `Categories`）へ自動生成し、`@poohma/shared/microcms` として `@poohma/web`・`@poohma/backend`・`@poohma/admin` の全ワークスペースで共通利用する。
 
-| フィールド     | 型                      | 説明                                 |
-| -------------- | ----------------------- | ------------------------------------ |
-| `id`           | string                  | microCMS コンテンツID                |
-| `slug`         | string                  | URLスラッグ                          |
-| `title`        | string                  | お知らせタイトル                     |
-| `content`      | string                  | リッチテキスト（HTML文字列）         |
-| `published_at` | string?                 | カスタム公開日時フィールド           |
-| `thumbnail`    | `{url, width, height}`? | サムネイル画像                       |
-| `publishedAt`  | string                  | microCMS標準公開日時（MicroCMSBase） |
+| フィールド     | 型                                                | 説明                               |
+| -------------- | ------------------------------------------------- | ---------------------------------- |
+| `id`           | string                                            | microCMS コンテンツID              |
+| `slug`         | string                                            | URLスラッグ                        |
+| `title`        | string                                            | お知らせタイトル                   |
+| `content`      | string                                            | リッチテキスト（HTML文字列）       |
+| `published_at` | string                                            | カスタム公開日時フィールド（必須） |
+| `thumbnail`    | `MicroCMSImage` (`{url, width?, height?, alt?}`)? | サムネイル画像                     |
+| `publishedAt`  | string?                                           | microCMS標準公開日時               |
 - **取得関数**: `fetchNewsListServer`（`info` エンドポイント、最大20件、`-publishedAt,-createdAt` 順）/ `fetchNewsDetailServer`（IDで1件取得）
 - **キャッシュ**: `staleTime = 5分`（NEWS_STALE_TIME）
 - **表示**: ヘッダーベル（`NewsBell` + Popover、未読バッジ付き）/ ユーザーメニュー / `/news` 一覧・`/news/$id` 詳細ページ（公開ルート）

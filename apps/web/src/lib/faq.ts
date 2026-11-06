@@ -1,8 +1,8 @@
+import type { Faq } from "@poohma/shared/microcms";
 import {
   extractSearchWords,
   matchesSearchWords,
 } from "@poohma/shared/utils/search-normalization";
-import type { FAQCategoryField, FAQContent } from "./cms.server";
 
 export const FAQ_CATEGORIES = [
   { key: "general", label: "基本情報" },
@@ -23,20 +23,17 @@ export const OTHER_CATEGORY_LABEL = "その他";
 export type GroupedFaqCategory = {
   key: string;
   label: string;
-  items: FAQContent[];
+  items: Faq[];
 };
 
 /**
  * FAQオブジェクトからカテゴリキー文字列を安全に抽出する
  */
 export function extractCategoryKey(
-  category: FAQCategoryField | undefined | null,
+  category: Faq["category"] | undefined | null,
 ): string {
   if (category == null) {
     return "";
-  }
-  if (typeof category === "string") {
-    return category.trim();
   }
   if (typeof category === "object" && typeof category.name === "string") {
     return category.name.trim();
@@ -83,7 +80,7 @@ export function normalizeSearchText(value: string): string {
  * FAQ単体が検索クエリにマッチするか判定する
  */
 export function matchFaq(
-  faq: FAQContent,
+  faq: Faq,
   searchQueryOrWords: string | string[],
 ): boolean {
   const searchWords = Array.isArray(searchQueryOrWords)
@@ -115,18 +112,18 @@ export function matchFaq(
  * @returns グルーピングされたFAQカテゴリの配列
  */
 export function filterAndGroupFaqs(
-  faqs: FAQContent[],
+  faqs: Faq[],
   searchQuery?: string,
 ): GroupedFaqCategory[] {
   const searchWords = extractSearchWords(searchQuery ?? "");
   const isSearching = searchWords.length > 0;
 
   // 各定義済みカテゴリのマップを初期化
-  const categoryMap = new Map<string, FAQContent[]>();
+  const categoryMap = new Map<string, Faq[]>();
   for (const cat of FAQ_CATEGORIES) {
     categoryMap.set(cat.key, []);
   }
-  const otherItems: FAQContent[] = [];
+  const otherItems: Faq[] = [];
 
   for (const faq of faqs) {
     if (isSearching && !matchFaq(faq, searchWords)) {

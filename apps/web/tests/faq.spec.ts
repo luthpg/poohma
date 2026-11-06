@@ -1,5 +1,5 @@
+import type { Faq } from "@poohma/shared/microcms";
 import { describe, expect, it } from "vitest";
-import type { FAQContent } from "@/lib/cms.server";
 import {
   FAQ_CATEGORIES,
   filterAndGroupFaqs,
@@ -7,13 +7,18 @@ import {
   OTHER_CATEGORY_LABEL,
 } from "@/lib/faq";
 
-const mockFaqs: FAQContent[] = [
+const mockFaqs: Faq[] = [
   {
     id: "faq-1",
     slug: "usage-1",
     question: "ログイン状態はどれくらい維持されますか？",
     answer: "<p>通常は<strong>30日間</strong>維持されます。</p>",
-    category: "usage",
+    category: {
+      id: "usage",
+      name: "usage",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+    },
     createdAt: "2026-01-01T00:00:00Z",
     updatedAt: "2026-01-01T00:00:00Z",
     publishedAt: "2026-01-01T00:00:00Z",
@@ -24,7 +29,12 @@ const mockFaqs: FAQContent[] = [
     slug: "troubleshooting-1",
     question: "パスコードを忘れた場合はどうすればよいですか？",
     answer: "<p>家族の他のメンバーに再招待してもらう必要があります。</p>",
-    category: { name: "troubleshooting" },
+    category: {
+      id: "troubleshooting",
+      name: "troubleshooting",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+    },
     createdAt: "2026-01-01T00:00:00Z",
     updatedAt: "2026-01-01T00:00:00Z",
     publishedAt: "2026-01-01T00:00:00Z",
@@ -35,7 +45,12 @@ const mockFaqs: FAQContent[] = [
     slug: "security-1",
     question: "暗号化のアルゴリズムは何ですか？",
     answer: "<p>AES-GCM 256bit による E2EE を採用しています。</p>",
-    category: "security",
+    category: {
+      id: "security",
+      name: "security",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+    },
     createdAt: "2026-01-01T00:00:00Z",
     updatedAt: "2026-01-01T00:00:00Z",
     publishedAt: "2026-01-01T00:00:00Z",
@@ -46,7 +61,12 @@ const mockFaqs: FAQContent[] = [
     slug: "technical-1",
     question: "推奨ブラウザは何ですか？",
     answer: "<p>最新の Google Chrome、Safari、Edge を推奨しています。</p>",
-    category: "technical",
+    category: {
+      id: "technical",
+      name: "technical",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+    },
     createdAt: "2026-01-01T00:00:00Z",
     updatedAt: "2026-01-01T00:00:00Z",
     publishedAt: "2026-01-01T00:00:00Z",
@@ -57,7 +77,12 @@ const mockFaqs: FAQContent[] = [
     slug: "custom-1",
     question: "将来追加された未知のカテゴリの質問です",
     answer: "<p>未知のカテゴリでも正常に表示されます。</p>",
-    category: { id: "cat-unknown", name: "unknownCategory" },
+    category: {
+      id: "unknown",
+      name: "unknown",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+    },
     createdAt: "2026-01-01T00:00:00Z",
     updatedAt: "2026-01-01T00:00:00Z",
     publishedAt: "2026-01-01T00:00:00Z",
