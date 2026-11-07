@@ -1,3 +1,4 @@
+import type {} from "@vitest/browser-playwright";
 import type { BrowserCommand } from "vitest/node";
 
 export const setupVirtualAuthenticator: BrowserCommand<

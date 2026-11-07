@@ -79,3 +79,14 @@ Firebase Auth および Session Cookie 管理における落とし穴と回避�
 - **回避法**:
   - Convex の Query / Mutation 発行ガード（skip 制御）には、Firebase Auth ではなく **`useConvexAuth().isAuthenticated`** を用いる。
   - バックエンド側で例外を握りつぶして空配列等を返す小手先対応は行わない（空配列を返すとアカウント未作成判定となり、画面が未作成へ誤リダイレクトされるため）。Single Source of Truth に基づき、Convex レベルの認証完了を待ってクエリを発行する。
+
+---
+
+### `firebase-admin` v14 への移行とレガシー名前空間 API の完全撤廃
+
+- **問題**: `firebase-admin` v14 へのメジャーアップデート後、`import admin from "firebase-admin"` や `admin.initializeApp()`、`admin.auth()`、`admin.credential.cert()` を呼び出すと `TypeError: admin.initializeApp is not a function` 等の実行時エラーが発生する。
+- **原因**: `firebase-admin` v14 では、長年非推奨とされていたレガシーな名前空間 API（グローバル `admin` オブジェクト）が完全に削除され、モジュラー形式のサブパスインポートが必須となった。また、Node.js 18 および 20 のサポートが打ち切られ、Node.js 22 以上が必須要件となった。
+- **回避法**:
+  - `firebase-admin/app`（`initializeApp`, `cert`, `getApps`, `getApp`, `type App`）および `firebase-admin/auth`（`getAuth`）から必要な関数を分割インポートする。
+  - 初期化と認証インスタンス取得は `const app = getApps().length > 0 ? getApp() : initializeApp({ credential: cert(serviceAccount), ... });` および `getAuth(app)` のパターンに統一する。
+  - `adminAuth()` の戻り値である `Auth` クラスのメソッド（`verifyIdToken`, `createSessionCookie`, `verifySessionCookie`, `revokeRefreshTokens` 等）は v13 と後方互換が保たれているため、呼び出し側のコード修正は不要。

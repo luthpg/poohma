@@ -14,6 +14,7 @@
 
 PoohMaは、フロントエンドとサーバーサイド処理を単一のTanStack Startアプリケーションで統合しつつ、データベース・ビジネスロジックの大部分をConvex（BaaS）に委譲する構成である。
 リポジトリは Turborepo によるモノレポ構成をとっており、責務に応じて以下のパッケージに分離されている：
+
 - `apps/web`: フロントエンド & SSR（TanStack Start, Vite）およびブラウザ E2E テスト（Playwright）
 - `apps/admin`: 管理者コンソール（TanStack Start, Cloudflare Workers / Vite Plugin, cmdk, Geist Fonts）
 - `apps/extension`: Chrome 拡張機能（Manifest V3, WXT, React 19, Tailwind v4, Side Panel, Content Script）
@@ -24,6 +25,7 @@ PoohMaは、フロントエンドとサーバーサイド処理を単一のTanSt
 - `workers/backup`: Cloudflare Workers バックアップワーカー
 
 システム全体の E2E テストは、モノレポルートのオーケストレーションにより「バックエンドのプロビジョニング（`@poohma/backend`）」→「ブラウザブリッジのビルド（`@poohma/web`）」→「Playwright 実行（`@poohma/web`）」の順で責務境界を保って実行される：
+
 - **Preview Deployment 実行 (`pnpm test:e2e`)**: CI パイプライン（`deploy-staging.yml`）およびステージング環境向けの動的 Preview Deployment（`preview/e2e-test`）を用いた結合検証。CI パイプラインでは Playwright 公式 Docker コンテナ（`mcr.microsoft.com/playwright`）上で実行し、`apps/web/package.json` から `@playwright/test` のバージョンを動的に抽出・同期することで、OS 依存インストール待ち（3〜6分）を排除している。
 - **ローカル Self-hosted 実行 (`pnpm test:e2e:local`)**: 開発時の反復テストにおいて Convex 無料プランの月間枠（Usage Limit）枯渇を防止するため、Docker による Local Convex Backend（`ghcr.io/convex/convex-backend`、`http://127.0.0.1:3210`）を自動起動 → コード・スキーマデプロイ → テスト実行 → 自動停止クリーンアップを一括実行するテスト戦略（`run-local-e2e.ts` による失敗時クリーンアップ保証付き）。
 
@@ -340,6 +342,7 @@ users     0..* ── * viewLogs          (viewLogs.accountId → users._id, opt
 認証情報の正式な保存先。`recordId` で `serviceRecords` を参照し、1レコードあたり最大10件の上限は作成・更新Mutationで検証する。
 
 `createCredential` / `updateCredential` Mutation では以下の整合性と安全性を保証する：
+
 - **楽観的ロック（`expectedRevision`）**: 呼び出し時に親 `serviceRecords` の `revision` と `expectedRevision` を突合し、不一致時は `Optimistic lock conflict` 例外を送出。更新成功時は親レコードの `revision` を +1 インクリメントして同時編集の競合を防ぐ（Issue #270）。
 - **ヒント暗号化4フィールドの不可分整合性検証**: 暗号化パスワードヒントを登録・更新する際、エンベロープ暗号化の4要素（`passwordHint`, `passwordHintIv`, `passwordHintDekEncrypted`, `passwordHintDekIv`）が「すべて指定されている」または「すべて未指定である」ことを検証し、不整合なリクエスト（IV欠落やDEK欠落等）を拒否する。
 - **安全な部分更新（Partial Patch）**: `updateCredential` において平文フィールド（label, loginId 等）のみを更新する場合でも、既存の暗号化ヒント4フィールドを保持し、誤って消去される事故を防止する。
@@ -514,7 +517,6 @@ Convex 側は auth.config.ts の Issuer 設定 (securetoken.google.com/poohma) �
 | recordAdminMutation                  | familyBound + 対象レコード（`args.id`）が存在し `requireAdminAccess` を満たすこと（`ctx.record` 注入） | レコード個別管理者追加・解除等のレコード管理者限定機能                                       |
 | systemAdminQuery / Mutation / Action | Identity検証 + `identity.email` が `ADMIN_EMAILS` に含まれること                                       | システム管理者コンソール（@poohma/admin）専用API（統計・問い合わせ・お知らせ・ユーザー管理） |
 
-
 #### アカウント解決（resolveAccount）の仕組み
 
 `authenticatedQuery` / `authenticatedMutation` / `familyBoundQuery` / `familyBoundMutation` / `familyAdminQuery` / `familyAdminMutation` / `recordAdminMutation` は共通引数として `accountId?: v.optional(v.id("users"))` をサポートします。
@@ -523,6 +525,7 @@ Convex 側は auth.config.ts の Issuer 設定 (securetoken.google.com/poohma) �
 
 一般メンバーが家族管理画面等の管理者専用機能にアクセスした際、単に操作ボタンを非活性化したり実UIの上にオーバーレイを重ねるだけでは、裏側で不要な Convex Query やフックが購読・実行されてしまうリスクがあります。
 そのため、PoohMa では共通コンポーネント `AdminRestrictedSection` を導入し、以下の二重保護を行います。
+
 1. **実コンポーネントのアンマウント（完全遮断）**: 一般メンバー表示時は children（実コンポーネント）をレンダリングせずアンマウントします。これにより実フック・Convex Query・イベントハンドラが端末上で一切稼働しません。
 2. **静的スケルトン ＋ 中央オーバーレイマスク**: 代替として、機能の外形を模した純粋な静的スケルトン（`pointer-events-none`, `aria-hidden="true"`, `blur`）を背景に配置し、中央にロックアイコンと「管理者機能」メッセージを重ねて描画します。
 3. **React Hooks ルール遵守のラッパー設計**: 実コンポーネントを `*Content` として分離し、最外層のラッパーコンポーネントが `isAdmin` に基づいて `AdminRestrictedSection` または `*Content` を排他的に描画することで、アーリーリターンによるフック呼び出し順序の不整合（Biome `useHookAtTopLevel`）を完全に排除します。
@@ -1153,6 +1156,7 @@ TanStack QueryとConvexは双方がキャッシュ機構を持つため、責務
 | 未保存フォームドラフト    | localStorage（useRecordForm / auth-recovery） | 暗号化済みレコード入力値（poohma_draft_*）                                                | iOSメモリ解放耐性・再認証後の入力復元。24h TTL、タブ複製衝突自律回避     |
 
 基本原則：
+
 1. **クエリ統合とDB I/O最適化（Issue #379）** ：同一画面内の複数セクション（一覧、バナー等）で同一データを参照する場合、個別に異なる引数でクエリを発行せず、親コンポーネントで取得したデータを Single Source of Truth として Props 伝搬する。またバックエンド（Convex）では `by_family_isArchived` などの複合インデックスを活用し、不要なレコードの走査・読み込みを DB レベルで遮断して無料枠上限および I/O を抑制する。
 2. **二重キャッシュの禁止** ：Convexが提供するアプリケーションデータは、ConvexのWebSocket経由のリアクティブ同期によって常に最新状態が保たれる。これをTanStack Queryで再度フェッチ・ラップしてキャッシュすることは、他端末での編集が即時反映されない等のデータ不整合と、不要なHTTPリクエストを招くため厳禁とする。
 3. **描画品質（チラツキ防止）の担保** ：Convexのデータ取得が開始してから完了するまでの遷移期間に画面がちらつかないよう、コンポーネントは `usePersistentQuery` フックを介してメモリ上にフォールバックキャッシュ（直近取得結果、最大1,000件、NFR-PERF-02）を保持する。
@@ -1169,6 +1173,7 @@ TanStack QueryとConvexは双方がキャッシュ機構を持つため、責務
 ### 8.5 ビジュアルデザインシステム（概要）
 
 PoohMaのUIは、Vercelのデザインシステム（Geist）を参考にしたビジュアル仕様に基づく。詳細なトークン定義は別紙のUIデザインシステム仕様書（0章の命名注記を参照）を参照し、ここでは実装上の要点のみを示す。
+
 - **タイポグラフィ** ：Geist Sans／Geist Mono（ `@fontsource/geist-sans`, `@fontsource/geist-mono` ）。見出しはネガティブなレタースペーシング（表示サイズで-2.4px〜-2.88px）を用いる。ウェイトは400（本文）／500（UI・操作）／600（見出し）の3段階に限定する。
 - **Shadow-as-border技法** ：カード・ボタン等の境界線には、通常のCSS `border` ではなく `box-shadow: 0px 0px 0px 1px rgba(0,0,0,0.08)` （ゼロオフセット・ゼロブラーの1pxシャドウ）を用いる。
 - **カラーパレット** ：基本はアクロマティック（ `#171717` 〜 `#ffffff` のグレースケール）とし、ブランドカラー（オレンジ系。LPデザイン定義書に別途規定）はCTA等の重要な操作にのみ点で使用する。

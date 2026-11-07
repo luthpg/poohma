@@ -155,6 +155,7 @@ it("一般ユーザーによるアクセス拒否と管理者によるアクセ�
 ## 3. 暗号化 (E2EE) のテストパターン
 
 Node.js 環境の `globalThis.crypto.subtle` を用いて、ブラウザと同一の Web Crypto API ロジックを検証する。
+
 - `crypto.spec.ts`: PBKDF2 反復回数、MasterKey/DEK のラップ＆アンラップ、不正なソルトや破損データ時のエラーハンドリングを網羅。
 - `recovery-kit.spec.ts`: Crockford's Base32 リカバリーコードの正規化、類似文字（O/0, I/1）置換、ハッシュ照合のテスト。
 
@@ -163,6 +164,7 @@ Node.js 環境の `globalThis.crypto.subtle` を用いて、ブラウザと同�
 ## 4. UI / Provider のテストパターン
 
 `PasscodeProvider` や `AccountProvider` のように複雑なライフサイクル・揮発性メモリを持つコンポーネントは `@testing-library/react` の `renderHook` や `act` を用いてテストする。
+
 - パスコード誤入力時の指数バックオフ（3回失敗後のロックアウトタイマー）
 - アカウント切り替え時の MasterKey リセット検証
 - WebAuthn 非対応環境における graceful fallback 動作
@@ -251,6 +253,7 @@ export const test = base.extend({
 #### `tests/convex-audit-logs.spec.ts`（バックエンド統合テスト）
 
 `convex-test` を用いた監査ログ機能の結合テストスイート。以下の観点を検証する：
+
 - **Zero-Knowledge保証**: `auditLogs.metadata` に平文ヒントや暗号資材（passwordHint, passwordHintIv, DEK等）が記録されないこと
 - **監査ログ生成**: createRecord / updateRecord / logRecordHintView 実行時にログが生成されること
 - **アクセス制御（IDOR防止）**: 他家族のメンバーが `getFamilyAuditLogs` / `getRecordAuditLogs` で他家族のログを取得できないこと
@@ -259,6 +262,7 @@ export const test = base.extend({
 ### E2E テスト実行前のバックエンド反映ルールと Preview Deployment 分離
 
 Playwright E2E テストは、環境汚染とメールクォータ消費を防止するため、**E2E 専用の Convex Preview Deployment（`preview/e2e-test`）を動的に構築・再利用**して実行する。
+
 - **自動セットアップフロー (`pnpm test:e2e`)**:
   1. `pnpm server preview:setup`:
      - `packages/backend/scripts/setup-preview.ts` が実行される。
@@ -288,6 +292,7 @@ Playwright E2E テストは、環境汚染とメールクォータ消費を防�
 ## 7. テスト実装時のプロダクションコード変更原則
 
 テスト実装・E2E作成中にテストが失敗した場合や不具合が発生した際は、以下の原則を厳守すること:
+
 1. **安易なプロダクションコードの改変禁止**:
    - 失敗が発生した際、プロダクションコードを即座に修正してはならない。まずテストコード側の待機処理、アサーション方法、フィクスチャの改善・調整で解決できないかを最優先で試みる。
 2. **プロダクションコード修正時の事前許可**:
@@ -309,6 +314,7 @@ Playwright E2E テストは、環境汚染とメールクォータ消費を防�
 ## 9. コミット前の動的テスト（E2E / `pnpm test:e2e`）によるローカル検証義務
 
 AI Agent がコード変更を行う際、静的検証（`pnpm check` や `pnpm typecheck`）および Vitest ユニットテスト（`pnpm test`）のみで作業を完了とし、コミット・プッシュしてはならない。
+
 - **義務の対象**:
   - UI 挙動の変更、新規機能・導線の追加
   - 認証・認可・セッション制御

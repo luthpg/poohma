@@ -135,6 +135,7 @@ window.addEventListener("storage", (e) => {
 ## 6. アカウント切り替え時の状態・キャッシュ破棄パターン (`AccountProvider.tsx`, `PasscodeProvider.tsx`)
 
 同一ブラウザでのアカウント切り替え時に前アカウントの機密データやクエリ結果が残存することを防ぐ。
+
 1. `PasscodeProvider`: `accountId` の変更を検知して `masterKey` を `null` にリセット（再ロック）。
 2. `AccountProvider`: 切り替え時にローカルメモリキャッシュの破棄（`clearQueryCache()`）と TanStack Query の無効化・再取得（`await queryClient.invalidateQueries()`）を実行。
 
@@ -143,6 +144,7 @@ window.addEventListener("storage", (e) => {
 ## 7. 五十音・アルファベット正規化ソートキー生成パターン (`src/utils/index-group.ts`)
 
 日本語・英数字混在レコードを五十音グループ（あ〜わ、英数、記号）順に正確にインデックスクエリするためのパターン。
+
 - サービス名・読み仮名からグループ順位プレフィックス（2桁ゼロ埋め数字）+ NFKC正規化文字列を合成して `sortKey` を生成。
 - Convex のインデックス `by_family_sortKey` により、サーバー側でフルテーブルスキャンなしにソート済み取得を実現。
 
@@ -184,6 +186,7 @@ test("authenticated user can create record", async () => {
 ## 9. ドキュメント横断セルフレビュー・パターン（CodeRabbit 指摘防止）
 
 PoohMa の仕様書（`code-design.md`, `security-model.md`, `requirements.md`）は多面的な構成（データモデル、フロー、API一覧、状態管理、セキュリティ境界）になっているため、コード変更時は以下のチェックリストでドキュメント全体を横断検索して整合性を確認する。
+
 1. **データモデル変更時**:
    - `accountId` vs `userId` の所有関係やテーブル構造を変更した際は、`code-design.md` の「4.1 ER概要」「4.2 テーブル定義」と `.ai/domain.md` を更新する。
 2. **API・関数変更時**:
@@ -225,6 +228,7 @@ async function syncSessionCookieInBackground(user: FirebaseUser) {
 ## 11. モバイルキーボード回避型インラインサジェストUIパターン (`TagInput`)
 
 モバイル端末において、ポップオーバー（Combobox）方式のサジェストはソフトウェアキーボード（OSK）によって覆い隠されやすく、フォーカス操作が必須となるため入力体験を損ないやすい。
+
 - **インライン候補チップ**: 入力欄の直下に横スクロール可能なチップ行を常時表示し、キーボード非展開のまま1タップで追加・削除を可能にする。
 - **選択状態の前方ソート**: 選択されたタグを前方にソートして描画することで、現在の選択状態の把握と解除操作を迅速化する。
 - **フォーカス維持 (`onMouseDown: e.preventDefault()`)**: チップタップ時にテキスト入力欄からフォーカスが外れるのを防ぎ、`onBlur` による下書き未確定文字列の意図しない自動タグ化を防止する。
@@ -235,6 +239,7 @@ async function syncSessionCookieInBackground(user: FirebaseUser) {
 ## 12. 多段 Sticky Section Headers パターン (`RecordForm`)
 
 グローバルナビゲーションが `sticky top-0 h-16` で固定されている画面において、縦に長い入力フォームのセクション見出しを連動固定するパターン。
+
 - **オフセット連動 (`top-16 z-10`)**: 各セクションの見出しバーを `sticky top-16 z-10` かつ背景色（`bg-card/95 backdrop-blur`）に指定する。
 - **自然なスライド切り替え**: CSS の `sticky` は親の `<section>` 要素のスクロール領域に拘束されるため、JavaScript での座標計算を行わずとも、次のセクションがスクロールインすると前のセクションヘッダーが自然に押し出されて切り替わる。
 - **操作アクションの常時視認**: アカウント情報の「+ 追加する」ボタンなどをセクションヘッダー内に配置することで、項目が多数（最大10件）増えても画面外に流れず、いつでも追加操作が可能になる。
@@ -381,6 +386,7 @@ PoohMa はITリテラシーを問わず家族全員が利用するサービス�
 ### 2. `JpText` による句点自動改行と BudouX の併用
 
 スマートフォンの小画面で長文が文字の塊（壁）になることを防ぐため、`JpText`（BudouX）を活用する。
+
 - **句点分割**: 文末以外の句点（`。`）の直後に改行を挿入し、一文ごとに `<br />` を生成。
 - **自然な折り返し**: 各文の内部では BudouX が `<wbr />` を挿入し、単語の途中での不自然な改行を防止。
 - **JSX要素の共存**: プレーンテキストだけでなく、強調（`<strong>`）やリンク（`<a>`）等の混在時も再帰的に適用。

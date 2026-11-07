@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import admin from "firebase-admin";
+import { type App, cert, getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 
 const dirname =
   import.meta.dirname ?? path.dirname(fileURLToPath(import.meta.url));
@@ -12,10 +13,16 @@ const E2E_TEST_UID = process.env.E2E_TEST_UID ?? "e2e-test-user";
 const E2E_TEST_EMAIL =
   process.env.E2E_TEST_EMAIL ?? "e2e-tests@poohma-staging.internal";
 
-let app: admin.app.App | null = null;
+let app: App | null = null;
 
-export function getAdminApp(): admin.app.App {
+export function getAdminApp(): App {
   if (app) return app;
+
+  const existingApp = getApps().find((a) => a.name === "e2e-admin");
+  if (existingApp) {
+    app = existingApp;
+    return app;
+  }
 
   // 1. 環境変数からの直接 JSON（CI / Vercel用）
   const serviceAccountJson =
@@ -29,10 +36,7 @@ export function getAdminApp(): admin.app.App {
         "\n",
       );
     }
-    app = admin.initializeApp(
-      { credential: admin.credential.cert(serviceAccount) },
-      "e2e-admin",
-    );
+    app = initializeApp({ credential: cert(serviceAccount) }, "e2e-admin");
     return app;
   }
 
@@ -43,10 +47,7 @@ export function getAdminApp(): admin.app.App {
     if (fs.existsSync(fullPath)) {
       const fileContent = fs.readFileSync(fullPath, "utf-8");
       const serviceAccount = JSON.parse(fileContent);
-      app = admin.initializeApp(
-        { credential: admin.credential.cert(serviceAccount) },
-        "e2e-admin",
-      );
+      app = initializeApp({ credential: cert(serviceAccount) }, "e2e-admin");
       return app;
     }
   }
@@ -174,7 +175,7 @@ export async function listStaleE2ETestUids(
   maxAgeMs = 2 * 60 * 60 * 1000,
 ): Promise<string[]> {
   try {
-    const auth = getAdminApp().auth();
+    const auth = getAuth(getAdminApp());
     const listResult = await auth.listUsers(1000);
     const now = Date.now();
     const staleUids: string[] = [];
@@ -216,7 +217,7 @@ export async function deleteE2EFirebaseUserIfDynamic(
     return;
   }
   try {
-    await getAdminApp().auth().deleteUser(uid);
+    await getAuth(getAdminApp()).deleteUser(uid);
   } catch {
     // 既に削除済みの場合は無視
   }
@@ -233,7 +234,7 @@ export async function ensureTestUserCustomToken(options?: {
     (uid === E2E_TEST_UID ? E2E_TEST_EMAIL : `${uid}@poohma-staging.internal`);
   const displayName = options?.displayName ?? "E2E Test User";
 
-  const auth = getAdminApp().auth();
+  const auth = getAuth(getAdminApp());
   try {
     await auth.getUser(uid);
   } catch {

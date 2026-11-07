@@ -15,6 +15,7 @@ PoohMa は Webアプリケーション（`apps/web`）と、日次バックア�
 pnpm workspace（`pnpm-workspace.yaml`：`apps/*` / `workers/*` / `packages/*`）とTurborepo（`turbo.json`）による単一リポジトリのモノレポ構成を採用する。Lint/Format（Biome）、CI（GitHub Actions の単一ワークフロー）をリポジトリ全体で共通化する。
 
 現在では以下の構成で各層の関心事を分離・共有している：
+
 - `apps/web`: エンドユーザー向け Web フロントエンド（TanStack Start, Vite）
 - `apps/admin`: 運用管理者向けダッシュボード（TanStack Start, Cloudflare Pages）
 - `packages/backend`: Convex バックエンド（スキーマ、ミューテーション、クエリ、RLS）

@@ -27,8 +27,8 @@
   },
   "dependencies": {
     "@react-email/components": "1.0.12",
-    "@react-email/render": "2.1.1",
-    "convex": "^1.47.0",
+    "@react-email/render": "2.2.0",
+    "convex": "^1.49.0",
     "ipaddr.js": "^2.5.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
@@ -36,14 +36,14 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@react-email/ui": "6.11.3",
-    "@types/node": "^26.6.5",
+    "@react-email/ui": "6.11.7",
+    "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@vitest/coverage-v8": "5.0.5",
+    "@vitest/coverage-v8": "5.1.0",
     "microcms-typegen": "^1.0.0",
-    "react-email": "6.11.3",
+    "react-email": "6.11.7",
     "typescript": "^7.0.2",
-    "vitest": "5.0.5"
+    "vitest": "5.1.0"
   }
 }

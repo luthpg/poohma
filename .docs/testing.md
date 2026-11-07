@@ -5,6 +5,7 @@
 PoohMa のテストは、既存テストを基準に場当たり的に拡張するのではなく、現行仕様・設計から必要な振る舞いを定義し、そのすべてを**単体テスト・統合テスト・E2Eテスト**の適切な層で検証する。
 
 特に PoohMa は、単なる CRUD アプリケーションではなく、
+
 - Google 認証・セッション Cookie ローリング
 - 家族単位のアクセス制御（Drive型 ACL）
 - E2EE（Web Crypto API）によるパスワードヒントの暗号化保護
@@ -51,6 +52,7 @@ flowchart TD
 | **ブラウザ依存 / E2E** | ブラウザ上の主要ユーザーフロー、WebAuthn、暗号UI  | 認証からUI、実ブラウザAPI（Web Crypto / PRF）を含む利用経路を保証 | Vitest Browser Mode, Playwright |
 
 原則として、同じ仕様をすべてのレイヤーで重複テストしない。
+
 - ロジックの境界値・フォーマット → **単体**
 - DB・認可・複数 function の組み合わせ・IDOR → **統合 (`convex-test`)**
 - ユーザーが実際に行う一連の操作・実暗号化ラウンドトリップ → **E2E (Playwright)**
@@ -123,6 +125,7 @@ flowchart TD
 ### 家族参加・家族移行の責務分離
 
 家族参加・家族変更に伴うデータ移行は、`prepareFamilyMigration → getMigrationForEncryption → commitFamilyMigration` の移行フローを利用する。
+
 - `convex-family.spec.ts`: 家族参加・家族変更というユーザー操作の文脈から、migration が正しく開始・完了することを検証
 - `convex-family.spec.ts`: migration 自体の状態遷移、認可、対象データ、コミット、abort、expire、旧Family削除などのバックエンド整合性を詳細に検証
 - `crypto.spec.ts`: `reWrapCredential` / `reEncryptCredentials` により、クライアント側での新マスターキーへの DEK 再ラップおよび移行後データの復号可能性を Web Crypto API で検証
@@ -240,6 +243,7 @@ Issue #176 の観点で、現在不足しているのは主に **「Playwright �
 ### 優先タスク 1: マルチユーザー協調 E2E テストの配備
 
 Playwright の `browser.newContext()` を活用し、2つの独立した認証セッション（招待者・被招待者）を協調動作させる E2E テストを作成する。
+
 1. 親ユーザーが招待コードを発行
 2. 子ユーザーが別セッションで参加申請を送信
 3. 親ユーザーが画面上で承認し、子ユーザーが家族共有レコードを閲覧できることを確認

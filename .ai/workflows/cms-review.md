@@ -39,6 +39,7 @@ endpoint: "legal"  ← get_list で取得（get_content は contentId が必要�
 ```
 
 **PowerShell でのタイムスタンプ付き保存例:**
+
 ```powershell
 $ts = Get-Date -Format "yyyyMMddTHHmmss"
 # MCP 取得結果を $result に受け取った後
@@ -46,6 +47,7 @@ $result | Out-File ".local/cms/faq_$ts.json" -Encoding UTF8
 ```
 
 **注意点:**
+
 - microCMS MCP は最初 `Forbidden` になることがある（再試行で解消する場合あり）
 - `legal` エンドポイントは `get_content` で `contentId` を要求されるが実際はオブジェクト型のため `get_list` で取得する
 - HTML エンティティ（`&lt;` 等）は JSON 内に埋め込まれている点に注意
@@ -66,6 +68,7 @@ CMS の評価前に、以下のソースで「最新の実装状態」を確定�
 | 最近の変更                | `git log --oneline -20`                     |
 
 **注意点:**
+
 - `.ai/` と実装が矛盾する場合は **実装を優先**
 - `features.md` の ⏳ 未実装は「コードに実装なし」をコードで裏取りすること
 - grep が効かない場合は PowerShell の `Select-String` を使う:
@@ -93,6 +96,7 @@ CMS の評価前に、以下のソースで「最新の実装状態」を確定�
 #### 法的ドキュメントの照合観点
 
 利用規約・プライバシーポリシーの更新が必要になるのは以下の変更があった場合のみ:
+
 - 暗号スキーム・E2EE の仕様変更
 - 外部サービス（Firebase, Convex, Cloudflare R2, Resend 等）の追加・削除
 - データ保持期間・削除ポリシーの変更
@@ -151,6 +155,7 @@ microcms_update_content: endpoint="legal", contentId="legal", content={terms, pr
 ```
 
 **注意点:**
+
 - `answer` フィールドは HTML 文字列（`<p>...</p>` 等）、Markdown は使わない
 - `category` は以下の既存 ID を使う（新カテゴリ作成は MCP 経由では不可）
 
@@ -176,12 +181,14 @@ microcms_get_content: endpoint="faq", contentId="<id>"
 ```
 
 確認観点:
+
 - `updatedAt` が最新タイムスタンプに更新されているか
 - **`answer` の全文を目視確認する**（`updatedAt` 更新だけでは文字レベルの誤りを検出できない）
 - `question` / `category` が想定通りか
 - 必要に応じてローカル dev サーバーで `/faq` ページの表示を確認する
 
 **意図しない変更がないか全件チェックする方法（PowerShell）:**
+
 ```powershell
 # 「変更前スナップショット」と「変更後再取得」で updatedAt を比較
 $before = (Get-Content ".local/cms/faq_<変更前タイムスタンプ>.json" -Raw -Encoding UTF8 | ConvertFrom-Json).contents
