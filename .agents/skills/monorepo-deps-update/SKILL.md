@@ -60,10 +60,10 @@ description: Update dependencies across PoohMa monorepo packages iteratively (on
 
 対象パッケージのディレクトリまたは `--filter` を指定し、保護対象を除外して `update --latest` を実行する。
 
-#### 例: `apps/web` の場合（playwright と firebase-admin を保護）
+#### 例: `apps/web` の場合（playwright と vitest 関連を保護）
 
 ```bash
-pnpm --filter @poohma/web update --latest "!@playwright/test" "!firebase-admin" "!vitest" "!@vitest/*"
+pnpm --filter @poohma/web update --latest "!@playwright/test" "!vitest" "!@vitest/*"
 ```
 
 #### 例: 保護パッケージが存在しない通常パッケージの場合
