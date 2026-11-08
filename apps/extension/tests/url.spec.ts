@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { isTrustedPoohmaOrigin, normalizeUrl } from "../lib/url";
+import {
+  isPoohmaDevelopmentOrigin,
+  isTrustedPoohmaOrigin,
+  normalizeUrl,
+} from "../lib/url";
 
 describe("Extension URL & Origin Verification", () => {
   describe("isTrustedPoohmaOrigin", () => {
@@ -79,5 +83,23 @@ describe("Extension URL & Origin Verification", () => {
     it("returns raw input safely if URL is invalid", () => {
       expect(normalizeUrl("invalid-raw-string")).toBe("invalid-raw-string");
     });
+  });
+});
+
+describe("isPoohmaDevelopmentOrigin", () => {
+  it("suppresses only the configured HTTPS web development origin", () => {
+    expect(isPoohmaDevelopmentOrigin("https://localhost:3000")).toBe(true);
+    for (const origin of [
+      "http://localhost:3000",
+      "https://localhost:5173",
+      "https://127.0.0.1:3000",
+      "https://localhost",
+      "https://poohma.ciderlabs.link",
+      "https://poohma.vercel.app",
+      "https://example.com",
+      "https://localhost:3000.example.com",
+    ]) {
+      expect(isPoohmaDevelopmentOrigin(origin)).toBe(false);
+    }
   });
 });

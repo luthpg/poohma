@@ -55,3 +55,8 @@ export function normalizeUrl(rawUrl: string): string {
     return rawUrl;
   }
 }
+
+/** Web 開発サーバー（apps/web の HTTPS・ポート3000設定）のみ保存提案を抑止する。 */
+export function isPoohmaDevelopmentOrigin(origin: string): boolean {
+  return origin === "https://localhost:3000";
+}

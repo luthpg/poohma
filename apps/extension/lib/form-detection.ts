@@ -178,7 +178,7 @@ export function scoreLoginIdInput(
 
   // 4. 自然言語・日本語 UI 表示 (placeholder, aria-label)
   const naturalLanguageRegex =
-    /(?:メール|電話番号|携帯|ログイン|ユーザー|アカウント|会員番号|ID|ユーザ)/i;
+    /(?:メール|電話番号|携帯|ログイン|ユーザ|アカウント|会員番号|(?:^|[^a-z0-9])id(?:$|[^a-z0-9]))/i;
   if (
     naturalLanguageRegex.test(placeholder) ||
     naturalLanguageRegex.test(ariaLabel)

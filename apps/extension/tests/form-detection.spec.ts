@@ -5,6 +5,7 @@ import {
   findLoginIdInput,
   isEligibleLoginIdInput,
   isPasswordLikeInput,
+  scoreLoginIdInput,
 } from "../lib/form-detection";
 
 describe("form-detection (ログインID柔軟抽出・判定エンジン)", () => {
@@ -223,4 +224,36 @@ describe("form-detection (ログインID柔軟抽出・判定エンジン)", () 
       expect(loginId).toBe("");
     });
   });
+});
+
+describe("natural language ID tokens", () => {
+  for (const attribute of ["placeholder", "aria-label"]) {
+    it.each(["Middle name", "valid", "ID123", "123id", "identity"])(
+      `${attribute}: %s does not add an ID score`,
+      (label) => {
+        const input = document.createElement("input");
+        input.setAttribute(attribute, label);
+        expect(scoreLoginIdInput(input, null)).toBe(0);
+      },
+    );
+    it.each([
+      "ID",
+      "id",
+      "Id",
+      "Login ID",
+      "user_id",
+      "ログインID",
+      "ユーザー",
+      "ユーザ",
+      "メール",
+      "電話番号",
+      "携帯",
+      "アカウント",
+      "会員番号",
+    ])(`${attribute}: %s adds a semantic score`, (label) => {
+      const input = document.createElement("input");
+      input.setAttribute(attribute, label);
+      expect(scoreLoginIdInput(input, null)).toBe(25);
+    });
+  }
 });

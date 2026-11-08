@@ -4,6 +4,7 @@ import { getGlobalStartContext } from "@tanstack/react-start";
 import { setNonce } from "get-nonce";
 
 import { isAuthSessionError } from "@/lib/auth-recovery";
+import { parseSearch } from "@/lib/search-params";
 // Import the generated route tree
 import { routeTree } from "@/routeTree.gen";
 
@@ -38,6 +39,7 @@ export const getRouter = () => {
 
   const router = createRouter({
     routeTree,
+    parseSearch,
     context: {
       queryClient,
     },

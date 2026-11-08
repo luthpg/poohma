@@ -1,7 +1,11 @@
 import { matchRecordUrl } from "@poohma/shared/utils/url-matcher";
 import { extractLoginIdFromForm, findLoginIdInput } from "@/lib/form-detection";
 import type { MatchedRecord } from "@/lib/messaging";
-import { isTrustedPoohmaOrigin, normalizeUrl } from "@/lib/url";
+import {
+  isPoohmaDevelopmentOrigin,
+  isTrustedPoohmaOrigin,
+  normalizeUrl,
+} from "@/lib/url";
 
 export default defineContentScript({
   matches: ["<all_urls>"],
@@ -21,8 +25,8 @@ export default defineContentScript({
     const DISMISS_KEY = `poohma_save_dismissed_${hostname}`;
     let isSaveDismissed = false;
 
-    // PoohMa Web アプリ本体の判定（パスコード入力時等の保存サジェストを完全抑止）
-    const isPoohmaOrigin = isTrustedPoohmaOrigin(window.location.origin);
+    // PoohMa Web アプリ開発環境の判定（パスコード入力時等の保存サジェストを完全抑止）
+    const isPoohmaOrigin = isPoohmaDevelopmentOrigin(window.location.origin);
 
     // 同期ストレージ（sessionStorage）から即時反映（タブ内リロード・SPA遷移対応）
     try {
