@@ -171,3 +171,17 @@ Playwright E2E テストおよびフロントエンド遷移における落と�
   これを閉じずに後続の画面操作（家族グループ名変更ボタンのクリック等）を進めようとすると、ダイアログに遮られてクリックがインターセプトされ、30秒タイムアウトとなる。
 - **回避法**:
   `ensureFamilyAssigned` で家族グループ作成ボタンをクリックしてセクションの表示を待機した直後に、「家族設定を見る」ボタン（`page.getByRole("button", { name: "家族設定を見る" })`）の表示を短時間待機（`waitFor` のタイムアウトはスキップ）し、表示された場合のみ `click()` を実行するハンドリングをテストフィクスチャに組み込む（待機タイムアウトとクリック失敗を同一 `try/catch` で握りつぶさない）。
+
+---
+
+### Vitest Browser Mode における推移的 peerDependencies 分裂（`_clearScreenPending` 衝突・`context.page` 未定義）
+
+- **問題**: `pnpm update` 後などに `vitest.config.ts` で `Type 'BrowserCommand<...>' is not assignable to type 'BrowserCommand<any, any>'`、`Types have separate declarations of a private property '_clearScreenPending'` や、ブラウザコマンド実装ファイルで `Property 'page' does not exist on type 'BrowserCommandContext'` という型エラーが発生する。
+- **原因**:
+  1. `firebase`（クライアント）と `firebase-admin`（サーバー）等で、推移的依存の `@opentelemetry/api` のバージョン（例: `1.9.1` と `1.10.0`）が異なると、pnpm の peerDependencies 解決によって `vitest` が別々のディレクトリ（インスタンスバリエーション）に分裂してインストールされる。
+  2. `@vitest/browser-playwright` の型拡張（Module Augmentation）が一方の Vitest インスタンスにのみ適用され、テストファイルがもう一方の未拡張な `BrowserCommandContext` を参照して `page` が欠落する。
+  3. さらに `vitest.config.ts` で異なるインスタンス由来の型が混ざることで、TypeScript の private プロパティ（`_clearScreenPending`）の公称型（nominal）不一致エラーとなる。
+- **回避法**:
+  - `pnpm-workspace.yaml` の `overrides` に `"@opentelemetry/api": "^1.10.0"` を明示し、全パッケージで単一バージョンに統一する。キャレット（`^`）指定にしておけばマイナー更新時も自動追従してメンテフリーとなる。
+  - ブラウザコマンド定義ファイル（`cdp-authenticator.ts` 等）では、Playwright Provider の型拡張を確実に読み込ませるため `import type {} from "@vitest/browser-playwright";` を明示する。
+  - なお、Windows の Sandbox モード下では、Vitest Browser Mode / Storybook のローカルサーバーへの Playwright からの接続が `net::ERR_NETWORK_ACCESS_DENIED` となるため、ブラウザ結合テストはサンドボックス外（BypassSandbox）で実行する。

@@ -157,6 +157,7 @@ CI 内で実行するコマンド群は、可能な限りルート `package.json
 ### 事象
 
 本番ワークフロー（`deploy-production.yml`）とステージングワークフロー（`deploy-staging.yml`）で、同一の `secrets.CONVEX_DEPLOY_KEY` を参照していた場合：
+
 1. Secret が開発用インスタンスを向いていると、本番デプロイ時にも開発環境へ反映されてしまい本番が更新されない。
 2. 逆に Secret を本番用キーに更新すると、ステージングのワークフローが本番インスタンスを直接上書きしてしまう。
 3. さらに「未設定なら開発用や本番用をフォールバックする」コードを入れると、シークレットの設定漏れ時に本番への誤爆がサイレントに発生する。
@@ -196,6 +197,7 @@ CI 内で実行するコマンド群は、可能な限りルート `package.json
 ### 対策
 
 シェル（`cmd.exe` や `/bin/sh`）を一切経由しない `execFileSync` パターンを採用する：
+
 ```ts
 import { execFileSync } from "node:child_process";
 
@@ -360,6 +362,7 @@ GitHub Actions のアクションを新規追加・バージョン更新する�
 #### 1. 前提ツールの確認
 
 GitHub CLI（`gh`）および `actions/gh-actions-lock` 拡張機能が導入されていることを確認する（未導入の場合は一度だけインストール）：
+
 ```bash
 gh extension install actions/gh-actions-lock
 ```
@@ -371,6 +374,7 @@ gh extension install actions/gh-actions-lock
 #### 3. ロックファイルの自動更新
 
 リポジトリルートで `gh actions-lock` を実行する：
+
 ```bash
 gh actions-lock
 ```

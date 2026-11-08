@@ -48,6 +48,7 @@ PoohMa では、AI Agent が継続的に利用するプロジェクト固有の�
 ## 3. Source of Truth（判断優先順位）
 
 `.ai/` の内容は常に検証可能な根拠に基づいている必要があります。情報の優先度は以下の通りです：
+
 1. **ユーザーによる明示的な決定**
 2. **`.docs/security/threat-model.md`**（脅威モデルおよびセキュリティ境界の Source of Truth）
 3. **現在のプロダクション実装**
@@ -81,6 +82,7 @@ Issue や PR レビューの作業中に、将来の作業でも再利用でき�
 ## 5. Knowledge Feedback ツール群 (`packages/knowledge-tools`)
 
 Knowledge の陳腐化防止とドキュメント同期を機械的に支援するため、以下のコマンドが提供されています：
+
 - **`pnpm check:knowledge`**: `.ai/` 配下の Markdown 内のコード・ドキュメント参照パスの実在性を検証（参照切れ・陳腐化の検知）。
 - **`pnpm check:doc-sync`**: `git` の変更差分から同期すべき `.docs/` や `.ai/` をマトリクスに基づいて判定・一覧表示。
 

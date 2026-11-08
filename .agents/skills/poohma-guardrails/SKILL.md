@@ -18,6 +18,7 @@ PoohMa の開発において、E2EE暗号・認証認可・フロント生エラ
 ## 1. 必読・最重要不変原則（Core Invariants）
 
 作業内容に応じて、以下のドキュメントをオンデマンドで必ず参照してください：
+
 - **外部レビュー（CodeRabbit等）審査 & 設計原則**: [`.ai/pitfalls/review-and-guardrails.md`](../../../.ai/pitfalls/review-and-guardrails.md)
   - **「念のため二重にする」精神・過剰冗長化の完全排除**: 「不安だから両方に保存・二重チェック」という思考停止を根絶し、Single Source of Truth を1つに断定・一本化する。
   - 一般的なReactの慣習に惑わされず、フロントエンドへの生エラー（`error.message`）露出提案を却下する。

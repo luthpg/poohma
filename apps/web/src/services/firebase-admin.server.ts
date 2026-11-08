@@ -1,15 +1,23 @@
 import fs from "node:fs";
 import path from "node:path";
-import admin from "firebase-admin";
+import {
+  type App,
+  cert,
+  getApp,
+  getApps,
+  initializeApp,
+} from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import { env } from "@/env/client";
 
 /**
  * Firebase Admin SDK の初期化
  * HMR(Hot Module Replacement)による二重初期化を防止する
  */
-export function initializeFirebaseAdmin() {
-  if (admin.apps.length > 0) {
-    return admin.app();
+export function initializeFirebaseAdmin(): App {
+  const apps = getApps();
+  if (apps.length > 0) {
+    return getApp();
   }
 
   const storageBucket = env.VITE_FIREBASE_STORAGE_BUCKET;
@@ -27,8 +35,8 @@ export function initializeFirebaseAdmin() {
           "\n",
         );
       }
-      return admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
+      return initializeApp({
+        credential: cert(serviceAccount),
         storageBucket,
         projectId,
       });
@@ -43,8 +51,8 @@ export function initializeFirebaseAdmin() {
     try {
       const fullPath = path.resolve(credentialsPath);
       const fileContent = fs.readFileSync(fullPath, "utf-8");
-      return admin.initializeApp({
-        credential: admin.credential.cert(JSON.parse(fileContent)),
+      return initializeApp({
+        credential: cert(JSON.parse(fileContent)),
         storageBucket,
         projectId,
       });
@@ -54,13 +62,13 @@ export function initializeFirebaseAdmin() {
   }
 
   // 3. デフォルト（おそらくADCや環境変数）
-  return admin.initializeApp({
+  return initializeApp({
     storageBucket,
     projectId,
   });
 }
 
-export const adminAuth = () => initializeFirebaseAdmin().auth();
+export const adminAuth = () => getAuth(initializeFirebaseAdmin());
 
 export const getSessionCookie = async (idToken: string, expiresIn: number) => {
   return adminAuth().createSessionCookie(idToken, { expiresIn });

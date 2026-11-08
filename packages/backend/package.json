@@ -31,23 +31,23 @@
     }
   },
   "dependencies": {
-    "@convex-dev/rate-limiter": "^0.4.2",
+    "@convex-dev/rate-limiter": "^0.4.3",
     "@poohma/shared": "workspace:*",
-    "@react-email/render": "2.1.1",
+    "@react-email/render": "2.2.0",
     "cheerio": "^1.2.0",
-    "convex": "^1.47.0",
-    "convex-helpers": "^0.1.128",
-    "dotenv": "^18.0.8",
-    "resend": "^6.34.1",
+    "convex": "^1.49.0",
+    "convex-helpers": "^0.1.134",
+    "dotenv": "^18.0.9",
+    "resend": "^6.37.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.6.2",
-    "@types/node": "^26.6.5",
-    "@vitest/coverage-v8": "5.0.5",
-    "convex-test": "^0.0.63",
+    "@biomejs/biome": "^2.6.6",
+    "@types/node": "^26.6.6",
+    "@vitest/coverage-v8": "5.1.0",
+    "convex-test": "^0.0.67",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
-    "vitest": "5.0.5"
+    "vitest": "5.1.0"
   }
 }
