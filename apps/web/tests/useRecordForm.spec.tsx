@@ -1218,5 +1218,25 @@ describe("useRecordForm", () => {
 
       expect(screen.queryByRole("alert")).toBeNull();
     });
+
+    it("クエリパラメータで loginId=1 や accountId 等が数値として渡された場合でも newRecordSearchSchema で型エラーにならず文字列として受理されること", async () => {
+      const { newRecordSearchSchema } = await import(
+        "@/routes/(app)/records/new"
+      );
+
+      const parsed = newRecordSearchSchema.parse({
+        loginId: 1,
+        title: "GEO Online",
+        url: "https://geo-online.co.jp/account/",
+        accountId: 12345,
+      });
+
+      expect(parsed).toEqual({
+        loginId: "1",
+        title: "GEO Online",
+        url: "https://geo-online.co.jp/account/",
+        accountId: "12345",
+      });
+    });
   });
 });

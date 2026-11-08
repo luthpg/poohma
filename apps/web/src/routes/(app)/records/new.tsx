@@ -12,12 +12,12 @@ import { Spinner } from "@/components/ui/spinner";
 import { useAccount } from "@/hooks/useAccount";
 import { type RecordFormValues, useRecordForm } from "@/hooks/useRecordForm";
 
-const newRecordSearchSchema = z.object({
-  draftId: z.string().optional(),
-  url: z.string().optional(),
-  title: z.string().optional(),
-  loginId: z.string().optional(),
-  accountId: z.string().optional(),
+export const newRecordSearchSchema = z.object({
+  draftId: z.coerce.string().optional(),
+  url: z.coerce.string().optional(),
+  title: z.coerce.string().optional(),
+  loginId: z.coerce.string().optional(),
+  accountId: z.coerce.string().optional(),
 });
 
 export const Route = createFileRoute("/(app)/records/new")({

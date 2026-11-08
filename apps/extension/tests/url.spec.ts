@@ -11,7 +11,9 @@ describe("Extension URL & Origin Verification", () => {
 
     it("allows official domains and subdomains", () => {
       expect(isTrustedPoohmaOrigin("https://poohma.ciderlabs.link")).toBe(true);
-      expect(isTrustedPoohmaOrigin("https://sub.ciderlabs.link")).toBe(true);
+      expect(isTrustedPoohmaOrigin("https://sub.poohma.ciderlabs.link")).toBe(
+        true,
+      );
     });
 
     it("allows Vercel preview and staging deployments", () => {
@@ -30,6 +32,8 @@ describe("Extension URL & Origin Verification", () => {
 
     it("rejects untrusted third-party, attacker, and non-web origins", () => {
       expect(isTrustedPoohmaOrigin("https://evil.com")).toBe(false);
+      expect(isTrustedPoohmaOrigin("https://ciderlabs.link")).toBe(false);
+      expect(isTrustedPoohmaOrigin("https://other.ciderlabs.link")).toBe(false);
       expect(isTrustedPoohmaOrigin("https://attacker.vercel.app")).toBe(false);
       expect(isTrustedPoohmaOrigin("https://poohma-attacker.vercel.app")).toBe(
         false,

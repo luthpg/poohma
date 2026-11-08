@@ -21,8 +21,11 @@ export function isTrustedPoohmaOrigin(origin: string): boolean {
       return false;
     }
 
-    // 公式ドメイン（本番・ステージング）
-    if (host === "ciderlabs.link" || host.endsWith(".ciderlabs.link")) {
+    // 公式ドメイン（PoohMa 本番およびそのサブドメインに限定）
+    if (
+      host === "poohma.ciderlabs.link" ||
+      host.endsWith(".poohma.ciderlabs.link")
+    ) {
       return true;
     }
 
