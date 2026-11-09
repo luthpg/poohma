@@ -1,6 +1,11 @@
 import { matchRecordUrl } from "@poohma/shared/utils/url-matcher";
+import { extractLoginIdFromForm, findLoginIdInput } from "@/lib/form-detection";
 import type { MatchedRecord } from "@/lib/messaging";
-import { isTrustedPoohmaOrigin, normalizeUrl } from "@/lib/url";
+import {
+  isPoohmaDevelopmentOrigin,
+  isTrustedPoohmaOrigin,
+  normalizeUrl,
+} from "@/lib/url";
 
 export default defineContentScript({
   matches: ["<all_urls>"],
@@ -19,6 +24,9 @@ export default defineContentScript({
     const hostname = window.location.hostname;
     const DISMISS_KEY = `poohma_save_dismissed_${hostname}`;
     let isSaveDismissed = false;
+
+    // PoohMa Web アプリ開発環境の判定（パスコード入力時等の保存サジェストを完全抑止）
+    const isPoohmaOrigin = isPoohmaDevelopmentOrigin(window.location.origin);
 
     // 同期ストレージ（sessionStorage）から即時反映（タブ内リロード・SPA遷移対応）
     try {
@@ -134,6 +142,7 @@ export default defineContentScript({
 
     // 3. 安全な保存サジェストバナーの構築（innerHTML を使わず DOM API + textContent で XSS を完全排除）
     function showSaveSuggestionBanner(detectedLoginId: string) {
+      if (isPoohmaOrigin) return;
       if (isSaveDismissed) return;
       if (saveBannerContainer) return;
       if (!document.body) {
@@ -367,53 +376,12 @@ export default defineContentScript({
       }
     }
 
-    // パスワード入力欄（またはパスワード表示切り替え等の疑いがある欄）か判定
-    function isPasswordLikeInput(input: HTMLInputElement): boolean {
-      if (input.type === "password") return true;
-      const name = input.name.toLowerCase();
-      const id = input.id.toLowerCase();
-      const autocomplete = (input.autocomplete || "").toLowerCase();
-      return (
-        name.includes("password") ||
-        name.includes("passwd") ||
-        id.includes("password") ||
-        id.includes("passwd") ||
-        autocomplete.includes("password")
-      );
-    }
-
-    // フォーム内から安全にログインIDを抽出する（パスワード欄は完全除外）
-    function extractLoginIdFromForm(form: HTMLFormElement | null): string {
-      if (!form) return "";
-
-      const selectors = [
-        'input[type="email"]',
-        'input[autocomplete="username"]',
-        'input[name*="user" i]',
-        'input[id*="user" i]',
-        'input[name*="login" i]',
-        'input[id*="login" i]',
-      ];
-
-      for (const selector of selectors) {
-        const inputs = form.querySelectorAll(selector);
-        for (const el of inputs) {
-          const input = el as HTMLInputElement;
-          if (isPasswordLikeInput(input)) continue;
-          const val = input.value?.trim();
-          if (val && val.length > 0 && !val.includes("\n")) {
-            return val;
-          }
-        }
-      }
-      return "";
-    }
-
     // 保存サジェストのトリガー判定（常時入力監視を撤廃し、送信アクション時のみ実行）
     function checkAndTriggerSaveSuggestion(
       submittedForm?: HTMLFormElement | null,
     ) {
       if (window.self !== window.top) return;
+      if (isPoohmaOrigin) return;
       if (isSaveDismissed) return;
       try {
         if (sessionStorage.getItem(DISMISS_KEY) === "true") {
@@ -433,8 +401,8 @@ export default defineContentScript({
         return;
       }
 
-      // 送信対象フォームから安全にログインIDを抽出
-      const loginId = extractLoginIdFromForm(form);
+      // 送信対象フォームから安全にログインIDを抽出（汎用多層スコアリング）
+      const loginId = extractLoginIdFromForm(form, activeInput);
 
       // 既登録サイトで、既存の ID と一致する場合はサジェストしない
       if (matchedRecords.length > 0 && loginId) {
@@ -466,7 +434,7 @@ export default defineContentScript({
       form?: HTMLFormElement | null,
       delay = 400,
     ) {
-      if (isSaveDismissed) return;
+      if (isSaveDismissed || isPoohmaOrigin) return;
       if (delay === 0) {
         checkAndTriggerSaveSuggestion(form);
         return;
@@ -485,8 +453,9 @@ export default defineContentScript({
 
     // ページロード・SPA遷移後にログインフォームの存在を検知して Background に通知（自動Popup・バッジ用）
     function checkLoginFormPresence() {
+      if (isPoohmaOrigin) return;
       setTimeout(() => {
-        if (!chrome.runtime?.id) return;
+        if (!chrome.runtime?.id || isPoohmaOrigin) return;
         const hasPasswordInput =
           document.querySelector('input[type="password"]') !== null;
         if (hasPasswordInput) {
@@ -508,7 +477,7 @@ export default defineContentScript({
       queryMatchedRecords(true);
       checkLoginFormPresence();
 
-      if (!isSaveDismissed) {
+      if (!isSaveDismissed && !isPoohmaOrigin) {
         try {
           if (sessionStorage.getItem(DISMISS_KEY) === "true") {
             isSaveDismissed = true;
@@ -544,26 +513,28 @@ export default defineContentScript({
       }, 500);
 
       // ページ読み込み直後の保留中保存確認
-      chrome.runtime
-        .sendMessage({
-          type: "GET_PENDING_SAVE",
-          url: normalizeUrl(window.location.href),
-        })
-        .then((res) => {
-          if (res?.success && res.pendingSave) {
-            const { loginId } = res.pendingSave;
-            if (!isSaveDismissed) {
-              try {
-                if (sessionStorage.getItem(DISMISS_KEY) === "true") {
-                  isSaveDismissed = true;
-                  return;
-                }
-              } catch (_) {}
-              showSaveSuggestionBanner(loginId);
+      if (!isPoohmaOrigin) {
+        chrome.runtime
+          .sendMessage({
+            type: "GET_PENDING_SAVE",
+            url: normalizeUrl(window.location.href),
+          })
+          .then((res) => {
+            if (res?.success && res.pendingSave) {
+              const { loginId } = res.pendingSave;
+              if (!isSaveDismissed) {
+                try {
+                  if (sessionStorage.getItem(DISMISS_KEY) === "true") {
+                    isSaveDismissed = true;
+                    return;
+                  }
+                } catch (_) {}
+                showSaveSuggestionBanner(loginId);
+              }
             }
-          }
-        })
-        .catch(() => {});
+          })
+          .catch(() => {});
+      }
 
       // フォーカス中の入力要素を追跡（入力補完先のフォールバック用）
       document.addEventListener("focusin", (e) => {
@@ -575,7 +546,7 @@ export default defineContentScript({
 
       // フォーム送信（submit）時の保存サジェスト（ページ破棄前に即時抽出・登録）
       document.addEventListener("submit", (e) => {
-        if (isSaveDismissed) return;
+        if (isSaveDismissed || isPoohmaOrigin) return;
         const form = e.target as HTMLFormElement;
         if (form?.querySelector?.('input[type="password"]')) {
           scheduleSaveSuggestion(form, 0);
@@ -584,7 +555,7 @@ export default defineContentScript({
 
       // ログイン/登録系ボタンクリック時の保存サジェスト
       document.addEventListener("click", (e) => {
-        if (isSaveDismissed) return;
+        if (isSaveDismissed || isPoohmaOrigin) return;
 
         const target = e.target as HTMLElement;
         const btn = target.closest(
@@ -622,7 +593,7 @@ export default defineContentScript({
 
       // パスワード欄での Enter キー押下時の保存サジェスト
       document.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" && !isSaveDismissed) {
+        if (e.key === "Enter" && !isSaveDismissed && !isPoohmaOrigin) {
           const target = e.target as HTMLElement;
           if (
             target &&
@@ -647,56 +618,11 @@ export default defineContentScript({
           return false;
         }
 
-        // パスワード欄ではない有効な入力要素を厳格に探索
-        const isEligibleInput = (el: HTMLInputElement | null) => {
-          if (!el) return false;
-          if (el.disabled || el.readOnly) return false;
-          const type = (el.type || "text").toLowerCase();
-          if (
-            type === "password" ||
-            type === "hidden" ||
-            type === "checkbox" ||
-            type === "radio" ||
-            type === "search"
-          ) {
-            return false;
-          }
-          if (
-            el.getAttribute("role") === "searchbox" ||
-            el.name?.toLowerCase().includes("search") ||
-            el.id?.toLowerCase().includes("search")
-          ) {
-            return false;
-          }
-          if (isPasswordLikeInput(el)) return false;
-          return el.offsetParent !== null; // 可視状態チェック
-        };
-
-        const idSelector =
-          'input[type="email"], input[autocomplete="username"], input[name*="user" i], input[id*="user" i], input[name*="login" i], input[id*="login" i]';
         const loginForm = document
           .querySelector('input[type="password"]')
           ?.closest("form");
         const primaryScope: ParentNode = loginForm ?? document;
-        const activeInputInLoginForm = Boolean(
-          activeInput?.form?.querySelector('input[type="password"]'),
-        );
-
-        let targetInput: HTMLInputElement | null = null;
-        if (activeInputInLoginForm && isEligibleInput(activeInput)) {
-          targetInput = activeInput;
-        } else {
-          // パスワード欄を含むフォームを優先して安全な ID 入力欄を探索
-          targetInput =
-            Array.from(
-              primaryScope.querySelectorAll<HTMLInputElement>(idSelector),
-            ).find(isEligibleInput) ??
-            (primaryScope !== document
-              ? (Array.from(
-                  document.querySelectorAll<HTMLInputElement>(idSelector),
-                ).find(isEligibleInput) ?? null)
-              : null);
-        }
+        const targetInput = findLoginIdInput(primaryScope, activeInput);
 
         if (targetInput) {
           targetInput.focus();

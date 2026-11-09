@@ -6,19 +6,13 @@ import { AlertCircle } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { z } from "zod";
 import { RecordForm } from "@/components/records/RecordForm";
 import { Spinner } from "@/components/ui/spinner";
 import { useAccount } from "@/hooks/useAccount";
 import { type RecordFormValues, useRecordForm } from "@/hooks/useRecordForm";
+import { newRecordSearchSchema } from "@/lib/new-record-search";
 
-const newRecordSearchSchema = z.object({
-  draftId: z.string().optional(),
-  url: z.string().optional(),
-  title: z.string().optional(),
-  loginId: z.string().optional(),
-  accountId: z.string().optional(),
-});
+export { newRecordSearchSchema };
 
 export const Route = createFileRoute("/(app)/records/new")({
   validateSearch: newRecordSearchSchema,

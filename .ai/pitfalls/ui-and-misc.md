@@ -381,3 +381,41 @@ UI 実装、外部 API 連携、環境変数、モノレポ設定における落
   - `apps/web/src/components/records/RecordForm.tsx`
   - `apps/web/src/components/records/CredentialFieldsCard.tsx`
   - `apps/web/src/hooks/useRecordForm.ts`
+
+---
+
+### TanStack Router の URL Search Params デシリアライズと Zod スキーマの数値不整合
+
+- **問題 (Problem)**:
+  - 外部（ブラウザ拡張機能等）から `/records/new?loginId=1&accountId=123` のように連携した際、TanStack Router が画面初期表示時に `Expected string, received number`（「文字列を期待していた」等）のバリデーションエラーをスローし、画面全体がクラッシュ・エラー画面となる。
+- **原因 (Root Cause)**:
+  - TanStack Router のデフォルト search parser はクエリパラメータの値が数値文字列（例: `loginId=1`）の場合、JSON.parse ライクに自動で JavaScript の `number` 型へデシリアライズする。
+  - ルートの `validateSearch` スキーマで `z.string().optional()` を定義していると、Zod バリデーションで型不一致となる。
+- **誤ったアプローチ (Anti-Pattern)**:
+  - 呼び出し元（拡張機能等）側でクエリ文字列を無理やり加工して回避しようとする。
+- **正しいアプローチ (Correct Pattern)**:
+  - ルートの URL 検索パラメータスキーマには `z.coerce.string().optional()` を使用し、数値としてデシリアライズされた場合でも文字列型へ自動変換（coerce）して安全に受理する。
+- **関連実装 (Related Code References)**:
+  - `apps/web/src/routes/(app)/records/new.tsx`
+  - `apps/web/tests/useRecordForm.spec.tsx`
+
+---
+
+### 拡張機能のフォーム解析における hidden/checkbox 誤検知と自アプリ除外
+
+- **問題 (Problem)**:
+  - ゲオオンライン等のログインフォームで、拡張機能の保存サジェストが本命のログインIDではなく `loginId="1"` を抽出してしまう。
+  - PoohMa Web 本体（`poohma.ciderlabs.link`）の家族パスコード入力欄に拡張機能が反応し、「PoohMa に登録しますか？」と自爆サジェストを表示してしまう。
+- **原因 (Root Cause)**:
+  - 多くのWebサイトのログインフォームには、DOM 先頭に `<input type="hidden" name="login_type" value="1">` や、自動ログインチェックボックス `<input type="checkbox" name="login_hold" value="1">` が存在し、属性値として固定値 `"1"` を保持している。
+  - 単純な `input[name*="login" i]` セレクタでは、本命のテキスト入力欄（`login_id` 等）より前にこれらがマッチして `"1"` が抽出されてしまう。
+  - 自社アプリ（PoohMa）オリジンのガードがなく、パスコード入力欄（`type="password"`）の存在に反応してしまう。
+- **正しいアプローチ (Correct Pattern)**:
+  - `type` ホワイトリスト判定（`text`, `email`, `tel`, `url` のみ許可）をハードゲートとして設け、`hidden`, `checkbox`, `radio`, `password` 等を完全遮断する。
+  - Web標準規格、セマンティクス、日本語UI（プレースホルダー）、パスワード欄直前配置、ユーザー直前操作（`activeInput`）を組み合わせた多層スコアリング方式で本命のログインID欄を柔軟かつ高精度に抽出する。
+  - `isTrustedPoohmaOrigin(window.location.origin)`（`poohma.ciderlabs.link` およびサブドメイン、ローカル環境）により、自アプリでは保存サジェスト判定・バナー表示を完全無効化する。
+- **関連実装 (Related Code References)**:
+  - `apps/extension/lib/form-detection.ts`
+  - `apps/extension/entrypoints/content.ts`
+  - `apps/extension/lib/url.ts`
+  - `apps/extension/tests/form-detection.spec.ts`
